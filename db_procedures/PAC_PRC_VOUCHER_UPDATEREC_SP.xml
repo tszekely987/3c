@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_VOUCHER_UPDATEREC_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_VOUCHER_UPDATEREC_SP" (
+in_TRANSNO            NUMBER,
+in_SOURCEMODULE       NUMBER,
+in_TRANSTYPE          VARCHAR2,
+in_BATCHNO            NUMBER,
+in_ENTRYUSER          VARCHAR2,
+in_ENTRYDATE          DATE,
+in_LASTUPDATEUSER     VARCHAR2,
+in_LASTUPDATEDATE     DATE,
+in_EXTERNALBATCHID    VARCHAR2,
+in_EXTERNALTRANSNO    NUMBER,
+in_LOCATIONID         VARCHAR2,
+in_DEPARTCODE         VARCHAR2,
+in_ENTITY             VARCHAR2,
+in_TRANSDATE          DATE,
+in_CLIENT             VARCHAR2,
+in_PROJECT            VARCHAR2,
+in_CHARGE_CODE        VARCHAR2,
+in_INPUT_TYPE         VARCHAR2,
+in_RESOURCE_CODE      VARCHAR2,
+in_QUANTITY           NUMBER,
+in_BILLRATE           NUMBER,
+in_AMOUNT             NUMBER,
+in_FACTORAMOUNT       NUMBER,
+in_BURDEN             NUMBER,
+in_OVERHEAD           NUMBER,
+in_TOTALAMOUNT        NUMBER,
+in_ACTUALCOST         NUMBER,
+in_STDCOST            NUMBER,
+in_TOTALCOST          NUMBER,
+in_COSTRULECODE       VARCHAR2,
+in_BURDENCODE         VARCHAR2,
+in_OVERHEADCODE       VARCHAR2,
+in_CHARGEABLE         NUMBER,
+in_NOTES              VARCHAR2,
+in_INVOICENO          VARCHAR2,
+in_EMPLYHOMELOCATION  VARCHAR2,
+in_EMPLYHOMEDEPART    VARCHAR2,
+in_EMPLYACTUALCOST    NUMBER,
+in_EMPLYSTDCOST       NUMBER,
+in_PROJECTTYPE        VARCHAR2,
+in_CLIENTCLASS        VARCHAR2,
+in_PROJECTCLASS       VARCHAR2,
+--in_COSTCLASS          VARCHAR2,
+in_TRANSCLASS         VARCHAR2,
+in_RESOURCE_CLASS     VARCHAR2,
+in_WIPCLASS           VARCHAR2,
+in_WORKINT            NUMBER,
+in_WORKBUF            VARCHAR2,
+/* added rateCurrencyCode and costCurrencyCode,
+for multicurrency changes */
+in_rateCurrencyCode   VARCHAR2,
+in_costCurrencyCode   VARCHAR2,
+in_stdcostCurrencyCode VARCHAR2,
+in_ROLE_CODE           VARCHAR2,
+in_USER_LOV1           VARCHAR2,
+in_USER_LOV2           VARCHAR2,
+in_EXPENSE_TYPE        VARCHAR2,
+in_taskID              NUMBER,   -- Added for the bug fix for CLRT-16877
+in_COST_TYPE           VARCHAR2,
+in_voucherID           NUMBER
+)
+AS
+StoO_selcnt			  INTEGER;
+StoO_error 			  INTEGER;
+StoO_rowcnt			  INTEGER;
+StoO_crowcnt		  INTEGER := 0;
+StoO_fetchstatus	  INTEGER := 0;
+StoO_errmsg			  GLOBALPKG.STRING;
+StoO_sqlstatus		  INTEGER;
+L_PROJECTID 		  GLOBALPKG.STRING;
+L_EXCHANGE_RATE_TYPE  GLOBALPKG.STRING;
+v_PROJECT_LOCATION    GLOBALPKG.STRING;
+v_PROJECT_DEPARTMENT  GLOBALPKG.STRING;
+
+  nErrorCode 	  NUMBER ;
+  tempErrorCode   NUMBER ;
+/* temp variables */
+
+BEGIN
+
+/* Called From:
+     Procedure         :- This procedure is used to update voucher records
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Partha Chowdhury
+   Modified Date :09/18/01
+*/
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      /* get the project location and department */
+
+	  SAVEPOINT VoucherUpdate;
+
+      SELECT LOCATIONID, DEPARTCODE
+        INTO v_PROJECT_LOCATION, v_PROJECT_DEPARTMENT
+        FROM PAC_MNT_PROJECTS
+       WHERE PROJECT_CODE = Pac_Prc_Voucher_Updaterec_Sp.in_PROJECT;
+
+      EXCEPTION WHEN OTHERS THEN
+        BEGIN
+          RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+          RETURN;
+        END;
+    END;
+
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  IF Pac_Prc_Voucher_Updaterec_Sp.in_TRANSNO = 0 THEN
+	  BEGIN
+  	  	  ROLLBACK TO SAVEPOINT VoucherUpdate;
+		  RAISE_APPLICATION_ERROR(-20800, 'Attempt to UPDATE with ZERO TransNo on PPA_TRANSCONTROL table.' );
+	  	  RETURN;
+	  END;
+      END IF;
+
+      BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* get the exchange rate type ie. "SPOT", "AVERAGE" etc. */
+
+		SELECT ID,DECODE(Pac_Prc_Voucher_Updaterec_Sp.in_TRANSTYPE,'L',LABOR_EXCHANGE_RATE_TYPE,
+		   		  												   'M',MATERIALS_EXCHANGE_RATE_TYPE,
+																   'Q',EQUIPMENT_EXCHANGE_RATE_TYPE,
+																   'X',EXPENSE_EXCHANGE_RATE_TYPE)
+		   INTO L_PROJECTID,L_EXCHANGE_RATE_TYPE
+		   FROM PAC_MNT_PROJECTS PROJ
+		   WHERE PROJ.PROJECT_CODE = Pac_Prc_Voucher_Updaterec_Sp.in_PROJECT ;
+
+		   EXCEPTION WHEN OTHERS THEN
+		   		RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+				RETURN ;
+	  END ;
+
+		/* Iupdate a record to ppa_transcontrol table
+		*/
+
+		BEGIN
+
+			/* Removed obsolute amount columns - Sanjay - 10/03/01*/
+			UPDATE PPA_TRANSCONTROL
+        	SET SOURCEMODULE	  = Pac_Prc_Voucher_Updaterec_Sp.in_SOURCEMODULE ,
+		     TRANSTYPE         = Pac_Prc_Voucher_Updaterec_Sp.in_TRANSTYPE ,
+			 BatchNo			  = 0,
+			 ENTRY_RESOURCE_CODE         = Pac_Prc_Voucher_Updaterec_Sp.in_ENTRYUSER ,
+			 EntryDate		  	  = Pac_Prc_Voucher_Updaterec_Sp.in_ENTRYDATE ,
+			 LASTUPDTDBY_RESOURCE_CODE    = Pac_Prc_Voucher_Updaterec_Sp.in_LASTUPDATEUSER ,
+			 LastUpdateDate    = SYSDATE,
+			 ExternalBatchId	  = NULL,
+			 ExternalTransNo   = NULL,
+			 LocationID	  	  = Pac_Prc_Voucher_Updaterec_Sp.in_LOCATIONID ,
+			 DepartCode	  	  = Pac_Prc_Voucher_Updaterec_Sp.in_DEPARTCODE ,
+			 ENTITY			  	  = Pac_Prc_Voucher_Updaterec_Sp.in_ENTITY ,
+			 TransDate		  	  = Pac_Prc_Voucher_Updaterec_Sp.in_TRANSDATE ,
+			 COMPANY_CODE			  	  = Pac_Prc_Voucher_Updaterec_Sp.in_CLIENT ,
+			 PROJECT_CODE			  = Pac_Prc_Voucher_Updaterec_Sp.in_PROJECT ,
+       		 CHARGE_CODE       = Pac_Prc_Voucher_Updaterec_Sp.in_CHARGE_CODE ,
+       		 INPUT_TYPE          = Pac_Prc_Voucher_Updaterec_Sp.in_INPUT_TYPE ,
+       		 RESOURCE_CODE          = Pac_Prc_Voucher_Updaterec_Sp.in_RESOURCE_CODE ,
+			 Quantity			  = Pac_Prc_Voucher_Updaterec_Sp.in_QUANTITY ,
+			 CostRuleCode	  = Pac_Prc_Voucher_Updaterec_Sp.in_COSTRULECODE ,
+			 BurdenCode	  	  = NULL,
+			 OverheadCode	  = NULL,
+			 Chargeable	  	  = Pac_Prc_Voucher_Updaterec_Sp.in_CHARGEABLE ,
+			 Notes			  	  = Pac_Prc_Voucher_Updaterec_Sp.in_NOTES ,
+			 InvoiceNo		  	  = NULL,
+			 EmplyHomeLocation = Pac_Prc_Voucher_Updaterec_Sp.in_EMPLYHOMELOCATION ,
+			 EmplyHomeDepart	  = Pac_Prc_Voucher_Updaterec_Sp.in_EMPLYHOMEDEPART ,
+			 ProjectType		  = Pac_Prc_Voucher_Updaterec_Sp.in_PROJECTTYPE ,
+			 ClientClass		  = Pac_Prc_Voucher_Updaterec_Sp.in_CLIENTCLASS ,
+			 ProjectClass	  = Pac_Prc_Voucher_Updaterec_Sp.in_PROJECTCLASS ,
+       		 --COSTCLASS        = Pac_Prc_Voucher_Updaterec_Sp.in_COSTCLASS ,
+			 TRANSCLASS			  = Pac_Prc_Voucher_Updaterec_Sp.in_TRANSCLASS ,
+       		 RESOURCE_CLASS       = Pac_Prc_Voucher_Updaterec_Sp.in_RESOURCE_CLASS ,
+       		 WIPCLASS       = Pac_Prc_Voucher_Updaterec_Sp.in_WIPCLASS,
+       		 PROJECT_LOCATION = Pac_Prc_Voucher_Updaterec_Sp.v_PROJECT_LOCATION,
+       		 PROJECT_DEPARTMENT = Pac_Prc_Voucher_Updaterec_Sp.v_PROJECT_DEPARTMENT,
+       		 ROLE_CODE      = Pac_Prc_Voucher_Updaterec_Sp.in_ROLE_CODE,
+       		 USER_LOV1      = Pac_Prc_Voucher_Updaterec_Sp.in_USER_LOV1,
+       		 USER_LOV2      = Pac_Prc_Voucher_Updaterec_Sp.in_USER_LOV2,
+       		 EXPENSE_TYPE    = Pac_Prc_Voucher_Updaterec_Sp.in_EXPENSE_TYPE,
+       		 TASK_ID        = Pac_Prc_Voucher_Updaterec_Sp.in_taskID, --  Added for the bug fix for CLRT-16877
+       		 COST_TYPE      = Pac_Prc_Voucher_Updaterec_Sp.in_COST_TYPE,
+			 PPA_TRANSCONTROLAPINFO_ID = Pac_Prc_Voucher_Updaterec_Sp.in_voucherID
+       WHERE TransNo        = Pac_Prc_Voucher_Updaterec_Sp.in_TRANSNO;
+
+			 StoO_rowcnt := SQL%ROWCOUNT;
+
+			 EXCEPTION
+
+			 WHEN NO_DATA_FOUND THEN
+				ROLLBACK TO SAVEPOINT VoucherUpdate;
+				RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+				RETURN ;
+			  WHEN OTHERS THEN
+				ROLLBACK TO SAVEPOINT VoucherUpdate;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				IF ( StoO_error = -1401 ) THEN
+				   RAISE_APPLICATION_ERROR(-20801, 'Note is too big'  );
+				   RETURN;
+				ELSE
+	   			   RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+			       RETURN;	
+				END IF;		   
+	   END;
+
+       -- update into ppa_transcontrol_values table
+       BEGIN
+		 	  	nErrorCode := 0 ;
+                PAC_IMP_INS_TRANSMC_VALUES_SP(
+												  nTransImportKey=&gt;NULL,
+												  nTRANSNO=&gt;in_TRANSNO,
+												  PROJECT_CODE=&gt;Pac_Prc_Voucher_updaterec_Sp.in_PROJECT,
+												  TRANSDATE=&gt;Pac_Prc_Voucher_updaterec_Sp.in_TRANSDATE,
+												  TRANSTYPE=&gt;Pac_Prc_Voucher_updaterec_Sp.in_TRANSTYPE,
+												  RATE_CURRENCY=&gt;in_rateCurrencyCode,
+												  COST_CURRENCY=&gt;in_costCurrencyCode,
+												  QUANTITY=&gt;Pac_Prc_Voucher_updaterec_Sp.in_QUANTITY,
+												  RATE=&gt;in_BILLRATE,
+												  AMOUNT=&gt;in_Amount,
+												  PRICE=&gt;1,
+												  FACTORAMOUNT=&gt;in_factorAmount,
+												  BURDEN=&gt;in_Burden,
+												  OVERHEAD=&gt;in_Overhead,
+												  ACTUALCOST=&gt;in_ActualCost,
+												  STDCOST=&gt;in_StdCost,
+												  nErrorCode=&gt;nErrorCode
+
+											);
+
+				EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+						     	ROLLBACK TO SAVEPOINT VoucherUpdate;
+								RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+								RETURN ;
+						WHEN OTHERS THEN
+							 	ROLLBACK TO SAVEPOINT VoucherUpdate;
+								RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+								RETURN ;
+		END ;
+
+		tempErrorCode := nErrorCode ;
+
+	  IF nErrorCode != 0 THEN
+	  BEGIN
+				 IF nErrorCode = 960 THEN
+				 	tempErrorCode := -20100 ;
+				 ELSIF nErrorCode = 962 THEN
+				 	tempErrorCode := -20098 ;
+				 ELSIF nErrorCode = 963 THEN
+				 	tempErrorCode := -20097 ;
+				 ELSIF nErrorCode = 964 THEN
+				 	tempErrorCode := -20096 ;
+				 ELSIF nErrorCode = 965 THEN
+				 	tempErrorCode := -20095 ;
+				 ELSIF nErrorCode = 966 THEN
+				 	tempErrorCode := -20094 ;
+				 ELSIF nErrorCode = 967 THEN
+				 	tempErrorCode := -20093 ;
+				 ELSIF nErrorCode = 961 THEN
+				 	tempErrorCode := -20099 ;
+				 ELSIF nErrorCode = 968 THEN
+				 	tempErrorCode := -20092 ;
+				 ELSIF nErrorCode = 3002 THEN
+				 	tempErrorCode := -20101 ;
+				END IF ;
+
+				ROLLBACK TO SAVEPOINT VoucherUpdate;
+				RAISE_APPLICATION_ERROR( tempErrorCode, 'Could not update PPA_TRANSCONTROL_VALUES table' ) ;
+	  END;
+	  END IF;
+
+
+END Pac_Prc_Voucher_Updaterec_Sp;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

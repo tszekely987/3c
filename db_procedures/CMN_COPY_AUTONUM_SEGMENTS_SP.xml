@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_COPY_AUTONUM_SEGMENTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_COPY_AUTONUM_SEGMENTS_SP" (
+  p_object_code         IN  VARCHAR2,
+  p_attribute_code      IN  VARCHAR2,
+  p_partition_code      IN  VARCHAR2,
+  p_copy_from_partition IN  VARCHAR2 DEFAULT 'NIKU.ROOT'
+)
+IS
+  l_scheme_id NUMBER := -1;
+  l_copy_from_scheme_id NUMBER := -1;
+  l_start_value VARCHAR2(80);
+
+  CURSOR c_scheme (v_partition_code VARCHAR2)
+  IS
+    SELECT id
+      FROM CMN_AUTONUM_SCHEMES
+      WHERE object_code = p_object_code
+        AND partition_code = v_partition_code
+        AND attribute_code = p_attribute_code;
+
+   CURSOR c_segments_copy (v_scheme_id NUMBER)
+   IS
+     SELECT segment_code, length, start_value, text_value, position, is_auto_extended
+       FROM CMN_AUTONUM_SCHEME_SEGMENTS
+      WHERE scheme_id = v_scheme_id
+     ORDER BY position;
+
+BEGIN
+
+  FOR scheme_rec IN c_scheme(p_partition_code)
+  LOOP
+    l_scheme_id := scheme_rec.id;
+  END LOOP;
+
+  FOR scheme_rec_copy_from IN c_scheme(p_copy_from_partition)
+  LOOP
+    l_copy_from_scheme_id := scheme_rec_copy_from.id;
+  END LOOP;
+
+  IF l_scheme_id = -1 OR l_copy_from_scheme_id = -1
+  THEN
+    return;
+  END IF;
+
+  FOR segment_rec IN c_segments_copy(l_copy_from_scheme_id)
+  LOOP
+    l_start_value := TO_CHAR(segment_rec.start_value);
+    IF segment_rec.segment_code = 'ALPHANUMERIC'
+    THEN
+      l_start_value := CMN_AUTONUM_TO_ALPHANUM_FCT(segment_rec.start_value);
+    END IF;
+    CMN_AUTONUM_SEGMENTS_INS_SP (
+      p_scheme_id =&gt; l_scheme_id,
+      p_seg_code =&gt; segment_rec.segment_code,
+      p_length =&gt; segment_rec.length,
+      p_start_value =&gt; l_start_value,
+      p_text_value =&gt; segment_rec.text_value,
+      p_position =&gt; segment_rec.position,
+      p_is_autoext =&gt; segment_rec.is_auto_extended );
+  END LOOP;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

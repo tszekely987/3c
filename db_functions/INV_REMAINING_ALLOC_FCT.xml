@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>INV_REMAINING_ALLOC_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."INV_REMAINING_ALLOC_FCT" (p_investment NUMBER)
+        RETURN NUMBER
+        IS
+        v_remaining_alloc NUMBER(32,6);
+
+        BEGIN
+        SELECT
+            SUM(a.remaining_alloc) remaining_alloc
+            INTO
+            v_remaining_alloc
+            FROM
+                (
+                    SELECT
+                        SUM(s.slice) remaining_alloc
+                    FROM
+                        prTeam t
+                    INNER JOIN srm_resources r ON
+                        t.prResourceID = r.id
+                        AND r.resource_type = 0
+                    INNER JOIN prj_blb_slices s ON
+                        t.prID = s.prj_object_id
+                        AND s.slice_request_id = 6
+                        AND s.slice &lt;&gt; 0
+                    WHERE
+                        t.prProjectID = p_investment
+                        AND s.slice_date &gt; NVL((SELECT MAX(a.prActThru-1) FROM prAssignment a WHERE t.prID = a.team_id), TO_DATE('01/01/1900', 'MM/DD/YYYY'))
+                UNION ALL
+                    SELECT
+                        SUM(s.slice) remaining_alloc
+                    FROM
+                        prTeam t
+                    INNER JOIN srm_resources r ON
+                        t.prResourceID = r.id
+                        AND r.resource_type = 0
+                    INNER JOIN prj_blb_slices s ON
+                        t.prID = s.prj_object_id
+                        AND s.slice_request_id = 10
+                        AND s.slice &lt;&gt; 0
+                    WHERE
+                        t.prProjectID = p_investment
+                        AND s.slice_date &gt; NVL((SELECT MAX(a.prActThru-1) FROM prAssignment a WHERE t.prID = a.team_id), TO_DATE('01/01/2100', 'MM/DD/YYYY'))
+                        AND s.slice_date &lt;= LAST_DAY(NVL((SELECT MAX(a.prActThru-1) FROM prAssignment a WHERE t.prID = a.team_id), TO_DATE('01/01/2100', 'MM/DD/YYYY')))) a;
+        RETURN v_remaining_alloc;
+        END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

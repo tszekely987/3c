@@ -1,0 +1,40 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_SEC_GLOBAL_RIGHT_V">
+    <indexes/>
+    <text_length>1533</text_length>
+    <text>SELECT U.ID USER_KEY,
+       664 OBJECT_KEY,
+       'resource' GLOBAL_RIGHT,
+       0 GLOBAL_RIGHT_KEY
+FROM   CMN_SEC_USERS U,
+	  (SELECT USER_ID
+       FROM   CMN_SEC_ASSGND_OBJ_PERM_R_V0
+	   WHERE  OBJECT_ID = 664           
+	   AND    PERMISSION_CODE = 'ResourceViewManagement') S
+WHERE  U.USER_STATUS_ID = 200
+AND    U.ID = S.USER_ID
+UNION
+SELECT U.ID USER_KEY,
+       CASE WHEN S.INVESTMENT_TYPE_KEY = 'project' THEN 663
+            WHEN S.INVESTMENT_TYPE_KEY = 'application' THEN 50663
+            WHEN S.INVESTMENT_TYPE_KEY = 'asset' THEN 50660
+            WHEN S.INVESTMENT_TYPE_KEY = 'idea' THEN 51780
+            WHEN S.INVESTMENT_TYPE_KEY = 'other' THEN 50669
+            WHEN S.INVESTMENT_TYPE_KEY = 'product' THEN 50666
+            WHEN S.INVESTMENT_TYPE_KEY = 'service' THEN 51101
+            ELSE O.OBJECT_KEY END OBJECT_KEY,
+       S.INVESTMENT_TYPE_KEY GLOBAL_RIGHT,
+       CASE WHEN S.INVESTMENT_TYPE_KEY = 'project' THEN 1
+            WHEN S.INVESTMENT_TYPE_KEY = 'application' THEN 2
+            WHEN S.INVESTMENT_TYPE_KEY = 'asset' THEN 3
+            WHEN S.INVESTMENT_TYPE_KEY = 'idea' THEN 4
+            WHEN S.INVESTMENT_TYPE_KEY = 'other' THEN 5
+            WHEN S.INVESTMENT_TYPE_KEY = 'product' THEN 6
+            WHEN S.INVESTMENT_TYPE_KEY = 'service' THEN 7
+            ELSE O.OBJECT_KEY END GLOBAL_RIGHT_KEY
+FROM   CMN_SEC_USERS U
+       INNER JOIN DWH_INV_SEC_GBL_PERMS_V S ON U.ID = S.USER_KEY
+	   INNER JOIN DWH_CFG_OBJECT_TYPE O ON S.INVESTMENT_TYPE_KEY = O.OBJECT_CODE
+WHERE  U.USER_STATUS_ID = 200</text>
+  </QueryResult>
+</ClarityDBViewQuery>

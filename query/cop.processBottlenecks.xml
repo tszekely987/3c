@@ -1,0 +1,658 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.processBottlenecks" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Process Bottlenecks" languageCode="en" name="Process Bottlenecks"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROCESS:RunPro.id:id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:DefSteps.Is_Milestone:Milestone@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:descPro.Name:Process_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:@NVL@(I.Name, @DBUSER@.COP_GET_OBJECT_NAME_FCT(RunPro.id)):Instance_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:RunPro.Status_code:Process_Status_Code@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:descProStat.Name:Process_Status@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:INITCAP(RunObj.object_type_code):Primary_Object@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:StageName.Name:Stage_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:RunPro.Initiated_By:Initiated_By@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:DefStages.Process_version_Id:Prc_Version_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:DefVer.id:DefVer_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:DefVer.Process_Id:DefVer_Process_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:RunPro.id:RunPro_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:Init_User.full_name:Init_By_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:1:iconMap@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROCESS:DefStages.Sequence_No:sort2@,
+       @SELECT:DIM:USER_DEF:IMPLIED:STEP:DefSteps.id:Step_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STEP:DefSteps.Sequence_no:sort3@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STEP:DefSteps.Sequence_no:sort4@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STEP:descStep.Name:Step_Name@,
+       @SELECT:metric:USER_DEF:IMPLIED:@DBUSER@.COP_GET_PROCESS_STEPS_FCT(DefVer.id, RunPro.Id, DefSteps.Id, 0):Durations@,
+       @SELECT:metric:USER_DEF:IMPLIED:to_number(@DBUSER@.COP_GET_PROCESS_STEPS_FCT(DefVer.id, RunPro.Id, DefSteps.Id, 1),'9'):Duration_Status@
+FROM   BPM_DEF_Steps DefSteps    
+INNER  JOIN  BPM_Def_Stages DefStages
+       ON    DefSTeps.Stage_Id = DefStages.id
+INNER  JOIN  BPM_Run_Processes RunPro
+       ON    RunPro.Process_Version_Id = DefStages.Process_Version_Id
+INNER  JOIN  Bpm_Def_Process_Versions DefVer
+       ON    DefVer.id = RunPro.PROCESS_VERSION_ID
+INNER  JOIN  Bpm_def_objects DefObj
+       ON    DefObj.pk_id = RunPro.Process_Version_Id
+       AND   DefObj.Src_table_Name = 'BPM_DEF_PROCESS_VERSIONS'
+       AND   DefObj.TYPE_CODE = 'BPM_POT_PRIMARY'
+INNER  JOIN  BPM_Run_objects RunObj
+             ON    RunObj.pk_id = RunPro.id
+             AND   RunObj.Type_code = 'BPM_POT_PRIMARY'
+
+LEFT   OUTER JOIN Inv_Investments I
+             ON   I.odf_object_code = RunObj.Object_Type_Code
+             AND  I.id = RunObj.Object_Id
+             AND  I.odf_object_code = RunObj.Object_Type_Code
+             AND  I.id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+LEFT   OUTER JOIN CMN_CAPTIONS_NLS descPro
+             ON   descPro.language_Code = @WHERE:PARAM:LANGUAGE@
+             AND  descPro.table_Name = 'BPM_DEF_PROCESSES'
+             AND  descPro.pk_id = DefVer.Process_id
+LEFT   OUTER JOIN CMN_LOOKUPS_V descProStat
+             ON   descProStat.language_Code = @WHERE:PARAM:LANGUAGE@
+             AND  descProStat.Lookup_Type = 'BPM_PROCESS_INSTANCE_STATES'
+             AND  descProStat.Lookup_Code = RunPro.Status_code
+LEFT   OUTER JOIN CMN_CAPTIONS_NLS StageName
+             ON   StageName.language_code = @WHERE:PARAM:LANGUAGE@
+             AND  StageName.pk_id = DefStages.id
+             AND  StageName.Table_Name = 'BPM_DEF_STAGES' 
+LEFT   OUTER JOIN CMN_CAPTIONS_NLS descStep
+             ON   descStep.language_Code = @WHERE:PARAM:LANGUAGE@
+             AND  descStep.Table_Name = 'BPM_DEF_STEPS'
+             AND  descStep.Pk_Id = DefSteps.Id
+LEFT   OUTER JOIN SRM_RESOURCES Init_User
+             ON   Init_User.user_id = RunPro.Initiated_By 
+
+WHERE  DefSteps.Is_Milestone = 1 
+AND    @FILTER@]]></nsql>
+            <attribute id="id" required="false">
+              
+              
+              
+              
+              <nls description="Process Internal ID" languageCode="en" name="Process Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="milestone" required="false">
+              
+              
+              
+              
+              <nls description="Is Milestone" languageCode="en" name="Is Milestone"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="process_name" required="true">
+              
+              
+              
+              
+              <nls description="Process" languageCode="en" name="Process"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="instance_name" required="false">
+              
+              
+              
+              
+              <nls description="Instance" languageCode="en" name="Instance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="process_status_code" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Process Status Code" languageCode="en" name="Process Status Code"/>
+              
+            </attribute>
+            <attribute id="process_status" lookup="COP_PORTLET_PROCESS_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Process Status" languageCode="en" name="Process Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="primary_object" required="false">
+              
+              
+              
+              
+              <nls description="Primary Object" languageCode="en" name="Primary Object"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage_name" required="false">
+              
+              
+              
+              
+              <nls description="Stage" languageCode="en" name="Stage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="initiated_by" required="false">
+              
+              
+              
+              <nls description="Initiated By Internal ID" languageCode="en" name="Initiated By Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="prc_version_id" required="false">
+              
+              
+              
+              
+              <nls description="Version Internal ID" languageCode="en" name="Version Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="defver_id" lookup="COP_PORTLET_PROCESS_TYPE" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Process Type Filter" languageCode="en" name="Process Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="defver_process_id" required="false">
+              
+              
+              
+              
+              <nls description="Process Type Internal ID" languageCode="en" name="Process Type Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="runpro_id" required="false">
+              
+              
+              
+              
+              <nls description="Run Process Internal ID" languageCode="en" name="Run Process Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="init_by_name" required="false">
+              
+              <nls description="Initiated By" languageCode="en" name="Initiated By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="iconmap" required="false">
+              
+              
+              
+              
+              <nls description="Flow Diagram" languageCode="en" name="Flow Diagram"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="OrgWorkflow"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="sort2" required="false">
+              
+              
+              
+              
+              <nls description="Stage Sequence" languageCode="en" name="Stage Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="step_id" required="false">
+              
+              <nls description="Step Internal ID" languageCode="en" name="Step Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sort3" required="false">
+              
+              
+              
+              
+              <nls description="Step Sequence" languageCode="en" name="Step Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sort4" required="false">
+              
+              
+              
+              
+              <nls description="Step Sequence" languageCode="en" name="Step Sequence (2)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="step_name" required="false">
+              
+              
+              
+              
+              <nls description="Step" languageCode="en" name="Step"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="durations" required="false">
+              
+              
+              
+              
+              <nls description="Duration" languageCode="en" name="Duration"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="duration_status" lookup="COP_PORTLET_PROCESS_DURATION" required="false">
+              
+              
+              
+              
+              <nls description="Duration Status" languageCode="en" name="Duration Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="2"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="3"/>
+              </displayMapping>
+            </attribute>
+            <links>
+              <link action="bpm.stepHistory" code="process">
+                
+                
+                
+                
+                <nls description="Process" languageCode="en" name="Process"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="runpro_id" dataSource="data" paramCode="process_instance_id"/>
+              </link>
+              <link action="bpm.processFlowLayoutPopup" code="processFlowDiagram">
+                
+                
+                
+                
+                <nls description="Process Flow Diagram" languageCode="en" name="Process Flow Diagram"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="runpro_id" dataSource="data" paramCode="process_instance_id"/>
+                <linkParam dataRef="defver_id" dataSource="data" paramCode="process_version_id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

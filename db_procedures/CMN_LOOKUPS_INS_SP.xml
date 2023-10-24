@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUPS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUPS_INS_SP" (
+   P_LOOKUP_TYPE            IN   VARCHAR2,
+   P_LOOKUP_CODE            IN   VARCHAR2,
+   P_LOOKUP_NAME            IN   VARCHAR2,
+   P_LOOKUP_DESCRIPTION     IN   VARCHAR2,
+   P_LOOKUP_ENUM            IN   NUMBER,
+   P_SORT_ORDER             IN   NUMBER,
+   P_IS_SYSTEM              IN   NUMBER,
+   P_IS_ACTIVE              IN   NUMBER,
+   P_IS_ADMIN_VISIBLE       IN   NUMBER,
+   P_IS_UPGRADE_PROTECTED   IN   NUMBER,
+   P_CREATED_BY             IN   NUMBER DEFAULT 1,
+   P_PARENT_LOOKUP_CODE     IN   VARCHAR2 DEFAULT NULL,
+   P_LOOKUP_LEVEL           IN   NUMBER DEFAULT 1,
+   P_PARTITION_CODE         IN   VARCHAR2 DEFAULT 'NIKU.ROOT',
+   P_PARTITION_MODE_CODE    IN   VARCHAR2 DEFAULT 'PARTITION_AND_ANSTRS_DESDNTS',
+   P_FEATURE_CODE           IN   VARCHAR2 DEFAULT NULL
+)
+IS
+   V_ID              NUMBER;
+   V_LOOKUP_CODE     VARCHAR2(30);
+   V_SORT_ORDER      NUMBER;
+   V_IS_SORTED_ALPHA NUMBER;
+BEGIN
+   SELECT   CMN_LOOKUPS_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+
+   SELECT   IS_SORTED_ALPHA
+   INTO     V_IS_SORTED_ALPHA
+   FROM     CMN_LOOKUP_TYPES
+   WHERE    LOOKUP_TYPE = P_LOOKUP_TYPE;
+
+   V_SORT_ORDER := P_SORT_ORDER;
+   IF p_sort_order IS NULL
+   THEN v_sort_order := 0;
+   END IF;
+
+   IF V_IS_SORTED_ALPHA = 0 AND P_SORT_ORDER &lt; 1
+   THEN
+     SELECT   MAX(SORT_ORDER) + 1
+     INTO     V_SORT_ORDER
+     FROM     CMN_LOOKUPS
+     WHERE    LOOKUP_TYPE = P_LOOKUP_TYPE;
+   END IF;
+
+   /* If this is the FIRST insert of a value and we are not sorted alpha the above select will set v_sort_order null and that is wrong */
+   IF v_sort_order IS NULL
+   THEN v_sort_order := 1;
+   END IF;
+
+   IF P_LOOKUP_CODE IS NULL
+   THEN
+     V_LOOKUP_CODE := to_char(V_ID);
+   ELSE
+     IF P_LOOKUP_CODE = '' OR LENGTH(LTRIM(RTRIM(P_LOOKUP_CODE))) &lt;= 0
+     THEN
+       V_LOOKUP_CODE := to_char(V_ID);
+     ELSE
+       V_LOOKUP_CODE := LTRIM(RTRIM(P_LOOKUP_CODE));
+     END IF;
+   END IF;
+
+   INSERT INTO CMN_LOOKUPS
+               (
+                  ID,
+                  LOOKUP_TYPE,
+                  LOOKUP_CODE,
+                  PARENT_LOOKUP_CODE,
+                  LOOKUP_LEVEL,
+                  LOOKUP_ENUM,
+                  SORT_ORDER,
+                  IS_SYSTEM,
+                  IS_ACTIVE,
+                  IS_ADMIN_VISIBLE,
+                  IS_UPGRADE_PROTECTED,
+                  PARTITION_CODE,
+                  PARTITION_MODE_CODE,
+                  FEATURE_CODE,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               P_LOOKUP_TYPE,
+               V_LOOKUP_CODE,
+               P_PARENT_LOOKUP_CODE,
+               P_LOOKUP_LEVEL,
+               P_LOOKUP_ENUM,
+               V_SORT_ORDER,
+               P_IS_SYSTEM,
+               P_IS_ACTIVE,
+               P_IS_ADMIN_VISIBLE,
+               P_IS_UPGRADE_PROTECTED,
+               P_PARTITION_CODE,
+               P_PARTITION_MODE_CODE,
+               P_FEATURE_CODE,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     DUAL
+      WHERE    NOT EXISTS (SELECT   'LOOKUP CODE ALREADY EXISTS'
+                           FROM     CMN_LOOKUPS
+                           WHERE    LOOKUP_TYPE = P_LOOKUP_TYPE
+                           AND      LOOKUP_CODE = V_LOOKUP_CODE);
+
+   CMN_CAPTIONS_NLS_INS_SP (
+      'CMN_LOOKUPS',
+      V_ID,
+      P_LOOKUP_NAME,
+      P_LOOKUP_DESCRIPTION,
+      P_CREATED_BY,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL
+   );
+
+   /* Now insert into the lookups hierarchy table CMN_LOOKUP_FLAT_HIERS */
+   CMN_LOOKUP_HIERS_INS_SP(
+     P_LOOKUP_TYPE,
+     V_ID,
+     P_PARENT_LOOKUP_CODE,
+     P_LOOKUP_LEVEL,
+     P_CREATED_BY
+     );
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

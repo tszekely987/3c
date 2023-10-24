@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="agl.prdRoadmapByMilestone" isUserPortletAvailable="1" source="agl.ca.com">
+            
+            
+            
+            
+            <nls description="Agile Product Roadmap by Milestone" languageCode="en" name="Agile Product Roadmap by Milestone"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:a.dim_id:dim_id@, 
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.level_name:level_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.level_id:level_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.start_date:start_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.finish_date:finish_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.wbs_sequence:wbs_sequence@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.project:project@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.release:release@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.agl_state:agile_state@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.agl_pln_start:pln_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.agl_pln_finish:pln_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.agl_act_start:act_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.agl_act_finish:act_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.investment_int_id:investment_int_id@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.task_int_id:task_int_id@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.linkcode:linkcode@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:@UPPER@(a.odf_object_code):investment_type_upper@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.hg_has_children:hg_has_children@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.agl_prelim_est:prelim_est@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_est_stypts,0):est_stypts@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_est_usrsty,0):est_usrsty@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_acp_stypts,0):acp_stypts@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_acp_usrsty,0):acp_usrsty@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_pctdon_stc,0):pctdon_stc@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(a.agl_pctdon_plest,0):pctdon_plest@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.agl_risk_score:risk_score@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.agl_value_score:value_score@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.agl_wsjf_score:wsjf_score@	   
+FROM (
+-- Product Level
+SELECT DISTINCT 'L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id) dim_id,  
+       i.name level_name,
+       i.code level_id,
+       i.schedule_start start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(i.schedule_finish) finish_date, 	   
+       0 wbs_sequence, 
+       i.id investment_int_id,	   
+       NULL task_int_id,	   
+       NULL project,
+       NULL release,	   
+       NULL agl_state,	   
+       s.agl_pln_start agl_pln_start,
+       s.agl_pln_finish agl_pln_finish,
+       s.agl_act_start agl_act_start,
+       s.agl_act_finish agl_act_finish,
+       NULL agl_prelim_est,	   
+       @NVL@(s.agl_acp_stypts,0) agl_acp_stypts,
+       @NVL@(s.agl_acp_usrsty,0) agl_acp_usrsty,
+       @NVL@(s.agl_est_stypts,0) agl_est_stypts,
+       @NVL@(s.agl_est_usrsty,0) agl_est_usrsty,
+       CASE WHEN @NVL@(s.agl_est_usrsty,0) = 0 THEN 0 ELSE (@NVL@(s.agl_acp_usrsty,0) / @NVL@(s.agl_est_usrsty,0) * 100) END agl_pctdon_stc,
+       CASE WHEN @NVL@(s.agl_est_stypts,0) = 0 THEN 0 ELSE (@NVL@(s.agl_acp_stypts,0) / @NVL@(s.agl_est_stypts,0) * 100) END agl_pctdon_plest,	   
+       NULL agl_risk_score,
+       NULL agl_value_score,
+       NULL agl_wsjf_score,   
+       'investmentProperties' linkcode,
+       i.odf_object_code odf_object_code,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   inv_flat_hierarchies h
+                         INNER  JOIN inv_investments inv ON h.child_id = inv.id
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    inv.odf_object_code = 'product') > 0
+            THEN  'L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            WHEN (SELECT COUNT(*) 
+                  FROM   inv_flat_hierarchies h
+                         INNER  JOIN inv_projects p ON h.child_id = p.prid
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    p.is_program = 1) > 0
+            THEN  'L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            WHEN (SELECT COUNT(*)
+                  FROM   inv_flat_hierarchies h
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    h.child_id IN (SELECT f.child_id
+                                        FROM   inv_flat_hierarchies f
+                                               INNER JOIN odf_ca_project p ON f.child_id = p.id
+                                        WHERE  f.parent_id <> f.child_id
+                                        AND    p.agl_id IS NULL
+                                        AND    h.parent_id = @WHERE:PARAM:USER_DEF:INTEGER:product@)) > 0
+            THEN 'L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            ELSE (SELECT DISTINCT 'L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+                  FROM   inv_flat_hierarchies h
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    h.child_id IN (SELECT f.child_id
+                                        FROM   inv_flat_hierarchies f
+                                               INNER JOIN odf_ca_project p ON f.child_id = p.id
+                                        WHERE  f.parent_id <> f.child_id
+                                        AND    p.agl_id IS NOT NULL
+                                        AND    h.parent_id = @WHERE:PARAM:USER_DEF:INTEGER:product@))
+            END hg_has_children
+FROM   inv_investments i
+       INNER JOIN inv_flat_hierarchies h ON i.id = h.parent_id
+       LEFT OUTER JOIN agl_hierarchy_rollup_mlst_v s ON s.investment_id = i.id	   
+WHERE  i.is_active = 1      
+AND    i.odf_object_code = 'product'
+AND    i.id = @WHERE:PARAM:USER_DEF:INTEGER:product@
+AND    @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL
+AND    @WHERE:SECURITY:INV:i.id@
+UNION  ALL
+-- Sub-product/Program Level
+SELECT 'L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id) dim_id,  
+       i.name level_name,
+       i.code level_id,
+       i.schedule_start start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(i.schedule_finish) finish_date,   
+       99999 wbs_sequence, 
+       i.id investment_int_id,	   
+       NULL task_int_id,	   
+       NULL project,
+       NULL release,	   
+       p.agl_state,	   	   
+       s.agl_pln_start agl_pln_start,
+       s.agl_pln_finish agl_pln_finish,
+       s.agl_act_start agl_act_start,
+       s.agl_act_finish agl_act_finish,
+       NULL agl_prelim_est,	   
+       @NVL@(s.agl_acp_stypts,0) agl_acp_stypts,
+       @NVL@(s.agl_acp_usrsty,0) agl_acp_usrsty,
+       @NVL@(s.agl_est_stypts,0) agl_est_stypts,
+       @NVL@(s.agl_est_usrsty,0) agl_est_usrsty,
+       CASE WHEN @NVL@(s.agl_est_usrsty,0) = 0 THEN 0 ELSE (@NVL@(s.agl_acp_usrsty,0) / @NVL@(s.agl_est_usrsty,0) * 100) END agl_pctdon_stc,
+       CASE WHEN @NVL@(s.agl_est_stypts,0) = 0 THEN 0 ELSE (@NVL@(s.agl_acp_stypts,0) / @NVL@(s.agl_est_stypts,0) * 100) END agl_pctdon_plest,	   	   
+       p.agl_risk_score,
+       p.agl_value_score,
+       p.agl_wsjf_score,	   
+       CASE WHEN @UPPER@(i.odf_object_code) = 'PROJECT' THEN 'projectProperties' ELSE 'investmentProperties' END linkcode,
+       i.odf_object_code odf_object_code,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   inv_flat_hierarchies h
+                         INNER  JOIN inv_investments inv ON h.child_id = inv.id
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    inv.odf_object_code = 'product') > 0
+            THEN  'L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            WHEN (SELECT COUNT(*) 
+                  FROM   inv_flat_hierarchies h
+                         INNER  JOIN inv_projects p ON h.child_id = p.prid
+                  WHERE  h.parent_id <> h.child_id
+                  AND    h.parent_id = i.id
+                  AND    p.is_program = 1) > 0
+            THEN  'L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            WHEN (SELECT COUNT(*) 
+                  FROM   inv_flat_hierarchies h
+                         INNER JOIN odf_ca_project p ON h.child_id = p.id				  
+                  WHERE  h.parent_id = i.id
+                  AND    h.parent_id <> h.child_id				  
+                  AND    p.agl_id IS NOT NULL) > 0
+            THEN  'L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(i.id)
+            ELSE  NULL  END hg_has_children
+FROM   inv_investments i
+       INNER JOIN inv_hierarchies h ON h.child_id = i.id	   
+       LEFT OUTER JOIN odf_ca_project p ON  p.id = i.id	   
+       LEFT OUTER JOIN agl_hierarchy_rollup_mlst_v s ON s.investment_id = i.id	   
+WHERE  i.is_active = 1
+AND    ((i.odf_object_code = 'project' AND (SELECT COUNT(*) 
+                                            FROM   inv_flat_hierarchies h
+                                                   INNER JOIN odf_ca_project p ON h.child_id = p.id												   
+                                            WHERE  h.parent_id = i.id											
+                                            AND    p.agl_id IS NOT NULL) > 0
+                                        AND i.id   IN (SELECT p.prid p FROM inv_projects p WHERE p.is_program = 1))										
+         OR  i.odf_object_code = 'product')
+AND    (('L1-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(h.parent_id) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@)
+         OR  ('L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(h.parent_id) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@))
+AND    @WHERE:SECURITY:INV:i.id@
+UNION  ALL
+-- Milestone
+SELECT 'L3-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(m.milestone_id) dim_id,  
+       m.milestone_name level_name,
+       m.milestone_code level_id,
+       NULL start_date,
+       NULL finish_date,   
+       99999 wbs_sequence, 
+       NULL investment_int_id,	   
+       NULL task_int_id,	   
+       NULL project,
+       NULL release,	   
+       NULL agl_state,	   	   
+       s.agl_pln_start agl_pln_start,
+       s.agl_pln_finish agl_pln_finish,
+       s.agl_act_start agl_act_start,
+       s.agl_act_finish agl_act_finish,
+       NULL agl_prelim_est,	   
+       @NVL@(s.agl_acp_stypts,0) agl_acp_stypts,
+       @NVL@(s.agl_acp_usrsty,0) agl_acp_usrsty,
+       @NVL@(s.agl_est_stypts,0) agl_est_stypts,
+       @NVL@(s.agl_est_usrsty,0) agl_est_usrsty,
+       @NVL@(s.agl_pctdon_stc,0) agl_pctdon_stc,
+       @NVL@(s.agl_pctdon_plest,0) agl_pctdon_plest,	   	   
+       NULL agl_risk_score,
+       NULL agl_value_score,
+       NULL agl_wsjf_score,	   
+       NULL linkcode,
+       NULL odf_object_code,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   odf_multi_valued_lookups m
+                         INNER JOIN prtask t ON t.prid  = m.pk_id
+                         INNER JOIN odf_ca_task odf_t ON odf_t.id = t.prid 				  
+                         INNER JOIN odf_ca_project p ON t.prprojectid = p.id 				  
+                  WHERE  m.value = mvl.milestone
+                  AND    p.agl_id IS NOT NULL
+                  AND 	 odf_t.agl_tsk_id IS NOT NULL
+                  AND    odf_t.agl_tsk_story_id IS NULL
+                  AND    m.attribute = 'agl_tsk_milestones'
+                  AND    t.prprojectid IN (SELECT h.child_id
+                                           FROM   inv_flat_hierarchies h				  
+                                           WHERE  h.parent_id <> h.child_id
+                                           AND    h.parent_id = @WHERE:PARAM:USER_DEF:INTEGER:product@)) > 0
+            THEN 'L4-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(mvl.milestone)
+            ELSE  NULL  END hg_has_children
+FROM  (SELECT DISTINCT mvl.value milestone
+       FROM   odf_multi_valued_lookups mvl 
+              INNER JOIN  prtask t ON t.prid = mvl.pk_id 
+              INNER JOIN inv_hierarchies h ON  h.child_id = t.prprojectid
+       WHERE  mvl.attribute = 'agl_tsk_milestones'
+       AND   (h.child_id IN (SELECT h.child_id 
+                             FROM   inv_flat_hierarchies h				  
+                             WHERE  h.parent_id <> h.child_id
+                             AND    'L2-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(h.parent_id) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@) ) ) mvl 	
+       INNER JOIN int_agl_milestones m ON m.milestone_id = mvl.milestone
+       LEFT OUTER JOIN (SELECT mvl.value milestone,
+                               MIN(odf_t.agl_tsk_pln_start) agl_pln_start,
+                               MAX(odf_t.agl_tsk_pln_finish) agl_pln_finish,
+                               MIN(odf_t.agl_tsk_act_start) agl_act_start,
+                               MAX(odf_t.agl_tsk_act_finish) agl_act_finish,
+                               SUM(@NVL@(odf_t.agl_tsk_acp_stypts,0)) agl_acp_stypts,
+                               SUM(@NVL@(odf_t.agl_tsk_acp_usrsty,0)) agl_acp_usrsty,
+                               SUM(@NVL@(odf_t.agl_tsk_est_stypts,0)) agl_est_stypts,
+                               SUM(@NVL@(odf_t.agl_tsk_est_usrsty,0)) agl_est_usrsty,
+                               CASE WHEN SUM(@NVL@(odf_t.agl_tsk_est_usrsty,0)) = 0 THEN 0 ELSE (SUM(@NVL@(odf_t.agl_tsk_acp_usrsty,0)) / SUM(@NVL@(odf_t.agl_tsk_est_usrsty,0)) * 100) END agl_pctdon_stc,
+                               CASE WHEN SUM(@NVL@(odf_t.agl_tsk_est_stypts,0)) = 0 THEN 0 ELSE (SUM(@NVL@(odf_t.agl_tsk_acp_stypts,0)) / SUM(@NVL@(odf_t.agl_tsk_est_stypts,0)) * 100) END agl_pctdon_plest							   
+                        FROM   odf_multi_valued_lookups mvl 
+                               INNER JOIN odf_ca_task odf_t ON odf_t.id = mvl.pk_id 
+                               INNER JOIN prtask tasks ON tasks.prid = odf_t.id
+                        WHERE  mvl.attribute = 'agl_tsk_milestones'
+                        AND    tasks.prprojectid IN (SELECT h.child_id
+                                                     FROM   inv_flat_hierarchies h				  
+                                                     WHERE  h.parent_id <> h.child_id
+                                                     AND    h.parent_id = @WHERE:PARAM:USER_DEF:INTEGER:product@)						
+                        GROUP  BY mvl.value) s ON s.milestone = mvl.milestone 
+WHERE  1=1
+UNION  ALL
+-- WBS Level 
+SELECT 'L4-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(tasks.prprojectid) @+@ @DBUSER@.AGL_TO_CHAR_FCT(tasks.prid) dim_id,
+       tasks.prname level_name,
+       tasks.prexternalid level_id,
+       tasks.prstart start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(tasks.prfinish) finish_date,
+       tasks.prwbssequence wbs_sequence,
+       i.id investment_int_id,   
+       tasks.prid task_int_id,	   
+       i.name project,
+       odf_t.agl_tsk_release release,	   
+       odf_t.agl_tsk_state agl_state,	   
+       odf_t.agl_tsk_pln_start agl_pln_start,
+       odf_t.agl_tsk_pln_finish agl_pln_finish,
+       odf_t.agl_tsk_act_start agl_act_start,
+       odf_t.agl_tsk_act_finish agl_act_finish,
+       odf_t.agl_tsk_prelim_est agl_prelim_est,	   
+       odf_t.agl_tsk_acp_stypts agl_acp_stypts,
+       odf_t.agl_tsk_acp_usrsty agl_acp_usrsty,
+       odf_t.agl_tsk_est_stypts agl_est_stypts,
+       odf_t.agl_tsk_est_usrsty agl_est_usrsty,
+       odf_t.agl_tsk_pctdon_stc * 100 agl_pctdon_stc,
+       odf_t.agl_tsk_pctdon_plest * 100 agl_pctdon_plest,
+       odf_t.agl_tsk_risk_score agl_risk_score,
+       odf_t.agl_tsk_value_score agl_value_score,
+       odf_t.agl_tsk_wsjf_score agl_wsjf_score,
+       'taskProperties' linkcode,
+       i.odf_object_code odf_object_code,
+       NULL hg_has_children
+FROM   prtask tasks 
+       INNER JOIN inv_investments i ON i.id = tasks.prprojectid
+       INNER JOIN odf_project_v2 pv ON pv.odf_pk = i.id	 
+       INNER JOIN odf_ca_task odf_t ON odf_t.id = tasks.prid
+       INNER JOIN odf_multi_valued_lookups mvl ON tasks.prid = mvl.pk_id
+WHERE  pv.is_program = 0
+AND    mvl.attribute = 'agl_tsk_milestones'
+AND    odf_t.agl_tsk_id IS NOT NULL
+AND    odf_t.agl_tsk_story_id IS NULL
+AND    ('L4-' @+@ @DBUSER@.AGL_TO_CHAR_FCT(mvl.value) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@)
+AND    tasks.prprojectid IN (SELECT h.child_id 
+                             FROM   inv_flat_hierarchies h				  
+                             WHERE  h.parent_id <> h.child_id
+                             AND    h.parent_id = @WHERE:PARAM:USER_DEF:INTEGER:product@)
+) A
+WHERE 1=1
+AND   @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="level_name" required="false">
+              
+              
+              
+              
+              <nls description="Product Hierarchy" languageCode="en" name="Product Hierarchy"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="level_id" required="false">
+              
+              
+              
+              
+              <nls description="ID" languageCode="en" name="ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wbs_sequence" required="false">
+              
+              
+              
+              
+              
+              <nls description="WBS Sequence" languageCode="en" name="WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="release" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile Release" languageCode="en" name="Agile Release"/>
+              
+            </attribute>
+            <attribute id="agile_state" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile State" languageCode="en" name="Agile State"/>
+              
+            </attribute>
+            <attribute id="pln_start" required="false">
+              
+              
+              
+              
+              <nls description="Agile Planned Start" languageCode="en" name="Agile Planned Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pln_finish" required="false">
+              
+              <nls description="Agile Planned Finish" languageCode="en" name="Agile Planned Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_start" required="false">
+              
+              
+              
+              
+              <nls description="Agile Actual Start" languageCode="en" name="Agile Actual Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_finish" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile Actual Finish" languageCode="en" name="Agile Actual Finish"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Investment Internal ID" languageCode="en" name="Investment Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_int_id" required="false">
+              
+              <nls description="Task Internal ID" languageCode="en" name="Task Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="linkcode" required="false">
+              
+              
+              
+              
+              <nls description="Link Code (Internal)" languageCode="en" name="Link Code (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="hg_has_children" required="false">
+              
+              <nls description="Has Child Records (Internal)" languageCode="en" name="Has Child Records (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="prelim_est" required="false">
+              
+              
+              
+              
+              <nls description="Agile Preliminary Estimate" languageCode="en" name="Agile Preliminary Estimate"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="est_stypts" required="false">
+              
+              
+              
+              
+              <nls description="Estimated Story Points" languageCode="en" name="Estimated Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="est_usrsty" required="false">
+              
+              
+              
+              
+              <nls description="Estimated User Stories" languageCode="en" name="Estimated User Stories"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="acp_stypts" required="false">
+              
+              
+              
+              
+              <nls description="Accepted Story Points" languageCode="en" name="Accepted Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="acp_usrsty" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Accepted User Stories" languageCode="en" name="Accepted User Stories"/>
+              
+            </attribute>
+            <attribute id="pctdon_stc" required="false">
+              
+              
+              
+              
+              <nls description="% Done by Story Count" languageCode="en" name="% Done by Story Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="25" lo="-999" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="75" lo="25" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="999" lo="75" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="pctdon_plest" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="% Done By Agile Plan Estimate" languageCode="en" name="% Done by Agile Plan Estimate"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="25" lo="-999" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="75" lo="25" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="999" lo="75" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="risk_score" required="false">
+              
+              
+              
+              
+              <nls description="Agile Risk Score" languageCode="en" name="Agile Risk Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="value_score" required="false">
+              
+              
+              
+              
+              <nls description="Agile Value Score" languageCode="en" name="Agile Value Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wsjf_score" required="false">
+              
+              <nls description="WSJF Score" languageCode="en" name="WSJF Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_product" lookup="AGL_PRODUCT_BROWSE" required="false">
+              
+              
+              
+              
+              <nls description="Product Filter" languageCode="en" name="Product Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hg_row_id" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Row ID (Internal)" languageCode="en" name="Row ID (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="investment_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

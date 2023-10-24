@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_TRANSACTIONLOCDEPT_OUTPUT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_TRANSACTIONLOCDEPT_OUTPUT" (
+COMPANY_CODE 	VARCHAR2 ,
+PROJECT_CODE 	VARCHAR2 ,
+charge_code  VARCHAR2 ,
+RESOURCE_CODE 	VARCHAR2 ,
+locationid 	IN OUT VARCHAR2,
+departcode 	IN OUT VARCHAR2)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+locidentifier 	GLOBALPKG.STRING;
+deptidentifier 	GLOBALPKG.STRING;
+chgordsep 	GLOBALPKG.STRING;
+BEGIN
+/*
+   Called From:
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/26/2001
+*/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   sourcefieldlocation,  sourcefielddepartment,  projchgordersep
+		INTO sp_transactionlocdept_output.locidentifier, sp_transactionlocdept_output.deptidentifier, sp_transactionlocdept_output.chgordsep FROM nameoptions;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  sp_transactionlocdept_output.locidentifier = 'RL' OR   sp_transactionlocdept_output.locidentifier = 'CCL' THEN
+		sp_transactionlocdept_output.locationid :=  '';
+	ELSE
+		IF  sp_transactionlocdept_output.locidentifier = 'CL' THEN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   locationid
+				INTO sp_transactionlocdept_output.locationid FROM clntsupp
+				WHERE COMPANY_CODE = sp_transactionlocdept_output.COMPANY_CODE;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		ELSE
+			IF  sp_transactionlocdept_output.locidentifier = 'EL' THEN
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   locationid
+          INTO sp_transactionlocdept_output.locationid
+          FROM pac_mnt_resources
+					WHERE RESOURCE_CODE = sp_transactionlocdept_output.RESOURCE_CODE;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+			ELSE
+/*
+IF charindex( @chgordsep, @PROJECT_CODE) = 0
+SELECT @locationid = locationid
+FROM   projcontrol
+WHERE  COMPANY_CODE = @COMPANY_CODE AND MASTER_PROJECT_CODE = @PROJECT_CODE
+ELSE
+SELECT @locationid = locationid
+FROM   projchgorder
+WHERE  COMPANY_CODE = @COMPANY_CODE AND PROJECT_CODE = @PROJECT_CODE
+*/
+				IF  sp_transactionlocdept_output.locidentifier = 'PL' THEN
+				BEGIN
+					BEGIN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error  := 0;
+						SELECT   locationid
+            INTO sp_transactionlocdept_output.locationid FROM pac_mnt_projects
+						WHERE COMPANY_CODE = sp_transactionlocdept_output.COMPANY_CODE
+						 and PROJECT_CODE = sp_transactionlocdept_output.PROJECT_CODE;
+						StoO_rowcnt := SQL%ROWCOUNT;
+						EXCEPTION
+							WHEN TOO_MANY_ROWS THEN
+								StoO_rowcnt := 2;
+							WHEN NO_DATA_FOUND THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+							WHEN OTHERS THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+					END;
+				END;
+				END IF;
+				END IF;
+				END IF;
+			END IF;
+		IF  sp_transactionlocdept_output.deptidentifier = 'RD' OR   sp_transactionlocdept_output.deptidentifier = 'CCD' THEN
+			sp_transactionlocdept_output.departcode :=  '';
+		ELSE
+			IF  sp_transactionlocdept_output.deptidentifier = 'CD' THEN
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   departcode
+					INTO sp_transactionlocdept_output.departcode FROM clntsupp
+					WHERE COMPANY_CODE = sp_transactionlocdept_output.COMPANY_CODE;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+			ELSE
+				IF  sp_transactionlocdept_output.deptidentifier = 'ED' THEN
+					BEGIN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error  := 0;
+						SELECT   departcode
+            INTO sp_transactionlocdept_output.departcode
+            FROM pac_mnt_resources
+						WHERE RESOURCE_CODE = sp_transactionlocdept_output.RESOURCE_CODE;
+						StoO_rowcnt := SQL%ROWCOUNT;
+						EXCEPTION
+							WHEN TOO_MANY_ROWS THEN
+								StoO_rowcnt := 2;
+							WHEN NO_DATA_FOUND THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+							WHEN OTHERS THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+					END;
+				ELSE
+/*
+IF charindex( @chgordsep, @PROJECT_CODE) = 0
+SELECT @departcode = departcode
+FROM   projcontrol
+WHERE  COMPANY_CODE = @COMPANY_CODE AND MASTER_PROJECT_CODE = @PROJECT_CODE
+ELSE
+SELECT @departcode = departcode
+FROM   projchgorder
+WHERE COMPANY_CODE = @COMPANY_CODE AND PROJECT_CODE = @PROJECT_CODE
+*/
+					IF  sp_transactionlocdept_output.deptidentifier = 'PD' THEN
+					BEGIN
+						BEGIN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error  := 0;
+							SELECT   departcode
+              INTO sp_transactionlocdept_output.departcode FROM pac_mnt_projects
+							WHERE COMPANY_CODE = sp_transactionlocdept_output.COMPANY_CODE
+							 and PROJECT_CODE = sp_transactionlocdept_output.PROJECT_CODE;
+							StoO_rowcnt := SQL%ROWCOUNT;
+							EXCEPTION
+								WHEN TOO_MANY_ROWS THEN
+									StoO_rowcnt := 2;
+								WHEN NO_DATA_FOUND THEN
+									StoO_rowcnt := 0;
+									StoO_selcnt := 0;
+								WHEN OTHERS THEN
+									StoO_rowcnt := 0;
+									StoO_selcnt := 0;
+									StoO_error := SQLCODE;
+									StoO_errmsg := SQLERRM;
+						END;
+					END;
+					END IF;
+					END IF;
+					END IF;
+				END IF;
+END sp_transactionlocdept_output;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

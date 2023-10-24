@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOCK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOCK_SP" (
+   p_user_id                 NUMBER,
+   p_table_name              VARCHAR2,
+   p_lock_name               VARCHAR2,
+   p_record_id               NUMBER,
+   p_ret_val           OUT   NUMBER,
+   p_timeout_seconds         NUMBER DEFAULT -1
+)
+/* Description:
+   ------------
+   This function places a lock in PRLOCK for a given record in a table.
+
+   It will complete successfully in any case, whether it could place a lock or
+   not.
+
+   Return Values:
+   --------------
+   0 if the lock couldn't be placed.
+   1 if the lock was placed.
+
+*/
+
+IS
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   v_rowid           ROWID;
+   e_record_locked   EXCEPTION;
+   v_locked          BOOLEAN   := FALSE;
+   v_cnt             NUMBER;
+   v_next_id         NUMBER;
+BEGIN
+   /* Check that the lock is a valid type of lock */
+   SELECT COUNT (*)
+     INTO v_cnt
+     FROM cmn_lookups
+    WHERE lookup_type = 'CMN_LOCK_TYPE'
+      AND lookup_code = p_lock_name;
+
+   IF (v_cnt != 0)
+   THEN
+      SELECT COUNT (*)
+        INTO v_cnt
+        FROM prlock
+       WHERE (  prtablename = p_table_name OR prtablename IS NULL)
+         AND prname = p_lock_name
+         AND prrecordid = p_record_id
+         AND (  (-1 = p_timeout_seconds)
+--   If timeout specified, then compare lockedsince + timeout seconds to current time.
+             OR ((prlockedsince + 1/24/3600 * p_timeout_seconds) &gt; SYSDATE));
+      IF (v_cnt = 0)
+      THEN
+         IF (p_timeout_seconds &gt; 0)
+         THEN
+            /* Clear out any existing expired (- added P_TIMEOUT_SECONDS for bug 68431) locks */
+            cmn_unlock_sp (
+               p_user_id,
+               p_table_name,
+               p_lock_name,
+               p_record_id,
+               p_ret_val,
+               p_timeout_seconds
+            );
+         END IF;
+
+         /* Place a lock */
+         INSERT INTO prlock (
+                        prname,
+                        prtablename,
+                        prrecordid,
+                        prcount,
+                        prlockedsince,
+                        pruserid
+                     )
+              VALUES (
+                 p_lock_name,
+                 p_table_name,
+                 p_record_id,
+                 1,
+                 SYSDATE,
+                 p_user_id
+              );
+         v_locked := TRUE;
+      END IF;
+   END IF;
+
+   IF v_locked
+   THEN
+      p_ret_val := 1;
+   ELSE
+      p_ret_val := 0;
+   END IF;
+
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      p_ret_val := 0;
+      COMMIT;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

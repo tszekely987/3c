@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_COPY_PLAN_TEMPLATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_COPY_PLAN_TEMPLATE_SP" 
+(
+ P_ID NUMBER,
+ P_TEMPLATE_ID NUMBER,
+ P_FROM_PERIOD_INDX INTEGER,
+ P_TO_PERIOD_INDX INTEGER,
+ P_USER NUMBER
+)
+AS
+V_TEMPL_ID NUMBER;
+V_TEMPL_START_PERIOD NUMBER;
+V_TEMPL_END_PERIOD NUMBER;
+V_TEMPL_REVISION NUMBER;
+V_TEMPL_FORECAST_TYPE VARCHAR2(30);
+V_TEMPL_PERIOD_TYPE VARCHAR2(30);
+V_TEMPL_DETAIL_TYPE INTEGER;
+V_FORECAST_ID NUMBER;
+V_STATUS INTEGER;
+V_REVISION NUMBER;
+V_PERIOD_TYPE VARCHAR2(30);
+V_DETAIL_TYPE INTEGER;
+V_PERIOD_ID NUMBER;
+V_PERIOD_INDX INTEGER;
+V_PERCENT_VALUE NUMBER;
+StoO_error Globalpkg.STRING;
+StoO_errmsg Globalpkg.STRING;
+ -- Get the current revision for all the forecasting types
+ CURSOR c_revisions IS
+	SELECT MAX(REVISION) revision,forecast_type
+    FROM PAC_FRC_FORECAST_PROPERTIES
+ 	WHERE PROJECT_ID = P_TEMPLATE_ID
+ 	GROUP BY forecast_type, period_type, use_detail_type;
+ -- Get the time periods for the plan revision
+ CURSOR c_periods IS
+	SELECT id
+    FROM BIZ_COM_PERIODS
+ 	WHERE start_date &gt;= (select start_date from biz_com_periods where id= V_TEMPL_START_PERIOD)
+ 	AND end_date &lt;= (select end_date from biz_com_periods where id=V_TEMPL_END_PERIOD) order by start_date;
+BEGIN
+  -- Get the scale percent value
+  SELECT 1 + NVL(PROCESS_SCALE_BDGT,0)
+  INTO V_PERCENT_VALUE 
+  FROM INV_PROJECTS
+  WHERE PRID = P_ID;
+  FOR c_revision in c_revisions LOOP
+    V_TEMPL_REVISION :=c_revision.revision;
+	V_TEMPL_FORECAST_TYPE := c_revision.forecast_type;
+
+	-- get the current forecast info of the template project
+    StoO_error   := -20993;
+    StoO_errmsg := 'Error retrieving the plan id for the template project';
+	SELECT ID, START_PERIOD, END_PERIOD, period_type, use_detail_type
+	INTO V_TEMPL_ID, V_TEMPL_START_PERIOD, V_TEMPL_END_PERIOD,V_TEMPL_PERIOD_TYPE, V_TEMPL_DETAIL_TYPE
+	FROM PAC_FRC_FORECAST_PROPERTIES
+	WHERE PROJECT_ID = P_TEMPLATE_ID
+	AND FORECAST_TYPE = V_TEMPL_FORECAST_TYPE
+	AND REVISION = V_TEMPL_REVISION;
+	
+    BEGIN 
+      -- get the current forecast info of the copied project
+      StoO_error   := -20994;
+      StoO_errmsg := 'Error retrieving the plan id for the copied project';
+	  
+	  V_FORECAST_ID := NULL;
+	  V_STATUS := NULL;
+	  V_REVISION := NULL;
+	  V_PERIOD_TYPE:= NULL;
+	  V_DETAIL_TYPE := NULL;
+
+      SELECT ID, STATUS, REVISION, period_type, use_detail_type
+        INTO V_FORECAST_ID, V_STATUS, V_REVISION, V_PERIOD_TYPE, V_DETAIL_TYPE
+        FROM PAC_FRC_FORECAST_PROPERTIES
+		WHERE PROJECT_ID = P_ID
+		AND FORECAST_TYPE = V_TEMPL_FORECAST_TYPE
+		AND REVISION = ( SELECT MAX(REVISION) FROM PAC_FRC_FORECAST_PROPERTIES 
+					     WHERE PROJECT_ID = P_ID AND FORECAST_TYPE = V_TEMPL_FORECAST_TYPE);
+	  EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+		  NULL;
+        WHEN OTHERS THEN
+          RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+	END;
+	-- if properties are not similar then throw an error.
+	IF V_TEMPL_PERIOD_TYPE != V_PERIOD_TYPE or V_TEMPL_DETAIL_TYPE != V_DETAIL_TYPE THEN
+	   RAISE_APPLICATION_ERROR(-20995, 'Cannot copy template beacuse the plan properties does not match');
+	END IF;
+	
+	-- delete the data for unapproved plans.
+	IF V_FORECAST_ID IS NOT NULL AND V_STATUS != 2 THEN
+	   DELETE FROM PAC_FRC_FORECAST_PROPERTIES WHERE ID = V_FORECAST_ID;
+	   DELETE FROM PAC_FRC_PROJ_ASSOC WHERE FORECAST_ID = V_FORECAST_ID;
+	   DELETE FROM PAC_FRC_FORECAST_VALUES WHERE FORECAST_DETAILS_ID IN ( SELECT ID FROM PAC_FRC_FORECAST_DETAILS WHERE FORECAST_ID = V_FORECAST_ID);
+	   DELETE FROM PAC_FRC_FORECAST_DETAILS WHERE FORECAST_ID = V_FORECAST_ID;
+	END IF;	   
+	
+	IF V_FORECAST_ID IS NULL OR (V_REVISION = 0 AND V_STATUS != 2) THEN
+	  -- if the forecast id is null then get the new sequence id
+	  IF V_FORECAST_ID IS NULL THEN
+	  	 SELECT PAC_FRC_FORECAST_PROPERTIES_S1.NEXTVAL INTO V_FORECAST_ID FROM DUAL;
+	  END IF;
+	  -- create a revision
+	  -- insert into the forecast properties
+      StoO_error   := -20967;
+      StoO_errmsg := 'Error inserting the plan properties';
+      INSERT INTO PAC_FRC_FORECAST_PROPERTIES
+       (
+         ID,
+         PROJECT_ID,
+         REVISION,
+         REVISION_DESCRIPTION,
+         STATUS,
+         PERIOD_TYPE,
+         START_PERIOD,
+         END_PERIOD,
+         UNIT_OF_MEASURE,
+         BUSINESS_UNIT_NUMBER,
+         USE_DETAIL_TYPE,
+         DEFAULT_VIEW,
+         SHOW_UNITS,
+         SHOW_COST,
+         SHOW_REVENUE,
+         EDIT_UNITS,
+         EDIT_COST,
+         EDIT_REVENUE,
+         PERIODS_PER_SCREEN,
+         CURRENCY_TYPE,
+  	   	 FORECAST_TYPE,
+         CREATED_DATE,
+         CREATED_BY,
+         LAST_UPDATED_DATE,
+         LAST_UPDATED_BY
+       )
+         SELECT V_FORECAST_ID,
+               P_ID,
+               0,
+               NULL,
+               0,
+               PERIOD_TYPE,
+               START_PERIOD,
+               END_PERIOD,
+               UNIT_OF_MEASURE,
+               BUSINESS_UNIT_NUMBER,
+               USE_DETAIL_TYPE,
+               DEFAULT_VIEW,
+               SHOW_UNITS,
+               SHOW_COST,
+               SHOW_REVENUE,
+               EDIT_UNITS,
+               EDIT_COST,
+               EDIT_REVENUE,
+               PERIODS_PER_SCREEN,
+               CURRENCY_TYPE,
+		 	   FORECAST_TYPE,
+               SYSDATE,
+               P_USER,
+               SYSDATE,
+               P_USER
+           FROM PAC_FRC_FORECAST_PROPERTIES
+           WHERE ID=V_TEMPL_ID;
+		   
+    ELSE
+	  -- create a revision by copying from the previous revision
+	  PAC_FRC_CREATE_REVISION_SP(P_ID, P_USER,V_TEMPL_FORECAST_TYPE,V_FORECAST_ID);
+	  
+	  -- update the start and end period from that of the template
+      StoO_error   := -20980;
+      StoO_errmsg := 'Error updating the plan properties';
+	  UPDATE PAC_FRC_FORECAST_PROPERTIES SET START_PERIOD=V_TEMPL_START_PERIOD, 
+	  		 END_PERIOD = V_TEMPL_END_PERIOD
+	  WHERE ID = V_FORECAST_ID;
+    END IF;
+  	-- Copy the plan detail associations.Insert into the plan detail association table
+    StoO_error   := -20969;
+    StoO_errmsg := 'Error copying the detail associations for this plan';
+    INSERT INTO PAC_FRC_PROJ_ASSOC
+         (
+           ID,
+           FORECAST_ID,
+           DETAIL_ID,
+		   DETAIL2_ID,
+		   SORT_ORDER,
+           CREATED_DATE,
+           CREATED_BY,
+           LAST_UPDATED_DATE,
+           LAST_UPDATED_BY
+         )
+         SELECT PAC_FRC_PROJ_ASSOC_S1.NEXTVAL,
+               V_FORECAST_ID,
+               A.DETAIL_ID,
+			   	 A.DETAIL2_ID,
+			   A.SORT_ORDER,
+               SYSDATE,
+               P_USER,
+               SYSDATE,
+               P_USER
+         FROM PAC_FRC_PROJ_ASSOC A
+         WHERE A.FORECAST_ID = V_TEMPL_ID
+   		 AND NOT EXISTS( SELECT 1 FROM PAC_FRC_PROJ_ASSOC AI WHERE AI.FORECAST_ID=V_FORECAST_ID
+                   AND AI.DETAIL_ID = A.DETAIL_ID
+				   AND NVL(AI.DETAIL2_ID,0) = NVL(A.DETAIL2_ID,0));
+	
+	V_PERIOD_INDX := 0;
+	FOR c_period in c_periods LOOP	  
+	  V_PERIOD_ID := c_period.id;
+	  V_PERIOD_INDX := V_PERIOD_INDX + 1;
+	  IF (P_FROM_PERIOD_INDX IS NULL OR V_PERIOD_INDX &gt;= P_FROM_PERIOD_INDX ) 
+	  	 AND ( P_TO_PERIOD_INDX IS NULL OR V_PERIOD_INDX &lt;= P_TO_PERIOD_INDX) THEN	
+	  StoO_error   := -20978;
+      StoO_errmsg := 'Error deleting the plan details';  
+	  DELETE FROM PAC_FRC_FORECAST_VALUES WHERE FORECAST_DETAILS_ID IN 
+	  		 ( SELECT C.ID FROM PAC_FRC_FORECAST_DETAILS C,PAC_FRC_FORECAST_DETAILS T 
+			 WHERE C.FORECAST_ID = V_FORECAST_ID AND T.FORECAST_ID = V_TEMPL_ID 
+			 AND C.PERIOD_ID = V_PERIOD_ID AND T.PERIOD_ID=V_PERIOD_ID
+			 AND C.DETAIL_ID = T.DETAIL_ID AND NVL(C.DETAIL2_ID,0) = NVL(T.DETAIL2_ID,0));
+	  DELETE FROM PAC_FRC_FORECAST_DETAILS WHERE ID IN 
+	  		 ( SELECT C.ID FROM PAC_FRC_FORECAST_DETAILS C,PAC_FRC_FORECAST_DETAILS T 
+			 WHERE C.FORECAST_ID = V_FORECAST_ID AND T.FORECAST_ID = V_TEMPL_ID 
+			 AND C.PERIOD_ID = V_PERIOD_ID AND T.PERIOD_ID=V_PERIOD_ID
+			 AND C.DETAIL_ID = T.DETAIL_ID AND NVL(C.DETAIL2_ID,0) = NVL(T.DETAIL2_ID,0));
+	  
+	  -- Copy the forecast details.Insert into the forecast details table.
+      StoO_error   := -20973;
+      StoO_errmsg := 'Error copying the plan details';
+       INSERT INTO PAC_FRC_FORECAST_DETAILS
+       (
+         ID,
+         FORECAST_ID,
+         PERIOD_ID,
+         DETAIL_ID,
+         UNITS,
+         CREATED_DATE,
+         CREATED_BY,
+         LAST_UPDATED_DATE,
+         LAST_UPDATED_BY
+       )
+         SELECT PAC_FRC_FORECAST_DETAILS_S1.NEXTVAL,
+               V_FORECAST_ID,
+               PERIOD_ID,
+               DETAIL_ID,
+               V_PERCENT_VALUE * UNITS ,
+               SYSDATE,
+               P_USER,
+               SYSDATE,
+               P_USER
+           FROM PAC_FRC_FORECAST_DETAILS
+           WHERE FORECAST_ID=V_TEMPL_ID
+		   AND PERIOD_ID = V_PERIOD_ID;
+
+ 	  -- Copy the forecast values.Insert into the forecast values table.
+      StoO_error   := -20974;
+      StoO_errmsg := 'Error copying the plan values';                
+      INSERT INTO PAC_FRC_FORECAST_VALUES
+      (
+        ID,
+        FORECAST_DETAILS_ID,
+        CURRENCY_TYPE,
+        CURRENCY_CODE,
+        COST,
+        REVENUE,
+        ACTUAL_BENEFITS
+      )
+        SELECT PAC_FRC_FORECAST_VALUES_S1.NEXTVAL,
+              DP.ID,
+              V.CURRENCY_TYPE,
+              V.CURRENCY_CODE,
+              V_PERCENT_VALUE * V.COST,
+              V_PERCENT_VALUE * V.REVENUE,
+              V_PERCENT_VALUE * V.ACTUAL_BENEFITS
+          	  FROM PAC_FRC_FORECAST_DETAILS D,
+              PAC_FRC_FORECAST_VALUES V,
+			  PAC_FRC_FORECAST_DETAILS DP
+        WHERE D.FORECAST_ID = V_TEMPL_ID
+		  AND D.PERIOD_ID = V_PERIOD_ID
+          AND D.ID = V.FORECAST_DETAILS_ID
+		  AND DP.FORECAST_ID = V_FORECAST_ID
+		  AND DP.PERIOD_ID = D.PERIOD_ID
+		  AND DP.DETAIL_ID = D.DETAIL_ID
+		  AND NVL(DP.DETAIL2_ID,0) = NVL(D.DETAIL2_ID,0);
+	  END IF;	
+	END LOOP;/* looping through the time periods*/
+
+ END LOOP;/* looping through all the forecast types*/
+ EXCEPTION
+   WHEN NO_DATA_FOUND THEN
+     NULL;
+   WHEN OTHERS THEN
+     RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);	
+END PAC_FRC_COPY_PLAN_TEMPLATE_SP;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

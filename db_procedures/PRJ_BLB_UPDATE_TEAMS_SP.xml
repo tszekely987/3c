@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_UPDATE_TEAMS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_UPDATE_TEAMS_SP" 
+	AS
+	BEGIN
+		LOOP
+			UPDATE PRTEAM
+			SET SLICE_STATUS = 1, HARD_SLICE_STATUS = 1
+			WHERE PRID IN
+			(
+				SELECT t.prID
+				FROM PRTeam t, INV_INVESTMENTS i, PRCalendar c, SRM_RESOURCES s, PRJ_RESOURCES r
+				WHERE t.prResourceID = r.prID
+				AND t.prProjectID = i.ID
+				AND r.prCalendarID = c.prID
+				AND r.prID = s.ID
+				AND ( i.SLICE_STATUS = 2
+							OR
+							r.SLICE_STATUS IS NOT NULL
+							OR
+							c.SLICE_STATUS = 2
+							OR
+							s.SLICE_STATUS = 2 )
+				minus
+				select 	t.prid
+				from 		prteam t
+				where 	t.slice_status = 1
+				and 		T.HARD_SLICE_STATUS = 1
+			)
+      AND ROWNUM &lt;= 10000;
+
+			EXIT WHEN SQL%ROWCOUNT = 0;
+			COMMIT;
+		END LOOP;
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

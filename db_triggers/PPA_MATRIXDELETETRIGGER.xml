@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXDELETETRIGGER</code>
+          <table_name>PPA_MATRIX</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."PPA_MATRIXDELETETRIGGER" 
+AFTER DELETE
+ON PPA_MATRIX
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  l_Count           NUMBER;
+  cMsg              GLOBALPKG.STRING;
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   COUNT(*)
+		INTO l_Count FROM DUAL
+		WHERE EXISTS (
+		SELECT  1
+     FROM pac_mnt_projects p
+		WHERE p.ratematrix = 1
+		 AND
+		(p.budgetratesourcelabor = :OLD.MatrixKey
+		 OR p.budgetratesourceequipment = :OLD.MatrixKey
+		 OR p.budgetratesourcematerials = :OLD.MatrixKey
+		 OR p.budgetcostsourcelabor = :OLD.MatrixKey
+		 OR p.budgetcostsourceequipment = :OLD.MatrixKey
+		 OR p.budgetcostsourcematerials = :OLD.MatrixKey
+		 OR p.transratesourcelabor = :OLD.MatrixKey
+		 OR p.transratesourceequipment = :OLD.MatrixKey
+		 OR p.transratesourcematerials = :OLD.MatrixKey
+		 OR p.transcostsourcelabor = :OLD.MatrixKey
+		 OR p.transcostsourceequipment = :OLD.MatrixKey
+		 OR p.transcostsourcematerials = :OLD.MatrixKey
+		 OR p.transratesourceexpenses = :OLD.MatrixKey
+		 OR p.transcostsourceexpenses = :OLD.MatrixKey) );
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF l_Count &lt;&gt; 0 THEN
+    BEGIN
+      raise_application_error(-20431, 'You cannot delete a matrix when it is used by a PROJECT_CODE.');
+    END;
+	END IF;
+END ppa_MatrixDeleteTrigger;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,209 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_CMN_PERIOD_V">
+    <indexes/>
+    <text_length>11472</text_length>
+    <text>SELECT CAST(D.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 1000000 AS INTEGER) PERIOD_KEY,
+       CAST(D.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 1000000 AS INTEGER) CLARITY_PERIOD_KEY,
+       'DAILY' PERIOD_TYPE_KEY,
+       D.START_DATE PERIOD_START_DATE,
+       D.END_DATE PERIOD_END_DATE,
+       NVL(CAST(M.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER),0) MONTH_KEY,
+       M.START_DATE MONTH_START_DATE,
+       M.END_DATE MONTH_END_DATE,
+       NVL(CAST(Q.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 4000000 AS INTEGER),0) QUARTER_KEY,
+       Q.START_DATE QUARTER_START_DATE,
+       Q.END_DATE QUARTER_END_DATE,
+       NVL(CAST(Y.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 4500000 AS INTEGER),0) YEAR_KEY,
+       Y.START_DATE YEAR_START_DATE,
+       Y.END_DATE YEAR_END_DATE,
+       0 ENTITY_KEY,
+       NULL ENTITY_ID,
+       NULL ENTITY,
+       D.FTE PERIOD_FTE,
+       D.CREATED_DATE CLARITY_CREATED_DATE,
+       D.LAST_UPDATED_DATE LAST_UPDATED_DATE,
+       L.LANGUAGE_CODE_KEY,
+       L.LANGUAGE_CODE,
+      (SELECT NAME FROM CMN_LOOKUPS_V WHERE LOOKUP_CODE = 'DAILY'
+                                      AND   LOOKUP_TYPE = 'DWH_CMN_PERIOD_TYPES'
+                                      AND   LANGUAGE_CODE = L.LANGUAGE_CODE) PERIOD_TYPE,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_MONTH,M.START_DATE,'M') MONTH_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_QUARTER,Q.START_DATE,'Q') QUARTER_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_YEAR,Y.START_DATE,'A') YEAR_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_DAY,D.START_DATE,'D') PERIOD_NAME
+FROM   rpt_calendar d
+       LEFT OUTER JOIN rpt_calendar m ON d.start_date BETWEEN m.start_date AND m.end_date
+                                     AND m.period_type = 'MONTHLY'
+       LEFT OUTER JOIN rpt_calendar q ON d.start_date BETWEEN q.start_date AND q.end_date
+                                     AND q.period_type = 'QUARTERLY'
+       LEFT OUTER JOIN rpt_calendar y ON d.start_date BETWEEN y.start_date AND y.end_date
+                                     AND y.period_type = 'ANNUALLY'
+       INNER JOIN (SELECT f.language_code_key,
+                          f.language_code,
+                          dwh_cal_dateformat_fct(f.language_code,'D') format_day,
+                          dwh_cal_dateformat_fct(f.language_code,'M') format_month,
+                          dwh_cal_dateformat_fct(f.language_code,'Q') format_quarter,
+                          dwh_cal_dateformat_fct(f.language_code,'A') format_year
+                   FROM  (SELECT DISTINCT l.id language_code_key,
+                                 l.language_code
+                          FROM   cmn_languages l
+                          WHERE  l.is_dw_enabled = 1) f) l ON 1=1
+WHERE  d.period_type = 'DAILY'
+UNION ALL
+SELECT CAST(W.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) PERIOD_KEY,
+       CAST(W.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) CLARITY_PERIOD_KEY,
+       'WEEKLY' PERIOD_TYPE_KEY,
+       W.START_DATE PERIOD_START_DATE,
+       W.END_DATE PERIOD_END_DATE,
+       0 MONTH_KEY,
+       NULL MONTH_START_DATE,
+       NULL MONTH_END_DATE,
+       0 QUARTER_KEY,
+       NULL QUARTER_START_DATE,
+       NULL QUARTER_END_DATE,
+       NVL(CAST(Y.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 4500000 AS INTEGER),0) YEAR_KEY,
+       Y.START_DATE YEAR_START_DATE,
+       Y.END_DATE YEAR_END_DATE,
+       0 ENTITY_KEY,
+       NULL ENTITY_ID,
+       NULL ENTITY,
+       W.FTE PERIOD_FTE,
+       W.CREATED_DATE CLARITY_CREATED_DATE,
+       W.LAST_UPDATED_DATE LAST_UPDATED_DATE,
+       L.LANGUAGE_CODE_KEY,
+       L.LANGUAGE_CODE,
+      (SELECT NAME FROM CMN_LOOKUPS_V WHERE LOOKUP_CODE = 'WEEKLY'
+                                      AND   LOOKUP_TYPE = 'DWH_CMN_PERIOD_TYPES'
+                                      AND   LANGUAGE_CODE = L.LANGUAGE_CODE) PERIOD_TYPE,
+       NULL MONTH_NAME,
+       NULL QUARTER_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_YEAR,Y.START_DATE,'A') YEAR_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_WEEK,W.START_DATE,'W') PERIOD_NAME
+FROM   rpt_calendar w
+       LEFT OUTER JOIN rpt_calendar y ON w.start_date BETWEEN y.start_date AND y.end_date
+                                AND y.period_type = 'ANNUALLY'
+       INNER JOIN (SELECT f.language_code_key,
+                          f.language_code,
+                          dwh_cal_dateformat_fct(f.language_code,'W') format_week,
+                          dwh_cal_dateformat_fct(f.language_code,'A') format_year
+                   FROM  (SELECT DISTINCT l.id language_code_key,
+                                 l.language_code
+                          FROM   cmn_languages l
+                          WHERE  l.is_dw_enabled = 1) f) l ON 1=1
+WHERE  w.period_type = 'WEEKLY'
+UNION ALL
+SELECT CAST(M.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) PERIOD_KEY,
+       CAST(M.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) CLARITY_PERIOD_KEY,
+       'MONTHLY' PERIOD_TYPE_KEY,
+       M.START_DATE PERIOD_START_DATE,
+       M.END_DATE PERIOD_END_DATE,
+       NVL(CAST(M.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER),0) MONTH_KEY,
+       M.START_DATE MONTH_START_DATE,
+       M.END_DATE MONTH_END_DATE,
+       NVL(CAST(Q.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 4000000 AS INTEGER),0) QUARTER_KEY,
+       Q.START_DATE QUARTER_START_DATE,
+       Q.END_DATE QUARTER_END_DATE,
+       NVL(CAST(Y.START_DATE - TO_DATE('01/01/2000','MM/DD/YYYY') + 4500000 AS INTEGER),0) YEAR_KEY,
+       Y.START_DATE YEAR_START_DATE,
+       Y.END_DATE YEAR_END_DATE,
+       0 ENTITY_KEY,
+       NULL ENTITY_ID,
+       NULL ENTITY,
+       M.FTE PERIOD_FTE,
+       M.CREATED_DATE CLARITY_CREATED_DATE,
+       M.LAST_UPDATED_DATE LAST_UPDATED_DATE,
+       L.LANGUAGE_CODE_KEY,
+       L.LANGUAGE_CODE,
+      (SELECT NAME FROM CMN_LOOKUPS_V WHERE LOOKUP_CODE = 'MONTHLY'
+                                      AND   LOOKUP_TYPE = 'DWH_CMN_PERIOD_TYPES'
+                                      AND   LANGUAGE_CODE = L.LANGUAGE_CODE) PERIOD_TYPE,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_MONTH,M.START_DATE,'M') MONTH_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_QUARTER,Q.START_DATE,'Q') QUARTER_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_YEAR,Y.START_DATE,'A') YEAR_NAME,
+       DWH_CAL_DATELABEL_FCT(L.LANGUAGE_CODE,L.FORMAT_MONTH,M.START_DATE,'M') PERIOD_NAME
+FROM   rpt_calendar m
+       LEFT OUTER JOIN rpt_calendar q ON m.start_date BETWEEN q.start_date AND q.end_date
+                                AND q.period_type = 'QUARTERLY'
+       LEFT OUTER JOIN rpt_calendar y ON m.start_date BETWEEN y.start_date AND y.end_date
+                                AND y.period_type = 'ANNUALLY'
+       INNER JOIN (SELECT f.language_code_key,
+                          f.language_code,
+                          dwh_cal_dateformat_fct(f.language_code,'M') format_month,
+                          dwh_cal_dateformat_fct(f.language_code,'Q') format_quarter,
+                          dwh_cal_dateformat_fct(f.language_code,'A') format_year
+                   FROM  (SELECT DISTINCT l.id language_code_key,
+                                 l.language_code
+                          FROM   cmn_languages l
+                          WHERE  l.is_dw_enabled = 1) f) l ON 1=1
+WHERE  m.period_type = 'MONTHLY'
+UNION ALL
+SELECT BP.ID PERIOD_KEY,
+       BP.ID CLARITY_PERIOD_KEY,
+       'FISCAL' PERIOD_TYPE_KEY,
+       BP.START_DATE PERIOD_START_DATE,
+       BP.END_DATE - 1 PERIOD_END_DATE,
+       0 MONTH_KEY,
+       NULL MONTH_START_DATE,
+       NULL MONTH_END_DATE,
+       NVL(BQ.ID,0) QUARTER_KEY,
+       BQ.START_DATE QUARTER_START_DATE,
+       BQ.END_DATE - 1 QUARTER_END_DATE,
+       NVL(BA.ID,0) YEAR_KEY,
+       BA.START_DATE YEAR_START_DATE,
+       BA.END_DATE - 1 YEAR_END_DATE,
+       BP.ENTITY_ID ENTITY_KEY,
+       E.ENTITY ENTITY_ID,
+       E.SHORTDESC ENTITY,
+       NVL((SELECT FTE_CONVERSION
+            FROM   TABLE(crv_fiscal_calendar_fct(BP.PERIOD_TYPE,BP.START_DATE,BP.END_DATE-1,NULL,'ENTITY=' || e.entity || ',FTE_CALENDAR'))),0) / 3600 PERIOD_FTE,
+       BP.CREATED_DATE CLARITY_CREATED_DATE,
+       BP.LAST_UPDATED_DATE LAST_UPDATED_DATE,
+       L.LANGUAGE_CODE_KEY,
+       L.LANGUAGE_CODE,
+      (SELECT NAME FROM CMN_LOOKUPS_V WHERE LOOKUP_CODE = 'FISCAL'
+                                      AND   LOOKUP_TYPE = 'DWH_CMN_PERIOD_TYPES'
+                                      AND   LANGUAGE_CODE = L.LANGUAGE_CODE) PERIOD_TYPE,
+       NULL MONTH_NAME,
+      (SELECT NAME FROM CMN_CAPTIONS_NLS WHERE PK_ID = BQ.ID
+                                                   AND LANGUAGE_CODE = L.LANGUAGE_CODE
+                                                   AND TABLE_NAME = 'BIZ_COM_PERIODS') QUARTER_NAME,
+      (SELECT NAME FROM CMN_CAPTIONS_NLS WHERE PK_ID = BA.ID
+                                                   AND LANGUAGE_CODE = L.LANGUAGE_CODE
+                                                   AND TABLE_NAME = 'BIZ_COM_PERIODS') YEAR_NAME,
+      (SELECT NAME FROM CMN_CAPTIONS_NLS WHERE PK_ID = BP.ID
+                                                   AND LANGUAGE_CODE = L.LANGUAGE_CODE
+                                                   AND TABLE_NAME = 'BIZ_COM_PERIODS') PERIOD_NAME
+FROM   biz_com_periods bp
+       INNER JOIN (SELECT DISTINCT l.id language_code_key,
+                          l.language_code
+                   FROM   cmn_languages l
+                   WHERE  l.is_dw_enabled = 1) l ON 1=1
+       LEFT OUTER JOIN biz_com_periods bq ON bp.entity_id = bq.entity_id
+                                         AND bp.start_date BETWEEN bq.start_date AND bq.end_date - 1
+                                         AND bq.period_type = 'QUARTERLY'
+       LEFT OUTER JOIN biz_com_periods ba ON bp.entity_id = ba.entity_id
+                                         AND bp.start_date BETWEEN ba.start_date AND ba.end_date - 1
+                                         AND ba.period_type = 'ANNUALLY'
+       INNER JOIN entity e ON bp.entity_id = e.id
+WHERE bp.id IN (SELECT d.period_key
+               FROM  (SELECT p.id period_key,
+                             p.start_date period_start,
+                             r.row_count,
+                             ROW_NUMBER () OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                      FROM   biz_com_periods p,
+                             dwh_settings s,
+                            (SELECT MIN (from_date) from_date,
+                                    MAX (num_periods) row_count
+                             FROM   prj_blb_slicerequests
+                             WHERE  is_dwh_request = 1
+                             AND request_name LIKE '%dwh_fiscal') r
+                      WHERE  p.entity_id = s.entity_key
+                      AND    p.period_type = CASE WHEN (SELECT COUNT(1)
+                                                        FROM   biz_com_periods
+                                                        WHERE  period_type = 'MONTHLY'
+                                                        AND    entity_id = (SELECT entity_key FROM dwh_settings)) > 0
+                                                  THEN 'MONTHLY' ELSE '13_PERIODS_PER_YEAR' END
+                      AND    p.start_date >= r.from_date) d
+                WHERE d.row_key &lt;= d.row_count)</text>
+  </QueryResult>
+</ClarityDBViewQuery>

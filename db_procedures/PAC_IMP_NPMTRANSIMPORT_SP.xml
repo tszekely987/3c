@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_IMP_NPMTRANSIMPORT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_IMP_NPMTRANSIMPORT_SP" 
+( p_job_run_id	in   number,
+  p_job_user_id	in   number,
+  dtrans_from_date VARCHAR2 DEFAULT NULL,
+  dtrans_to_date VARCHAR2 DEFAULT NULL,
+  P_BATCH_HEADER NUMBER DEFAULT 0)
+AS
+  StoO_selcnt	INTEGER;
+  StoO_error 	INTEGER;
+  StoO_rowcnt	INTEGER;
+  StoO_crowcnt	INTEGER := 0;
+  StoO_fetchstatus	INTEGER := 0;
+  StoO_errmsg	GLOBALPKG.STRING;
+  StoO_sqlstatus	INTEGER;
+
+  cUser VARCHAR2(32);
+  noOfTransactions NUMBER;
+  noOfFailures NUMBER;
+  jobid   number := 0 ;
+  successStatus NUMBER(1) := 1;
+  nMasterKey	NUMBER;
+  oldMasterKey  NUMBER;
+  nErrorCode    NUMBER := 0;
+  cStatus		VARCHAR2(1);
+  cFatalStatus	VARCHAR2(2000);
+  validation_error EXCEPTION;
+  nDocType      NUMBER;
+  dFromDate		Date;
+  dToDate		Date;
+
+  
+  CURSOR HEADERS_CURSOR IS
+     SELECT ID
+      FROM PAC_IMP_TRANSIMPORT_HEADER;
+
+BEGIN
+  BEGIN-- Get default User
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+    SELECT DEFAULT_VALUE
+    INTO cUser
+	FROM DEFAULT_COSTKEY_VALUES
+	WHERE COSTKEY_LEVEL = 4;
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+      NULL;
+  END;-- End Get default User
+
+  cUser := NVL(TRIM(cUser), 'admin');
+
+  BEGIN -- Get JobId 
+    SELECT IMP_TRANSACTIONIMPORT_JOBID_S1.NEXTVAL
+      INTO jobid
+      FROM DUAL;
+  EXCEPTION
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(-20878, StoO_errmsg || ' - ' || 'Error reading PAC_IMP_TRANSIMPORT_HEADER');
+  END;-- End Get JobId
+
+  BEGIN
+    
+    IF dTRANS_FROM_DATE IS NULL OR dTRANS_FROM_DATE = '' THEN
+      dFromDate := TO_DATE('01/01/1900', 'MM/DD/YYYY');
+      ELSE
+      dFromDate := TO_DATE(SUBSTR(dTRANS_FROM_DATE,1,10), 'YYYY-MM-DD');
+    END IF;
+
+    IF dTRANS_TO_DATE IS NULL OR dTRANS_TO_DATE = '' THEN
+      dToDate := TO_DATE('12/31/2999', 'MM/DD/YYYY');
+      ELSE
+      dToDate := TO_DATE(SUBSTR(dTRANS_TO_DATE,1,10), 'YYYY-MM-DD');
+    END IF;
+	
+    dToDate   := dToDate + ((23) /24) + (59) / (24 * 60);
+
+    --Update he status for the details that doesn't have master with "N" except the 'hold' once.
+    UPDATE IMP_TRANSACTIONIMPORT
+      SET IMPORTSTATUS = 'N'
+      WHERE PAC_IMP_HEADER_ID = P_BATCH_HEADER
+      AND IMPORTSTATUS != 'H'
+      AND TRANSDATE BETWEEN dFromDate AND dToDate;
+    -- END Update the status of all details with "N"
+
+    IMP_PROCESSTRANSIMPORTTABLE (
+        cUserID=&gt;cUser,
+        bValidateOnly=&gt;0,
+        bDisableResultSet=&gt;1,
+        bDeleteImportedRows=&gt;1,
+        dFromDate=&gt;dFromDate,
+        dToDate=&gt;dToDate,
+        bDeleteAllImported=&gt;0,
+        nDocType =&gt;0,
+        nJobID=&gt;jobid,
+        nHeaderID=&gt;P_BATCH_HEADER
+    );
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+  END;--Now Call the sub procedure for the Transactions that doesn't have the header information
+
+  IF P_BATCH_HEADER IS NULL OR P_BATCH_HEADER = 0 THEN
+  BEGIN
+    FOR HEADER_REC IN HEADERS_CURSOR LOOP
+      BEGIN -- Begin LOOP
+        BEGIN -- Handle the Exception thrown by the inner block
+          BEGIN -- Check if any detail trans for this master in hold
+            StoO_selcnt := 0;
+            SELECT 1 INTO StoO_selcnt
+              FROM DUAL
+              WHERE  EXISTS (
+                SELECT  1
+                FROM IMP_TRANSACTIONIMPORT I
+                WHERE I.PAC_IMP_HEADER_ID = HEADER_REC.ID
+                AND I.ImportStatus = 'H' 
+                AND TRANSDATE BETWEEN dFromDate AND dToDate);
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END; -- END Check if any detail trans for this master in hold
+
+          IF StoO_selcnt = 1 THEN
+            nErrorCode := 9002; --  Detail trans are on hold
+            cStatus := 'H';
+            RAISE validation_error;
+          END IF; -- END IF StoO_selcnt = 1
+
+          ---Check if the header doesn't have any detail
+          BEGIN
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  1
+              FROM IMP_TRANSACTIONIMPORT I
+              WHERE I.PAC_IMP_HEADER_ID = HEADER_REC.ID);
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+					  NULL; -- Hedaer doesn't have any detail, just ignore and move on..
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END; -- ---Check if the header doesn't have any detail
+          --Validate VENDOR_CODE
+          BEGIN -- VALIDATE VENDOR CODE
+            SELECT 1 INTO StoO_selcnt
+              FROM PAC_IMP_TRANSIMPORT_HEADER PH
+              WHERE  ID = HEADER_REC.ID
+              AND (PH.VENDOR_CODE IS NULL OR EXISTS
+			  ( SELECT 1
+              FROM INT_VENDORS I
+              WHERE I.VENDOR_CODE = PH.VENDOR_CODE));
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              cStatus := 'E';
+              nErrorCode := 9005; -- Invalid or Inactive Vendor code
+              BEGIN -- Update the status of all details with Error Code
+		        UPDATE IMP_TRANSACTIONIMPORT
+                SET IMPORTSTATUS = 'E',
+                ERRORCODE = 9005
+                WHERE PAC_IMP_HEADER_ID = HEADER_REC.ID
+                AND TRANSDATE BETWEEN dFromDate AND dToDate;
+              EXCEPTION
+                WHEN OTHERS THEN
+                  RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+              END;-- Update the status of all details with Error Code
+              RAISE validation_error;
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END; -- END VALIDATE VENDOR CODE
+
+          --Validate INCURRED_BY
+          BEGIN -- VALIDATE INCURRED_BY
+            SELECT 1 INTO StoO_selcnt
+              FROM PAC_IMP_TRANSIMPORT_HEADER PH
+              WHERE  ID = HEADER_REC.ID
+              AND (PH.INCURRED_BY IS NULL OR EXISTS(
+                SELECT 1
+                FROM SRM_RESOURCES,PAC_MNT_RESOURCES
+                WHERE SRM_RESOURCES.ID = PAC_MNT_RESOURCES.ID
+                AND NLS_UPPER(RESOURCE_CODE) like NLS_UPPER(PH.INCURRED_BY)
+                AND SRM_RESOURCES.RESOURCE_TYPE=0));
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              cStatus := 'E';
+              nErrorCode := 9006; -- Invalid or Inactive Resource Code (Incurred by)
+              BEGIN -- Update the status of all details with Error Code
+                UPDATE IMP_TRANSACTIONIMPORT
+                SET IMPORTSTATUS = 'E',
+                ERRORCODE = 9006
+                WHERE PAC_IMP_HEADER_ID = HEADER_REC.ID
+                AND TRANSDATE BETWEEN dFromDate AND dToDate;
+              EXCEPTION
+                WHEN OTHERS THEN
+                  RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+              END;-- Update the status of all details with Error Code
+              RAISE validation_error;
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END; -- END VALIDATE INCURRED_BY
+
+          --VAlidate DOCUMENT_TYPE
+          BEGIN
+            nDocType := 0;
+            SELECT DOCUMENT_TYPE INTO nDocType
+            FROM PAC_IMP_TRANSIMPORT_HEADER PH
+            WHERE  ID = HEADER_REC.ID;
+            IF nDocType = 51 THEN
+              SELECT ID INTO nDocType FROM CMN_LOOKUPS
+              WHERE LOOKUP_TYPE = 'PAC_DOCUMENT_TYPE'
+              AND LOOKUP_CODE = 'NIKU_TIME';
+            ELSE 
+			  IF nDocType = 50 THEN
+                SELECT ID INTO nDocType FROM CMN_LOOKUPS
+                WHERE LOOKUP_TYPE = 'PAC_DOCUMENT_TYPE'
+                AND LOOKUP_CODE = 'IMPORTED';
+              ELSE
+                nErrorCode := 90007; --Invalid Document Type
+                BEGIN -- Update the status of all details with Error Code
+                  UPDATE IMP_TRANSACTIONIMPORT
+                  SET IMPORTSTATUS = 'E',
+                    ERRORCODE = 9007
+                  WHERE PAC_IMP_HEADER_ID = HEADER_REC.ID
+                  AND TRANSDATE BETWEEN dFromDate AND dToDate;
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+                END;-- Update the status of all details with Error Code
+                RAISE validation_error;
+              END IF; -- END IF nDocType = 50 
+            END IF; -- END IF nDocType = 51 
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END;--END VAlidate DOCUMENT_TYPE
+
+          BEGIN -- Update he status of all details with "N", No hold , no error, so we can move to the detail trans.
+            UPDATE IMP_TRANSACTIONIMPORT
+            SET IMPORTSTATUS = 'N'
+            WHERE PAC_IMP_HEADER_ID = HEADER_REC.ID
+            AND TRANSDATE BETWEEN dFromDate AND dToDate;
+          EXCEPTION
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END;-- END Update he status of all details with "N"
+
+          UPDATE PAC_IMP_TRANSIMPORT_HEADER
+          SET ERRORCODE = 0,
+              IMPORTSTATUS = 'N',
+              FATALERROR = NULL
+          WHERE ID = HEADER_REC.ID;
+
+          BEGIN -- Call IMP_PROCESSTRANSIMPORTTABLE
+		  
+            IMP_PROCESSTRANSIMPORTTABLE(cUserID=&gt;cUser,
+                    bValidateOnly=&gt;0,
+                    bDisableResultSet=&gt;1,
+                    bDeleteImportedRows=&gt;1,
+                    dFromDate=&gt;dFromDate ,
+                    dToDate=&gt;dToDate,
+                    bDeleteAllImported=&gt;0,
+			      	nDocType=&gt;nDocType,
+                    nJobID=&gt;jobid,
+                    nHeaderID=&gt;HEADER_REC.ID
+                    );
+          EXCEPTION
+            WHEN OTHERS THEN
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+          END;  -- End Call IMP_PROCESSTRANSIMPORTTABLE
+
+        EXCEPTION -- Handle the Exception thrown by the inner block
+          WHEN validation_error THEN
+                BEGIN -- UPDATE header with Error code
+                  cFatalStatus := NULL;
+                  UPDATE PAC_IMP_TRANSIMPORT_HEADER
+                  SET ERRORCODE = nErrorCode,
+                  IMPORTSTATUS = cStatus,
+                  FATALERROR = cFatalStatus
+                  WHERE ID = HEADER_REC.ID;
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ) ;
+                END; -- END UPDATE header with Error code
+          WHEN OTHERS THEN
+            BEGIN -- UPDATE header with Error code
+              nErrorCode := 9010; -- Fatal Error, Contact your system administrator
+              cStatus := 'E';
+              cFatalStatus := SUBSTR(SQLCODE || ' - ' || SQLERRM, 0,1999);
+              UPDATE PAC_IMP_TRANSIMPORT_HEADER
+       	      SET ERRORCODE = nErrorCode,
+                 IMPORTSTATUS = cStatus,
+                 FATALERROR = cFatalStatus
+                 WHERE ID = HEADER_REC.ID;
+            EXCEPTION
+              WHEN OTHERS THEN
+                RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+            END; -- END UPDATE header with Error code
+        END; -- Handle the Exception thrown by the inner block
+      END;
+    END LOOP;
+  EXCEPTION
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(-20878, StoO_error || ' - ' || StoO_errmsg );
+  END;
+  END IF; --  IF P_BATCH_HEADER IS NULL OR P_BATCH_HEADER = 0 THEN 
+
+  delete from PPA_TRANSCONTROLAPINFO where 
+  document_type in (SELECT ID FROM CMN_LOOKUPS WHERE LOOKUP_TYPE = 'PAC_DOCUMENT_TYPE' AND LOOKUP_CODE IN( 'NIKU_TIME','IMPORTED'))
+  and id not in (select ppa_transcontrolapinfo_id from ppa_transcontrol pt);
+
+
+END PAC_IMP_NPMTRANSIMPORT_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

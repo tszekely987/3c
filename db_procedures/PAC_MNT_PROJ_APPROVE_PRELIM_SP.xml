@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_PROJ_APPROVE_PRELIM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_PROJ_APPROVE_PRELIM_SP" (
+  RESOURCE_CODE   VARCHAR2 ,
+  RC1   IN OUT PAC_MNT_PROJ_APPROVE_PRELIMPkg.RCT1)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	OPEN RC1 FOR
+  SELECT r.COMPANY_CODE,  r.PROJECT_CODE,  i.NAME,  r.projrevisionid,  NVL(r.AWAITAPPRVL_RESOURCE_CODE, p.AWAITAPPRVL_RESOURCE_CODE) "Submitter",  NVL(r.needapprovaldatetime, p.needapprovaldatetime) "Date_Submitted"
+    FROM projrevision r, 
+	     pac_mnt_projects p,
+		 inv_investments i
+	WHERE p.id = i.id
+	 AND r.awaitingapproval = 1
+	 AND r.approved = 0
+	 AND r.COMPANY_CODE = p.COMPANY_CODE
+	 AND r.PROJECT_CODE = p.PROJECT_CODE
+	 AND EXISTS (
+	SELECT  1
+	 FROM projstaff s
+	WHERE s.COMPANY_CODE = r.COMPANY_CODE
+	 AND s.PROJECT_CODE = r.PROJECT_CODE
+	 AND s.RESOURCE_CODE = PAC_MNT_PROJ_APPROVE_PRELIM_SP.RESOURCE_CODE );
+END PAC_MNT_PROJ_APPROVE_PRELIM_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

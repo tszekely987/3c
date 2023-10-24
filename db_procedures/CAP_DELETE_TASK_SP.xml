@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_DELETE_TASK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_DELETE_TASK_SP" (
+  P_TASK_ID    IN NUMBER
+  )
+AS
+BEGIN
+  
+  -- This script is intended to delete tasks and assignments
+  -- from the context of all scenarios when plan of record task is deleted.
+  DELETE FROM PRJ_BLB_SLICES_D_CAP_ETC WHERE PRJ_OBJECT_ID IN (SELECT ASSIGNMENT_ID FROM CAP_SCENARIO_ASSIGNMENTS WHERE TASK_ID = P_TASK_ID );
+  DELETE FROM PRJ_BLB_SLICES_W_CAP_ETC WHERE PRJ_OBJECT_ID IN (SELECT ASSIGNMENT_ID FROM CAP_SCENARIO_ASSIGNMENTS WHERE TASK_ID = P_TASK_ID );
+  DELETE FROM PRJ_BLB_SLICES_M_CAP_ETC WHERE PRJ_OBJECT_ID IN (SELECT ASSIGNMENT_ID FROM CAP_SCENARIO_ASSIGNMENTS WHERE TASK_ID = P_TASK_ID );
+  DELETE FROM CAP_SCENARIO_TASKS WHERE TASK_ID = P_TASK_ID;  
+  DELETE FROM CAP_SCENARIO_ASSIGNMENTS WHERE TASK_ID = P_TASK_ID;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

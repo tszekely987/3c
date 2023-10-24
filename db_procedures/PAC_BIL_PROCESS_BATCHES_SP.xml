@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_PROCESS_BATCHES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_PROCESS_BATCHES_SP" 
+(
+  cUserID                  VARCHAR2,
+  bSelective               NUMBER,
+  in_cBegEntity         IN VARCHAR2,
+  in_cEndEntity         IN VARCHAR2,
+  in_cBegLocation       IN VARCHAR2,
+  in_cEndLocation       IN VARCHAR2,
+  in_cBegDepartment     IN VARCHAR2,
+  in_cEndDepartment     IN VARCHAR2,
+  in_cBegClient         IN VARCHAR2,
+  in_cEndClient         IN VARCHAR2,
+  in_cBegProjClass      IN VARCHAR2,
+  in_cEndProjClass      IN VARCHAR2,
+  in_cBillCycle         IN VARCHAR2,
+  cBillDate                VARCHAR2,
+  in_cFinProjectType       VARCHAR2,
+  bConsolidateInvoices     NUMBER,
+  generateNegativeInvoices NUMBER,
+  bAutoPost                NUMBER,
+  iBillRunKey       IN OUT NUMBER,
+  bError               OUT NUMBER,
+  iRetainPrecision	    IN NUMBER DEFAULT 1 -- retain precision change
+)
+AS
+  cBegEntity  GLOBALPKG.STRING;
+  cEndEntity  GLOBALPKG.STRING;
+  cBegLocation  GLOBALPKG.STRING;
+  cEndLocation  GLOBALPKG.STRING;
+  cBegDepartment  GLOBALPKG.STRING;
+  cEndDepartment  GLOBALPKG.STRING;
+  cBegClient  GLOBALPKG.STRING;
+  cEndClient  GLOBALPKG.STRING;
+  cBegProjClass   GLOBALPKG.STRING;
+  cEndProjClass   GLOBALPKG.STRING;
+  cBillCycle  GLOBALPKG.STRING;
+  cFinProjectType   GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  cActionID   GLOBALPKG.STRING;
+  dActionDate   DATE;
+  iTotCount   INTEGER;
+  nTotAmount  NUMBER(32, 6);
+  errorCount  NUMBER(10,0);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	Pac_Bil_Process_Batches_Sp.cBegEntity := Pac_Bil_Process_Batches_Sp.in_cBegEntity;
+	Pac_Bil_Process_Batches_Sp.cEndEntity := Pac_Bil_Process_Batches_Sp.in_cEndEntity;
+	Pac_Bil_Process_Batches_Sp.cBegLocation := Pac_Bil_Process_Batches_Sp.in_cBegLocation;
+	Pac_Bil_Process_Batches_Sp.cEndLocation := Pac_Bil_Process_Batches_Sp.in_cEndLocation;
+	Pac_Bil_Process_Batches_Sp.cBegDepartment := Pac_Bil_Process_Batches_Sp.in_cBegDepartment;
+	Pac_Bil_Process_Batches_Sp.cEndDepartment := Pac_Bil_Process_Batches_Sp.in_cEndDepartment;
+	Pac_Bil_Process_Batches_Sp.cBegClient := Pac_Bil_Process_Batches_Sp.in_cBegClient;
+	Pac_Bil_Process_Batches_Sp.cEndClient := Pac_Bil_Process_Batches_Sp.in_cEndClient;
+	Pac_Bil_Process_Batches_Sp.cBegProjClass := Pac_Bil_Process_Batches_Sp.in_cBegProjClass;
+	Pac_Bil_Process_Batches_Sp.cEndProjClass := Pac_Bil_Process_Batches_Sp.in_cEndProjClass;
+	Pac_Bil_Process_Batches_Sp.cBillCycle := Pac_Bil_Process_Batches_Sp.in_cBillCycle;
+	Pac_Bil_Process_Batches_Sp.cFinProjectType := Pac_Bil_Process_Batches_Sp.in_cFinProjectType;
+
+	IF  Pac_Bil_Process_Batches_Sp.cEndEntity IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cEndEntity :=  'zzzzzzzzzz';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cEndLocation IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cEndLocation :=  'zzzzzzzzzz';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cEndDepartment IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cEndDepartment :=  'zzzzzzzzzz';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cEndClient IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cEndClient :=  'zzzzzzzzzz';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cEndProjClass IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cEndProjClass :=  'zzzzzzzzzz';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cBegEntity IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBegEntity :=  ' ';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cBegLocation IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBegLocation :=  ' ';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cBegDepartment IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBegDepartment :=  ' ';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cBegClient IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBegClient :=  ' ';
+	END IF;
+	IF  Pac_Bil_Process_Batches_Sp.cBegProjClass IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBegProjClass :=  ' ';
+	END IF;
+	IF  UPPER(Pac_Bil_Process_Batches_Sp.cBillCycle) = '&lt;ALL&gt;'
+	OR  Pac_Bil_Process_Batches_Sp.cBillCycle IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cBillCycle :=  NULL;
+	END IF;
+	IF  UPPER(Pac_Bil_Process_Batches_Sp.cFinProjectType) = '&lt;ALL&gt;'
+	OR  Pac_Bil_Process_Batches_Sp.cFinProjectType IS NULL THEN
+		Pac_Bil_Process_Batches_Sp.cFinProjectType :=  'SPR';
+	END IF;
+
+	Pac_Bil_Process_Batches_Sp.cActionID :=  'BBILL' || UPPER(RPAD(TO_CHAR(SYSDATE,'mon dd yyyy hh:mi:ssAM'), 26, ' '));
+	Pac_Bil_Process_Batches_Sp.dActionDate :=  TRUNC(SYSDATE);
+	Pac_Bil_Process_Batches_Sp.bError :=  0;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO BB_BILLINGRUN ( BILLINGRUNKEY, UserID, ActionDate, CompletionStatus, InvNumbersGenerated)
+		   VALUES (S_31_1_BB_BILLINGRUN.NEXTVAL, Pac_Bil_Process_Batches_Sp.cUserID, Pac_Bil_Process_Batches_Sp.dActionDate, 'I', 0);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	SELECT S_31_1_BB_BILLINGRUN.CURRVAL	INTO Pac_Bil_Process_Batches_Sp.iBillRunKey	FROM DUAL;
+
+	IF Pac_Bil_Process_Batches_Sp.bError = 0 THEN
+		BEGIN
+		 Bb_Batchbill(Pac_Bil_Process_Batches_Sp.cUserID,
+		 			  Pac_Bil_Process_Batches_Sp.iBillRunKey,
+					  Pac_Bil_Process_Batches_Sp.cActionID,
+					  Pac_Bil_Process_Batches_Sp.dActionDate,
+		 			  Pac_Bil_Process_Batches_Sp.bSelective,
+					  Pac_Bil_Process_Batches_Sp.cBegEntity,
+					  Pac_Bil_Process_Batches_Sp.cEndEntity,
+					  Pac_Bil_Process_Batches_Sp.cBegLocation,
+					  Pac_Bil_Process_Batches_Sp.cEndLocation,
+					  Pac_Bil_Process_Batches_Sp.cBegDepartment,
+					  Pac_Bil_Process_Batches_Sp.cEndDepartment,
+					  Pac_Bil_Process_Batches_Sp.cBegClient,
+					  Pac_Bil_Process_Batches_Sp.cEndClient,
+					  Pac_Bil_Process_Batches_Sp.cBegProjClass,
+					  Pac_Bil_Process_Batches_Sp.cEndProjClass,
+					  Pac_Bil_Process_Batches_Sp.cBillCycle,
+					  Pac_Bil_Process_Batches_Sp.cBillDate,
+					  Pac_Bil_Process_Batches_Sp.cFinProjectType,
+					  Pac_Bil_Process_Batches_Sp.bConsolidateInvoices,
+					  Pac_Bil_Process_Batches_Sp.generateNegativeInvoices,
+					  Pac_Bil_Process_Batches_Sp.bAutoPost,
+					  Pac_Bil_Process_Batches_Sp.iTotCount,
+					  Pac_Bil_Process_Batches_Sp.nTotAmount,
+                Pac_Bil_Process_Batches_Sp.bError,
+                Pac_Bil_Process_Batches_Sp.errorCount,
+            	  Pac_Bil_Process_Batches_Sp.iRetainPrecision -- retain precision change
+            	  );
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+  IF  ( Pac_Bil_Process_Batches_Sp.bError = 0 OR Pac_Bil_Process_Batches_Sp.bError = 2 ) THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE BB_BILLINGRUN
+		SET CompletionStatus = 'N'
+		WHERE BillingRunKey = Pac_Bil_Process_Batches_Sp.iBillRunKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+    if ( pac_bil_process_batches_sp.errorCount &gt; 0 ) then
+		begin
+		   pac_bil_process_batches_sp.bError := 2;
+		end;
+		end if;
+	END;
+  ELSE
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE BB_BILLINGRUN
+		SET CompletionStatus = 'E'
+		WHERE BillingRunKey = Pac_Bil_Process_Batches_Sp.iBillRunKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+END Pac_Bil_Process_Batches_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

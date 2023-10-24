@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="csk_appChangeProject" createdBy="admin" endStep="Finish" source="csk.niku.com" startEvent="create" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls description="Creates a project with the Application Change template" languageCode="en" name="Create Small Project"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisProject" objectInstanceCode="csk.appChange" objectType="project" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" template="csk.appChange" type="BPM_POT_PRIMARY"/>
+              <Object manualStart="false" name="thisTemplate" objectInstanceCode="csk.appChange" objectType="template" parentObjectName="thisProject" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" template="csk.appChange" type="BPM_POT_TEMPLATE"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_PARALLEL_SPLIT">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_docHierarchy"/>
+                          <Transition to="csk_step_projectPlan"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_docHierarchy" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls description="Build Document Hierarchy" languageCode="en" name="Build Document Hierarchy"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_copyDocuments" objectMethod="copydocumentsfromtemplate" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Copy Documents" languageCode="en" name="Copy Documents"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="process_object_id"/>
+                      <Param name="process_initiated_by"/>
+                      <Param name="template_id"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_runEstRules"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_projectPlan" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="Create Project Plan" languageCode="en" name="Create Project Plan"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_copyWBS" objectMethod="copywbsfromtemplate" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Copy WBS" languageCode="en" name="Copy WBS"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="copytaskifexists" value="0"/>
+                      <Param name="convertresourcetorole" value="0"/>
+                      <Param name="insertbeforetask_externalid"/>
+                      <Param name="includeancestors" value="0"/>
+                      <Param name="template_id"/>
+                      <Param name="insertaftertask_externalid"/>
+                      <Param name="templatetask_externalid"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action code="csk_act_copyRIC" objectMethod="copyrisksissueschangesfromtemplate" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Copy Risks, Issues, and Change Requests" languageCode="en" name="Copy Risks, Issues, and Change Requests"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="template_id"/>
+                      <Param name="process_object_id"/>
+                      <Param name="process_initiated_by"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_runEstRules"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_runEstRules" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="Run Estimating Rules" languageCode="en" name="Run Estimating Rules"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_runEstRules" objectMethod="estimate" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Run Estimating Rules" languageCode="en" name="Run Estimating Rules"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="taskexternalid"/>
+                      <Param name="estvalue"/>
+                      <Param name="topdown" value="0"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SYNCHRONIZATION">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_setProjTemp"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_setProjTemp" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                <nls description="Set Project Template" languageCode="en" name="Set Project template"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_setPrjTmpl" objectMethod="obj_methodology" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Set Project template" languageCode="en" name="Set Project template"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="csk.appChange"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_baslineProject"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_baslineProject" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="Baseline Project" languageCode="en" name="Baseline Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_baselineProject" objectMethod="baseline" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Baseline Project"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="baseline_desc" value="Original Baseline"/>
+                      <Param name="current_revision" value="1"/>
+                      <Param name="process_object_id"/>
+                      <Param name="baseline_name" value="Original Baseline"/>
+                      <Param name="baseline_code" value="BL0001"/>
+                      <Param name="create_new" value="1"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

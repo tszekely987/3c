@@ -1,0 +1,102 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CLB_DMS_FOLDERS_INST_R_V0">
+    <indexes/>
+    <text_length>4466</text_length>
+    <text>select u.first_name            FIRST_NAME            ,    
+       u.last_name             LAST_NAME             ,    
+       fo.name                 NAME                  ,    
+       fo.created_by           CREATOR_ID            ,    
+       fo.path_name            PATH_NAME             ,    
+       fo.is_visible           IS_VISIBLE            ,    
+       fo.parent_folder_id     PARENT_FOLDER_ID      ,    
+       fo.assoc_obj_id         ASSOC_OBJ_ID          ,    
+       fo.assoc_obj_type       ASSOC_OBJ_TYPE        ,    
+       fo.owner_id             OWNER_ID              ,    
+       fo.owner_group_id       OWNER_GROUP_ID        ,    
+       fo.folder_type          FOLDER_TYPE           ,    
+       fo.is_system_created    IS_SYSTEM_CREATED     ,    
+       fo.has_all_participants HAS_ALL_PARTICIPANTS  ,    
+       fo.area_id              AREA_ID               ,    
+       fo.id             FOLDER_ID             ,    
+       ug.user_id               USER_ID               ,    
+       pe.permission_value      PERMISSION_VALUE	     ,    
+       fo.last_updated_date    MODIFY_DATE	 
+from	clb_dms_folders          fo                 ,    
+	cmn_sec_users               u ,   
+	CMN_SEC_PERM_ELEMENTS PE, 
+     CMN_SEC_ASSGND_OBJ_PERM AP, 
+     CMN_SEC_GROUP_FLAT_HIERS H, 
+     CMN_SEC_GROUPS PARENT_GROUP, 
+     CMN_SEC_GROUPS G, 
+     CMN_SEC_USER_GROUPS UG 
+where  fo.owner_id = u.id  
+	AND	   UG.GROUP_ID = H.GROUP_ID 
+	AND      H.GROUP_ID = G.ID 
+	AND      G.IS_ACTIVE = 1 
+	AND      AP.PRINCIPAL_ID = H.PARENT_GROUP_ID 
+	AND      H.PARENT_GROUP_ID = PARENT_GROUP.ID 
+	AND      PARENT_GROUP.IS_ACTIVE = 1 
+	AND      AP.PRINCIPAL_TYPE = 'GROUP' 
+	AND      AP.PERMISSION_ID = PE.PERMISSION_ID 
+	AND	AP.OBJECT_ID = 200   
+	AND	AP.OBJECT_INSTANCE_ID = FO.ID 
+UNION 
+select u.first_name            FIRST_NAME            ,    
+       u.last_name             LAST_NAME             ,    
+       fo.name                 NAME                  ,    
+       fo.created_by           CREATOR_ID            ,    
+       fo.path_name            PATH_NAME             ,    
+       fo.is_visible           IS_VISIBLE            ,    
+       fo.parent_folder_id     PARENT_FOLDER_ID      ,    
+       fo.assoc_obj_id         ASSOC_OBJ_ID          ,    
+       fo.assoc_obj_type       ASSOC_OBJ_TYPE        ,    
+       fo.owner_id             OWNER_ID              ,    
+       fo.owner_group_id       OWNER_GROUP_ID        ,    
+       fo.folder_type          FOLDER_TYPE           ,    
+       fo.is_system_created    IS_SYSTEM_CREATED     ,    
+       fo.has_all_participants HAS_ALL_PARTICIPANTS  ,    
+       fo.area_id              AREA_ID               ,    
+       fo.id             FOLDER_ID             ,    
+       ap.principal_id               USER_ID               ,    
+       pe.permission_value      PERMISSION_VALUE	     ,    
+       fo.last_updated_date    MODIFY_DATE	 
+from  clb_dms_folders          fo                 ,    
+	cmn_sec_users               u ,   
+	CMN_SEC_PERM_ELEMENTS PE, 
+     CMN_SEC_ASSGND_OBJ_PERM AP 
+where  fo.owner_id = u.id  
+	AND	   AP.PRINCIPAL_TYPE = 'USER' 
+	AND      AP.PERMISSION_ID = PE.PERMISSION_ID 
+	and	AP.OBJECT_ID = 200   
+	AND	AP.OBJECT_INSTANCE_ID = FO.ID
+UNION
+select u.first_name            FIRST_NAME            , 
+       u.last_name             LAST_NAME             , 
+       fo.name                 NAME                  , 
+       fo.created_by           CREATOR_ID            , 
+       fo.path_name            PATH_NAME             , 
+       fo.is_visible           IS_VISIBLE            , 
+       fo.parent_folder_id     PARENT_FOLDER_ID      , 
+       fo.assoc_obj_id         ASSOC_OBJ_ID          , 
+       fo.assoc_obj_type       ASSOC_OBJ_TYPE        , 
+       fo.owner_id             OWNER_ID              , 
+       fo.owner_group_id       OWNER_GROUP_ID        , 
+       fo.folder_type          FOLDER_TYPE           , 
+       fo.is_system_created    IS_SYSTEM_CREATED     , 
+       fo.has_all_participants HAS_ALL_PARTICIPANTS  , 
+       fo.area_id              AREA_ID               , 
+       fo.id             FOLDER_ID             , 
+       -1               USER_ID               , /* Dummy - to keep all dms views consistent */
+       1      PERMISSION_VALUE	     , 
+       fo.last_updated_date    MODIFY_DATE 
+from  clb_dms_folders          fo                 , 
+       cmn_sec_users               u 
+where  fo.owner_id             = u.id	and
+		fo.allow_non_participants = 1
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

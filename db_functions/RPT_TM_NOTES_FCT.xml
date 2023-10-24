@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>RPT_TM_NOTES_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."RPT_TM_NOTES_FCT" (
+        p_record_id NUMBER,
+        p_type VARCHAR2
+) 
+RETURN VARCHAR2
+IS
+    v_value CLOB;
+    v_new_value VARCHAR2(4000);
+    v_time DATE;
+BEGIN
+    v_value := NULL;
+    v_new_value := NULL;
+    DECLARE CURSOR cursor1 IS
+    SELECT n.prCreatedTime, n.prValue
+    FROM   PRNOTE n
+    WHERE  n.prRecordID = p_record_id AND
+           UPPER(n.prTableName) = UPPER(p_type)
+    ORDER BY n.prCreatedTime;
+    BEGIN
+        OPEN cursor1;
+        LOOP
+            FETCH cursor1 INTO v_time, v_value;
+            EXIT WHEN cursor1%NOTFOUND;
+            IF v_new_value IS NOT NULL THEN
+                IF LENGTH(v_new_value || '; ' || v_value) &lt;= 1000 THEN
+                    v_new_value := v_new_value || '; ' || v_value;
+                ELSE
+                    v_new_value := SUBSTR(v_new_value || '; ' || v_value, 1, 1000);
+                END IF;
+            ELSE
+                IF LENGTH(v_value) &lt;= 1000 THEN
+                    v_new_value := v_value;
+                ELSE
+                    v_new_value := SUBSTR(v_value, 1, 1000);
+                END IF;
+            END IF;
+        END LOOP;
+        CLOSE cursor1;
+    END;
+    RETURN v_new_value;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

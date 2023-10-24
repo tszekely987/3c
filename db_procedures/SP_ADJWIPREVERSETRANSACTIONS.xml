@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_ADJWIPREVERSETRANSACTIONS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_ADJWIPREVERSETRANSACTIONS" (
+transaction 	NUMBER ,
+wiphist 	NUMBER )
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+adjustnumber  NUMBER;
+tempVar1 	NUMBER :=1;
+v_isRole     NUMBER;
+BEGIN
+ /* Check if the Role code is present in the Transaction*/
+		BEGIN
+		SELECT prj.prisrole
+		INTO v_isRole
+		FROM srm_resources s,
+			prj_resources prj
+		WHERE s.ID       = prj.prid
+		AND s.unique_name=(select w.RESOURCE_CODE FROM ppa_WIP w WHERE w.TransNo = sp_adjwipreversetransactions.transaction);
+
+		IF v_isRole = 1 THEN
+					RAISE_APPLICATION_ERROR( -20901, 'Role is not allowed in Resource ID.' );
+		END IF;
+		END;
+
+      SAVEPOINT tran1;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_WIP
+	SET Status = 4
+	WHERE TransNo = sp_adjwipreversetransactions.transaction;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF  StoO_error = 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+    INSERT INTO ppa_TransWIPAdjust (TRANSNO, ApplyTo, SourceModule, TransType, BatchNo,
+		   ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate,
+		   ExternalBatchID, ExternalTransNo, LocationID, DepartCode, Entity, TransDate,
+		   COMPANY_CODE, PROJECT_CODE, Charge_Code, Input_Type, RESOURCE_CODE,
+		   Quantity, CostRuleCode, BurdenCode, OverheadCode, Chargeable, Status, Notes,
+		   InvoiceNo, EmplyHomeLocation, EmplyHomeDepart, ProjectType, ClientClass,
+		   ProjectClass, TransClass, Resource_Class, WIPClass, WorkInt, WorkBuf, GLPosted,
+		   GLPeriod, AdjustGroupNo, TransDescription, Del, AdjType, TASK_ID, ROLE_CODE,
+		   VENDOR_CODE, VoucherNo, PONo, document_type, incurred_by, APINFO_ID, USER_LOV1, USER_LOV2, EXPENSE_TYPE, COST_TYPE )
+    SELECT S_116_1_PPA_TRANSWIPADJUST.NEXTVAL, sp_adjwipreversetransactions.transaction "ApplyTo", w.SourceModule,
+			   'A', w.BatchNo, w.ENTRY_RESOURCE_CODE, w.EntryDate, w.LASTUPDTDBY_RESOURCE_CODE, SYSDATE,
+			   w.ExternalBatchID, w.ExternalTransNo, w.LocationID, w.DepartCode,
+         w.Entity, w.TransDate, w.COMPANY_CODE, w.PROJECT_CODE, w.Charge_Code, w.Input_type,
+			   w.RESOURCE_CODE, w.Quantity, w.CostRuleCode, w.BurdenCode,
+         w.OverheadCode, w.Chargeable, 0, w.Notes, w.InvoiceNo,
+			   w.EmplyHomeLocation, w.EmplyHomeDepart,
+         w.ProjectType, w.ClientClass, w.ProjectClass, W.TRANSCLASS "TransClass",
+		 w.Resource_Class, w.WIPClass, w.WorkInt, w.WorkBuf,
+			   w.GLPosted, w.GLPeriod, PPA_TRANSWIPADJ_ADJGRPNBR_S1.NEXTVAL
+			   "AdjustGroupNo", 'R' "TransDescription", 0 "Del", 'R' "AdjType", W.TASK_ID, W.ROLE_CODE,
+			   a.VENDOR_CODE, a.VoucherNo, a.PONo, a.document_type, a.incurred_by, a.id, W.USER_LOV1, W.USER_LOV2, W.EXPENSE_TYPE, W.COST_TYPE
+			 FROM ppa_WIP w, ppa_WIPAPInfo a
+			WHERE w.TransNo = sp_adjwipreversetransactions.transaction
+			 and a.ID (+) = w.PPA_WIPAPINFO_ID;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+        IF StoO_error = -20328 THEN
+          RAISE_APPLICATION_ERROR(-20328, 'Originating transaction is being billed');
+        ELSE
+          RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+        END IF;
+		END;
+		IF  StoO_error = 0 THEN
+		BEGIN
+			COMMIT WORK;
+		END;
+		ELSE
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+		END;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+	END;
+	END IF;
+
+
+/* veeru - start */
+
+	StoO_error := 0 ;
+
+BEGIN
+
+			INSERT INTO PPA_TRANSWIPADJUST_VALUES
+				   					   (
+									   	ID,
+				   					   	TRANSNO,
+										CURRENCY_TYPE,
+										CURRENCY_CODE,
+										RATE_EXCHANGE_ID,
+										RATE_EXCHANGE_RATE,
+										RATE_CURRENCY_CODE,
+										NATURAL_BILLRATE,
+										BillRate ,
+										amount,
+										COST_EXCHANGE_ID,
+										COST_EXCHANGE_RATE,
+										COST_CURRENCY_CODE,
+										STDCOST_CURRENCY_CODE,
+										NATURAL_ACTUALCOST,
+										NATURAL_STDCOST,
+										ActualCost                ,
+										StdCost                    ,
+										totalCost                ,
+										Price ,
+										FactorAmount                ,
+										Burden                     ,
+										overhead                   ,
+										TotalAmount               ,
+										EmplyActualCost            ,
+										EmplyStdcost,
+										AmountRemaining
+							 		   )
+					SELECT
+									    PPA_TRANSWIPADJUST_VALUES_S1.NEXTVAL,
+										S_116_1_PPA_TRANSWIPADJUST.currval,--wip_rec.transno,
+										wval.CURRENCY_TYPE,
+										wval.CURRENCY_CODE,
+										wval.RATE_EXCHANGE_ID,
+										wval.RATE_EXCHANGE_RATE,
+										wval.RATE_CURRENCY_CODE,
+										wval.NATURAL_BILLRATE,
+										wval.BILLRATE,
+										wval.AMOUNT,
+										wval.COST_EXCHANGE_ID,
+										wval.COST_EXCHANGE_RATE,
+										wval.COST_CURRENCY_CODE,
+										wval.STDCOST_CURRENCY_CODE,
+										wval.NATURAL_ACTUALCOST,
+										wval.NATURAL_STDCOST,
+										wval.ACTUALCOST,
+										wval.STDCOST,
+										wval.TOTALCOST,
+										wval.PRICE,
+										wval.FACTORAMOUNT,
+										wval.BURDEN,
+										wval.OVERHEAD,
+										wval.TOTALAMOUNT,
+										wval.EMPLYACTUALCOST,
+										wval.EMPLYSTDCOST,
+										wval.AMOUNTREMAINING
+					 FROM ppa_WIP w, ppa_WIPAPInfo a, PPA_WIP_VALUES wval
+					 WHERE w.TransNo = sp_adjwipreversetransactions.transaction
+					 and a.ID (+) = w.PPA_WIPAPINFO_ID
+					 and w.TRANSNO = wval.TRANSNO ;
+
+			EXCEPTION
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+
+			END;
+
+	  IF StoO_error != 0 THEN
+	  	 RAISE_APPLICATION_ERROR( -20313, 'Data not found on PPA_WIP / PPA_WIPAPINFO / PPA_WIP_VALUES table ' || StoO_errmsg );
+	  END IF ;
+/* veeru - end */
+END sp_adjwipreversetransactions;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

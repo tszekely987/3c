@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DEL_ASSGND_OBJ_PERMS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DEL_ASSGND_OBJ_PERMS_SP" (deleteorphanpermlimit NUMBER, jobid number default -99, jobrunid number default -99)
+    AS 
+        v_log_message  varchar2(4000);
+        v_recs_per_iteration NUMBER;
+        v_batch_size      NUMBER;
+        v_start_id        NUMBER;
+        v_end_id          NUMBER;
+        v_enable_deletion NUMBER;
+        v_total_req_loops NUMBER;
+        v_current_loop    NUMBER;
+        v_current_object_code varchar2(250) ;
+        v_query LONG;
+        v_sql LONG;
+        v_seed_query LONG;
+        v_orphan_recs_cnt_per_obj NUMBER;
+        v_seed_id NUMBER;
+        v_seed_entries_per_object NUMBER;
+        v_total_seed_count NUMBER;
+        v_obj_exists      NUMBER;
+        total_target_orphans NUMBER;
+        v_dev_conf NUMBER;
+
+        CURSOR cur_customobjects IS
+        select distinct objs.code from  CMN_SEC_OBJECTS sobj inner join odf_objects objs on  UPPER('odf_cst_'|| objs.code)  = UPPER(sobj.object_code) and objs.is_custom = 1 
+                WHERE EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID = (SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE='NMC_DB_MAINT_INST_RIGHTS' AND IS_ACTIVE=1) AND VALUE='1') order by code;
+
+        CURSOR seed_configs IS
+        select select_criteria,cast(batch_size as NUMBER) as batch_size, id as id from DEL_ORPHAN_OBJ_PERM_CONF where status=1 order by id;
+
+        BEGIN
+            --this should be turned off, only for development purpose
+            v_dev_conf := 0;
+            total_target_orphans := deleteorphanpermlimit;
+            
+            --log table will not be deleted, delete the entries older than 30 days            
+            DELETE FROM DEL_ORPHAN_ASSGND_OBJ_PERM_LOG WHERE LOG_DATE &lt; (SYSDATE - 30);
+            
+            v_log_message := 'Initializing deletion of orphan entries in cmn_sec_assgnd_obj_perm';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            v_log_message := concat('Target cleanup orphans count ',total_target_orphans);
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+            
+            v_log_message := concat('Current Processing Job : ',jobid);
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            v_log_message := concat('Current Processing Job Run : ',jobrunid);
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+            
+            v_log_message := 'Creating index z_temp_cmn_sec_assgnd_obj_perm_n21 on cmn_sec_assgnd_obj_perm (object_id,object_instance_id,id)';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            SELECT count(1) INTO v_obj_exists FROM user_indexes WHERE upper(index_name) = ('Z_TEMP_CMN_SEC_ASSGND_OBJ_PERM_N21');
+            IF (v_obj_exists&lt;1) THEN
+                v_sql :=q'[create index z_temp_cmn_sec_assgnd_obj_perm_n21 on cmn_sec_assgnd_obj_perm (object_id,object_instance_id,id)]';
+            EXECUTE IMMEDIATE v_sql;
+            END IF;
+
+            v_log_message := 'Index z_temp_cmn_sec_assgnd_obj_perm_n21 created';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            v_query := 'truncate table DEL_ORPHAN_OBJ_PERM_CONF'; 
+            EXECUTE IMMEDIATE v_query;
+
+            --generate seed configuration
+            v_recs_per_iteration := 3000000;
+            v_batch_size := 200000;
+            v_enable_deletion := 1;
+            
+            -- dev mode is on, set batch, iterations to lower values 
+            IF v_dev_conf = 1 THEN
+                BEGIN
+                    v_recs_per_iteration := 3;
+                    v_batch_size := 2;
+                    v_enable_deletion := 1;
+                END;
+            END IF;
+            
+
+            v_seed_id := 0;
+            v_total_seed_count := 0;
+
+            v_query :='';
+
+            for obj_def IN cur_customobjects
+                loop
+                    v_current_object_code := obj_def.code;
+                    v_query:= 'select count(1) from cmn_sec_assgnd_obj_perm perm inner join 
+                    CMN_SEC_OBJECTS sobjs on sobjs.id = perm.object_id and sobjs.object_code  = ''odf_cst_'  || 
+                    v_current_object_code || '''  and perm.object_instance_id  is not null  and not exists ( select  oca.id from  odf_ca_'||v_current_object_code ||' oca where oca.id=perm.object_instance_id )';
+                    EXECUTE IMMEDIATE v_query into  v_orphan_recs_cnt_per_obj;
+                    if v_orphan_recs_cnt_per_obj &gt; 0 then 
+                        v_seed_query := 'select perm.id from cmn_sec_assgnd_obj_perm perm 
+                                                inner join CMN_SEC_OBJECTS sobjs on sobjs.id = perm.object_id 
+                                                inner join odf_objects objs on  '''||UPPER('odf_cst_'|| v_current_object_code)||'''  = UPPER(sobjs.object_code) and objs.is_custom = 1 and objs.code = '''||v_current_object_code||'''
+                                                and perm.object_instance_id  is not null  and not exists ( select  oca.id from  odf_ca_'||v_current_object_code||' oca where oca.id=perm.object_instance_id) AND rownum &lt;  '||(v_recs_per_iteration+1);
+                        v_seed_entries_per_object := ceil(coalesce(v_orphan_recs_cnt_per_obj,0)/v_recs_per_iteration);
+                        
+                        if v_seed_entries_per_object &lt; 1 then 
+                            v_seed_entries_per_object := 1;
+                        end if;
+
+                        for counter in 1..v_seed_entries_per_object loop
+                            if (v_seed_id*v_recs_per_iteration &lt; total_target_orphans) then 
+                                INSERT INTO DEL_ORPHAN_OBJ_PERM_CONF (id, select_criteria, status, batch_size) 
+                                SELECT v_seed_id as id, v_seed_query as select_criteria, 1 as status , v_batch_size as batch_size
+                                FROM   dual;
+                                v_seed_id := v_seed_id+1;
+                            end if;
+                        end loop;
+                    end if;
+                end loop;
+
+            v_total_seed_count := v_seed_id;
+            v_log_message := 'Configurations for deletion of orphans generated';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            v_log_message := 'Total Configurations to be processed :'||v_total_seed_count;
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            v_log_message := 'Initiating deletion of orphan entries';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+
+            for seed_config IN seed_configs
+                loop
+                    v_start_id :=0;
+                    v_end_id := 0;
+                    v_total_req_loops := 0; 
+
+                    v_seed_query := coalesce(seed_config.select_criteria,'select 1 as id from dual where 1=2');
+                    v_batch_size := coalesce(seed_config.batch_size,200000);
+                    v_seed_id := seed_config.id;
+
+                    v_log_message := 'before actual data processing (during ddl definitions creation)';
+                    v_log_message := ('Processing configuration '||v_seed_id||'/'||v_total_seed_count);
+                    insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+                    commit;
+                    -- if table exist, process the records.
+                    SELECT count(1) INTO v_obj_exists FROM user_tables WHERE upper(table_name) = 'DEL_ORPHAN_ASSGND_OBJ_PERM';
+                    IF (v_obj_exists&gt;0) THEN
+                        v_query :='DROP TABLE DEL_ORPHAN_ASSGND_OBJ_PERM';
+                        EXECUTE IMMEDIATE v_query;
+                    END IF;
+                    -- create table and indexes for temporary processing
+                    v_query := 'create table DEL_ORPHAN_ASSGND_OBJ_PERM as '||v_seed_query;
+                    EXECUTE IMMEDIATE v_query;
+
+                    v_query := 'create unique index DEL_ORPHAN_ASSGND_OBJ_PERM_u1 on DEL_ORPHAN_ASSGND_OBJ_PERM(id)'; 
+                    EXECUTE IMMEDIATE v_query;
+
+                    v_log_message := 'required records inserted into DEL_ORPHAN_ASSGND_OBJ_PERM';
+                    insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+                    commit;
+
+
+                    -- start deleting entries in batches 
+                    select coalesce(min(id),0) min_start_id,
+                       coalesce(max(id),0) max_end_id
+                    into   v_start_id, v_end_id
+                    from   DEL_ORPHAN_ASSGND_OBJ_PERM;
+
+                    v_total_req_loops := ceil((( v_end_id - v_start_id ) / v_batch_size ) + 1);
+                    
+                    v_current_loop := 0;
+                    v_log_message := 'total loops ['||v_total_req_loops||'] start :['||v_start_id||'] end :['||v_end_id||']';
+                    insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+                    commit;
+
+                    for i in 1..v_total_req_loops loop 
+                       begin
+                        -- TODO
+                        --invoke JOB_STATUS_RESPONDER_SP to respond based on the status of the job.
+                        --if job is already cancelled then JOB_STATUS_RESPONDER_SP will throw an exception and aborts the execution of this procedure
+                        delete from cmn_sec_assgnd_obj_perm
+                        where cmn_sec_assgnd_obj_perm.id IN (SELECT id 
+                                     FROM   DEL_ORPHAN_ASSGND_OBJ_PERM 
+                                     WHERE id &gt;= v_start_id AND id &lt; ( v_start_id + v_batch_size)
+                                     AND 1=v_enable_deletion)
+                           and cmn_sec_assgnd_obj_perm.id &gt;= v_start_id and cmn_sec_assgnd_obj_perm.id &lt; ( v_start_id + v_batch_size );
+
+                      v_start_id := v_start_id + v_batch_size;
+                      v_current_loop := v_current_loop+1;
+
+                      exception when others then
+                             RAISE_APPLICATION_ERROR(-20001,'error in processing cmn_sec_assgnd_obj_perm cursor: ' || COALESCE(SQLERRM,'')); 
+                            end;
+                            v_log_message := ('processing state : done with : '||v_current_loop||'/'||v_total_req_loops||' - processed till '||v_start_id|| '/'||v_end_id);
+                            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+                      -- commit updated cmn_sec_assgnd_obj_perm
+                            commit;
+                    end loop;
+                end loop; 
+
+            SELECT count(1) INTO v_obj_exists FROM user_indexes WHERE upper(index_name) = ('Z_TEMP_CMN_SEC_ASSGND_OBJ_PERM_N21');
+            IF (v_obj_exists&gt;0) THEN
+                v_sql :=q'[drop index z_temp_cmn_sec_assgnd_obj_perm_n21]';
+            EXECUTE IMMEDIATE v_sql;
+            END IF;
+
+            v_log_message := 'Completed deletion of orphan entries';
+            insert into DEL_ORPHAN_ASSGND_OBJ_PERM_LOG(log_message) values(v_log_message);
+            commit;
+    END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

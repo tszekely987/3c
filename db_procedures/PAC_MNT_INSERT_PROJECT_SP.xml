@@ -1,0 +1,787 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_INSERT_PROJECT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_INSERT_PROJECT_SP" (
+  ID                          NUMBER DEFAULT 0,
+  COMPANY_CODE             IN pac_mnt_projects.COMPANY_CODE%TYPE DEFAULT '',
+  in_projcode              IN pac_mnt_projects.MASTER_PROJECT_CODE%TYPE DEFAULT '',
+  title                       VARCHAR2  DEFAULT '',
+  status                      VARCHAR2,
+  type_                       VARCHAR2,
+  manager                     VARCHAR2,
+  affiliateproject            VARCHAR2,
+  targetedstartdate           DATE,
+  startdate                   DATE,
+  targetedcompldate           DATE,
+  completedate                DATE,
+  class                       VARCHAR2,
+  wipclass                    VARCHAR2,
+  locationid                  VARCHAR2,
+  departcode                  VARCHAR2,
+  budget                      NUMBER,
+  poc                         NUMBER,
+  BILL_TO_COMPANY_CODE        VARCHAR2,
+  batchcycle                  VARCHAR2,
+  historymode                 NUMBER,
+  timeincrement               NUMBER,
+  costplus                    NUMBER,
+  RESOURCE_CODE               VARCHAR2,
+  in_projid                IN VARCHAR2,
+  in_changeorder           IN VARCHAR2,
+  is_changeorder           IN NUMBER DEFAULT 0,
+  template                 IN NUMBER,
+--  allowcostclass           IN NUMBER,
+  ex_allow_expenses        IN pac_mnt_projects.ex_allow_expenses%TYPE,
+  ex_bill_expenses         IN pac_mnt_projects.ex_bill_expenses%TYPE,
+  old_projcode             IN pac_mnt_projects.MASTER_PROJECT_CODE%TYPE,
+  billing_currency_code       pac_mnt_projects.billing_currency_code%TYPE,
+  forecast                    pac_mnt_projects.forecast%TYPE  DEFAULT 0,
+  billing_project_code        pac_mnt_projects.PROJECT_CODE%TYPE )
+AS
+  MASTER_PROJECT_CODE         pac_mnt_projects.MASTER_PROJECT_CODE%TYPE;
+  PROJECT_CODE                pac_mnt_projects.PROJECT_CODE%TYPE;
+  changeorder                 GLOBALPKG.STRING;
+  StoO_selcnt                 INTEGER;
+  StoO_error                  INTEGER;
+  StoO_rowcnt                 INTEGER;
+  StoO_crowcnt                INTEGER := 0;
+  StoO_fetchstatus            INTEGER := 0;
+  StoO_errmsg                 GLOBALPKG.STRING;
+  StoO_sqlstatus              INTEGER;
+  projrevisionid              NUMBER;
+  save_dates_to_project       NUMBER(1,0);
+  LANGUAGE_ID                 NUMBER;
+  msg                         GLOBALPKG.STRING;
+  temp_rc                     SP_GET_NEXT_CHANGEORDERPkg.RCT1;
+  budgetlevellabor            pac_mnt_projects.budgetlevellabor%TYPE;
+  budgetlevelmaterial         pac_mnt_projects.budgetlevelmaterial%TYPE;
+  budgetlevelequipment        pac_mnt_projects.budgetlevelequipment%TYPE;
+  budgetratesourcelabor       pac_mnt_projects.budgetratesourcelabor%TYPE;
+  budgetratesourcematerials   pac_mnt_projects.budgetratesourcematerials%TYPE;
+  budgetratesourceequipment   pac_mnt_projects.budgetratesourceequipment%TYPE;
+  budgetcostsourcelabor       pac_mnt_projects.budgetcostsourcelabor%TYPE;
+  budgetcostsourcematerials   pac_mnt_projects.budgetcostsourcematerials%TYPE;
+  budgetcostsourceequipment   pac_mnt_projects.budgetcostsourceequipment%TYPE;
+  transratesourcelabor        pac_mnt_projects.transratesourcelabor%TYPE;
+  transratesourcematerials    pac_mnt_projects.transratesourcematerials%TYPE;
+  transratesourceequipment    pac_mnt_projects.transratesourceequipment%TYPE;
+  transratesourceexpenses     pac_mnt_projects.transratesourceexpenses%TYPE;
+  transcostsourcelabor        pac_mnt_projects.transcostsourcelabor%TYPE;
+  transcostsourcematerials    pac_mnt_projects.transcostsourcematerials%TYPE;
+  transcostsourceequipment    pac_mnt_projects.transcostsourceequipment%TYPE;
+  transcostsourceexpenses     pac_mnt_projects.transcostsourceexpenses%TYPE;
+  budgetrateoverridelabor     pac_mnt_projects.budgetrateoverridelabor%TYPE;
+  budgetrateoverridematerials pac_mnt_projects.budgetrateoverridematerials%TYPE;
+  budgetrateoverrideequipment pac_mnt_projects.budgetrateoverridematerials%TYPE;
+  transrateoverridelabor      pac_mnt_projects.transrateoverridelabor%TYPE;
+  transrateoverridematerials  pac_mnt_projects.transrateoverridematerials%TYPE;
+  transrateoverrideequipment  pac_mnt_projects.transrateoverridematerials%TYPE;
+  transrateoverrideexpenses   pac_mnt_projects.transrateoverridematerials%TYPE;
+  budgetratelocationlabor     pac_mnt_projects.budgetratelocationlabor%TYPE;
+  budgetratelocationmaterials pac_mnt_projects.budgetratelocationmaterials%TYPE;
+  budgetratelocationequipment pac_mnt_projects.budgetratelocationmaterials%TYPE;
+  transratelocationlabor      pac_mnt_projects.transratelocationlabor%TYPE;
+  transratelocationmaterials  pac_mnt_projects.transratelocationmaterials%TYPE;
+  transratelocationequipment  pac_mnt_projects.transratelocationmaterials%TYPE;
+  transratelocationexpenses   pac_mnt_projects.transratelocationmaterials%TYPE;
+  exchangeRateType            pac_mnt_projects.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+  laborExchangeRateType       pac_mnt_projects.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+  expenseExchangeRateType     pac_mnt_projects.EXPENSE_EXCHANGE_RATE_TYPE%TYPE;
+  materialsExchangeRateType   pac_mnt_projects.MATERIALS_EXCHANGE_RATE_TYPE%TYPE;
+  equipmentExchangeRateType    pac_mnt_projects.EQUIPMENT_EXCHANGE_RATE_TYPE%TYPE;
+  poc_int                     NUMBER(1);
+  v_billing_project_code	  pac_mnt_projects.PROJECT_CODE%TYPE ;
+  v_Billing_Project_ID		  pac_mnt_projects.Billing_Project_ID%TYPE ;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE := PAC_MNT_INSERT_PROJECT_SP.in_projcode;
+	PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE := PAC_MNT_INSERT_PROJECT_SP.in_projid;
+	PAC_MNT_INSERT_PROJECT_SP.changeorder := PAC_MNT_INSERT_PROJECT_SP.in_changeorder;
+	poc_int := 0; --Vantive 50830
+	PAC_MNT_INSERT_PROJECT_SP.v_billing_project_code := PAC_MNT_INSERT_PROJECT_SP.billing_project_code ;
+
+  BEGIN
+
+      IF PAC_MNT_INSERT_PROJECT_SP.type_ = 'I' THEN
+	    PAC_MNT_INSERT_PROJECT_SP.v_billing_project_code := NULL;
+	  End If;
+
+		/*COMPANY_CODE validation*/
+		BEGIN
+      StoO_selcnt := 0;
+
+      SELECT 1
+        INTO StoO_selcnt
+        FROM DUAL
+       WHERE EXISTS (SELECT 1
+                       FROM clntsupp
+                      WHERE COMPANY_CODE = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE);
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          raise_application_error(-20031, 'COMPANY_CODE is invalid');
+          RETURN;
+        WHEN OTHERS THEN
+          raise_application_error(-20031, 'COMPANY_CODE is invalid');
+          RETURN;
+		END;
+
+    IF StoO_selcnt = 0 THEN
+			raise_application_error(-20031, 'COMPANY_CODE is invalid');
+			RETURN;
+		END IF;
+
+		IF is_changeorder = 1 THEN
+			BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM pac_mnt_projects
+                       WHERE COMPANY_CODE = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE
+                         AND MASTER_PROJECT_CODE = PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20032, 'PROJECT_CODE code is invalid');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20032, 'PROJECT_CODE code is invalid');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20032, 'PROJECT_CODE code is invalid');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF affiliateproject IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM pac_mnt_projects
+                       WHERE COMPANY_CODE = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE
+                         AND MASTER_PROJECT_CODE = PAC_MNT_INSERT_PROJECT_SP.affiliateproject);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20033, 'Affiliate PROJECT_CODE code is invalid for this COMPANY_CODE.');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20033, 'Affiliate PROJECT_CODE code is invalid for this COMPANY_CODE.');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20033, 'Affiliate PROJECT_CODE code is invalid for this COMPANY_CODE.');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF manager IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM pac_mnt_resources
+                       WHERE RESOURCE_CODE = manager);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20034, 'PROJECT_CODE manager is invalid');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20034, 'PROJECT_CODE manager is invalid');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20034, 'PROJECT_CODE manager is invalid');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF class IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM projclass
+                       WHERE projclass = class);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20035, 'PROJECT_CODE class is invalid');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20035, 'PROJECT_CODE class is invalid');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20035, 'PROJECT_CODE class is invalid');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF wipclass IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM wipclass
+                       WHERE wipclass = PAC_MNT_INSERT_PROJECT_SP.wipclass);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20036, 'WIP class is invalid');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20036, 'WIP class is invalid');
+            RETURN;
+			END;
+			IF StoO_selcnt = 0 THEN
+				raise_application_error(-20036, 'WIP class is invalid');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF locationid IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM locations
+                       WHERE locationid = PAC_MNT_INSERT_PROJECT_SP.locationid);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20037, 'Location is invalid');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20037, 'Location is invalid');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20037, 'Location is invalid');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF departcode IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM locationdept
+                       WHERE locationid = PAC_MNT_INSERT_PROJECT_SP.locationid
+                         AND departcode = PAC_MNT_INSERT_PROJECT_SP.departcode);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20038, 'Department is invalid  for this location.');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20038, 'Department is invalid  for this location.');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20038, 'Department is invalid  for this location.');
+				RETURN;
+			END IF;
+		END IF;
+
+    	IF BILL_TO_COMPANY_CODE IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM int_BillTo
+                       WHERE ClientID = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE
+                         AND BillToID = PAC_MNT_INSERT_PROJECT_SP.BILL_TO_COMPANY_CODE);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20039, 'Bill To code is invalid for this COMPANY_CODE.');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20039, 'Bill To code is invalid for this COMPANY_CODE.');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20039, 'Bill To code is invalid for this COMPANY_CODE.');
+				RETURN;
+			END IF;
+		END IF;
+
+		IF batchcycle IS NOT NULL THEN
+			BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+         WHERE EXISTS(SELECT 1
+                        FROM batchsettings
+                       WHERE batchcycle = PAC_MNT_INSERT_PROJECT_SP.batchcycle);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            raise_application_error(-20040, 'Batch cycle is invalid.');
+            RETURN;
+          WHEN OTHERS THEN
+            raise_application_error(-20040, 'Batch cycle is invalid.');
+            RETURN;
+			END;
+
+      IF StoO_selcnt = 0 THEN
+				raise_application_error(-20040, 'Batch cycle is invalid.');
+				RETURN;
+			END IF;
+		END IF;
+	END;
+
+  IF  PAC_MNT_INSERT_PROJECT_SP.type_ IN('S', 'I') THEN
+    BEGIN
+      PAC_MNT_INSERT_PROJECT_SP.poc_int :=  0;
+    END;
+  END IF;
+
+  PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE :=  UPPER(PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE);
+	PAC_MNT_INSERT_PROJECT_SP.changeorder :=  NULL;
+
+  IF  PAC_MNT_INSERT_PROJECT_SP.is_changeorder = 1 THEN
+    BEGIN
+      PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE :=  '';
+
+      BEGIN
+        sp_get_next_changeorder(COMPANY_CODE=&gt;PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE,
+                                MASTER_PROJECT_CODE=&gt;PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE,
+                                return_projid=&gt;PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE,
+                                return_changeorder=&gt;PAC_MNT_INSERT_PROJECT_SP.changeorder,
+                                RC1=&gt;temp_rc);
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+      END;
+    END;
+	ELSE
+    BEGIN
+      PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE :=  PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE;
+    END;
+	END IF;
+
+    IF v_billing_project_code IS NOT NULL Then
+	  BEGIN
+        IF v_billing_project_code = PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE Then
+	        v_Billing_Project_ID := PAC_MNT_INSERT_PROJECT_SP.ID ;
+		ELSE
+		  BEGIN
+	          SELECT ID
+	            INTO v_Billing_Project_ID
+	            FROM PAC_MNT_PROJECTS
+	            WHERE PROJECT_CODE = v_billing_project_code AND
+		   		 	TYPE_ = PAC_MNT_INSERT_PROJECT_SP.TYPE_ AND
+					BILLING_CURRENCY_CODE = PAC_MNT_INSERT_PROJECT_SP.BILLING_CURRENCY_CODE AND
+					COMPANY_CODE = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE AND
+					STATUS != 'C' AND
+			    		APPROVED = 1 ;
+          	  EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  raise_application_error(-20990, 'Billing Project is invalid. Select a Billing Project with the same Type, Billing Currency and Company Code as the current project.');
+                  RETURN;
+                WHEN OTHERS THEN
+                  raise_application_error(-20990, 'Billing Project is invalid. Select a Billing Project with the same Type, Billing Currency and Company Code as the current project.');
+                  RETURN;
+		  END;
+		END IF;
+	  END;
+	ELSE
+	    v_Billing_Project_ID := NULL ;
+	END IF;
+
+  -- Default the exchange rate types to one of exchange_rate_type look ups.
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT min(lookup_code)
+      into PAC_MNT_INSERT_PROJECT_SP.exchangeRateType
+      from CMN_LOOKUPS
+     where lookup_type='CMN_EXCHANGE_RATE_TYPE'
+       and is_active = 1;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+  END;
+
+  BEGIN
+    StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT E.EXCHANGE_RATE_TYPE_LABOR,
+           E.EXCHANGE_RATE_TYPE_EXPENSE,
+           E.EXCHANGE_RATE_TYPE_MATERIALS,
+           E.EXCHANGE_RATE_TYPE_EQUIPMENT
+      INTO PAC_MNT_INSERT_PROJECT_SP.laborExchangeRateType,
+           PAC_MNT_INSERT_PROJECT_SP.expenseExchangeRateType,
+           PAC_MNT_INSERT_PROJECT_SP.materialsExchangeRateType,
+           PAC_MNT_INSERT_PROJECT_SP.equipmentExchangeRateType
+      FROM ENTITY E, LOCATIONS L
+    WHERE L.LOCATIONID = PAC_MNT_INSERT_PROJECT_SP.locationid
+      AND L.ENTITY = E.ENTITY;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+  END;
+
+  BEGIN
+    StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT NVL(PAC_MNT_INSERT_PROJECT_SP.laborExchangeRateType, LABOR_EXCHANGE_RATE_TYPE),
+           NVL(PAC_MNT_INSERT_PROJECT_SP.expenseExchangeRateType, EXPENSE_EXCHANGE_RATE_TYPE),
+           NVL(PAC_MNT_INSERT_PROJECT_SP.materialsExchangeRateType, MATERIALS_EXCHANGE_RATE_TYPE),
+           NVL(PAC_MNT_INSERT_PROJECT_SP.equipmentExchangeRateType, EQUIPMENT_EXCHANGE_RATE_TYPE)
+      INTO PAC_MNT_INSERT_PROJECT_SP.laborExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.expenseExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.materialsExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.equipmentExchangeRateType
+      FROM NAMEOPTIONS;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+  END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO PAC_MNT_PROJECTS
+      (ID,
+      COMPANY_CODE,
+      MASTER_PROJECT_CODE,
+      PROJECT_CODE,
+      title,
+      status,
+      type_,
+      manager,
+      affiliateproject,
+      targetedstartdate,
+      startdate,
+      targetedcompldate,
+      completedate,
+      class,
+      wipclass,
+      locationid,
+      departcode,
+      budget,
+      resource_scheduling_int,
+      poc_method,
+      BILL_TO_COMPANY_CODE,
+      billcycle,
+      historymode,
+      timeincrement,
+      historysummary,
+      ratematrix,
+      allow_indirect_approvers,
+      costplus,
+      budgetrateoverridelabor,
+      budgetrateoverridematerials,
+      budgetrateoverrideequipment,
+      deactivatemileage,
+      deactivatetravel,
+      transrateoverridelabor,
+      transrateoverridematerials,
+      transrateoverrideequipment,
+      transrateoverrideexpenses,
+      applyolabor,
+      applyomaterials,
+      applyoequipment,
+      applyoexpenses,
+      applyblabor,
+      applybmaterials,
+      applybequipment,
+      applybexpenses,
+      awaitingapproval,
+      inprogress,
+      approved,
+      burden,
+      overhead,
+      applybilling,
+      RESOURCE_CODE,
+      template_only,
+      allowcostclass,
+      changeorder,
+      ex_allow_expenses,
+      ex_bill_expenses,
+      billing_currency_code,
+      LABOR_EXCHANGE_RATE_TYPE,
+      EXPENSE_EXCHANGE_RATE_TYPE,
+      MATERIALS_EXCHANGE_RATE_TYPE,
+      EQUIPMENT_EXCHANGE_RATE_TYPE,
+      FORECAST,
+      BILLING_PROJECT_ID,
+      CREATED_DATE, 
+      CREATED_BY, 
+      LAST_UPDATED_DATE, 
+      LAST_UPDATED_BY )
+    VALUES
+      (PAC_MNT_INSERT_PROJECT_SP.ID,
+      PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE,
+      PAC_MNT_INSERT_PROJECT_SP.MASTER_PROJECT_CODE,
+      PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE,
+      PAC_MNT_INSERT_PROJECT_SP.title,
+      PAC_MNT_INSERT_PROJECT_SP.status,
+      PAC_MNT_INSERT_PROJECT_SP.type_,
+      PAC_MNT_INSERT_PROJECT_SP.manager,
+      PAC_MNT_INSERT_PROJECT_SP.affiliateproject,
+      PAC_MNT_INSERT_PROJECT_SP.targetedstartdate,
+      PAC_MNT_INSERT_PROJECT_SP.startdate,
+      PAC_MNT_INSERT_PROJECT_SP.targetedcompldate,
+      PAC_MNT_INSERT_PROJECT_SP.completedate,
+      PAC_MNT_INSERT_PROJECT_SP.class,
+      PAC_MNT_INSERT_PROJECT_SP.wipclass,
+      PAC_MNT_INSERT_PROJECT_SP.locationid,
+      PAC_MNT_INSERT_PROJECT_SP.departcode,
+      PAC_MNT_INSERT_PROJECT_SP.budget,
+      0,
+      PAC_MNT_INSERT_PROJECT_SP.poc_int,
+      PAC_MNT_INSERT_PROJECT_SP.BILL_TO_COMPANY_CODE,
+      PAC_MNT_INSERT_PROJECT_SP.batchcycle,
+      PAC_MNT_INSERT_PROJECT_SP.historymode,
+      PAC_MNT_INSERT_PROJECT_SP.timeincrement,
+      0,
+      1,
+      0,
+      PAC_MNT_INSERT_PROJECT_SP.costplus,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      PAC_MNT_INSERT_PROJECT_SP.RESOURCE_CODE,
+      template,
+      0,
+      PAC_MNT_INSERT_PROJECT_SP.changeorder,
+      ex_allow_expenses,
+      ex_bill_expenses,
+      PAC_MNT_INSERT_PROJECT_SP.billing_currency_code,
+      NVL(PAC_MNT_INSERT_PROJECT_SP.laborExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.exchangeRateType),
+      NVL(PAC_MNT_INSERT_PROJECT_SP.expenseExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.exchangeRateType),
+      NVL(PAC_MNT_INSERT_PROJECT_SP.materialsExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.exchangeRateType),
+      NVL(PAC_MNT_INSERT_PROJECT_SP.equipmentExchangeRateType, PAC_MNT_INSERT_PROJECT_SP.exchangeRateType),
+	  1, --Forecasting Always On
+	  PAC_MNT_INSERT_PROJECT_SP.v_billing_project_id,
+      sysdate,
+      1,
+      sysdate,
+      1);
+
+      -- first get the entity default values
+      SELECT TRANS_RATE_SOURCE_LABOR,
+             TRANS_COST_SOURCE_LABOR,
+             TRANS_LOCATION_LABOR,
+             TRANS_RATE_SOURCE_MATERIALS,
+             TRANS_RATE_SOURCE_EQUIPMENT,
+             TRANS_RATE_SOURCE_EXPENSE,
+             TRANS_RATE_SOURCE_MATERIALS,
+             TRANS_RATE_SOURCE_EQUIPMENT,
+             TRANS_RATE_SOURCE_EXPENSE
+        INTO PAC_MNT_INSERT_PROJECT_SP.transratesourcelabor,
+             PAC_MNT_INSERT_PROJECT_SP.transcostsourcelabor,
+             PAC_MNT_INSERT_PROJECT_SP.transratelocationlabor,
+             PAC_MNT_INSERT_PROJECT_SP.transratesourcematerials,
+             PAC_MNT_INSERT_PROJECT_SP.transratesourceequipment,
+             PAC_MNT_INSERT_PROJECT_SP.transratesourceexpenses,
+             PAC_MNT_INSERT_PROJECT_SP.transcostsourcematerials,
+             PAC_MNT_INSERT_PROJECT_SP.transcostsourceequipment,
+             PAC_MNT_INSERT_PROJECT_SP.transcostsourceexpenses
+        FROM ENTITY E, LOCATIONS L
+       WHERE L.LOCATIONID = PAC_MNT_INSERT_PROJECT_SP.locationid
+         AND L.ENTITY = E.ENTITY;
+
+      -- second get the remaining system default values
+      SELECT
+        DFLTBUDGETLEVELLBR,
+        DFLTBUDGETLEVELMTL,
+        DFLTBUDGETLEVELEQUIP,
+        DFLTBUDGETRATESRCLBR,
+        DFLTBUDGETRATESRCMTL,
+        DFLTBUDGETRATESRCEQUIP,
+        DFLTBUDGETCOSTSRCLBR,
+        DFLTBUDGETCOSTSRCMTL,
+        DFLTBUDGETCOSTSRCEQUIP,
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transratesourcelabor, TRANSRATESRCLBR),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transratesourcematerials, TRANSRATESRCMTL),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transratesourceequipment, TRANSRATESRCEQUIP),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transratesourceexpenses, TRANSRATESRCEXPENSE),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transcostsourcelabor, TRANSCOSTSRCLBR),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transcostsourcematerials,TRANSCOSTSRCMTL),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transcostsourceequipment, TRANSCOSTSRCEQUIP),
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transcostsourceexpenses, TRANSCOSTSRCEXPENSE),
+        DFLTBUDGETRATEALLOWOVRDLBR,
+        DFLTBUDGETRATEALLOWOVRDMTL,
+        DFLTBUDGETRATEALLOWOVRDEQUIP,
+        TRANSRATEALLOWOVRDLBR,
+        TRANSRATEALLOWOVRDMTL,
+        TRANSRATEALLOWOVRDEQUIP,
+        DFLTBUDGETRATELOCLBR,
+        DFLTBUDGETRATELOCMTL,
+        DFLTBUDGETRATELOCEQUIP,
+        NVL(PAC_MNT_INSERT_PROJECT_SP.transratelocationlabor, TRANSRATELOCLBR),
+        TRANSRATELOCMTL,
+        TRANSRATELOCEQUIP,
+        TRANSRATEALLOWOVRDEEXPENSE,
+        TRANSRATELOCEXPENSE
+      INTO
+        PAC_MNT_INSERT_PROJECT_SP.budgetlevellabor,
+        PAC_MNT_INSERT_PROJECT_SP.budgetlevelmaterial,
+        PAC_MNT_INSERT_PROJECT_SP.budgetlevelequipment,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratesourcelabor,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratesourcematerials,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratesourceequipment,
+        PAC_MNT_INSERT_PROJECT_SP.budgetcostsourcelabor,
+        PAC_MNT_INSERT_PROJECT_SP.budgetcostsourcematerials,
+        PAC_MNT_INSERT_PROJECT_SP.budgetcostsourceequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transratesourcelabor,
+        PAC_MNT_INSERT_PROJECT_SP.transratesourcematerials,
+        PAC_MNT_INSERT_PROJECT_SP.transratesourceequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transratesourceexpenses,
+        PAC_MNT_INSERT_PROJECT_SP.transcostsourcelabor,
+        PAC_MNT_INSERT_PROJECT_SP.transcostsourcematerials,
+        PAC_MNT_INSERT_PROJECT_SP.transcostsourceequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transcostsourceexpenses,
+        PAC_MNT_INSERT_PROJECT_SP.budgetrateoverridelabor,
+        PAC_MNT_INSERT_PROJECT_SP.budgetrateoverridematerials,
+        PAC_MNT_INSERT_PROJECT_SP.budgetrateoverrideequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transrateoverridelabor,
+        PAC_MNT_INSERT_PROJECT_SP.transrateoverridematerials,
+        PAC_MNT_INSERT_PROJECT_SP.transrateoverrideequipment,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratelocationlabor,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratelocationmaterials,
+        PAC_MNT_INSERT_PROJECT_SP.budgetratelocationequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transratelocationlabor,
+        PAC_MNT_INSERT_PROJECT_SP.transratelocationmaterials,
+        PAC_MNT_INSERT_PROJECT_SP.transratelocationequipment,
+        PAC_MNT_INSERT_PROJECT_SP.transrateoverrideexpenses,
+        PAC_MNT_INSERT_PROJECT_SP.transratelocationexpenses
+      FROM  nameoptions;
+
+      UPDATE pac_mnt_projects SET
+        budgetlevellabor = PAC_MNT_INSERT_PROJECT_SP.budgetlevellabor,
+        budgetlevelmaterial = PAC_MNT_INSERT_PROJECT_SP.budgetlevelmaterial,
+        budgetlevelequipment = PAC_MNT_INSERT_PROJECT_SP.budgetlevelequipment,
+        budgetratesourcelabor = PAC_MNT_INSERT_PROJECT_SP.budgetratesourcelabor,
+        budgetratesourcematerials = PAC_MNT_INSERT_PROJECT_SP.budgetratesourcematerials,
+        budgetratesourceequipment = PAC_MNT_INSERT_PROJECT_SP.budgetratesourceequipment,
+        budgetcostsourcelabor = PAC_MNT_INSERT_PROJECT_SP.budgetcostsourcelabor,
+        budgetcostsourcematerials = PAC_MNT_INSERT_PROJECT_SP.budgetcostsourcematerials,
+        budgetcostsourceequipment = PAC_MNT_INSERT_PROJECT_SP.budgetcostsourceequipment,
+        transratesourcelabor = PAC_MNT_INSERT_PROJECT_SP.transratesourcelabor,
+        transratesourcematerials = PAC_MNT_INSERT_PROJECT_SP.transratesourcematerials,
+        transratesourceequipment = PAC_MNT_INSERT_PROJECT_SP.transratesourceequipment,
+        transratesourceexpenses = PAC_MNT_INSERT_PROJECT_SP.transratesourceexpenses,
+        transcostsourcelabor = PAC_MNT_INSERT_PROJECT_SP.transcostsourcelabor,
+        transcostsourcematerials = PAC_MNT_INSERT_PROJECT_SP.transcostsourcematerials,
+        transcostsourceequipment = PAC_MNT_INSERT_PROJECT_SP.transcostsourceequipment,
+        transcostsourceexpenses = PAC_MNT_INSERT_PROJECT_SP.transcostsourceexpenses,
+        budgetrateoverridelabor = PAC_MNT_INSERT_PROJECT_SP.budgetrateoverridelabor,
+        budgetrateoverridematerials = PAC_MNT_INSERT_PROJECT_SP.budgetrateoverridematerials,
+        budgetrateoverrideequipment = PAC_MNT_INSERT_PROJECT_SP.budgetrateoverrideequipment,
+        transrateoverridelabor = PAC_MNT_INSERT_PROJECT_SP.transrateoverridelabor,
+        transrateoverridematerials = PAC_MNT_INSERT_PROJECT_SP.transrateoverridematerials,
+        transrateoverrideequipment = PAC_MNT_INSERT_PROJECT_SP.transrateoverrideequipment,
+        budgetratelocationlabor = PAC_MNT_INSERT_PROJECT_SP.budgetratelocationlabor,
+        budgetratelocationmaterials = PAC_MNT_INSERT_PROJECT_SP.budgetratelocationmaterials,
+        budgetratelocationequipment = PAC_MNT_INSERT_PROJECT_SP.budgetratelocationequipment,
+        transratelocationlabor = PAC_MNT_INSERT_PROJECT_SP.transratelocationlabor,
+        transratelocationmaterials = PAC_MNT_INSERT_PROJECT_SP.transratelocationmaterials,
+        transratelocationequipment = PAC_MNT_INSERT_PROJECT_SP.transratelocationequipment,
+        transrateoverrideexpenses = PAC_MNT_INSERT_PROJECT_SP.transrateoverrideexpenses,
+        transratelocationexpenses = PAC_MNT_INSERT_PROJECT_SP.transratelocationexpenses
+       WHERE COMPANY_CODE = PAC_MNT_INSERT_PROJECT_SP.COMPANY_CODE
+        AND PROJECT_CODE = PAC_MNT_INSERT_PROJECT_SP.PROJECT_CODE;
+
+	END;
+END PAC_MNT_INSERT_PROJECT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

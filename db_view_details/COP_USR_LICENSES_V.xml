@@ -1,0 +1,87 @@
+<ClarityDBViewQuery>
+  <QueryResult code="COP_USR_LICENSES_V">
+    <indexes/>
+    <text_length>3242</text_length>
+    <text>WITH license_rights AS (
+ SELECT cmn_sec_groups.id,
+        cmn_sec_groups.group_code,
+        cmn_sec_groups.is_active,
+        CASE cmn_sec_groups.lic_right_type
+             WHEN 'creator' THEN 1
+             WHEN 'studioDev' THEN 1
+             WHEN 'participant' THEN 2
+             WHEN 'viewer' THEN 3
+             ELSE NULL END AS licence_priority
+  FROM  cmn_sec_groups
+  WHERE cmn_sec_groups.lic_right_type IN ('idle', 'viewer', 'participant', 'creator', 'studioDev')
+  AND   NOT (EXISTS (SELECT cov.value
+                     FROM   cmn_option_values cov,
+                            cmn_options co
+                     WHERE  cov.option_id = co.id AND co.option_code = 'CMN_VIEW_LIC_TYPE' AND cov.value = 'old'))
+)
+
+SELECT r.principal_id AS user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_right r,
+       license_rights l
+WHERE  r.right_id = l.id AND r.principal_type = 'USER' AND r.instance_type = 'SYSTEM'
+UNION ALL
+SELECT ug.user_id,
+       l.licence_priority
+FROM   cmn_sec_user_groups ug,
+       license_rights l,
+       cmn_sec_group_hierarchies gh,
+       cmn_sec_groups g
+WHERE  gh.group_id = l.id AND ug.group_id = gh.parent_group_id AND g.id = ug.group_id AND g.is_active = 1
+UNION ALL
+SELECT r.user_id,
+       l.licence_priority
+FROM   license_rights l,
+       cmn_sec_assgnd_right os,
+       obs_unit_entities_v ou,
+       srm_resources r
+WHERE  os.principal_type = ou.unit_mode AND os.principal_id = ou.unit_id AND os.instance_type = 'SYSTEM' AND os.right_id = l.id AND ou.instance_id = r.id AND ou.table_name = 'SRM_RESOURCES'
+UNION ALL
+SELECT r.principal_id AS user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_right r,
+       license_rights l
+WHERE  r.right_id = l.id AND r.principal_type = 'USER' AND r.instance_type LIKE 'OBS%'
+UNION ALL
+SELECT ug.user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_right r,
+       license_rights l,
+       cmn_sec_user_groups ug,
+       cmn_sec_groups g
+WHERE  r.right_id = l.id AND r.principal_type = 'GROUP' AND r.principal_id = ug.group_id AND r.instance_type &lt;&gt; 'SYSTEM' AND g.id = ug.group_id AND g.is_active = 1
+UNION ALL
+SELECT ou.instance_id user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_right os,
+       obs_unit_entities_v ou,
+       license_rights l
+WHERE  os.principal_type = ou.unit_mode AND os.principal_id = ou.unit_id AND os.instance_type LIKE 'OBS%' AND os.right_id = l.id AND ou.table_name = 'SRM_RESOURCES'
+UNION ALL
+SELECT aop.principal_id AS user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_obj_perm aop,
+       license_rights l
+WHERE  aop.principal_type = 'USER' AND l.id = aop.right_id
+UNION ALL
+SELECT ug.user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_obj_perm aop,
+       license_rights l,
+       cmn_sec_user_groups ug,
+       cmn_sec_groups g
+WHERE  aop.principal_type = 'GROUP' AND l.id = aop.right_id AND aop.principal_id = ug.group_id AND g.id = ug.group_id AND g.is_active = 1
+UNION ALL
+SELECT ou.instance_id user_id,
+       l.licence_priority
+FROM   cmn_sec_assgnd_right os,
+       obs_unit_entities_v ou,
+       license_rights l
+WHERE os.principal_type = ou.unit_mode AND os.principal_id = ou.unit_id AND os.instance_type = 'INSTANCE' AND os.right_id = l.id  AND ou.table_name = 'SRM_RESOURCES'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

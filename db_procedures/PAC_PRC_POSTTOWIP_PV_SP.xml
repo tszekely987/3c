@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_POSTTOWIP_PV_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_POSTTOWIP_PV_SP" 
+(
+  dfromdates               DATE,
+  dtodates                 DATE,
+  in_cLocationlist      IN VARCHAR2 DEFAULT NULL,
+  in_cClntcodelist      IN VARCHAR2 DEFAULT NULL,
+  in_cProjcodelist      IN VARCHAR2 DEFAULT NULL,
+  in_cResource_Codelist IN VARCHAR2 DEFAULT NULL,
+  in_sourceModule       IN PPA_TRANSCONTROL.SOURCEMODULE%TYPE DEFAULT NULL,
+  vlabor                   INTEGER DEFAULT 1,
+  vmaterial                INTEGER DEFAULT 1,
+  vequipment               INTEGER DEFAULT 1,
+  vexpense                 INTEGER DEFAULT 1,
+  vpoc                     INTEGER DEFAULT 0,
+  in_incurredBy			   VARCHAR2,
+  username              IN VARCHAR2,
+  RC1               IN OUT Pac_Prc_Posttowip_Pv_Sppkg.RCT1
+)
+AS
+  cLocationList            VARCHAR2(4000);
+  cClntcodelist            VARCHAR2(4000);
+  cProjcodelist            VARCHAR2(4000);
+  cResource_Codelist       VARCHAR2(4000);
+  StoO_selcnt              INTEGER;
+  StoO_error               INTEGER;
+  StoO_rowcnt              INTEGER;
+  StoO_crowcnt             INTEGER := 0;
+  StoO_fetchstatus         INTEGER := 0;
+  StoO_errmsg              GLOBALPKG.STRING;
+  StoO_sqlstatus           INTEGER;
+  iLength                  INTEGER;
+  iLength2                 INTEGER;
+  iSubVal                  INTEGER;
+  iSubVal2                 INTEGER;
+  cSubStr                  GLOBALPKG.STRING;
+  cSubStr2                 GLOBALPKG.STRING;
+  iTransNo                 NUMBER;
+  labor                    GLOBALPKG.STRING;
+  material                 GLOBALPKG.STRING;
+  equipment                GLOBALPKG.STRING;
+  expense                  GLOBALPKG.STRING;
+  poc                      GLOBALPKG.STRING;
+  TRANSCLASS               GLOBALPKG.STRING;
+  codetype                 GLOBALPKG.STRING;
+  translevel               GLOBALPKG.STRING;
+  levelcode                GLOBALPKG.STRING;
+  transdatef               DATE;
+  transdatet               DATE;
+  transsumm                NUMBER(32,6);
+  tlabor                   GLOBALPKG.STRING;
+  tmaterial                GLOBALPKG.STRING;
+  tequipment               GLOBALPKG.STRING;
+  texpense                 GLOBALPKG.STRING;
+  tpoc                     GLOBALPKG.STRING;
+  COMPANY_CODE             GLOBALPKG.STRING;
+  v_string_array           Get_String_Pkg.v_string_type;
+  v_dFromDates			   DATE;
+  v_dToDates			   DATE;
+BEGIN
+	cLocationList := RTRIM(in_cLocationList);
+	cClntcodelist := RTRIM(in_cClntcodelist);
+	cProjcodelist := RTRIM(in_cProjcodelist);
+	
+	Pac_Prc_Posttowip_Pv_Sp.v_dFromDates := NVL(Pac_Prc_Posttowip_Pv_Sp.dFromDates, TO_DATE('01/01/1900', 'MM/DD/YYYY'));
+	Pac_Prc_Posttowip_Pv_Sp.v_dToDates   := NVL(Pac_Prc_Posttowip_Pv_Sp.dToDates, SYSDATE);
+
+  cResource_Codelist := RTRIM(in_cResource_Codelist);
+  IF vLabor = 1 THEN
+    labor := 'L';
+    tlabor := 'Labor';
+	ELSE
+    IF vlabor = 0 THEN
+      labor := NULL;
+		END IF;
+	END IF;
+
+  IF vmaterial = 1 THEN
+    material := 'M';
+    tmaterial := ', Material';
+	ELSE
+    IF vmaterial = 0 THEN
+      material := NULL;
+		END IF;
+	END IF;
+
+  IF vequipment = 1 THEN
+    equipment := 'Q';
+    tequipment := ', Equipment';
+	ELSE
+    IF vequipment = 0 THEN
+      equipment := NULL;
+		END IF;
+	END IF;
+
+  IF vexpense = 1 THEN
+    expense := 'X';
+    texpense := ', Expense';
+	ELSE
+    IF vexpense = 0 THEN
+      expense := NULL;
+		END IF;
+	END IF;
+
+  IF vPoc = 1 THEN
+    poc := 'POC';
+    tpoc := ', POC';
+	ELSE
+    IF vPoc = 0 THEN
+      poc := NULL;
+		END IF;
+	END IF;
+
+	TRANSCLASS :=  tlabor || tmaterial || tequipment || texpense || tpoc;
+
+  IF (INSTR(TRANSCLASS, ',') = 1 ) THEN
+    TRANSCLASS :=RTRIM(SUBSTR(TRANSCLASS, 3));
+	END IF;
+
+  DELETE FROM TEMP_TEMP_WIPPOST_PVPAC_PRC_P;
+
+  IF cLocationList IS NULL AND cClntcodeList IS NULL AND cprojcodelist IS NULL AND cResource_Codelist IS NULL  AND in_incurredBy IS NULL THEN
+    BEGIN
+      codetype := 'All';
+
+      BEGIN
+        BEGIN
+          Pac_Prc_Posttowip_Pv1_Sp(
+            v_dFromdates,
+            v_dTodates,
+            codetype,
+            NULL,
+            NULL,
+            in_sourceModule,
+            labor,
+            material,
+            equipment,
+            expense,
+            poc,
+            NULL,
+            translevel,
+            levelcode,
+            transdatef,
+            transdatet,
+            transSumm,
+            in_incurredBy,
+            username
+          );
+
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+        END;
+
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+          (
+            TRANSLEVEL,
+            LEVELCODE,
+            TRANSDATEF,
+            TRANSDATET,
+            TRANSCLASS,
+            TRANSSUMM,
+            COMPANY_CODE,
+            LABOR,
+            MATERIAL,
+            EQUIPMENT,
+            EXPENSE,
+            POC,
+            source_module
+          )
+          SELECT
+            translevel,
+            levelcode,
+            transdatef,
+            transdatet,
+            TRANSCLASS,
+            transsumm,
+            COMPANY_CODE,
+            labor,
+            material,
+            equipment,
+            expense,
+            poc,
+            in_sourceModule
+            FROM DUAL;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+        END;
+      END;
+    END;
+	END IF;
+
+  IF cLocationList IS NOT NULL THEN
+		BEGIN
+      codetype := 'Locations';
+      v_string_array := Get_String_Pkg.get_string(cLocationList);
+      FOR looper IN 1..v_string_array.COUNT LOOP
+        BEGIN
+          BEGIN
+            Pac_Prc_Posttowip_Pv1_Sp(
+              v_dFromdates,
+              v_dTodates,
+              codetype,
+              v_string_array(looper),
+              NULL,
+              in_sourceModule,
+              labor,
+              material,
+              equipment,
+              expense,
+              NULL,
+              poc,
+              translevel,
+              levelcode,
+              transdatef,
+              transdatet,
+              transSumm,
+              -- transclass,
+              in_incurredBy,
+              username
+            );
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+            (TRANSLEVEL, LEVELCODE, TRANSDATEF, TRANSDATET, TRANSCLASS, TRANSSUMM, COMPANY_CODE, LABOR, MATERIAL, EQUIPMENT, EXPENSE, POC, source_module)
+            SELECT translevel, levelcode, transdatef, transdatet, TRANSCLASS, transsumm, COMPANY_CODE, labor, material, equipment, expense, poc, in_sourceModule
+              FROM dual;
+            StoO_rowcnt := SQL%ROWCOUNT;
+
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+        END;
+      END LOOP;
+		END;
+	END IF;
+
+  IF cClntcodeList IS NOT NULL THEN
+		BEGIN
+      codetype := 'Clients';
+      v_string_array := Get_String_Pkg.get_string(cClntcodeList);
+      FOR looper IN 1..v_string_array.COUNT LOOP
+        BEGIN
+          BEGIN
+            Pac_Prc_Posttowip_Pv1_Sp(
+              v_dFromdates,
+              v_dTodates,
+              codetype,
+              v_string_array(looper),
+              --cSubStr,
+              NULL,
+              in_sourceModule,
+              labor,
+              material,
+              equipment,
+              expense,
+              NULL,
+              poc,
+              translevel,
+              levelcode,
+              transdatef,
+              transdatet,
+              transSumm,
+              in_incurredBy,
+              username
+            );
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+            (TRANSLEVEL, LEVELCODE, TRANSDATEF, TRANSDATET, TRANSCLASS, TRANSSUMM, COMPANY_CODE, LABOR, MATERIAL, EQUIPMENT, EXPENSE, POC, source_module)
+            SELECT  translevel, levelcode, transdatef, transdatet, TRANSCLASS, transsumm, '', labor, material, equipment, expense, poc, in_sourceModule
+            FROM DUAL;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+        END;
+      END LOOP;
+		END;
+	END IF;
+
+  IF cprojcodelist IS NOT NULL THEN
+		BEGIN
+      codetype := 'Projects';
+      v_string_array := Get_String_Pkg.get_string(cprojcodelist);
+      FOR looper IN 1..v_string_array.COUNT LOOP
+        BEGIN
+          iSubVal2 := INSTR( v_string_array(looper), ':');
+          COMPANY_CODE := SUBSTR(v_string_array(looper), 1,(iSubVal2 - 1));
+          cSubStr2 := SUBSTR(v_string_array(looper), (iSubVal2 + 1));
+
+          BEGIN
+            Pac_Prc_Posttowip_Pv1_Sp(
+              v_dFromdates,
+              v_dTodates,
+              codetype,
+              cSubStr2,
+              COMPANY_CODE,
+              in_sourceModule,
+              labor,
+              material,
+              equipment,
+              expense,
+              poc,
+              NULL,
+              translevel,
+              levelcode,
+              transdatef,
+              transdatet,
+              transSumm,
+              in_incurredBy,
+              username
+            );
+
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+            (TRANSLEVEL, LEVELCODE, TRANSDATEF, TRANSDATET, TRANSCLASS, TRANSSUMM, COMPANY_CODE, LABOR, MATERIAL, EQUIPMENT, EXPENSE, POC, source_module)
+            SELECT translevel, levelcode, transdatef, transdatet, TRANSCLASS, transsumm, COMPANY_CODE, labor, material, equipment, expense, poc, in_sourceModule
+            FROM DUAL;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+        END;
+      END LOOP;
+    END;
+	END IF;
+
+ IF  cResource_Codelist IS NOT NULL THEN
+		BEGIN
+		codetype :=  'Employees';
+    v_string_array := Get_String_Pkg.get_string(cResource_Codelist);
+		FOR looper IN 1..v_string_array.COUNT LOOP
+		BEGIN
+			BEGIN
+				Pac_Prc_Posttowip_Pv1_Sp(v_dFromdates,
+				v_dTodates,
+				codetype,
+				v_string_array(looper),
+				NULL,
+        in_sourceModule,
+        labor,
+				material,
+				equipment,
+				expense,
+				NULL,
+				poc,
+				translevel,
+				levelcode,
+				transdatef,
+				transdatet,
+				transSumm,
+				in_incurredBy,
+              		username
+ 				);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+			(TRANSLEVEL, LEVELCODE, TRANSDATEF, TRANSDATET, TRANSCLASS, TRANSSUMM, COMPANY_CODE, LABOR, MATERIAL, EQUIPMENT, EXPENSE, POC, source_module)
+			VALUES(translevel, levelcode, transdatef, transdatet, TRANSCLASS, transsumm, NULL, labor, material,
+				   equipment, expense, poc, in_sourceModule);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+			END;
+		END;
+		END LOOP;
+	END;
+	END IF;
+
+	IF  in_incurredBy IS NOT NULL THEN
+		BEGIN
+		codetype :=  'incurredBy';
+		BEGIN
+			BEGIN
+			 Pac_Prc_Posttowip_Pv1_Sp(v_dFromdates,
+			 v_dTodates,
+			 codetype,
+			 NULL,
+			 NULL,
+       		 in_sourceModule,
+       		 labor,
+			 material,
+			 equipment,
+			 expense,
+			 NULL,
+			 poc,
+			 translevel,
+			 levelcode,
+			 transdatef,
+			 transdatet,
+			 transSumm,
+			 in_incurredBy,
+                     username
+			 );
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+			(TRANSLEVEL, LEVELCODE, TRANSDATEF, TRANSDATET, TRANSCLASS, TRANSSUMM, COMPANY_CODE, LABOR, MATERIAL, EQUIPMENT, EXPENSE, POC, source_module)
+			SELECT translevel, levelcode, transdatef, transdatet, TRANSCLASS, transsumm,
+				   COMPANY_CODE, labor,  material, equipment,  expense, poc, in_sourceModule FROM dual;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END;
+	END IF;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    DELETE FROM TEMP_TEMP_WIPPOST_PVPAC_PRC_P
+     WHERE translevel IS NULL
+        OR transsumm =0;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR (-20264, 'No data was found');
+        RETURN;
+  END;
+
+  OPEN RC1 FOR
+	SELECT DISTINCT *
+    FROM TEMP_TEMP_WIPPOST_PVPAC_PRC_P;
+END Pac_Prc_Posttowip_Pv_Sp;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

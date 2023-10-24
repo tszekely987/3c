@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_TAXCODE_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_TAXCODE_DELETE_SP" (
+in_taxid 		  NUMBER
+)
+AS
+sql_rowcount	  INTEGER := 0;
+in_taxcode taxcode.code%type;
+BEGIN
+	/* Get code from id passed */
+	select code into in_taxcode from taxcode where id = in_taxid;
+
+	DELETE  taxcode
+	WHERE   taxcode.code = in_taxcode
+	AND		taxcode.code not in
+	(
+		SELECT  apply_to_taxcode
+		FROM  	taxcode
+		WHERE 	apply_to_taxcode = in_taxcode
+	)
+	AND taxcode.code not in
+	(
+		SELECT  pMV.StrVal1
+		FROM 	ppa_MatrixValues pMV,ppa_Matrix pM
+		WHERE 	pMV.MatrixKey = pM.MatrixKey
+		AND 	pMV.StrVal1   = in_taxcode
+		AND 	pM.MatrixType in ( SELECT SUBSTR(taxtype,1,1) FROM TAXCODE WHERE CODE = in_taxcode)
+	)
+        AND NOT EXISTS ( select 1 FROM PROJCNTRTS p where p.TAXCODE=taxcode.code ) ;
+	
+
+	sql_rowcount := SQL%ROWCOUNT;
+
+	IF sql_rowcount = 0 THEN
+			RAISE_APPLICATION_ERROR(-20637, 'A Tax Code cannot be deleted if it has been assigned to an Administrative Code / matrix in the Matrix Manager.');
+	END IF;
+
+	DELETE  taxcode_method
+	WHERE 	taxcode_method.taxcode = in_taxcode;
+
+EXCEPTION
+	WHEN OTHERS THEN
+		 RAISE_APPLICATION_ERROR(-20099,SQLERRM);
+END PAC_TAXCODE_DELETE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

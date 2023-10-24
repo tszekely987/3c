@@ -1,0 +1,31 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_ASSIGN_SUM_FACTS_V">
+    <indexes/>
+    <text_length>1857</text_length>
+    <text>SELECT a.prID assignment_key,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(a.prActSum, 0) &lt; 10000000000000 THEN NVL (a.prActSum, 0) / 3600 ELSE 0 END actual_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(a.prEstSum, 0) &lt; 10000000000000 THEN NVL (a.prEstSum, 0) / 3600 ELSE 0 END etc_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(a.prActSum, 0) + NVL(a.prEstSum, 0) &lt; 10000000000000 
+		       THEN (NVL (a.prActSum, 0) + NVL (a.prEstSum, 0)) / 3600 ELSE 0 END eac_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(bd.usage_sum, 0) &lt; 10000000000000 THEN NVL (bd.usage_sum, 0) / 3600 ELSE 0 END base_hours,
+          NVL (a.actcost_sum, 0) actual_cost,
+          NVL (a.etccost_sum, 0) etc_cost,
+          NVL (a.actcost_sum, 0) + NVL(a.etccost_sum,0) eac_cost,
+          NVL (bd.cost_sum, 0) base_cost,
+          CASE WHEN NVL(a.prPendActSum,0) > 10000000000000
+               THEN 0
+               ELSE CASE WHEN r.resource_type &lt;= 1 THEN NVL (a.prPendActSum, 0) / 3600 ELSE 0 END END pending_actual_hours,
+          CASE WHEN NVL(a.prPendEstSum,0) > 10000000000000
+               THEN 0
+               ELSE CASE WHEN r.resource_type &lt;= 1 THEN NVL (a.prPendEstSum, 0) / 3600 ELSE 0 END END pending_etc_hours,
+          CASE WHEN NVL(a.prPendEstSum,0) + NVL(a.prPendActSum,0) > 10000000000000
+               THEN 0
+               ELSE CASE WHEN r.resource_type &lt;= 1 THEN (NVL (a.prPendActSum, 0) + NVL (a.prPendEstSum, 0)) / 3600 ELSE 0 END END pending_eac_hours,
+          a.last_updated_date clarity_updated_date
+     FROM prAssignment a
+          INNER JOIN srm_resources r ON a.prResourceID = r.id
+          LEFT OUTER JOIN prj_baseline_details bd ON a.prID = bd.object_id
+                                                 AND bd.object_type = 'ASSIGNMENT'
+                                                 AND bd.is_current = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

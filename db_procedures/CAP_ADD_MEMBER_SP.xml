@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_ADD_MEMBER_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_ADD_MEMBER_SP" (
+  P_INV_ID         IN NUMBER,
+  P_SCENARIO_ID    IN NUMBER,
+  P_USERID         IN NUMBER
+    
+  )
+AS
+  V_SQLString   VARCHAR2(500);
+  V_CNT         NUMBER;
+  V_MBR_ID      NUMBER;
+
+BEGIN
+
+  -- This script is intended to add an investment, team members, tasks, assignments
+  -- and blob slices to a tentative state in support of a scenario
+  
+  -- Insert a new entry into the scenario members table
+  -- Get the next number for the table
+  SELECT CAP_SCENARIO_MEMBERS_S1.NEXTVAL INTO V_MBR_ID FROM DUAL;
+  
+  INSERT INTO CAP_SCENARIO_MEMBERS
+    ( id, scenario_id, member_type, object_id, staff_percent, start_date, finish_date, is_excluded, priority, 
+      is_approved, is_active, created_date, created_by, last_updated_date, last_updated_by, is_expression, 
+      selected_by_expression_id, bdgt_cst_start, bdgt_cst_total, bdgt_rev_total, fcst_cst_total, fcst_rev_total,
+      planned_cost, planned_cost_start, planned_cost_finish, planned_benefit, planned_benefit_start, 
+      planned_benefit_finish )
+    ( SELECT V_MBR_ID, P_SCENARIO_ID, upper(ca.odf_object_code), inv.id, null, inv.schedule_start, inv.schedule_finish, 0, inv.priority,
+             DECODE(inv.STATUS, 1,1,5,1,0) is_approved, 
+             inv.is_active, sysdate, P_USERID, sysdate, P_USERID, 0, null, 
+             --fin.budget_cst_start, fin.budget_cst_total, fin.budget_rev_total,
+             fin.planned_cst_start, fin.planned_cst_total, fin.planned_ben_total,
+             forecast_cst_total, forecast_rev_total, 
+             planned_cst_total, planned_cst_start, planned_cst_finish, 
+             planned_ben_total, planned_ben_start, planned_ben_finish
+        FROM INV_INVESTMENTS inv, ODF_CA_INV ca, FIN_FINANCIALS FIN, ODF_OBJECT_INSTANCE_MAPPING MAP
+       WHERE inv.id = P_INV_ID
+         AND ca.id = inv.id
+         AND INV.ID = MAP.PRIMARY_OBJECT_INSTANCE_ID (+)
+         AND INV.ODF_OBJECT_CODE = MAP.PRIMARY_OBJECT_INSTANCE_CODE (+)
+         AND MAP.SECONDARY_OBJECT_INSTANCE_CODE (+) = 'financials' 
+         AND MAP.SECONDARY_OBJECT_INSTANCE_ID = FIN.ID (+)
+          );
+         
+  CAP_ADD_MEMBER_SUPP_SP( P_INV_ID, P_SCENARIO_ID, P_USERID );
+ 
+  
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_NK_TEAM_REMAIN_AVAIL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_NK_TEAM_REMAIN_AVAIL_FCT" (p_team_id INTEGER, p_start TIMESTAMP DEFAULT NULL, p_finish TIMESTAMP DEFAULT NULL)
+   RETURN NUMBER
+IS
+ v_return    NUMBER;
+ v_resourceid INTEGER;
+ v_isrole smallint;
+ v_resource_type smallint;
+ v_isactive smallint;
+ v_start timestamp;
+ v_finish timestamp;
+BEGIN
+  v_return := 0;
+  if(p_team_id is null) then
+    return v_return;
+  end if;
+  BEGIN
+  -- get investment start/finish, resource type, is role
+  select prj.prisrole, srm.resource_type, inv.is_active, inv.schedule_start, inv.schedule_finish, t.prresourceid
+  into v_isrole, v_resource_type, v_isactive, v_start, v_finish, v_resourceid
+  from prteam t, inv_investments inv, srm_resources srm, prj_resources prj
+  where t.prid = p_team_id
+        and inv.id = t.prprojectid
+        and srm.id = t.prresourceid
+        and prj.prid = t.prresourceid;
+  EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RETURN v_return;
+  END;
+  if(v_isrole is null or v_isrole = 1 or v_resource_type is null or v_resource_type &gt; 2 or v_isactive is null or v_isactive = 0) then
+    return v_return;
+  end if;
+  /*
+    overriding the start/finish date of the investment?
+  */
+  if(p_start is not null) then
+    v_start := p_start;
+  end if;
+  if(p_finish is not null) then
+    v_finish := p_finish;
+  end if;
+  /*
+    Truncate the start date and check for a time portion on the finish date, if found then truncate and add 1 day (midnight date)
+    if still null then assign max start/finish dates
+  */
+  if(v_start is not null) then
+    v_start := TRUNC(v_start,'DDD');
+  else
+    v_start := CRV_DATE_FROM_JULIAN_FCT(2);
+  end if;
+  if(v_finish is not null) then
+    IF(EXTRACT(HOUR FROM V_FINISH) &gt; 0) THEN
+      V_FINISH := TRUNC(V_FINISH, 'DDD') + 1;
+    ELSE
+      V_FINISH := TRUNC(V_FINISH, 'DDD');
+    END IF;
+  else
+    v_finish := CRV_DATE_FROM_JULIAN_FCT(65535);
+  end if;
+  -- get availability - team demand
+  select nk_sum_fct(r.odf_nk_odf_pravailcurve, v_start, v_finish) - nk_sum_fct(t.odf_nk_odf_pralloccurve, v_start, v_finish) into v_return
+   from prteam t, prj_resources r
+  where t.prid = p_team_id
+    and r.prid = t.prresourceid;
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

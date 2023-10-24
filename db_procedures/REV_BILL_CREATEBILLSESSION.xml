@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_CREATEBILLSESSION</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_CREATEBILLSESSION" (
+  cUserID   VARCHAR2 ,
+  cCOMPANY_CODE   VARCHAR2 ,
+  cProjectList  VARCHAR2,
+  cFromDate     VARCHAR2  DEFAULT NULL,
+  cCutoffDate   VARCHAR2  DEFAULT NULL,
+  iBillingSessionKey  IN OUT NUMBER,
+  cBillingCurrency_in VARCHAR2,
+  bCanApproveBill   IN OUT NUMBER)
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus     INTEGER;
+  iProjCount       NUMBER;
+  iApproveCount      NUMBER;
+  dCutoffDate      DATE;
+  dFromDate        DATE;
+  cBillingCurrency   GLOBALPKG.STRING;
+  v_InsertedCount    NUMBER := 0;
+  v_TotalInsertedCount NUMBER := 0;
+
+BEGIN
+	REV_BILL_CREATEBILLSESSION.cBillingCurrency := REV_BILL_CREATEBILLSESSION.cBillingCurrency_in;
+	REV_BILL_CREATEBILLSESSION.iBillingSessionKey :=  0;
+	REV_BILL_CREATEBILLSESSION.bCanApproveBill :=  0;
+	REV_BILL_CREATEBILLSESSION.iProjCount :=  0;
+	REV_BILL_CREATEBILLSESSION.iApproveCount :=  -1;
+	IF  NVL(RTRIM(REV_BILL_CREATEBILLSESSION.cCutoffDate), '')  IN('', 'NULL') THEN
+		REV_BILL_CREATEBILLSESSION.dCutoffDate :=  TO_DATE('12/31/2049','mm/dd/yyyy');
+	ELSE REV_BILL_CREATEBILLSESSION.dCutoffDate :=  TO_DATE(SUBSTR(REV_BILL_CREATEBILLSESSION.cCutoffDate, 1,10), 'yyyy/mm/dd');
+	END IF;
+
+	IF  NVL(RTRIM(REV_BILL_CREATEBILLSESSION.cFromDate), '')  IN('', 'NULL') THEN
+		REV_BILL_CREATEBILLSESSION.dFromDate :=  TO_DATE('01/01/1900', 'mm/dd/yyyy');
+	ELSE REV_BILL_CREATEBILLSESSION.dFromDate :=  TO_DATE(SUBSTR(REV_BILL_CREATEBILLSESSION.cFromDate, 1,10), 'yyyy/mm/dd');
+	END IF;
+-- clean up prior billing sessions
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  pc_BillingDetailAllocations
+		WHERE ROWID IN
+		(SELECT A.ROWID FROM pc_BillingSession S, pc_BillingDetailAllocations A
+		WHERE S.UserID = REV_BILL_CREATEBILLSESSION.cUserID
+/*		 and TRUNC(SYSDATE - (S.ActionDate)) &gt; 0 */
+		 and A.BillingSessionKey = S.BillingSessionKey);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM olb_BillingCheckout
+		WHERE ROWID IN
+		(SELECT C.ROWID FROM pc_BillingSession S, olb_BillingCheckout C
+		WHERE S.UserID = REV_BILL_CREATEBILLSESSION.cUserID
+/*		 and TRUNC(SYSDATE - (S.ActionDate)) &gt; 0 */
+		 and C.UserID = S.UserID
+		 and C.ActionID = RPAD(S.BillingSessionKey, 10, ' '));
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM pc_BillingSession
+		WHERE UserID = REV_BILL_CREATEBILLSESSION.cUserID;
+/*		 and TRUNC(SYSDATE - (ActionDate)) &gt; 0; */
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM PAC_BIL_DETAIL_SUMMARY
+		WHERE UserID = REV_BILL_CREATEBILLSESSION.cUserID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM TEMP_BILL_ITEM_DETAILS
+		WHERE UserID = REV_BILL_CREATEBILLSESSION.cUserID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO pc_BillingSession (BillingSessionKey, UserID, ActionDate, COMPANY_CODE, ProjectList, CutoffDate, FROMDATE, BILLING_CURRENCY_CODE)
+	VALUES (S_109_1_PC_BILLINGSESSION.nextval, REV_BILL_CREATEBILLSESSION.cUserID, SYSDATE, REV_BILL_CREATEBILLSESSION.cCOMPANY_CODE,
+		   REV_BILL_CREATEBILLSESSION.cProjectList, REV_BILL_CREATEBILLSESSION.dCutoffDate, REV_BILL_CREATEBILLSESSION.dFromDate,
+		   REV_BILL_CREATEBILLSESSION.cBillingCurrency );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+      SELECT S_109_1_PC_BILLINGSESSION.currval INTO  REV_BILL_CREATEBILLSESSION.iBillingSessionKey FROM dual;
+
+	IF  StoO_error = 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO olb_BillingCheckout (UserID, ActionID, ActionDate, COMPANY_CODE, PROJECT_CODE, PROJECT_ID)
+		  SELECT  REV_BILL_CREATEBILLSESSION.cUserID, RPAD(REV_BILL_CREATEBILLSESSION.iBillingSessionKey,
+			   10, ' '), SYSDATE, REV_BILL_CREATEBILLSESSION.cCOMPANY_CODE, P.PROJECT_CODE, P.ID
+       FROM pac_mnt_projects P
+			WHERE P.COMPANY_CODE = REV_BILL_CREATEBILLSESSION.cCOMPANY_CODE
+       and INSTR( REV_BILL_CREATEBILLSESSION.cProjectList, '~' || RTRIM(P.PROJECT_CODE) || '~') &gt; 0 and
+			NOT EXISTS (
+			SELECT  1
+			 FROM olb_BillingCheckout O
+			WHERE O.COMPANY_CODE = P.COMPANY_CODE
+			 and O.PROJECT_CODE = P.PROJECT_CODE );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		v_TotalInsertedCount := StoO_rowcnt ;
+		v_InsertedCount := v_TotalInsertedCount ;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		/* Now insert Billing Subprojects recursively making sure to grab down to the lowest level */
+		WHILE NVL( v_InsertedCount, 0 ) &gt; 0
+		  LOOP
+	  	    BEGIN
+			  StoO_error   := 0;
+			  StoO_rowcnt  := 0;
+			  INSERT INTO olb_BillingCheckout (UserID, ActionID, ActionDate, COMPANY_CODE, PROJECT_CODE, PROJECT_ID)
+		  	  		 SELECT  REV_BILL_CREATEBILLSESSION.cUserID, RPAD(REV_BILL_CREATEBILLSESSION.iBillingSessionKey,
+			   		 		 10, ' '), SYSDATE, REV_BILL_CREATEBILLSESSION.cCOMPANY_CODE, P.PROJECT_CODE, P.ID
+			 			FROM PAC_MNT_PROJECTS P
+						WHERE P.BILLING_PROJECT_ID IN ( SELECT PROJECT_ID
+							  					 	  	FROM olb_BillingCheckout O
+														WHERE O.UserID = REV_BILL_CREATEBILLSESSION.cUserID AND
+															  O.PROJECT_ID != P.ID ) and
+						  NOT EXISTS ( SELECT  1
+						  			     FROM olb_BillingCheckout O
+										 WHERE O.COMPANY_CODE = P.COMPANY_CODE
+			 							 and O.PROJECT_CODE = P.PROJECT_CODE );
+			  StoO_rowcnt := SQL%ROWCOUNT;
+			  v_InsertedCount := StoO_rowcnt ;
+			  v_TotalInsertedCount := v_TotalInsertedCount + v_InsertedCount ;
+			  EXCEPTION
+			  WHEN NO_DATA_FOUND THEN
+				NULL;
+			  WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	  	    END;
+		  END LOOP;
+
+		REV_BILL_CREATEBILLSESSION.iProjCount :=  v_TotalInsertedCount ;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   COUNT(*)
+			INTO REV_BILL_CREATEBILLSESSION.iApproveCount FROM projstaff PS, olb_BillingCheckout O
+			WHERE O.UserID = REV_BILL_CREATEBILLSESSION.cUserID
+			 and O.ActionID = RPAD(REV_BILL_CREATEBILLSESSION.iBillingSessionKey,
+			   10, ' ')
+			 and PS.RESOURCE_CODE = O.UserID
+			 and PS.COMPANY_CODE = O.COMPANY_CODE
+			 and PS.PROJECT_CODE = O.PROJECT_CODE
+			 and PS.billingapproval = 1;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		IF  NVL(REV_BILL_CREATEBILLSESSION.iApproveCount, 0) = 0 THEN
+			REV_BILL_CREATEBILLSESSION.iApproveCount :=  -1;
+		END IF;
+		IF  NVL(REV_BILL_CREATEBILLSESSION.iProjCount, 0) = REV_BILL_CREATEBILLSESSION.iApproveCount THEN
+			REV_BILL_CREATEBILLSESSION.bCanApproveBill :=  1;
+		END IF;
+	END;
+	END IF;
+
+END REV_BILL_CREATEBILLSESSION;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

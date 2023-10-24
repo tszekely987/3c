@@ -1,0 +1,20 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_INVOICE_V2">
+    <indexes/>
+    <text_length>1628</text_length>
+    <text>select   'x' pmd_analytical_partition_by, cbk_invoice.id odf_pk, cbk_invoice.IS_LOCKED as is_locked, ( select sum (CBK_SCALED_GL_TXNS.scaled_amount)
+        from CBK_SCALED_GL_TXNS
+        where CBK_INVOICE.ID = CBK_SCALED_GL_TXNS.INVOICE_ID
+        and CBK_SCALED_GL_TXNS.chargeback_type = 'D'
+        and NOT CBK_SCALED_GL_TXNS.to_inv_id IN
+        ( SELECT from_inv_id
+        FROM CBK_SCALED_GL_TXNS toptxn
+        WHERE toptxn.invoice_id = CBK_INVOICE.ID
+        AND NOT toptxn.from_inv_id = toptxn.to_inv_id
+        )
+        ) as amount, cbk_invoice.status_code as status_code, cbk_invoice.department_id as department_id, odf_ca_invoice.odf_period_end as odf_period_end, odf_ca_invoice.odf_period_type as odf_period_type, CREATED.FULL_NAME as created_by, ( select DISTINCT CBK_SCALED_GL_TXNS.CURRENCY_CODE
+        from CBK_SCALED_GL_TXNS
+        where CBK_INVOICE.ID = CBK_SCALED_GL_TXNS.INVOICE_ID
+        ) as currency_code, cbk_invoice.invoice_date as invoice_date, odf_ca_invoice.odf_period_start as odf_period_start, cbk_invoice.generated_by as generated_by, UPDATED.FULL_NAME as last_updated_by, CBK_INVOICE.CREATED_DATE as created_date, odf_ca_invoice.partition_code as partition_code, cbk_invoice.period_id as period_id, CBK_INVOICE.LAST_UPDATED_DATE as last_updated_date, cbk_invoice.invoice_number as invoice_number, odf_ca_invoice.odf_entity_code as odf_entity_code  from cbk_invoice cbk_invoice JOIN odf_ca_invoice odf_ca_invoice ON odf_ca_invoice.id=cbk_invoice.id , SRM_RESOURCES CREATED, SRM_RESOURCES UPDATED where CBK_INVOICE.CREATED_BY = CREATED.USER_ID AND CBK_INVOICE.LAST_UPDATED_BY = UPDATED.USER_ID</text>
+  </QueryResult>
+</ClarityDBViewQuery>

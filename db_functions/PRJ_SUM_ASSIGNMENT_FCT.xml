@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_SUM_ASSIGNMENT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_SUM_ASSIGNMENT_FCT" 
+  (
+     P_TEAM_ID       NUMBER,
+     P_ACTUALS       INTEGER
+   )
+
+   RETURN NUMBER
+/* Description:
+   ------------
+   This function computes the sum of the actuals/estimates for a particular team member on a project
+*/
+IS
+  V_SUM NUMBER;
+BEGIN
+  V_SUM := 0;
+  
+  IF (P_ACTUALS = 1)
+  THEN
+    SELECT nvl(SUM(PRASSIGNMENT.PRACTSUM),0) INTO V_SUM
+    FROM PRASSIGNMENT
+    WHERE PRASSIGNMENT.TEAM_ID = P_TEAM_ID;
+  ELSE
+    SELECT nvl(SUM(PRASSIGNMENT.PRESTSUM),0) INTO V_SUM
+    FROM PRASSIGNMENT
+    WHERE PRASSIGNMENT.TEAM_ID = P_TEAM_ID;
+  END IF;
+
+  RETURN V_SUM;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

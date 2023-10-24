@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_GET_RETAIN_PRECISION_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_GET_RETAIN_PRECISION_FCT" RETURN NUMBER IS
+      iRetainPrecision NUMBER;
+      /******************************************************************************
+         NAME:       CMN_GET_RETAIN_PRECISION_FCT
+         PURPOSE:    return the CMN_RETAIN_CURRENCY_PRECISION value from the CMN_OPTIONS_VALUE. 
+                 Return 1 by default - this represents the current behavior where rates / costs
+               are rounded off sometimes
+      ******************************************************************************/
+      
+        BEGIN
+             iRetainPrecision := 1;
+             SELECT VALUE INTO iRetainPrecision FROM CMN_OPTION_VALUES 
+             WHERE OPTION_ID = (SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_RETAIN_CURRENCY_PRECISION');  
+             
+             RETURN iRetainPrecision;
+          EXCEPTION
+               WHEN OTHERS THEN
+                 -- Consider logging the error and then re-raise
+                 iRetainPrecision := 1;
+          RETURN iRetainPrecision;
+             
+        END CMN_GET_RETAIN_PRECISION_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="CSK_RPT_FISCAL_YEAR" displayAttributeName="year_name" hiddenAttributeName="year_key" objectCode="" sortAttributeName="sort_order" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Report (Fiscal Years)" languageCode="en" name="Report (Fiscal Years)"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Datawarehouse" dbVendor="mssql"><![CDATA[SELECT @SELECT:x.year_key:year_key@,
+       @SELECT:x.year_name:year_name@,
+       @SELECT:x.record_type @+@ '-' @+@ x.year_name:sort_order@
+FROM  (SELECT DISTINCT 'A' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'											   
+       AND    c.year_key IN (SELECT a.year_key
+                             FROM   dwh_cmn_period a
+                             WHERE  a.period_type_key = 'FISCAL'
+                             AND    ppm_dwh.dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)
+       UNION ALL							   
+       SELECT DISTINCT 'B' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'	   
+	   AND    c.year_key NOT IN (SELECT a.year_key
+                                 FROM   dwh_cmn_period a
+                                 WHERE  a.period_type_key = 'FISCAL'
+                                 AND    ppm_dwh.dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)) x
+WHERE  @FILTER@]]></nsql>
+            <nsql databaseId="Datawarehouse" dbVendor="oracle"><![CDATA[SELECT @SELECT:x.year_key:year_key@,
+       @SELECT:x.year_name:year_name@,
+       @SELECT:x.record_type @+@ '-' @+@ x.year_name:sort_order@
+FROM  (SELECT DISTINCT 'A' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'											   
+       AND    c.year_key IN (SELECT a.year_key
+                             FROM   dwh_cmn_period a
+                             WHERE  a.period_type_key = 'FISCAL'
+                             AND    dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)
+       UNION ALL							   
+       SELECT DISTINCT 'B' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'	   
+	   AND    c.year_key NOT IN (SELECT a.year_key
+                                 FROM   dwh_cmn_period a
+                                 WHERE  a.period_type_key = 'FISCAL'
+                                 AND    dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)) x
+WHERE  @FILTER@]]></nsql>
+            <nsql databaseId="Datawarehouse" dbVendor="postgres"><![CDATA[SELECT @SELECT:x.year_key:year_key@,
+       @SELECT:x.year_name:year_name@,
+       @SELECT:x.record_type @+@ '-' @+@ x.year_name:sort_order@
+FROM  (SELECT DISTINCT 'A' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'											   
+       AND    c.year_key IN (SELECT a.year_key
+                             FROM   dwh_cmn_period a
+                             WHERE  a.period_type_key = 'FISCAL'
+                             AND    dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)
+       UNION ALL							   
+       SELECT DISTINCT 'B' record_type,
+              c.year_key year_key,
+              cln.year_name year_name
+       FROM   dwh_cmn_period c
+              INNER JOIN dwh_cmn_period_ln cln ON  c.period_key = cln.period_key
+                                               AND cln.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  1=1
+       AND    c.period_type_key = 'FISCAL'	   
+	   AND    c.year_key NOT IN (SELECT a.year_key
+                                 FROM   dwh_cmn_period a
+                                 WHERE  a.period_type_key = 'FISCAL'
+                                 AND    dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.period_start_date AND a.period_end_date)) x
+WHERE  @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="year_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="year_name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Fiscal Year"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Fiscal Years"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="year_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Year"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="year_key" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Year Key"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="year_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Year"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="sort_order" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Sort Order"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

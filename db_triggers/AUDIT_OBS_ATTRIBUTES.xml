@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>AUDIT_OBS_ATTRIBUTES</code>
+          <table_name>PRJ_OBS_ASSOCIATIONS</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE OR DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>AUDIT_OBS_ATTRIBUTES
+AFTER INSERT OR UPDATE OR DELETE
+ON PRJ_OBS_ASSOCIATIONS
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>BEGIN
+DECLARE
+  V_IS_AUDIT_ATTR       NUMBER;
+  V_AUDIT_INFO          NUMBER;
+  V_OBJECT_CODE         VARCHAR2(50);
+  V_OBJECT_ID           NUMBER;
+  V_IS_CUSTOM           NUMBER;
+  V_ATTRIBUTE_CODE      VARCHAR2(50);
+  V_UNIT_ID             VARCHAR2(50);
+  V_TMP_VALUE           VARCHAR2(50);
+  V_FULL_PATH           VARCHAR2(200);
+  V_IS_INSERT           NUMBER;
+  V_IS_DELETE           NUMBER;
+  V_VALUE_BEFORE        VARCHAR2(20);
+	V_ID                  NUMBER;
+  V_OPCODE              VARCHAR2(5);
+  DB_OPCODE             VARCHAR2(5);
+  AUDIT_ID              NUMBER;
+  IS_CTX_EXIST          NUMBER;
+  V_TRANSACTION_ID      VARCHAR2(20);
+  V_QUERY               VARCHAR2(300);
+  V_ONLY_INSERT         NUMBER;
+  V_ONLY_DELETE         NUMBER;
+  V_INSTANCE_CODE       VARCHAR2(100);
+  V_INSTANCE_NAME       VARCHAR2(300);
+  V_LAST_UPDATED_BY  		ODF_AUD_OBJ_INST_CONTEXT.LAST_UPDATED_BY%TYPE;
+  V_LAST_UPDATED_DATE		ODF_AUD_OBJ_INST_CONTEXT.LAST_UPDATED_DATE%TYPE;
+
+BEGIN
+
+    SELECT DBMS_TRANSACTION.LOCAL_TRANSACTION_ID INTO V_TRANSACTION_ID FROM DUAL;
+ -- If the operation type is Insert, then first check if the respective attribute is audit enabled or not. If yes, insert
+    -- a record into CMN_AUDITS only if it is first in the transaction with the respective instance otherwise update CMN_AUDITS.
+    IF INSERTING THEN
+
+       V_OBJECT_ID := :new.record_id;
+       V_UNIT_ID := :new.unit_id;
+       V_LAST_UPDATED_BY := :new.LAST_UPDATED_BY;
+       V_LAST_UPDATED_DATE := :new.LAST_UPDATED_DATE;
+       V_IS_AUDIT_ATTR := 0;
+       V_AUDIT_INFO := 0;
+
+       BEGIN
+          -- Below query checks if the obs attribute is audit enabled or not. Input is unit_id and it will find the corresponding
+          -- OBS Type and from the object assocition with the found obs type it gets the associated obs attribute and using this attribute code
+          -- it checks if this attribute is audited or not.
+
+          SELECT count(1), OBJECTS.CODE, OBJECTS.IS_CUSTOM, OBSOBJECTTYPES.ASSOC_ATT_CODE
+                into V_IS_AUDIT_ATTR, V_OBJECT_CODE, V_IS_CUSTOM, V_ATTRIBUTE_CODE
+          FROM PRJ_OBS_UNITS OBSUNITS,
+            PRJ_OBS_TYPES OBSTYPES,
+            PRJ_OBS_OBJECT_TYPES OBSOBJECTTYPES,
+            ODF_OBJECTS OBJECTS,
+            ODF_AUDITED_ATTRIBUTES OBSAUDITATTRS
+          WHERE OBJECTS.OBS_CODE = OBSOBJECTTYPES.TABLE_NAME AND
+            OBSUNITS.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.ATTRIBUTE_CODE = OBSOBJECTTYPES.ASSOC_ATT_CODE AND
+            OBSAUDITATTRS.OBJECT_CODE = OBJECTS.CODE AND
+            OBSOBJECTTYPES.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.IS_ACTIVE = 1 AND
+            ( OBSAUDITATTRS.OPERATION_CODE = 'I' OR
+              OBSAUDITATTRS.OPERATION_CODE = 'U') AND
+            OBSOBJECTTYPES.TABLE_NAME = :new.table_name AND
+            OBSUNITS.ID = :new.unit_id GROUP BY OBJECTS.CODE, OBJECTS.IS_CUSTOM, OBSOBJECTTYPES.ASSOC_ATT_CODE;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN OTHERS THEN RAISE;
+       END;
+
+       DB_OPCODE := 'BOTH';
+
+       IF V_IS_AUDIT_ATTR = 1 THEN
+       BEGIN
+          SELECT OPERATION_CODE INTO DB_OPCODE FROM ODF_AUDITED_ATTRIBUTES
+            WHERE ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                  OBJECT_CODE = V_OBJECT_CODE AND
+                  OPERATION_CODE IN ('I', 'U') AND
+                  IS_ACTIVE = 1;
+         EXCEPTION
+           WHEN NO_DATA_FOUND THEN NULL;
+           WHEN OTHERS THEN RAISE;
+       END;
+       END IF;
+
+       IF V_IS_AUDIT_ATTR &lt;&gt; 0 THEN
+       BEGIN
+       SELECT COUNT(1) INTO V_AUDIT_INFO
+       FROM CMN_AUDITS
+          WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                OBJECT_ID = V_OBJECT_ID AND
+                ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                OBJECT_CODE = V_OBJECT_CODE;
+         EXCEPTION
+          WHEN NO_DATA_FOUND THEN NULL;
+          WHEN OTHERS THEN RAISE;
+       END;
+
+      IF V_AUDIT_INFO &gt; 1 THEN
+      DELETE FROM CMN_AUDITS
+              WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                    OBJECT_ID = V_OBJECT_ID AND
+                    ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                    OBJECT_CODE = V_OBJECT_CODE AND
+                    OPERATION_CODE = 'U';
+     END IF;
+
+      BEGIN
+        SELECT ID, RAW_VALUE_BEFORE, OPERATION_CODE
+              INTO AUDIT_ID, V_VALUE_BEFORE, V_OPCODE
+          FROM CMN_AUDITS
+          WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                OBJECT_ID = V_OBJECT_ID AND
+                ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                OBJECT_CODE = V_OBJECT_CODE;
+       EXCEPTION
+          WHEN NO_DATA_FOUND THEN NULL;
+          WHEN OTHERS THEN RAISE;
+       END;
+       END IF;
+
+      IF V_IS_AUDIT_ATTR &lt;&gt; 0 THEN
+       IF V_OPCODE = 'U' THEN -- This is also comes when a record has to be updated in the same transaction and implies a delete operation has been audited before this call.
+          IF V_UNIT_ID = V_VALUE_BEFORE OR DB_OPCODE = 'I' THEN -- This check will remove auditing of values that are not actually modified implies same value before and after the save operation.
+            DELETE FROM CMN_AUDITS
+              WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                    OBJECT_ID = V_OBJECT_ID AND
+                    ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                    OBJECT_CODE = V_OBJECT_CODE;
+          --ELSIF  THEN
+           --DELETE FROM CMN_AUDITS
+              --WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                    --OBJECT_ID = V_OBJECT_ID AND
+                    --ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                    --OBJECT_CODE = V_OBJECT_CODE;
+          ELSE
+            UPDATE CMN_AUDITS
+                SET VALUE_AFTER = OBS_UNIT_FULL_PATH(V_UNIT_ID),
+                    RAW_VALUE_AFTER = V_UNIT_ID,
+				LAST_UPDATED_DATE = V_LAST_UPDATED_DATE,
+                LAST_UPDATED_BY = V_LAST_UPDATED_BY,
+				CREATED_DATE = V_LAST_UPDATED_DATE,
+                CREATED_BY = V_LAST_UPDATED_BY
+                WHERE ID = AUDIT_ID;
+          END IF;
+       ELSIF V_OPCODE = 'I' THEN
+         IF DB_OPCODE ='I' OR DB_OPCODE='BOTH' THEN
+         UPDATE CMN_AUDITS
+                SET VALUE_AFTER = OBS_UNIT_FULL_PATH(V_UNIT_ID),
+                    RAW_VALUE_AFTER = V_UNIT_ID
+                WHERE ID = AUDIT_ID;
+         ELSE
+          DELETE FROM CMN_AUDITS
+              WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                    OBJECT_ID = V_OBJECT_ID AND
+                    ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                    OBJECT_CODE = V_OBJECT_CODE;
+         END IF;
+
+      ELSIF DB_OPCODE = 'U' OR DB_OPCODE='BOTH' THEN -- This mean no record with the same transaction is found so, an update operation is called and the user has enabled Update operation on this attribute.
+        INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE ,
+                  VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID )
+        SELECT CMN_AUDITS_S1.nextval, V_OBJECT_CODE, V_OBJECT_ID, V_ATTRIBUTE_CODE, :new.table_name, '',null, OBS_UNIT_FULL_PATH(:new.unit_id) , null, :new.unit_id, 'U', V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL;
+      END IF;
+     END IF;
+
+     ELSIF DELETING THEN
+
+      V_OBJECT_ID := :old.record_id;
+      V_LAST_UPDATED_BY := :old.LAST_UPDATED_BY;
+      V_LAST_UPDATED_DATE := :old.LAST_UPDATED_DATE;
+
+       BEGIN
+
+          SELECT count(1), OBJECTS.CODE, OBJECTS.IS_CUSTOM, OBSOBJECTTYPES.ASSOC_ATT_CODE
+                into V_IS_AUDIT_ATTR, V_OBJECT_CODE, V_IS_CUSTOM, V_ATTRIBUTE_CODE
+          FROM PRJ_OBS_UNITS OBSUNITS,
+            PRJ_OBS_TYPES OBSTYPES,
+            PRJ_OBS_OBJECT_TYPES OBSOBJECTTYPES,
+            ODF_OBJECTS OBJECTS,
+            ODF_AUDITED_ATTRIBUTES OBSAUDITATTRS
+          WHERE OBJECTS.OBS_CODE = OBSOBJECTTYPES.TABLE_NAME AND
+            OBSUNITS.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.ATTRIBUTE_CODE = OBSOBJECTTYPES.ASSOC_ATT_CODE AND
+            OBSAUDITATTRS.OBJECT_CODE = OBJECTS.CODE AND
+            OBSOBJECTTYPES.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.IS_ACTIVE = 1 AND
+            ( OBSAUDITATTRS.OPERATION_CODE = 'D' OR
+              OBSAUDITATTRS.OPERATION_CODE = 'U') AND
+            OBSOBJECTTYPES.TABLE_NAME = :old.table_name AND
+            OBSUNITS.ID = :old.unit_id GROUP BY OBJECTS.CODE, OBJECTS.IS_CUSTOM, OBSOBJECTTYPES.ASSOC_ATT_CODE;
+
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN OTHERS THEN RAISE;
+       END;
+       DB_OPCODE := 'BOTH';
+
+       IF V_IS_AUDIT_ATTR = 1 THEN
+       BEGIN
+          SELECT OPERATION_CODE INTO DB_OPCODE FROM ODF_AUDITED_ATTRIBUTES
+            WHERE ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                  OBJECT_CODE = V_OBJECT_CODE AND
+                  OPERATION_CODE IN ('D','U') AND
+                  IS_ACTIVE = 1;
+         EXCEPTION
+           WHEN NO_DATA_FOUND THEN NULL;
+           WHEN OTHERS THEN RAISE;
+       END;
+       END IF;
+
+       IF DB_OPCODE = 'U' OR DB_OPCODE = 'BOTH' THEN
+       BEGIN
+       SELECT COUNT(1) INTO V_AUDIT_INFO
+       FROM CMN_AUDITS
+          WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                OBJECT_ID = V_OBJECT_ID AND
+                ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                OBJECT_CODE = V_OBJECT_CODE;
+         EXCEPTION
+          WHEN NO_DATA_FOUND THEN NULL;
+          WHEN OTHERS THEN RAISE;
+       END;
+       END IF;
+
+       IF V_AUDIT_INFO &gt; 1 THEN
+       DELETE FROM CMN_AUDITS
+              WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                    OBJECT_ID = V_OBJECT_ID AND
+                    ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                    OBJECT_CODE = V_OBJECT_CODE AND
+                    OPERATION_CODE = 'I';
+       END IF;
+
+       IF V_IS_AUDIT_ATTR &lt;&gt; 0 THEN
+       BEGIN
+        SELECT ID, RAW_VALUE_BEFORE, OPERATION_CODE
+              INTO AUDIT_ID, V_VALUE_BEFORE, V_OPCODE
+          FROM CMN_AUDITS
+          WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                OBJECT_ID = V_OBJECT_ID AND
+                ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                OBJECT_CODE = V_OBJECT_CODE;
+       EXCEPTION
+          WHEN NO_DATA_FOUND THEN NULL;
+          WHEN OTHERS THEN RAISE;
+       END;
+       END IF;
+
+     IF V_IS_AUDIT_ATTR &lt;&gt; 0 THEN
+      IF V_OPCODE = 'D' THEN -- This is also comes when a record has to be updated in the same transaction and implies a delete operation has been audited before this call.
+           IF DB_OPCODE='D' OR DB_OPCODE='BOTH' THEN
+            UPDATE CMN_AUDITS
+                SET VALUE_BEFORE = OBS_UNIT_FULL_PATH(:old.unit_id),
+                    RAW_VALUE_BEFORE = :old.unit_id
+                WHERE ID = AUDIT_ID;
+         ELSE
+            DELETE FROM CMN_AUDITS
+            WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                  OBJECT_ID = V_OBJECT_ID AND
+                   ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                   OBJECT_CODE =  V_OBJECT_CODE;
+         END IF;
+       ELSIF DB_OPCODE='U' OR DB_OPCODE='BOTH'  THEN -- This mean no record with the same transaction is found so, an update operation is called and the user has enabled Update operation on this attribute.
+        INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE ,
+                  VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID )
+        SELECT CMN_AUDITS_S1.nextval, V_OBJECT_CODE, V_OBJECT_ID, V_ATTRIBUTE_CODE, :old.table_name, '',OBS_UNIT_FULL_PATH(:old.unit_id), null, :old.unit_id, null, 'U', V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL;
+      END IF;
+     END IF;
+
+
+    ELSE
+       V_OBJECT_ID := :old.record_id;
+       V_LAST_UPDATED_BY := :new.LAST_UPDATED_BY;
+       V_LAST_UPDATED_DATE := :new.LAST_UPDATED_DATE;
+       BEGIN
+
+          IF LENGTH( :old.unit_id ) &gt; 0 THEN
+            V_UNIT_ID := :old.unit_id;
+          ELSE
+            V_UNIT_ID := :new.unit_id;
+          END IF;
+
+          SELECT 1, OBJECTS.CODE, OBJECTS.IS_CUSTOM, OBSOBJECTTYPES.ASSOC_ATT_CODE
+                into V_IS_AUDIT_ATTR, V_OBJECT_CODE, V_IS_CUSTOM, V_ATTRIBUTE_CODE
+          FROM PRJ_OBS_UNITS OBSUNITS,
+            PRJ_OBS_TYPES OBSTYPES,
+            PRJ_OBS_OBJECT_TYPES OBSOBJECTTYPES,
+            ODF_OBJECTS OBJECTS,
+            ODF_AUDITED_ATTRIBUTES OBSAUDITATTRS
+          WHERE OBJECTS.OBS_CODE = OBSOBJECTTYPES.TABLE_NAME AND
+            OBSUNITS.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.ATTRIBUTE_CODE = OBSOBJECTTYPES.ASSOC_ATT_CODE AND
+            OBSAUDITATTRS.OBJECT_CODE = OBJECTS.CODE AND
+            OBSOBJECTTYPES.TYPE_ID = OBSTYPES.ID AND
+            OBSAUDITATTRS.IS_ACTIVE = 1 AND
+            OBSAUDITATTRS.OPERATION_CODE = 'U' AND
+            OBSOBJECTTYPES.TABLE_NAME = :old.table_name AND
+            OBSUNITS.ID = V_UNIT_ID;
+
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN OTHERS THEN RAISE;
+       END;
+       IF V_IS_AUDIT_ATTR &lt;&gt; 0 THEN
+          AUDIT_ID := 0;
+          BEGIN
+            SELECT ID INTO AUDIT_ID FROM CMN_AUDITS
+                WHERE TRANSACTION_ID = V_TRANSACTION_ID AND
+                OBJECT_ID = V_OBJECT_ID AND
+                ATTRIBUTE_CODE = V_ATTRIBUTE_CODE AND
+                OBJECT_CODE = V_OBJECT_CODE;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN NULL;
+            WHEN OTHERS THEN RAISE;
+          END;
+
+
+          IF AUDIT_ID &lt;&gt; 0 THEN
+              UPDATE CMN_AUDITS
+                  SET VALUE_BEFORE = OBS_UNIT_FULL_PATH(:old.unit_id),
+                      VALUE_AFTER  = OBS_UNIT_FULL_PATH(:new.unit_id),
+                      RAW_VALUE_BEFORE = :old.unit_id,
+                      RAW_VALUE_AFTER = :new.unit_id,
+                      OPERATION_CODE ='U'
+					  WHERE ID = AUDIT_ID;
+          ELSE
+            INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE ,
+                  VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID )
+            SELECT CMN_AUDITS_S1.nextval, V_OBJECT_CODE, V_OBJECT_ID, V_ATTRIBUTE_CODE, :old.table_name, '', OBS_UNIT_FULL_PATH(:old.unit_id), OBS_UNIT_FULL_PATH(:new.unit_id), :old.unit_id, :new.unit_id, 'U', V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL;
+          END IF;  -- END IF FOR  AUDIT_ID CHECK
+		END IF; -- END IF FOR  V_IS_AUDIT_ATTR CHECK
+
+    END IF; -- END IF FOR INSERTING, DELETING OR UPDATING CHECK
+
+
+    -- Insert / update ODF_AUD_OBJ_INST_CONTEXT table with the object code and object instance accordingly
+    IF ( LENGTH( V_OBJECT_CODE ) &gt; 0 ) THEN
+
+      GET_INSTANCE_CODE ( V_OBJECT_CODE, V_OBJECT_ID, V_IS_CUSTOM, V_INSTANCE_CODE, V_INSTANCE_NAME );
+
+      BEGIN
+        IS_CTX_EXIST := 0;
+        SELECT 1 INTO IS_CTX_EXIST FROM DUAL
+        WHERE EXISTS ( SELECT 1 FROM ODF_AUD_OBJ_INST_CONTEXT
+                        WHERE OBJECT_CODE = V_OBJECT_CODE AND
+                              OBJECT_INSTANCE_ID = V_OBJECT_ID );
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN NULL;
+          WHEN OTHERS THEN RAISE;
+      END;
+      IF IS_CTX_EXIST &lt;&gt; 0 THEN
+        UPDATE ODF_AUD_OBJ_INST_CONTEXT
+          SET LAST_UPDATED_DATE = V_LAST_UPDATED_DATE,
+              LAST_UPDATED_BY = V_LAST_UPDATED_BY,
+              OBJECT_INSTANCE_CODE = V_INSTANCE_CODE,
+              OBJECT_INSTANCE_NAME = V_INSTANCE_NAME
+          WHERE OBJECT_CODE = V_OBJECT_CODE AND
+              OBJECT_INSTANCE_ID = V_OBJECT_ID;
+      ELSE
+        INSERT INTO ODF_AUD_OBJ_INST_CONTEXT(ID, OBJECT_CODE, OBJECT_INSTANCE_ID, OBJECT_INSTANCE_CODE, OBJECT_INSTANCE_NAME, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+        SELECT  ODF_AUD_OBJ_INST_CONTEXT_S1.nextval, V_OBJECT_CODE, V_OBJECT_ID, V_INSTANCE_CODE, V_INSTANCE_NAME, V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY, V_LAST_UPDATED_DATE, V_LAST_UPDATED_BY  FROM  DUAL;
+      END IF;  -- END IF FOR  IS_CTX_EXIST CHECK
+   END IF;
+   END;
+END;</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

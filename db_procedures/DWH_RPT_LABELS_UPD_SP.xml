@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DWH_RPT_LABELS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DWH_RPT_LABELS_UPD_SP" 
+(
+    p_label_code IN VARCHAR2,
+    p_label_name IN VARCHAR2,
+    p_created_by IN NUMBER DEFAULT 1,
+    p_language_code IN VARCHAR2 DEFAULT 'en'
+)
+AS
+    v_label_id NUMBER;
+    v_caption_id NUMBER;
+BEGIN
+    BEGIN
+    SELECT   l.id
+    INTO     v_label_id
+    FROM     cmn_rpt_labels l
+    WHERE    l.label_code = p_label_code;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+        BEGIN
+        v_label_id := 0;
+        END;
+    END;
+    IF NVL(v_label_id,0) = 0 THEN
+        SELECT cmn_rpt_labels_s1.NEXTVAL
+        INTO   v_label_id
+        FROM   DUAL;
+        INSERT INTO cmn_rpt_labels
+            (
+             id,
+             label_code,
+             created_date,
+             created_by,
+             last_updated_date,
+             last_updated_by
+            )
+        VALUES
+            (
+             v_label_id,
+             p_label_code,
+             SYSDATE,
+             p_created_by,
+             SYSDATE,
+             p_created_by
+            );
+        INSERT INTO cmn_captions_nls
+            (
+             id,
+             table_name,
+             pk_id,
+             language_code,
+             name,
+             description,
+             created_date,
+             created_by,
+             last_updated_date,
+             last_updated_by,
+             attribute1,
+             attribute2,
+             attribute3,
+             attribute4,
+             attribute5
+            )
+        SELECT cmn_captions_nls_s1.NEXTVAL,
+               'CMN_RPT_LABELS',
+               v_label_id,
+               l.language_code,
+               p_label_name,
+               p_label_name,
+               SYSDATE,
+               p_created_by,
+               SYSDATE,
+               p_created_by,
+               NULL,
+               NULL,
+               NULL,
+               NULL,
+               NULL
+        FROM   cmn_languages l
+        WHERE  NOT EXISTS (SELECT 'CAPTION ALREADY EXISTS'
+                           FROM   cmn_captions_nls
+                           WHERE  table_name = 'CMN_RPT_LABELS'
+                           AND    pk_id = v_label_id
+                           AND    language_code = l.language_code);
+    ELSE
+        BEGIN
+        SELECT cc.id
+        INTO   v_caption_id
+        FROM   cmn_captions_nls cc
+        WHERE  cc.pk_id = v_label_id
+        AND    cc.table_name = 'CMN_RPT_LABELS'
+        AND    cc.language_code = p_language_code;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+            v_caption_id := 0;
+            END;
+        END;
+        IF NVL(v_caption_id,0) = 0 THEN
+            SELECT cmn_captions_nls_s1.NEXTVAL
+            INTO   v_caption_id
+            FROM   DUAL;
+            INSERT INTO cmn_captions_nls
+                (
+                 id,
+                 table_name,
+                 pk_id,
+                 language_code,
+                 name,
+                 description,
+                 created_date,
+                 created_by,
+                 last_updated_date,
+                 last_updated_by,
+                 attribute1,
+                 attribute2,
+                 attribute3,
+                 attribute4,
+                 attribute5
+                )
+            VALUES
+                (
+                 v_caption_id,
+                 'CMN_RPT_LABELS',
+                 v_label_id,
+                 p_language_code,
+                 p_label_name,
+                 p_label_name,
+                 SYSDATE,
+                 p_created_by,
+                 SYSDATE,
+                 p_created_by,
+                 NULL,
+                 NULL,
+                 NULL,
+                 NULL,
+                 NULL
+                );
+        ELSE
+            UPDATE cmn_captions_nls
+            SET    name = p_label_name,
+                   description = p_label_name,
+                   last_updated_date = SYSDATE,
+                   last_updated_by = p_created_by
+            WHERE  id = v_caption_id;
+        END IF;
+    END IF;
+    COMMIT;
+END DWH_RPT_LABELS_UPD_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

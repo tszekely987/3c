@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_FOS_VALID_MATRIX_ROW_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_FOS_VALID_MATRIX_ROW_FCT" 
+ (P_RESOURCE_CODE  VARCHAR2,
+  P_MATRIX_ROW_KEY NUMBER)
+  RETURN INTEGER
+IS
+  V_SECURITY_LEVEL  INTEGER := 0;
+  V_DEFAULT_ENTITY  VARCHAR2(60);
+  V_RESOURCE_ENTITY VARCHAR2(60);
+  V_MATRIX_ENTITY   VARCHAR2(60);
+  V_MATRIX_LOCATION VARCHAR2(60);
+  V_ENTITY_COLUMN   INTEGER;
+  V_LOCATION_COLUMN INTEGER;
+  V_RETURN_VALUE    INTEGER := 0;
+  V_COUNT           INTEGER := 0;
+BEGIN
+  BEGIN
+    SELECT NVL(ENTITY_SECURITY, 0),
+           NVL(DEFAULTENTITY, ' ')
+      INTO V_SECURITY_LEVEL,
+           V_DEFAULT_ENTITY
+      FROM NAMEOPTIONS;
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        RETURN 0;
+  END;
+
+  IF V_SECURITY_LEVEL = 0 THEN -- if there is no security, return TRUE to give them access to this location
+    V_RETURN_VALUE := 1;
+  ELSE
+    BEGIN
+      BEGIN
+        SELECT L.ENTITY
+          INTO V_RESOURCE_ENTITY
+          FROM PAC_MNT_RESOURCES R,
+               LOCATIONS L
+         WHERE R.RESOURCE_CODE = P_RESOURCE_CODE
+           AND R.LOCATIONID = L.LOCATIONID;
+
+        EXCEPTION
+          WHEN OTHERS THEN
+            RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+      END;
+
+      IF V_RESOURCE_ENTITY = V_DEFAULT_ENTITY AND V_SECURITY_LEVEL = 2 THEN  -- if they work for
+        V_RETURN_VALUE := 1;
+      ELSE
+        BEGIN
+          BEGIN
+            SELECT COUNT(*)
+              INTO V_COUNT
+              FROM PPA_MATRIXCOLDEF C,
+                  PPA_MATRIXVALUES V
+            WHERE V.MATRIXROWKEY = P_MATRIX_ROW_KEY
+              AND V.MATRIXKEY = C.MATRIXKEY
+              AND C.FIELDNAME in ('entity', 'locationid');
+
+            EXCEPTION
+              WHEN OTHERS THEN
+                RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+          END;
+
+          IF V_COUNT = 0 THEN      -- if entity and location aren't part of the matrix, we can skip the entity-based security
+            V_RETURN_VALUE := 1;
+          ELSE
+            BEGIN
+              BEGIN
+                SELECT MIN(COLUMNNO)
+                  INTO V_ENTITY_COLUMN
+                  FROM PPA_MATRIXCOLDEF C,
+                       PPA_MATRIXVALUES V
+                 WHERE V.MATRIXROWKEY = P_MATRIX_ROW_KEY
+                   AND V.MATRIXKEY = C.MATRIXKEY
+                   AND C.FIELDNAME = 'entity';
+
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+              END;
+
+              BEGIN
+                SELECT MIN(COLUMNNO)
+                  INTO V_LOCATION_COLUMN
+                  FROM PPA_MATRIXCOLDEF C,
+                       PPA_MATRIXVALUES V
+                 WHERE V.MATRIXROWKEY = P_MATRIX_ROW_KEY
+                   AND V.MATRIXKEY = C.MATRIXKEY
+                   AND C.FIELDNAME = 'locationid';
+
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+              END;
+
+              BEGIN
+                SELECT DECODE(V_ENTITY_COLUMN,
+                              1, VALUE1,
+                              2, VALUE2,
+                              3, VALUE3,
+                              4, VALUE4,
+                              5, VALUE5,
+                              6, VALUE6,
+                              7, VALUE7,
+                              8, VALUE8,
+                              9, VALUE9,
+                              10,VALUE10,
+                              NULL)
+                  INTO V_MATRIX_ENTITY
+                  FROM PPA_MATRIXVALUES
+                 WHERE MATRIXROWKEY = P_MATRIX_ROW_KEY;
+
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+              END;
+
+              BEGIN
+                SELECT DECODE(V_LOCATION_COLUMN,
+                              1, VALUE1,
+                              2, VALUE2,
+                              3, VALUE3,
+                              4, VALUE4,
+                              5, VALUE5,
+                              6, VALUE6,
+                              7, VALUE7,
+                              8, VALUE8,
+                              9, VALUE9,
+                              10,VALUE10,
+                              NULL)
+                  INTO V_MATRIX_LOCATION
+                  FROM PPA_MATRIXVALUES
+                 WHERE MATRIXROWKEY = P_MATRIX_ROW_KEY;
+
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+              END;
+
+              -- if the entity in the row isn't the resource's entity, don't show it to him...
+              IF NVL(V_MATRIX_ENTITY, V_RESOURCE_ENTITY) = V_RESOURCE_ENTITY THEN
+
+                IF V_MATRIX_LOCATION IS NULL OR PAC_FOS_IS_VALID_LOCATION_FCT(P_RESOURCE_CODE, V_MATRIX_LOCATION) = 1 THEN
+                  V_RETURN_VALUE := 1;
+                END IF;
+              END IF;
+            END;
+          END IF;
+        END;
+      END IF;
+    END;
+  END IF;
+
+  RETURN NVL(V_RETURN_VALUE, 0);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

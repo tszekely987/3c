@@ -1,0 +1,32 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_TME_ENTRY_FACTS_V">
+    <indexes/>
+    <text_length>1137</text_length>
+    <text>SELECT s.timeentry_key,
+          s.period_key,
+          s.slice time_hours,
+          s.clarity_updated_date
+   FROM  (WITH cal_slice_keys AS
+              (SELECT from_date,
+                      num_periods,
+                      id request_key
+               FROM   prj_blb_slicerequests
+               WHERE  is_dwh_request = 1
+               AND    request_name = 'DAILYRESOURCETIMECURVE')
+          SELECT s.prj_object_id timeentry_key,
+                 CAST(s.slice_date - TO_DATE ('01/01/2000', 'MM/DD/YYYY') + 1000000 AS INTEGER) period_key,
+                 s.slice,
+                 GREATEST(te.prModTime,ts.prModTime) clarity_updated_date
+          FROM   prj_blb_slices s,
+                 cal_slice_keys sk,
+                 prtimeentry te,
+                 prtimesheet ts,
+                 rpt_calendar c
+          WHERE  s.slice_request_id = sk.request_key
+          AND    s.prj_object_id = te.prID
+          AND    te.prTimeSheetID = ts.prID
+          AND    s.slice_date = c.start_date
+          AND    c.period_type = 'DAILY'
+          AND    s.slice_date BETWEEN sk.from_date AND (sk.from_date + sk.num_periods)) s</text>
+  </QueryResult>
+</ClarityDBViewQuery>

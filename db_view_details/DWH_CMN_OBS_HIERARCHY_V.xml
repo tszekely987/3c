@@ -1,0 +1,36 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_CMN_OBS_HIERARCHY_V">
+    <indexes/>
+    <text_length>1500</text_length>
+    <text>SELECT t.obs_type_key,
+       t.obs_type_id,
+       t.obs_type,
+       branch_unit_id parent_obs_unit_key,
+       p.name parent_obs_unit,
+       p.depth parent_level,
+       unit_id child_obs_unit_key,
+       c.name child_obs_unit,
+       c.depth child_level,
+       t.is_investment_obs is_investment_obs,
+       t.is_resource_obs is_resource_obs,
+       f.created_date clarity_created_date,
+       f.last_updated_date last_updated_date
+FROM   prj_obs_units_flat f
+       INNER JOIN prj_obs_units p ON f.branch_unit_id = p.id
+       INNER JOIN prj_obs_units c ON f.unit_id = c.id
+       INNER JOIN 
+            (SELECT ot.id obs_type_key,
+                    ot.unique_name obs_type_id,
+                    ot.name obs_type,
+                    CASE WHEN (SELECT COUNT(*) FROM prj_obs_object_types WHERE type_id = ot.id
+                                                                         AND  (table_name LIKE 'INV_%' 
+                                                                         OR    table_name = 'SRM_PROJECTS')) > 0
+                         THEN 1 ELSE 0 END is_investment_obs,
+                    CASE WHEN (SELECT COUNT(*) FROM prj_obs_object_types WHERE type_id = ot.id
+                                                                         AND  table_name = 'SRM_RESOURCES') > 0
+                         THEN 1 ELSE 0 END is_resource_obs,
+                    ot.last_updated_date
+             FROM   prj_obs_types ot
+             WHERE  1=1) t ON p.type_id = t.obs_type_key</text>
+  </QueryResult>
+</ClarityDBViewQuery>

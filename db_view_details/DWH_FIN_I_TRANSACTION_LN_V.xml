@@ -1,0 +1,25 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_I_TRANSACTION_LN_V">
+    <indexes/>
+    <text_length>1288</text_length>
+    <text>SELECT CAST (r.transno AS INTEGER) transaction_key,
+       l.language_code_key,
+       l.language_code,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = tc.transtype AND lookup_type = 'RPT_TRANSACTION_TYPE'
+                   AND language_code = l.language_code) transaction_type,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = r.cost_type AND lookup_type = 'LOOKUP_FIN_COSTTYPECODE'
+                   AND language_code = l.language_code) cost_type,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = r.user_lov1 AND lookup_type = 'PRTIMEENTRY_USER_LOV1'
+                   AND language_code = l.language_code) user_value1,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = r.user_lov2 AND lookup_type = 'PRTIMEENTRY_USER_LOV2'
+                   AND language_code = l.language_code) user_value2,
+      (SELECT name FROM cmn_lookups_v WHERE id = r.document_type AND lookup_type = 'PAC_DOCUMENT_TYPE'
+                   AND language_code = l.language_code) document_type
+FROM   dwh_tmp_fin_transaction r
+       INNER JOIN (SELECT DISTINCT l.id language_code_key, l.language_code
+                     FROM cmn_languages l
+                    WHERE l.is_dw_enabled = 1) l ON 1 = 1
+       INNER JOIN transclass tc ON r.transclass = tc.transclass
+WHERE  1=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

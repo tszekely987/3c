@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUTONUM_GET_NEXT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUTONUM_GET_NEXT_SP" (
+   P_OBJECT_CODE    IN  VARCHAR2,
+   P_ATTRIBUTE_CODE IN  VARCHAR2,
+   P_PARTITION_CODE IN  VARCHAR2,
+   P_TABLE_NAME     IN  VARCHAR2 DEFAULT NULL,
+   P_COLUMN_NAME    IN  VARCHAR2 DEFAULT NULL,
+   P_PARENT_REFERENCE_ATTR IN VARCHAR2 DEFAULT NULL,
+   P_PARENT_PK      IN  INTEGER DEFAULT 0,
+   P_NEXT_ID        OUT VARCHAR2
+)
+IS
+  PRAGMA AUTONOMOUS_TRANSACTION;
+
+  CURSOR c_segments IS
+    SELECT cass.id
+         , cass.segment_code
+         , cass.length
+         , cass.next_value
+         , cass.text_value
+         , cass.is_auto_extended
+         , cas.max_length
+         , cas.next_value
+      FROM CMN_AUTONUM_SCHEMES cas
+         , CMN_AUTONUM_SCHEME_SEGMENTS cass
+     WHERE cas.id = cass.scheme_id
+       AND cas.object_code = p_object_code
+       AND cas.attribute_code = p_attribute_code
+       AND cas.partition_code = p_partition_code
+   ORDER BY cass.position;
+
+   v_is_active INTEGER(1);
+   v_is_autonumbered INTEGER(1);
+   v_collision_encountered INTEGER(1);
+   v_new_next_id VARCHAR2(80);
+   v_seg_id NUMBER;
+   v_seg_code VARCHAR2(80);
+   v_seg_length INTEGER;
+   v_seg_next_value NUMBER;
+   v_seg_curr_value NUMBER;
+   v_seg_text_value VARCHAR2(80);
+   v_seg_curr_text_value VARCHAR2(80);
+   v_dynamic_sql VARCHAR2(200);
+   v_dynamic_cursor INTEGER;
+   v_counter INTEGER := 1000;
+   v_is_autoext INTEGER := 0;
+   v_max_length INTEGER := 30;
+   v_scheme_next_value VARCHAR2(80);
+   v_curr_total_length INTEGER := 0;
+
+   scheme_exhausted_exception EXCEPTION;
+
+BEGIN
+  P_NEXT_ID := 0;
+  v_collision_encountered := 0;
+
+  BEGIN
+    -- Check if Auto Numbering is enabled for this attribute
+    SELECT is_autonumbered
+      INTO v_is_autonumbered
+      FROM ODF_ATTRIBUTE_AUTONUMBERING
+     WHERE object_code = p_object_code
+       AND attribute_code = p_attribute_code;
+
+    IF v_is_autonumbered IS NULL OR v_is_autonumbered = 0
+    THEN
+      RAISE_APPLICATION_ERROR(-20002, 'AUTO NUMBERING IS NOT ENABLED');
+    END IF;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20002, 'AUTO NUMBERING IS NOT ENABLED');
+	 END;
+
+   -- Fetch the next id
+   SELECT next_value
+     INTO p_next_id
+     FROM CMN_AUTONUM_SCHEMES
+    WHERE object_code = p_object_code
+      AND attribute_code = p_attribute_code
+      AND partition_code = p_partition_code;
+
+   -- Find the total of the maximum lengths for each segment
+   SELECT SUM(cass.length)
+   INTO v_curr_total_length
+   FROM CMN_AUTONUM_SCHEMES cas ,
+     CMN_AUTONUM_SCHEME_SEGMENTS cass
+   WHERE cas.id           = cass.scheme_id
+   AND cas.object_code    = p_object_code
+   AND cas.attribute_code = p_attribute_code
+   AND cas.partition_code = p_partition_code;
+
+   v_dynamic_cursor := DBMS_SQL.OPEN_CURSOR;
+   WHILE (v_counter &gt; 0 and v_counter &lt;= 1000)
+   LOOP
+     -- Calculate the new next id for this scheme
+     OPEN C_SEGMENTS;
+     FETCH C_SEGMENTS INTO V_SEG_ID, V_SEG_CODE, V_SEG_LENGTH,
+                           V_SEG_NEXT_VALUE, V_SEG_TEXT_VALUE,
+                           v_is_autoext, v_max_length, v_scheme_next_value;
+     WHILE (C_SEGMENTS%FOUND)
+     LOOP
+       IF V_SEG_CODE IN ('TEXT', 'CREATE_DATE', 'PARENT_REF')
+       THEN
+          V_NEW_NEXT_ID := V_NEW_NEXT_ID || V_SEG_TEXT_VALUE;
+       ELSE
+         -- Calculate and update the new next id for this segment
+         V_SEG_CURR_VALUE := V_SEG_NEXT_VALUE;
+         V_SEG_NEXT_VALUE := V_SEG_NEXT_VALUE + 1;
+         UPDATE CMN_AUTONUM_SCHEME_SEGMENTS
+         SET    NEXT_VALUE = V_SEG_NEXT_VALUE,
+                LAST_UPDATED_DATE = SYSDATE
+         WHERE  ID = V_SEG_ID;
+
+         IF V_SEG_CODE = 'NUMERIC'
+         THEN
+            V_SEG_TEXT_VALUE := V_SEG_NEXT_VALUE;
+            v_SEG_CURR_TEXT_VALUE := V_SEG_CURR_VALUE;
+         ELSE
+            -- Convert numeric value to alphanumeric value
+            V_SEG_TEXT_VALUE := CMN_AUTONUM_TO_ALPHANUM_FCT(V_SEG_NEXT_VALUE);
+            V_SEG_CURR_TEXT_VALUE := CMN_AUTONUM_TO_ALPHANUM_FCT(V_SEG_CURR_VALUE);
+         END IF;
+
+         -- Make sure counter value doesn't exceed the counter length
+         IF LENGTH(V_SEG_TEXT_VALUE) &gt; V_SEG_LENGTH
+         THEN
+           -- If the segment is set to auto-extended, extend the counter length by 1.
+           IF v_is_autoext = 1 AND v_max_length &gt; v_curr_total_length
+           THEN
+             v_curr_total_length := v_curr_total_length + 1;
+             UPDATE CMN_AUTONUM_SCHEME_SEGMENTS
+                SET length = v_seg_length + 1
+              WHERE id = v_seg_id;
+           ELSIF v_is_autoext = 0 THEN -- If the segment is not auto-extended, check the boundary condition
+           IF LENGTH(V_SEG_CURR_TEXT_VALUE) &gt; V_SEG_LENGTH
+            THEN
+                RAISE scheme_exhausted_exception;
+            END IF;
+            ELSE RAISE scheme_exhausted_exception;            
+          END IF;
+         ELSE
+           V_SEG_TEXT_VALUE := LPAD(V_SEG_TEXT_VALUE,V_SEG_LENGTH,'0');
+         END IF;
+
+         V_NEW_NEXT_ID := V_NEW_NEXT_ID || V_SEG_TEXT_VALUE;
+       END IF;
+
+       -- Process next segment
+       FETCH C_SEGMENTS INTO V_SEG_ID, V_SEG_CODE, V_SEG_LENGTH,
+                             V_SEG_NEXT_VALUE, V_SEG_TEXT_VALUE,
+                             v_is_autoext, v_max_length, v_scheme_next_value;
+      END LOOP;
+      CLOSE C_SEGMENTS;
+
+     -- Now, update the new next id for this scheme
+     UPDATE CMN_AUTONUM_SCHEMES
+        SET next_value = v_new_next_id
+      WHERE object_code = p_object_code
+        AND attribute_code = p_attribute_code
+        AND partition_code = p_partition_code;
+
+     -- Check for collision
+     IF p_table_name IS NOT NULL
+     THEN
+       v_collision_encountered := 0;
+       v_dynamic_sql := 'SELECT 1 value_exists FROM ' || p_table_name || ' WHERE ' || p_column_name || ' = :1 ';
+       IF p_parent_reference_attr IS NOT NULL
+       THEN
+         v_dynamic_sql := v_dynamic_sql || ' AND ' || p_parent_reference_attr || ' = :2 ' ;
+       END IF;
+       DBMS_SQL.PARSE(v_dynamic_cursor, v_dynamic_sql, DBMS_SQL.NATIVE);
+       DBMS_SQL.BIND_VARIABLE(v_dynamic_cursor, ':1', p_next_id);
+       IF p_parent_reference_attr IS NOT NULL
+       THEN
+         DBMS_SQL.BIND_VARIABLE(v_dynamic_cursor, ':2', p_parent_pk);
+       END IF;
+
+       v_collision_encountered := DBMS_SQL.EXECUTE(v_dynamic_cursor);
+       v_collision_encountered := DBMS_SQL.FETCH_ROWS(v_dynamic_cursor);
+
+       IF v_collision_encountered &gt; 0
+       THEN
+         p_next_id := v_new_next_id;
+         v_new_next_id := '';
+         v_counter := v_counter - 1;
+       ELSE
+         v_counter := 0;  -- stop getting the next number
+       END IF;
+     ELSE
+       v_counter := 0;  -- don't do collision check
+     END IF;
+   END LOOP;
+   DBMS_SQL.CLOSE_CURSOR(v_dynamic_cursor);
+
+  COMMIT;
+
+  EXCEPTION
+    WHEN scheme_exhausted_exception THEN
+    BEGIN
+      RAISE_APPLICATION_ERROR(-20001, 'SCHEME_EXHAUSTED');
+      DBMS_SQL.CLOSE_CURSOR(v_dynamic_cursor);
+      ROLLBACK;
+    END;
+    WHEN OTHERS THEN
+    BEGIN
+      DBMS_SQL.CLOSE_CURSOR(v_dynamic_cursor);
+      ROLLBACK;
+    END;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

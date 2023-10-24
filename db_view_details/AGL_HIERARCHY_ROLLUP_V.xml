@@ -1,0 +1,21 @@
+<ClarityDBViewQuery>
+  <QueryResult code="AGL_HIERARCHY_ROLLUP_V">
+    <indexes/>
+    <text_length>921</text_length>
+    <text>SELECT h.parent_id investment_id,
+           MIN(p.agl_pln_start) agl_pln_start,
+           MAX(p.agl_pln_finish) agl_pln_finish,
+           MIN(p.agl_act_start) agl_act_start,
+           MAX(p.agl_act_finish) agl_act_finish,
+           SUM(NVL(p.agl_acp_stypts,0)) agl_acp_stypts,
+           SUM(NVL(p.agl_acp_usrsty,0)) agl_acp_usrsty,
+           SUM(NVL(p.agl_est_stypts,0)) agl_est_stypts,
+           SUM(NVL(p.agl_est_usrsty,0)) agl_est_usrsty,
+           CASE WHEN SUM(NVL(p.agl_est_usrsty,0)) = 0 THEN 0 ELSE (SUM(NVL(p.agl_acp_usrsty,0)) / SUM(NVL(p.agl_est_usrsty,0)) * 100) END agl_pctdon_stc,
+           CASE WHEN SUM(NVL(p.agl_est_stypts,0)) = 0 THEN 0 ELSE (SUM(NVL(p.agl_acp_stypts,0)) / SUM(NVL(p.agl_est_stypts,0)) * 100) END agl_pctdon_plest
+    FROM   inv_flat_hierarchies h
+           INNER JOIN odf_ca_project p ON h.child_id = p.id            
+    WHERE  p.agl_id IS NOT NULL
+    GROUP BY h.parent_id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

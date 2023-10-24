@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="FIN_TXN_TRANSCLASS" displayAttributeName="shortdesc" hiddenAttributeName="transclass" objectCode="" sortAttributeName="shortdesc" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Browse for Transaction Class" languageCode="en" name="Transaction Class Browse"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:T.TRANSCLASS:TRANSCLASS@,
+	@SELECT:T.SHORTDESC:SHORTDESC@,
+	@SELECT:L.NAME:TYPE@ 
+	FROM TRANSCLASS T, CMN_LOOKUPS_V L  
+	WHERE @FILTER@
+	AND L.LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'         
+	AND L.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+	AND L.LOOKUP_CODE = T.TRANSTYPE 
+	@BROWSE-ONLY:
+	AND T.TRANSTYPE IN ( SELECT (CASE WHEN DOCUMENT_TYPE = 4798 THEN 'X' 
+									  WHEN DOCUMENT_TYPE = 4799 AND TRANS_TYPE = 'X' THEN 'Z' 
+									  ELSE TRANS_TYPE 
+								 END) TGT 
+						   FROM (SELECT @NVL@((SELECT DOCUMENT_TYPE 
+												 FROM PPA_TRANSCONTROLAPINFO 
+												 WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4796) DOCUMENT_TYPE FROM DUAL) DOCTYPE 
+												 CROSS JOIN (SELECT 'L' TRANS_TYPE FROM DUAL UNION ALL  
+												 SELECT 'Q' TRANS_TYPE FROM DUAL UNION ALL 
+												 SELECT 'M' TRANS_TYPE FROM DUAL UNION ALL 
+												 SELECT 'X' TRANS_TYPE FROM DUAL) TRANSTYPE 
+							WHERE @WHERE:PARAM:USER_DEF:INTEGER:RESOURCE_ID@ IS NULL
+							UNION ALL  
+							SELECT (CASE WHEN S.RESOURCE_TYPE = 3 THEN 'X' 
+											  WHEN S.RESOURCE_TYPE = 0 THEN 'L' 
+											  WHEN S.RESOURCE_TYPE = 1 THEN 'Q' 
+											  WHEN S.RESOURCE_TYPE = 2 THEN 'M' 
+										 END) 
+							from SRM_RESOURCES S 
+							WHERE @WHERE:PARAM:USER_DEF:INTEGER:RESOURCE_ID@ IS NOT NULL
+							AND S.ID = @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:RESOURCE_ID@, S.ID)
+						)
+	:BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="shortdesc"/>
+              <displayedSuggestionAttribute value="type"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="shortdesc"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Transaction Class" languageCode="en" name="Select Transaction Class"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Transaction Classes" languageCode="en" name="Select Transaction Classes"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="transclass" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Name" languageCode="en" name="Transaction Class Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="shortdesc" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Short Description" languageCode="en" name="Transaction Class Short Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="type" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Type" languageCode="en" name="Transaction Class Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="transclass" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Name" languageCode="en" name="Transaction Class Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="shortdesc" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Short Description" languageCode="en" name="Transaction Class Short Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="type" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class Type" languageCode="en" name="Transaction Class Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

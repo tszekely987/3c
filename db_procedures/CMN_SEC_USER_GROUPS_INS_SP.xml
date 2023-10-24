@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_USER_GROUPS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_USER_GROUPS_INS_SP" (
+   P_GROUP_ROLE_CODE   IN   VARCHAR2,
+   P_USER_NAME         IN   VARCHAR2,
+   P_CREATED_BY        IN   NUMBER DEFAULT 1
+)
+IS
+   V_ID                          NUMBER;
+BEGIN
+   SELECT   CMN_SEC_USER_GROUPS_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   INSERT INTO CMN_SEC_USER_GROUPS
+               (
+                  ID,
+                  GROUP_ID,
+                  USER_ID,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               G.ID,
+               U.ID,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     CMN_SEC_GROUPS G,
+               CMN_SEC_USERS U
+      WHERE    G.GROUP_CODE = P_GROUP_ROLE_CODE
+      AND      U.USER_NAME = P_USER_NAME
+      AND      NOT EXISTS (SELECT   'USER/GROUP ASSIGNMENT ALREADY EXISTS'
+                           FROM     CMN_SEC_USER_GROUPS UG,
+                                    CMN_SEC_GROUPS G1,
+                                    CMN_SEC_USERS U1
+                           WHERE    UG.GROUP_ID = G.ID
+                           AND      UG.USER_ID = U.ID
+                           AND      G.GROUP_CODE = P_GROUP_ROLE_CODE
+                           AND      U.USER_NAME = P_USER_NAME);
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

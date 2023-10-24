@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="BROWSE_WBS_PARENT_TASKS" displayAttributeName="prname" hiddenAttributeName="prid" objectCode="" sortAttributeName="prname" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List tasks for a project hierarchy" languageCode="en" name="Browse Tasks for a Project Hierarchy"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:q.prid:prid@,
+         @SELECT:q.PRUID:UNIQUE_CODE@,
+         @SELECT:q.prexternalid:prexternalid@,
+         @SELECT:q.prname:prname@,
+         @SELECT:q.investment_name:investment_name@,
+         @SELECT:q.subproject:subproject@,
+		 @SELECT:q.last_updated_date:last_updated_date@
+         FROM (
+  SELECT task.prid, task.PRUID, task.prexternalid, task.prname, inv.name investment_name, task.last_updated_date
+         , ( CASE WHEN task.prprojectid = @where:param:xml:integer:/data/id/@value@ THEN 0 ELSE 1 END ) subproject          
+  FROM   prtask task, inv_investments inv
+  WHERE  task.prprojectid in
+          (
+           select id
+             from   inv_investments
+           where  id = @where:param:xml:integer:/data/id/@value@
+            union
+           select child_id
+             from inv_flat_hierarchies
+            where parent_id = @where:param:xml:integer:/data/id/@value@
+            )
+  AND    task.pristask = 0
+  AND    inv.id = task.prprojectid
+  @BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@:BROWSE-ONLY@ 
+        ) q
+          WHERE  1=1 AND @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="prname"/>
+              <displayedSuggestionAttribute value="prexternalid"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="prname"/>
+              <searchedSuggestionAttribute value="prexternalid"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Task" languageCode="en" name="Select Task"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Tasks" languageCode="en" name="Select Tasks"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="prexternalid" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="External ID" languageCode="en" name="External ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="prname" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="investment_name" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment" languageCode="en" name="Investment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="subproject" defaultValue="" lookupCode="PSP_YESNO" order="4" widgetType="select">
+                
+                
+                
+                
+                <nls description="Include Subprojects" languageCode="en" name="Include Subprojects"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="3" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="id" languageCode="en" name="id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prexternalid" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="External ID" languageCode="en" name="External ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prname" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="investment_name" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment" languageCode="en" name="Investment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

@@ -1,0 +1,28 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_TRANS_I_FACTS_V">
+    <indexes/>
+    <text_length>1845</text_length>
+    <text>SELECT w.investment_id investment_key,
+       w.transno transaction_key,
+       CAST (w.transdate - TO_DATE ('01/01/2000', 'MM/DD/YYYY') + 1000000 AS INTEGER) period_key,
+       MAX (CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN 1 ELSE w.quantity END) quantity,
+       SUM (CASE WHEN wv.currency_type = 'HOME' THEN
+                (CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.actualcost END) ELSE 0 END) home_actual_cost_rate,
+       SUM (CASE WHEN wv.currency_type = 'HOME' THEN wv.totalcost ELSE 0 END) home_actual_cost,
+       SUM (CASE WHEN wv.currency_type = 'HOME' THEN
+                (CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.billrate END) ELSE 0 END) home_revenue_rate,
+       SUM (CASE WHEN wv.currency_type = 'HOME' THEN wv.totalamount ELSE 0 END) home_revenue,
+       SUM (CASE WHEN wv.currency_type = 'BILLING' THEN 
+                (CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.actualcost END) ELSE 0 END) billing_actual_cost_rate,
+       SUM (CASE WHEN wv.currency_type = 'BILLING' THEN wv.totalcost ELSE 0 END) billing_actual_cost,
+       SUM (CASE WHEN wv.currency_type = 'BILLING' THEN 
+                (CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.billrate END) ELSE 0 END) billing_revenue_rate,
+       SUM (CASE WHEN wv.currency_type = 'BILLING' THEN wv.totalamount ELSE 0 END) billing_revenue,
+       w.lastupdatedate clarity_updated_date
+FROM   dwh_tmp_record_keys c
+       INNER JOIN ppa_wip w ON c.record_key = w.transno
+       INNER JOIN ppa_wip_values wv ON (w.transno = wv.transno AND wv.currency_type IN ('HOME','BILLING'))
+       INNER JOIN transclass t ON w.transclass = t.transclass
+GROUP BY w.investment_id, w.transno, w.transdate, w.lastupdatedate</text>
+  </QueryResult>
+</ClarityDBViewQuery>

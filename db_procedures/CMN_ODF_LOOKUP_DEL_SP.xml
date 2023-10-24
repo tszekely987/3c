@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ODF_LOOKUP_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ODF_LOOKUP_DEL_SP" (p_lookup_type IN VARCHAR2)
+IS
+   v_count           NUMBER;
+   v_nsql_id         NUMBER;
+   v_bc_nsql_id      NUMBER;
+   v_desc_nsql_id    NUMBER;
+   v_label_nsql_id    NUMBER;
+   v_lov_object_id   NUMBER;
+BEGIN
+   SELECT   COUNT (*)
+   INTO     v_count
+   FROM     cmn_list_of_values
+   WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+   IF v_count &gt; 0
+   THEN
+      SELECT   sql_text_id
+      INTO     v_nsql_id
+      FROM     cmn_list_of_values
+      WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+      IF v_nsql_id &gt; 0
+      THEN
+         SELECT   id
+         INTO     v_lov_object_id
+         FROM     cmn_lov_objects
+         WHERE    ui_type = 'LOV_BROWSE'
+         AND      NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+         -- This is a lookup that is based on dynamic query.
+         DELETE
+           FROM cmn_captions_nls
+          WHERE table_name IN (
+                                 'CMN_BROWSE_SINGLE_SELECT',
+                                 'CMN_BROWSE_MULTI_SELECT'
+                              )
+       AND      pk_id = v_lov_object_id;
+
+         DELETE
+           FROM cmn_captions_nls
+          WHERE table_name = 'CMN_BROWSE_PORTLET_ATTRIBUTES'
+       AND      pk_id in (select id
+                          FROM cmn_browse_portlet_attributes
+                          WHERE table_name = 'CMN_LOV_OBJECTS'
+                          AND      pk_id = v_lov_object_id);
+
+         DELETE
+           FROM cmn_browse_portlet_attributes
+          WHERE table_name = 'CMN_LOV_OBJECTS'
+       AND      pk_id = v_lov_object_id;
+       
+       DELETE cmn_nsql_query_filters
+         WHERE cmn_nsql_queries_id = v_nsql_id;
+       
+       DELETE cmn_nsql_queries
+         WHERE id = v_nsql_id;
+
+      END IF;
+
+      -- get the bread crumb query and delete it if there is one
+      SELECT   crumb_sql_text_id
+      INTO     v_bc_nsql_id
+      FROM     cmn_list_of_values
+      WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+      IF v_bc_nsql_id &gt; 0
+      THEN
+             
+       DELETE cmn_nsql_query_filters
+         WHERE cmn_nsql_queries_id = v_bc_nsql_id;
+       
+       DELETE cmn_nsql_queries
+         WHERE id = v_bc_nsql_id;
+
+      END IF;
+
+      -- get the descendents query and delete it if there is one
+      SELECT   desc_sql_text_id
+      INTO     v_desc_nsql_id
+      FROM     cmn_list_of_values
+      WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+      IF v_desc_nsql_id &gt; 0
+      THEN
+             
+       DELETE cmn_nsql_query_filters
+         WHERE cmn_nsql_queries_id = v_desc_nsql_id;
+       
+       DELETE cmn_nsql_queries
+         WHERE id = v_desc_nsql_id;
+
+      END IF;
+
+      -- get the label query and delete it if there is one
+      SELECT   label_sql_text_id
+      INTO     v_label_nsql_id
+      FROM     cmn_list_of_values
+      WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+      IF v_label_nsql_id &gt; 0
+      THEN
+             
+       DELETE cmn_nsql_query_filters
+         WHERE cmn_nsql_queries_id = v_label_nsql_id;
+       
+       DELETE cmn_nsql_queries
+         WHERE id = v_label_nsql_id;
+
+      END IF;
+
+      -- Now delete all the rows related to ODF
+      -- CMN_ATTRIBUTES
+      -- CMN_LOV_OBJECTS
+      -- CMN_LIST_OF_VALUES
+
+      DELETE
+        FROM cmn_attributes
+       WHERE table_name = 'CMN_LOV_OBJECTS'
+    AND      pk_id IN (SELECT   id
+                       FROM     cmn_lov_objects
+                       WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type))
+    AND      pk_id &gt; 1;
+
+      DELETE
+        FROM cmn_attributes
+       WHERE table_name = 'CMN_LIST_OF_VALUES'
+    AND      pk_id IN (SELECT   id
+                       FROM     cmn_list_of_values
+                       WHERE    NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type));
+
+      DELETE
+        FROM cmn_lov_objects
+       WHERE NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+
+      DELETE
+        FROM cmn_list_of_values
+       WHERE NLS_UPPER(lookup_type_code) = NLS_UPPER(p_lookup_type);
+   END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

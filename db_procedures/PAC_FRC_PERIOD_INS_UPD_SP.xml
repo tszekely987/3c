@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_PERIOD_INS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_PERIOD_INS_UPD_SP" (
+ periodName 	IN VARCHAR2 ,
+ period 	IN NUMBER ,
+ quarter 	IN NUMBER ,
+ year 	IN NUMBER ,
+ startDate 	IN DATE,
+ endDate 	IN DATE,
+ description 	IN VARCHAR2,
+ periodType IN VARCHAR2,
+ entityId IN NUMBER,
+ isActive IN NUMBER,
+ id IN NUMBER
+ )
+ AS
+ StoO_selcnt	INTEGER;
+ StoO_error 	INTEGER;
+ StoO_rowcnt	INTEGER;
+ StoO_errmsg	GLOBALPKG.STRING;
+ duration       INTEGER;
+ periodId       NUMBER := NVL(PAC_FRC_PERIOD_INS_UPD_SP.id,0);
+ new_period_id  NUMBER;
+ BEGIN
+
+
+	-- validate entity id
+    IF (PAC_FRC_PERIOD_INS_UPD_SP.entityId != 0) THEN     
+ 		BEGIN
+ 			StoO_rowcnt := 0;
+ 			StoO_selcnt := 0;
+ 			StoO_error  := 0;
+			SELECT 1 INTO StoO_selcnt
+ 			FROM DUAL
+ 			WHERE  EXISTS (
+ 				SELECT  1
+ 				FROM entity
+ 				WHERE id = PAC_FRC_PERIOD_INS_UPD_SP.entityId);
+
+ 			StoO_rowcnt := SQL%ROWCOUNT;
+ 			EXCEPTION
+ 				WHEN NO_DATA_FOUND THEN
+ 					StoO_rowcnt := 0;
+ 					StoO_selcnt := 0;
+ 				WHEN OTHERS THEN
+ 					StoO_rowcnt := 0;
+ 					StoO_selcnt := 0;
+ 					StoO_error := SQLCODE;
+ 					StoO_errmsg := SQLERRM;
+ 		END;
+ 		IF StoO_selcnt = 0 THEN
+ 			RAISE_APPLICATION_ERROR(-20932, 'Invalid entity id entered.');
+ 			RETURN ;
+        END IF;
+    END IF;
+
+	-- Validate the start and end date.
+	IF( PAC_FRC_PERIOD_INS_UPD_SP.startDate &gt; PAC_FRC_PERIOD_INS_UPD_SP.endDate ) THEN
+		RAISE_APPLICATION_ERROR(-20924, 'End date is earlier than start date.');
+ 	    RETURN ;
+	END IF;
+
+
+	-- Insert the period.
+	BEGIN
+		 CMN_ID_SP( 'BIZ_COM_PERIODS', new_period_id );
+		 IF ( PAC_FRC_PERIOD_INS_UPD_SP.periodId = 0 ) THEN
+			 INSERT INTO biz_com_periods(ID, PERIOD_NAME, PERIOD, P_QUARTER, P_YEAR, START_DATE, END_DATE, P_DESCRIPTION, PERIOD_TYPE, ENTITY_ID, IS_ACTIVE)
+			 VALUES( new_period_id
+			 		 ,PAC_FRC_PERIOD_INS_UPD_SP.periodName
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.period
+					 ,NVL(PAC_FRC_PERIOD_INS_UPD_SP.quarter,0)
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.year
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.startDate
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.endDate
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.description
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.periodType
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.entityId
+					 ,PAC_FRC_PERIOD_INS_UPD_SP.isActive);
+
+              --INSERT INTO odf_ca_fiscaltimeperiod
+              --VALUES (new_period_id, SYSDATE, 1, SYSDATE, 1, 'NIKU.ROOT');
+              EXECUTE IMMEDIATE 'INSERT INTO odf_ca_fiscaltimeperiod (ID, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, PARTITION_CODE) VALUES (' || TO_CHAR(new_period_id) || ', SYSDATE, 1, SYSDATE, 1, ''NIKU.ROOT'')' ;
+
+		 ELSE
+		 	 UPDATE biz_com_periods
+			 SET period_name = PAC_FRC_PERIOD_INS_UPD_SP.periodName
+			 	 ,period = PAC_FRC_PERIOD_INS_UPD_SP.period
+				 ,p_quarter = NVL(PAC_FRC_PERIOD_INS_UPD_SP.quarter,0)
+				 ,p_year = PAC_FRC_PERIOD_INS_UPD_SP.year
+				 ,start_date = PAC_FRC_PERIOD_INS_UPD_SP.startDate
+				 ,end_date = PAC_FRC_PERIOD_INS_UPD_SP.endDate
+				 ,p_description = PAC_FRC_PERIOD_INS_UPD_SP.description
+				 ,period_type = PAC_FRC_PERIOD_INS_UPD_SP.periodType
+				 ,entity_id = PAC_FRC_PERIOD_INS_UPD_SP.entityId
+				 ,is_active = PAC_FRC_PERIOD_INS_UPD_SP.isActive
+			 WHERE id = PAC_FRC_PERIOD_INS_UPD_SP.periodId;
+		 END IF;
+		 EXCEPTION
+ 			WHEN OTHERS THEN
+ 				 RAISE_APPLICATION_ERROR(-20929, 'Cannot create the period because the combination of period type,period number and year already exists.');
+	   			 RETURN ;
+	END;
+
+ END PAC_FRC_PERIOD_INS_UPD_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

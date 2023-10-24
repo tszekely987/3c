@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_GET_RES_RATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_GET_RES_RATE_SP" 
+(
+  res_code              VARCHAR2,
+  res_type              VARCHAR2, -- L M X Q
+  role_code             VARCHAR2,
+  proj_currency         VARCHAR2,
+  res_rate              OUT NUMBER,
+  proj_code             VARCHAR DEFAULT NULL
+)
+
+AS
+   nAmount NUMBER;
+   nRate NUMBER;
+   nCost NUMBER;
+   nStdCost NUMBER;
+   nFactorAmt NUMBER;
+   nBurdenAmt NUMBER;
+   nOverheadAmt NUMBER;
+   cCostPlusCode VARCHAR2(30);
+   bRateFound NUMBER;
+   cRateCurrencyCode VARCHAR2(30);
+   cCostCurrencyCode VARCHAR2(30);
+   rc1 Ppa_Getratepkg.RCT1;
+   nConvertedRate NUMBER;
+   l_exchange_rate_type VARCHAR(30);
+   entityID VARCHAR2(60);
+   v_transaction_class PAC_MNT_RESOURCES.TRANSCLASS%TYPE :='*';
+   v_proj_code VARCHAR(30);
+
+BEGIN
+   
+   IF proj_code IS NULL  OR  LENGTH(proj_code) = 0 THEN
+      v_proj_code:= '[N/A]';
+   ELSE
+      v_proj_code:= UPPER(proj_code);
+   END IF;
+   
+   BEGIN
+    SELECT transclass
+    INTO v_transaction_class
+    FROM PAC_MNT_RESOURCES
+    WHERE resource_code = res_code;
+    EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+         NULL;
+   END;
+
+   BEGIN
+     Ppa_Getrate_WithRole(
+       '[N/A]',
+       v_proj_code,
+       '[N/A]',
+       '[N/A]',
+       res_code,
+       NULL,
+       NULL,
+       res_type,
+       TO_CHAR(SYSDATE, 'mm/dd/yyyy'),
+       1.0,
+       0,
+       nAmount,
+       nRate,
+       nCost,
+       nStdCost,
+       nFactorAmt,
+       nBurdenAmt,
+       nOverheadAmt,
+       cCostPlusCode,
+       bRateFound,
+       0,
+       0,
+       cRateCurrencyCode,
+       cCostCurrencyCode,
+       role_code,
+       v_transaction_class,
+       NULL, -- team_id, added for role added multiple times to same team
+       rc1,
+	   NULL,
+	   '[N/A]'
+     );
+     EXCEPTION
+     WHEN NO_DATA_FOUND THEN
+       NULL;
+   END;
+
+   -- If the resource is financially enabled, there will be an entity
+   -- associated with it.  Ppa_Getrate_WithRole() will use this to obtain
+   -- the rate, but then in this stored proc we need to check for it to
+   -- adjust the exchange rate.
+
+   -- Get the resource's entity if financial properties are enabled
+   BEGIN
+      SELECT L.ENTITY
+        INTO entityID
+        FROM PAC_MNT_RESOURCES R,
+             LOCATIONS L
+       WHERE R.RESOURCE_CODE = res_code
+         AND R.LOCATIONID = L.LOCATIONID;
+
+      EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+   END;
+
+   IF entityID IS NULL THEN
+     BEGIN
+       IF res_type = 'L' THEN
+         SELECT LABOR_exchange_rate_type
+           INTO  l_exchange_rate_type
+           FROM NAMEOPTIONS;
+       ELSIF  res_type = 'M' THEN
+         SELECT MATERIALS_exchange_rate_type
+           INTO l_exchange_rate_type
+           FROM NAMEOPTIONS;
+       ELSIF  res_type = 'Q' THEN
+         SELECT EQUIPMENT_exchange_rate_type
+           INTO  l_exchange_rate_type
+           FROM NAMEOPTIONS;
+       ELSIF  res_type = 'X' THEN
+         SELECT EXPENSE_exchange_rate_type
+           INTO l_exchange_rate_type
+           FROM NAMEOPTIONS;
+       END IF;
+     END;
+   ELSE -- there is an associated entity; get the exchange rate for it
+     BEGIN
+       IF res_type = 'L' THEN
+         SELECT NVL(E.exchange_rate_type_LABOR, N.LABOR_exchange_rate_type)
+           INTO  l_exchange_rate_type
+           FROM ENTITY E, NAMEOPTIONS N WHERE E.ENTITY=entityID;
+       ELSIF  res_type = 'M' THEN
+         SELECT NVL(E.exchange_rate_type_MATERIALS, N.MATERIALS_exchange_rate_type)
+           INTO l_exchange_rate_type
+           FROM ENTITY E, NAMEOPTIONS N WHERE ENTITY=entityID;
+       ELSIF  res_type = 'Q' THEN
+         SELECT NVL(E.exchange_rate_type_EQUIPMENT, N.EQUIPMENT_exchange_rate_type)
+           INTO  l_exchange_rate_type
+           FROM ENTITY E, NAMEOPTIONS N WHERE ENTITY=entityID;
+       ELSIF  res_type = 'X' THEN
+         SELECT NVL(E.exchange_rate_type_EXPENSE, N.EXPENSE_exchange_rate_type)
+           INTO l_exchange_rate_type
+           FROM ENTITY E, NAMEOPTIONS N WHERE ENTITY=entityID;
+       END IF;
+     END;
+   END IF;
+
+   SELECT CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                  SYSDATE,
+                  cCostCurrencyCode,
+                  proj_currency,
+                  nCost,
+                  l_exchange_rate_type
+               )
+   INTO nConvertedRate
+   FROM DUAL;
+
+   res_rate := nConvertedRate;
+END PRJ_GET_RES_RATE_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

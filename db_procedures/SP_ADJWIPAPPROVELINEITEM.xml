@@ -1,0 +1,1080 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_ADJWIPAPPROVELINEITEM</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_ADJWIPAPPROVELINEITEM" 
+(
+  adjustgroupno NUMBER,
+  userid        VARCHAR2,
+  newwipno_out  IN OUT NUMBER
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  applytono   NUMBER;
+  rofound   NUMBER(1,0);
+  rorigtransactionno  NUMBER;
+  glpostedflag  GLOBALPKG.STRING;
+  transtype   GLOBALPKG.STRING;
+  sourcemodule  NUMBER(5,0);
+  origapplyto   NUMBER;
+  deleteflag  NUMBER(1,0);
+  adjustmenttype  GLOBALPKG.STRING;
+  applytotranstype  GLOBALPKG.STRING;
+  wipsourcemodule   NUMBER(5,0);
+  reversetranstype  GLOBALPKG.STRING;
+  origsourcemodule  NUMBER(5,0);
+  rounitquantity  NUMERIC(32, 6);
+  hours   NUMBER(3,0);
+  minutes   NUMBER(3,0);
+  oldbegindate  DATE;
+  newdate   DATE;
+  integration_id  NUMBER(3,0);
+  ijournal_no   NUMBER(10,0);
+  ijournal_line   NUMBER(10,0);
+  description   GLOBALPKG.STRING;
+  pos2  NUMBER(3,0);
+  PROJECT_CODE  GLOBALPKG.STRING;
+  BatchNumber NUMBER;
+  NewWIPNo  NUMBER;
+  TWATransNo  NUMBER;
+  applytotype   GLOBALPKG.STRING;
+  ExternalTransNo   NUMBER;
+  ApplyExternalTransNo  NUMBER;
+  apdetailtransno   NUMBER;
+  ReverseTransNo  NUMBER;
+  TransSource   GLOBALPKG.STRING;
+  NewBillingsNo   NUMBER;
+  APDetailsTransNo  NUMBER;
+  errorFlagForActualsExport  INTEGER;
+  IS_NULL_EXCEPTION EXCEPTION;
+
+BEGIN
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   Del
+		INTO SP_ADJWIPAPPROVELINEITEM.deleteflag
+		FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  SP_ADJWIPAPPROVELINEITEM.deleteflag = 1 THEN
+		RETURN ;
+	END IF;
+	SAVEPOINT tran2;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_TransWIPAdjust
+	SET Del = 1
+	WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   ApplyTo,  TransType,  SourceModule, SP_ADJWIPAPPROVELINEITEM.ExternalTransNo,
+				 TransNo
+		INTO SP_ADJWIPAPPROVELINEITEM.applytono, SP_ADJWIPAPPROVELINEITEM.reversetranstype,
+			 SP_ADJWIPAPPROVELINEITEM.origsourcemodule,
+			 SP_ADJWIPAPPROVELINEITEM.ApplyExternalTransNo, SP_ADJWIPAPPROVELINEITEM.ReverseTransNo
+		FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND TransDescription = 'R';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND TransDescription = 'RO' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   TransNo,  TransType,  PROJECT_CODE,  SourceModule,  AdjType,  Quantity,
+					 TransDate, TransNo,  ExternalTransNo
+			INTO SP_ADJWIPAPPROVELINEITEM.rorigtransactionno, SP_ADJWIPAPPROVELINEITEM.transtype,
+			 SP_ADJWIPAPPROVELINEITEM.PROJECT_CODE, SP_ADJWIPAPPROVELINEITEM.sourcemodule,
+			 SP_ADJWIPAPPROVELINEITEM.adjustmenttype, SP_ADJWIPAPPROVELINEITEM.rounitquantity,
+			 SP_ADJWIPAPPROVELINEITEM.newdate,
+			 SP_ADJWIPAPPROVELINEITEM.TWATransNo, SP_ADJWIPAPPROVELINEITEM.ExternalTransNo
+			FROM ppa_TransWIPAdjust
+			WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+			 AND TransDescription = 'RO';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		SP_ADJWIPAPPROVELINEITEM.rofound :=  1;
+
+    /*   LB    PTR # 5624  */
+/*
+    IF  SP_ADJWIPAPPROVELINEITEM.origsourcemodule = 7 THEN
+      BEGIN
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  1
+              FROM ate_BeginEndTimes
+              WHERE transno = SP_ADJWIPAPPROVELINEITEM.ExternalTransNo
+              AND tabletype = 'P' );
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+          IF StoO_selcnt != 0 THEN
+          BEGIN
+            BEGIN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+              SELECT   begintime
+              INTO SP_ADJWIPAPPROVELINEITEM.oldbegindate
+              FROM ate_BeginEndTimes
+              WHERE tabletype = 'P'
+              AND transno = SP_ADJWIPAPPROVELINEITEM.ExternalTransNo;
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN TOO_MANY_ROWS THEN
+                  StoO_rowcnt := 2;
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+                WHEN OTHERS THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+            END;
+    -- 1/29/99 PTR 10641
+            SP_ADJWIPAPPROVELINEITEM.hours :=  TO_NUMBER(TO_CHAR( SP_ADJWIPAPPROVELINEITEM.oldbegindate,
+              'HH'));
+            SP_ADJWIPAPPROVELINEITEM.minutes :=  TO_NUMBER(TO_CHAR( SP_ADJWIPAPPROVELINEITEM.oldbegindate,
+              'MI'));
+            SP_ADJWIPAPPROVELINEITEM.newdate :=  SP_ADJWIPAPPROVELINEITEM.newdate
+              + ((SP_ADJWIPAPPROVELINEITEM.hours) /24);
+            SP_ADJWIPAPPROVELINEITEM.newdate :=  SP_ADJWIPAPPROVELINEITEM.newdate
+              + (SP_ADJWIPAPPROVELINEITEM.minutes) / (24 * 60);
+    -- PTR # 10641
+            BEGIN
+              StoO_error   := 0;
+              StoO_rowcnt  := 0;
+              UPDATE ate_BeginEndTimes
+              SET begintime = SP_ADJWIPAPPROVELINEITEM.newdate,
+              endtime = SP_ADJWIPAPPROVELINEITEM.newdate +
+                  (( SP_ADJWIPAPPROVELINEITEM.rounitquantity * 60 )) / (24 * 60)
+              WHERE transno = SP_ADJWIPAPPROVELINEITEM.ExternalTransNo
+              AND tabletype = 'P';
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  NULL;
+                WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+            END;
+            IF  StoO_error != 0 THEN
+              BEGIN
+                ROLLBACK TO SAVEPOINT tran2;
+                RETURN ;
+              END;
+            END IF;
+          END;
+          END IF;
+        END;
+      END;
+		END IF;
+*/
+	END;
+	ELSE
+	BEGIN
+/* IF @reversetranstype = 'DM' LB  05/20/97  PTR # 7042 */
+		SP_ADJWIPAPPROVELINEITEM.transtype :=  'A';
+		IF  SP_ADJWIPAPPROVELINEITEM.origsourcemodule &gt;= 100 THEN
+			SP_ADJWIPAPPROVELINEITEM.sourcemodule :=  SP_ADJWIPAPPROVELINEITEM.origsourcemodule;
+		ELSE
+			SP_ADJWIPAPPROVELINEITEM.sourcemodule :=  0;
+		END IF;
+		SP_ADJWIPAPPROVELINEITEM.rofound :=  0;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS ( SELECT  1  FROM ppa_WIP
+				  WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono )
+		   OR ( SP_ADJWIPAPPROVELINEITEM.applytono  IS NULL);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   NVL(GLPosted, 'N'),  ApplyTo,  TransType
+			INTO SP_ADJWIPAPPROVELINEITEM.glpostedflag, SP_ADJWIPAPPROVELINEITEM.origapplyto,
+				 SP_ADJWIPAPPROVELINEITEM.applytotranstype
+			FROM ppa_WIP
+			WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+/* IF @glpostedflag != 'P' SELECT @glpostedflag = 'D' LB  06/04/97  PTR # 7140 */
+		IF  SP_ADJWIPAPPROVELINEITEM.rofound = 1 THEN
+			SP_ADJWIPAPPROVELINEITEM.origapplyto :=  SP_ADJWIPAPPROVELINEITEM.rorigtransactionno;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TransWIPAdjust
+		SET GLPosted = 'N'
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND (TransDescription = 'RO' OR TransDescription = 'RS');
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+		IF  SP_ADJWIPAPPROVELINEITEM.glpostedflag != 'D' THEN
+			SP_ADJWIPAPPROVELINEITEM.glpostedflag :=  'N';/* LB  06/04/97 PTR # 7140 */
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TransWIPAdjust
+		SET GLPosted = SP_ADJWIPAPPROVELINEITEM.glpostedflag
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND (TransDescription != 'RO' AND TransDescription != 'RS');
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/*:1:2:3checkin start */
+        	declare cursor adj_cursor is
+		select A.transno from  ppa_transwipadjust A
+		WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+    	 AND A.TransType != 'A'
+		 AND A.ProjectType != 'I'
+		 AND A.Chargeable != 0;
+		begin
+
+			for adj_rec in adj_cursor
+			loop
+
+			UPDATE ppa_TransWIPAdjust_values
+			SET AmountRemaining = TotalAmount
+			WHERE transno = adj_rec.transno;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			 end loop;
+		end;
+		/*checkin end */
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/*checkin start */
+		declare cursor adj_cursor is
+		select A.transno from  ppa_transwipadjust A
+		WHERE
+		AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND (ProjectType = 'I' OR Chargeable = 0);
+		begin
+
+			for adj_rec in adj_cursor
+			loop
+
+				UPDATE ppa_TransWIPAdjust_values
+				SET AmountRemaining = 0
+				WHERE transno = adj_rec.transno;
+				StoO_rowcnt := SQL%ROWCOUNT;
+
+			end loop;
+		end;
+		/*checkin end */
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+		SP_ADJWIPAPPROVELINEITEM.wipsourcemodule :=  SP_ADJWIPAPPROVELINEITEM.origsourcemodule;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+		VALUES (S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, SP_ADJWIPAPPROVELINEITEM.userid, 'W', 'ADJUST');
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		SELECT S_307_1_PPA_POSTINGBATCH.currval INTO SP_ADJWIPAPPROVELINEITEM.BatchNumber FROM dual;
+		IF  SP_ADJWIPAPPROVELINEITEM.BatchNumber IS NULL THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20354, 'Unable to insert into ppa_PostingBatch');
+			RETURN ;
+		END;
+		END IF;
+		IF  SP_ADJWIPAPPROVELINEITEM.rofound = 1 THEN
+		BEGIN /* 2/16/99 PTR # 11113 */
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+      INSERT INTO ppa_WIP (TransNo, ApplyTo, SourceModule, TransType, BatchNo, ENTRY_RESOURCE_CODE,
+			EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, ExternalBatchID, ExternalTransNo,
+      LocationID, DepartCode, Entity, TransDate, COMPANY_CODE, PROJECT_CODE, Charge_Code, Input_type,
+      Charge_Code_id, Input_Type_id, Trans_Class_id, resource_class_id, ROLE_CODE_ID, USER_VAL1_ID, USER_VAL2_ID, EmplyLocationID, EmplyDepartID,
+			RESOURCE_CODE, Quantity,
+      CostRuleCode, BurdenCode, OverheadCode, Chargeable, Status, Notes,
+			InvoiceNo, EmplyHomeLocation, EmplyHomeDepart,
+      ProjectType, ClientClass, ProjectClass, TransClass, Resource_Class,
+      WIPClass, WorkInt, WorkBuf, GLPosted, GLPeriod, TASK_ID, PROJECT_LOCATION, PROJECT_DEPARTMENT, ROLE_CODE, PPA_WIPAPINFO_ID,
+	  USER_LOV1, USER_LOV2, EXPENSE_TYPE, INVESTMENT_ID, MONTH_BEGIN, MONTH_END, COST_TYPE, RESOURCE_ID)
+      SELECT  S_54_1_PPA_WIP.NEXTVAL, A.ApplyTo, A.SourceModule, A.TransType,
+           SP_ADJWIPAPPROVELINEITEM.BatchNumber, A.ENTRY_RESOURCE_CODE, A.EntryDate, A.LASTUPDTDBY_RESOURCE_CODE,
+           A.LastUpdateDate, A.ExternalBatchID, A.ExternalTransNo, A.LocationID,
+           A.DepartCode, A.Entity, A.TransDate, A.COMPANY_CODE, A.PROJECT_CODE, A.Charge_Code, A.Input_Type,
+           (select prid from prchargecode where prexternalid = A.Charge_Code) Charge_Code_id,
+           (select prid from prtypecode where prexternalid = A.Input_Type) Input_Type_id,
+           (select id from transclass where transclass = A.TransClass) TransClass_id,
+           (select id from pac_fos_resource_class where resource_class = A.resource_class) resource_class_id,
+           (select id from srm_resources where UNIQUE_NAME = A.ROLE_CODE) role_code_id,
+           (select id from CMN_LOOKUPS where LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV1' and lookup_code = A.USER_LOV1) user_val1_id,
+           (select id from CMN_LOOKUPS where LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV2' and lookup_code = A.USER_LOV2) user_val2_id,
+           (select id from LOCATIONS where locationid = A.EmplyHomeLocation) EmplyHomeLocation,
+           (select id from DEPARTMENTS where departcode = A.EmplyHomeDepart) EmplyHomeDepart,
+           A.RESOURCE_CODE, A.Quantity,
+           A.CostRuleCode, A.BurdenCode, A.OverheadCode, A.Chargeable,
+           A.Status, A.Notes, A.InvoiceNo, A.EmplyHomeLocation, A.EmplyHomeDepart,
+           A.ProjectType, A.ClientClass, A.ProjectClass,
+           A.TransClass, A.Resource_Class, A.WIPClass, A.workint, A.WorkBuf,
+           A.GLPosted, A.GLPeriod, A.TASK_ID, P.locationid, P.departcode, A.ROLE_CODE, APINFO_ID,
+           A.USER_LOV1, A.USER_LOV2, A.EXPENSE_TYPE, P.ID,
+           ADD_MONTHS(LAST_DAY(A.TransDate),-1)+1, LAST_DAY(A.TransDate)+1, A.COST_TYPE, R.ID        
+         FROM ppa_TransWIPAdjust A, pac_mnt_projects P, pac_mnt_resources R
+        WHERE A.AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+         AND A.TransType  IN ('L', 'M', 'Q', 'X')
+         AND A.PROJECT_CODE = P.PROJECT_CODE
+         AND A.RESOURCE_CODE = R.RESOURCE_CODE;
+         
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+			/*checkin start */
+					BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO ppa_WIP_values (id,natural_billrate, BillRate, Price, Amount, FactorAmount,
+				   Burden, Overhead, TotalAmount, AmountRemaining,natural_actualcost, ActualCost, natural_stdcost,
+				   StdCost,TotalCost, EmplyActualCost, EmplyStdCost, TransNo, currency_type, currency_code,
+				   rate_currency_code, cost_currency_code, stdcost_currency_code, rate_exchange_rate, rate_exchange_id,
+				   cost_exchange_rate, cost_exchange_id )
+			SELECT ppa_wip_values_s1.NEXTVAL, natural_billrate, v.BillRate, v.Price, v.Amount, v.FactorAmount,
+				   v.Burden, v.Overhead, v.TotalAmount, v.AmountRemaining,v.natural_actualcost, v.ActualCost,
+				   v.natural_stdcost,
+				   v.StdCost,v.TotalCost, v.EmplyActualCost, v.EmplyStdCost, S_54_1_PPA_WIP.currval, v.currency_type, v.currency_code,
+				   v.rate_currency_code, v.cost_currency_code, v.stdcost_currency_code, v.rate_exchange_rate, v.rate_exchange_id,
+				   v.cost_exchange_rate, v.cost_exchange_id
+				FROM ppa_transwipadjust A, ppa_TransWIPAdjust_values V
+				WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+   				 and A.TRANSNO = V.TRANSNO
+				 AND TransType  IN ('L', 'M', 'Q', 'X');
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+					ROLLBACK TO SAVEPOINT tran2;
+					RETURN ;
+			END;
+
+			/*checkin end*/
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   TransNo
+				INTO SP_ADJWIPAPPROVELINEITEM.NewWIPNo FROM ppa_WIP
+				WHERE BatchNo = SP_ADJWIPAPPROVELINEITEM.BatchNumber;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			SP_ADJWIPAPPROVELINEITEM.newwipno_out :=  SP_ADJWIPAPPROVELINEITEM.NewWIPNo;
+
+		END;
+		END IF;
+	END;
+	END IF;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+/* 1/5/98 PTR # 10663 */
+		SELECT   TransType
+		INTO SP_ADJWIPAPPROVELINEITEM.applytotype FROM ppa_WIP
+		WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	  -- Insert the transactions adjusted/transfered/reversed into the PAC_ACTUALS_EXPORT_INSERT
+	  BEGIN
+		 REV_ACTUALS_EXPORT_INSERT( adjustgroupno, errorFlagForActualsExport );
+		 IF( errorFlagForActualsExport != 0 ) THEN
+		 	 BEGIN
+			 	  ROLLBACK TO SAVEPOINT tran2;
+			 	  RAISE IS_NULL_EXCEPTION;
+				  RETURN ;
+			 END;
+		 END IF;
+	  END;
+
+	/*Original transaction entry of transtype = A  and transdecsription = 'R'
+	is inserted into ppa_billings table  from ppa_transwipadjust table*/
+
+  INSERT INTO ppa_Billings (TRANSNO, SourceModule, TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE,
+   BillingDate, Input_Type, Quantity, ApplyTo,
+	 ApplyToTransType, InvoiceNo, Notes, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate,
+	 GLPosted, BatchNo, Status, WorkInt, WorkBuf, ExternalTransNo)
+	SELECT S_13_1_PPA_BILLINGS.nextval, (( SIGN(INSTR( ppa_TransWIPAdjust.TransType, 'A')) -
+		   ( SIGN(INSTR( ppa_TransWIPAdjust.TransType, 'V')) ) ) * 5 ) ||
+		   ( ABS(( SIGN(INSTR( ppa_TransWIPAdjust.TransType, 'A')) - 1 )
+		   || SIGN(INSTR( ppa_TransWIPAdjust.TransType, 'V'))) * SourceModule),
+       ppa_TransWIPAdjust.TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE,
+       TransDate, Input_type, Quantity,
+		   ApplyTo, SP_ADJWIPAPPROVELINEITEM.applytotype,
+		   InvoiceNo, Notes, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate,
+		   GLPosted, SP_ADJWIPAPPROVELINEITEM.BatchNumber, Status, WorkInt,
+		   WorkBuf, ExternalTransNo
+	FROM ppa_TransWIPAdjust
+	WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+		 AND ppa_TransWIPAdjust.TransType  NOT IN ('L', 'M', 'Q', 'X');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+	  WHEN IS_NULL_EXCEPTION THEN
+			raise_application_error(errorFlagForActualsExport, 'No exchange rate found.');
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+	/*checkin start */
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_Billing_values (id, transno, exchange_rate, exchange_id, currency_type, currency_code, BillRate, Amount, AmountRemaining	 )
+	SELECT ppa_billing_values_s1.nextval, S_13_1_PPA_BILLINGS.currval,tv.RATE_EXCHANGE_RATE, tv.RATE_EXCHANGE_ID, tv.CURRENCY_TYPE, tv.CURRENCY_CODE, tv.BillRate, tv.TotalAmount,  tv.AmountRemaining
+	FROM ppa_TransWIPAdjust T, ppa_transwipadjust_values TV
+		WHERE T.AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno
+	     and T.TRANSNO = TV.TRANSNO
+		 AND T.TransType  NOT IN ('L', 'M', 'Q', 'X');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+
+	/*checkin end */
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   TransNo
+		INTO SP_ADJWIPAPPROVELINEITEM.NewBillingsNo FROM ppa_Billings
+		WHERE BatchNo = SP_ADJWIPAPPROVELINEITEM.BatchNumber;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+/* 2/11/99 Moved the following block down because of the wip split */
+/* LB   04/10/97  PTR #6595 */
+
+/*
+  IF  SP_ADJWIPAPPROVELINEITEM.sourcemodule &gt;= 100 THEN
+  BEGIN
+		IF  SP_ADJWIPAPPROVELINEITEM.reversetranstype = 'DM' THEN
+		BEGIN
+			SP_ADJWIPAPPROVELINEITEM.TransSource :=  'B';
+			SP_ADJWIPAPPROVELINEITEM.apdetailtransno :=  SP_ADJWIPAPPROVELINEITEM.ReverseTransNo;
+			SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo :=  SP_ADJWIPAPPROVELINEITEM.NewBillingsNo;
+		END;
+		ELSE
+		BEGIN
+			SP_ADJWIPAPPROVELINEITEM.TransSource :=  'W';
+			SP_ADJWIPAPPROVELINEITEM.apdetailtransno :=  SP_ADJWIPAPPROVELINEITEM.rorigtransactionno;
+			SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo :=  SP_ADJWIPAPPROVELINEITEM.NewWIPNo;
+		END;
+		END IF;
+
+    BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE NOT EXISTS (
+			SELECT  1 FROM apdetails
+			WHERE transactionno = SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo
+       AND transource = SP_ADJWIPAPPROVELINEITEM.TransSource ); -- 11/02/99 PTR 13449
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO apdetails (transactionno, apcost, AP_COMPANY_CODE, transource)
+			SELECT  SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo, apdetails.apcost,
+				   apdetails.AP_COMPANY_CODE, SP_ADJWIPAPPROVELINEITEM.TransSource
+			FROM apdetails
+			WHERE apdetails.transactionno = SP_ADJWIPAPPROVELINEITEM.apdetailtransno
+				 AND apdetails.transource = 'A';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			DELETE FROM apdetails
+				WHERE apdetails.transactionno = SP_ADJWIPAPPROVELINEITEM.apdetailtransno
+				 AND apdetails.transource = 'A';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+		END;
+
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE NOT EXISTS (
+			SELECT  1 FROM apdetailsaccts
+			WHERE transactionno = SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo
+			 AND transource = SP_ADJWIPAPPROVELINEITEM.TransSource );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+-- 11/02/99 PTR 13449
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO apdetailsaccts (transactionno, seqid, apglexpacct, percentage, transource)
+			SELECT  SP_ADJWIPAPPROVELINEITEM.APDetailsTransNo, apdetailsaccts.seqid,
+				   apdetailsaccts.apglexpacct, apdetailsaccts.percentage, SP_ADJWIPAPPROVELINEITEM.TransSource
+			FROM apdetailsaccts
+			WHERE apdetailsaccts.transactionno = SP_ADJWIPAPPROVELINEITEM.apdetailtransno
+				 AND apdetailsaccts.transource = 'A';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			DELETE FROM apdetailsaccts
+				WHERE apdetailsaccts.transactionno = SP_ADJWIPAPPROVELINEITEM.apdetailtransno
+				 AND apdetailsaccts.transource = 'A';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+*/
+
+	/* 2/11/99 Moved the previous block down because of the wip split */
+	IF  SP_ADJWIPAPPROVELINEITEM.rofound = 1 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP
+		SET ppa_WIP.ApplyTo = SP_ADJWIPAPPROVELINEITEM.NewWIPNo
+		WHERE ppa_WIP.TransNo = SP_ADJWIPAPPROVELINEITEM.NewWIPNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+		IF  SP_ADJWIPAPPROVELINEITEM.transtype  IN('M', 'Q', 'X', 'L') THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO ppa_WIPAPInfo (ID, VENDOR_CODE, VoucherNo, PONo, incurred_by, document_type)
+			SELECT  APINFO_ID, VENDOR_CODE, VoucherNo, PONo, incurred_by, document_type
+			FROM ppa_TransWIPAdjust
+			WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.TWATransNo
+      AND APINFO_ID != NULL
+      AND NOT EXISTS( SELECT 1 FROM ppa_wipapinfo WHERE id = APINFO_ID );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT tran2;
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+ /* CLRT-57250 - grab the external id if it is there from old transaction and give it to new transaction for tracking */
+
+  UPDATE ppa_WIP set external_id =(select external_id from ppa_wip
+  WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono and external_id is not null)
+  WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.NewWIPNo ;
+
+	/*checkin start */
+
+  UPDATE ppa_WIP
+	SET Status = 2,/*Set status as reversed*/
+		ApplyTo = NVL(SP_ADJWIPAPPROVELINEITEM.NewWIPNo, ApplyTo),
+		LastUpdateDate = SYSDATE,
+		LASTUPDTDBY_RESOURCE_CODE = SP_ADJWIPAPPROVELINEITEM.userid
+	WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono;
+
+	UPDATE ppa_WIP_values
+	SET AmountRemaining = 0
+	WHERE TransNo = SP_ADJWIPAPPROVELINEITEM.applytono;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	/*checkin end */
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+/* glposted = @glpostedflag, LB  06/04/97  PTR # 7140 */
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+
+	END IF;
+
+/*
+	IF  ( SP_ADJWIPAPPROVELINEITEM.transtype  IN('A', 'DM') AND   SP_ADJWIPAPPROVELINEITEM.applytotranstype = 'L')
+	    OR   ( SP_ADJWIPAPPROVELINEITEM.transtype  IN('L', 'M', 'Q')) THEN
+		BEGIN
+		sp_adjwipadjustbudgettogos(SP_ADJWIPAPPROVELINEITEM.adjustgroupno);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+*/
+
+/* setting ACTUALS_OUT_OF_DATE flag to 1 for re-populating actuals when accessing from costplans */
+  UPDATE FIN_PLANS
+	SET ACTUALS_OUT_OF_DATE = 1
+	WHERE OBJECT_ID IN (SELECT DISTINCT INVESTMENT_ID FROM PPA_WIP W, ppa_TransWIPAdjust A
+						WHERE W.PROJECT_CODE = A.PROJECT_CODE
+						and A.ADJUSTGROUPNO = SP_ADJWIPAPPROVELINEITEM.adjustgroupno);
+
+/* setting ACTUALS_OUT_OF_DATE flag to 1 for re-populating investment actuals when running sync job */
+  UPDATE FIN_FINANCIALS
+	SET ACTUALS_OUT_OF_DATE = 1
+	WHERE ID IN (SELECT DISTINCT F.ID FROM PPA_WIP W, ppa_TransWIPAdjust A, FIN_FINANCIALS F, odf_object_instance_mapping M
+						WHERE W.PROJECT_CODE = A.PROJECT_CODE
+						and M.primary_object_instance_id = W.INVESTMENT_ID
+                        and F.id = M.secondary_object_instance_id
+						and A.ADJUSTGROUPNO = SP_ADJWIPAPPROVELINEITEM.adjustgroupno);
+
+/*  This logic must be after the Insert into wip for transwipadjust delete trigger to work*/
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	--checkin start
+	declare cursor adjust_cursor is
+	select transno from ppa_TransWIPAdjust
+	WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno;
+	begin
+		for adjust_rec in adjust_cursor
+		loop
+
+		DELETE FROM PPA_TRANSWIPADJUST_VALUES
+		WHERE TRANSNO = adjust_rec.TRANSNO;
+		end loop;
+	end;
+	--checkin end
+	StoO_rowcnt := SQL%ROWCOUNT;
+	DELETE FROM ppa_TransWIPAdjust
+	WHERE AdjustGroupNo = SP_ADJWIPAPPROVELINEITEM.adjustgroupno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+
+/*
+	IF  SP_ADJWIPAPPROVELINEITEM.transtype = 'X' AND
+		SP_ADJWIPAPPROVELINEITEM.sourcemodule = 3 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        DELETE FROM transexpadjust
+        WHERE transactionno = SP_ADJWIPAPPROVELINEITEM.rorigtransactionno;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+      IF  StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT tran2;
+          RETURN ;
+        END;
+      END IF;
+    END;
+	END IF;
+*/
+
+  IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT tran2;
+	END IF;
+END SP_ADJWIPAPPROVELINEITEM;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

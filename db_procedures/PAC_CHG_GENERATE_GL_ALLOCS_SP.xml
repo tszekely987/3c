@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_GENERATE_GL_ALLOCS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_GENERATE_GL_ALLOCS_SP" 
+(
+  P_USER_ID            NUMBER,
+  P_SESSION_ID         NUMBER,
+  P_TRANS_SOURCE       CHAR,
+  P_TRANSNO            NUMBER,
+  P_TRANSDATE          DATE,
+  P_ENTITY_ID          NUMBER,
+  P_LOCATION_ID        NUMBER,
+  P_DEPARTMENT_ID      NUMBER,
+  P_PROJECT_ID         NUMBER,
+  P_WIPCLASS_ID        NUMBER,
+  P_TRANSCLASS_ID      NUMBER,
+  P_CHARGECODE_ID      NUMBER,
+  P_RESOURCECLASS_ID   NUMBER,
+  P_RESOURCE_ID        NUMBER,
+  P_QUANTITY           NUMBER,
+  P_TOTALAMOUNT        NUMBER,
+  P_CURRENCY_CODE      VARCHAR2,
+  P_EXCHANGE_RATE_TYPE VARCHAR2,
+  P_ALLOCATION_TYPE    VARCHAR2,
+  P_LANGUAGE_CODE      VARCHAR2
+)
+AS
+  V_DATE               DATE;
+  V_END_DATE           DATE;
+  V_STMT               VARCHAR2(255);
+  V_TOTAL_AMOUNT       NUMBER(32, 6);
+  V_DEBIT_AMOUNT       NUMBER(32, 6);
+  V_CREDIT_AMOUNT      NUMBER(32, 6);
+  V_BEST_MATCH_ID      NUMBER;
+  V_CREDIT_NOT_FOUND   NUMBER;
+  V_CHARGE_NOT_FOUND   NUMBER;
+  V_ENTITY_ID          NUMBER;
+  V_HOME_CURRENCY_CODE VARCHAR2(30);
+  V_TRIALRUN_ID        NUMBER;
+  V_STATUS			   VARCHAR2(30);
+  V_ERROR_CODE         NUMBER;
+  V_EXCHANGE_RATES     CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          GLOBALPKG.STRING;
+  StoO_sqlstatus       INTEGER;
+
+CURSOR C1_REC(C_END_DATE DATE) IS
+SELECT 
+       C.ID,
+       C.STATUS,
+       E.HOME_CURRENCY_CODE
+  FROM PAC_CHG_RESOURCE_CREDITS C,
+       PAC_CHG_RESCREDIT_DATES D,
+       ENTITY E
+ WHERE C.STATUS != 'INACTIVE'
+   AND C.ID = D.RESOURCE_CREDIT_ID
+   AND P_TRANSDATE BETWEEN D.FROM_DATE AND NVL(D.TO_DATE, C_END_DATE)
+   AND P_ENTITY_ID = NVL(C.ENTITY_ID, P_ENTITY_ID)
+   AND P_LOCATION_ID = NVL(C.LOCATION_ID, P_LOCATION_ID)
+   AND P_DEPARTMENT_ID = NVL(C.DEPARTMENT_ID, P_DEPARTMENT_ID)
+   AND P_TRANSCLASS_ID = NVL(C.TRANSACTION_CLASS_ID, P_TRANSCLASS_ID)
+   AND P_RESOURCECLASS_ID = NVL(C.RESOURCE_CLASS_ID, P_RESOURCECLASS_ID)
+   AND NVL(C.ENTITY_ID, P_ENTITY_ID) = E.ID
+ ORDER BY C.ENTITY_ID, C.LOCATION_ID, C.DEPARTMENT_ID, C.TRANSACTION_CLASS_ID, C.RESOURCE_CLASS_ID;
+
+CURSOR C2_REC (C_RES_CREDIT_ID NUMBER, C_TRANS_DATE DATE, C_END_DATE DATE) IS
+SELECT R.ID, D.ACCOUNT_CODE_ID, D.ALLOCATION_PERCENT,
+       NVL(A.ENTITY_ID, P_ENTITY_ID) "ENTITY_ID"
+  FROM PAC_CHG_RESCREDIT_DATES R,
+       PAC_CHG_RESCREDIT_DETAILS D,
+       PAC_CHG_GL_ACCOUNTS A
+ WHERE R.RESOURCE_CREDIT_ID = C_RES_CREDIT_ID
+   AND C_TRANS_DATE BETWEEN R.FROM_DATE AND NVL(R.TO_DATE, C_END_DATE)
+   AND R.ID = D.RES_CREDIT_DATES_ID
+   AND D.ACCOUNT_CODE_ID = A.ID;
+
+CURSOR C3_REC(C_END_DATE DATE) IS
+SELECT 
+       A.ID,
+       DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P.ALLOCATION_STATUS, CC.ALLOCATION_STATUS) "STATUS",
+       E.HOME_CURRENCY_CODE
+  FROM PAC_CHG_ALLOCATIONS A,
+       PAC_CHG_ALLOCS_DATES D,
+       ENTITY E,
+       PAC_MNT_PROJECTS P,
+       PRCHARGECODE CC
+ WHERE A.ALLOCATION_TYPE = P_ALLOCATION_TYPE
+   AND A.OBJECT_ID = DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P_PROJECT_ID, P_CHARGECODE_ID)
+   AND A.ID = D.ALLOCATION_ID
+   AND P_TRANSDATE BETWEEN D.FROM_DATE AND NVL(D.TO_DATE, C_END_DATE)
+   AND P.ID = P_PROJECT_ID
+   AND CC.PRID = P_CHARGECODE_ID
+   AND E.ID = P_ENTITY_ID;
+   --AND DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P.ALLOCATION_STATUS, CC.ALLOCATION_STATUS) != 'INACTIVE';
+
+CURSOR C4_REC (C_ALLOCATION_ID NUMBER, C_TRANS_DATE DATE, C_END_DATE DATE) IS
+SELECT R.ID, D.ACCOUNT_CODE_ID, D.ALLOCATION_PERCENT,
+       NVL(A.ENTITY_ID, P_ENTITY_ID) "ENTITY_ID"
+  FROM PAC_CHG_ALLOCS_DATES R,
+       PAC_CHG_ALLOCS_DETAILS D,
+       PAC_CHG_GL_ACCOUNTS A
+ WHERE R.ALLOCATION_ID = C_ALLOCATION_ID
+   AND C_TRANS_DATE BETWEEN R.FROM_DATE AND NVL(R.TO_DATE, C_END_DATE)
+   AND R.ID = D.ALLOCATION_DATES_ID
+   AND D.ACCOUNT_CODE_ID = A.ID;
+
+BEGIN
+  V_STMT := 'Initializing variables';
+  V_DATE := SYSDATE;
+  V_DEBIT_AMOUNT := 0;
+  V_CREDIT_AMOUNT := 0;
+  V_ERROR_CODE := 0;
+  V_END_DATE := TO_DATE('12/31/2999', 'MM/DD/YYYY');
+  V_BEST_MATCH_ID := NULL;
+  V_CREDIT_NOT_FOUND := 0;
+  V_CHARGE_NOT_FOUND := 0;
+
+  V_STMT := 'Determine the resource credit rule';
+  FOR C1_DATA IN C1_REC(V_END_DATE)
+  LOOP
+    V_BEST_MATCH_ID :=  C1_DATA.ID;
+	V_HOME_CURRENCY_CODE := C1_DATA.HOME_CURRENCY_CODE;
+	V_STATUS := C1_DATA.STATUS;
+	
+	IF C1_REC%ROWCOUNT = 1 THEN
+	  EXIT;
+	END IF;
+  END LOOP;
+
+  IF V_BEST_MATCH_ID IS NULL THEN
+    BEGIN
+      V_STMT := 'Inserting error 1000 into exceptions table';
+      V_ERROR_CODE := 1000;
+      V_CREDIT_NOT_FOUND := 1;
+	  	   
+      -- resource credit match not found
+      INSERT INTO PAC_CHG_EXCEPTIONS
+      (
+        ID,
+        BATCH_ID,
+        SOURCE_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        ERROR_ID,
+        ERROR_MESSAGE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY,
+        SESSION_ID
+      )
+      SELECT
+        PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+        P_SESSION_ID * -1,
+        0,
+        P_TRANS_SOURCE,
+        P_TRANSNO,
+        V_ERROR_CODE,
+        C.DESCRIPTION,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID,
+        P_SESSION_ID
+      FROM CMN_LOOKUPS L,
+           CMN_CAPTIONS_NLS C
+     WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+       AND L.LOOKUP_ENUM = 1000
+       AND L.ID = C.PK_ID
+       AND C.TABLE_NAME = 'CMN_LOOKUPS'
+       AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+    END;
+  ELSIF V_STATUS = 'ONHOLD' THEN
+    BEGIN
+      V_STMT := 'Inserting error 1001 into exceptions table';
+      V_ERROR_CODE := 1001;
+
+      -- matching resource credit rule is on hold
+      INSERT INTO PAC_CHG_EXCEPTIONS
+      (
+        ID,
+        BATCH_ID,
+        SOURCE_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        ERROR_ID,
+        ERROR_MESSAGE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY,
+        SESSION_ID
+      )
+      SELECT
+        PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+        P_SESSION_ID * -1,
+        0,
+        P_TRANS_SOURCE,
+        P_TRANSNO,
+        V_ERROR_CODE,
+        C.DESCRIPTION,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID,
+        P_SESSION_ID
+      FROM CMN_LOOKUPS L,
+           CMN_CAPTIONS_NLS C
+     WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+       AND L.LOOKUP_ENUM = 1001
+       AND L.ID = C.PK_ID
+       AND C.TABLE_NAME = 'CMN_LOOKUPS'
+       AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+    END;
+  END IF;
+
+  IF V_ERROR_CODE &lt;&gt; 1000 THEN
+    V_STMT := 'Calculate the credit to resource allocations';
+    FOR C2_DATA IN C2_REC(V_BEST_MATCH_ID, P_TRANSDATE, V_END_DATE)
+      LOOP
+        V_STMT := 'Get next trial run ID';
+        SELECT PAC_CHG_TRIALRUNS_S1.NEXTVAL
+          INTO V_TRIALRUN_ID
+          FROM DUAL;
+
+        V_STMT := 'Insert into trial run table';
+        INSERT INTO PAC_CHG_TRIALRUNS
+        (
+          ID,
+          SESSIONID,
+          CHARGEBACK_TYPE,
+          SOURCE_ID,
+          DATES_ID,
+          TRANS_SOURCE,
+          TRANSNO,
+          ENTITY_ID,
+          ACCOUNT_CODE_ID,
+          QUANTITY,
+          ERROR_CODE,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        SELECT
+          V_TRIALRUN_ID,
+          P_SESSION_ID,
+          'C',
+          V_BEST_MATCH_ID,
+          C2_DATA.ID,
+          P_TRANS_SOURCE,
+          P_TRANSNO,
+          C2_DATA.ENTITY_ID,
+          C2_DATA.ACCOUNT_CODE_ID,
+          P_QUANTITY,
+          V_ERROR_CODE,
+          V_DATE,
+          P_USER_ID,
+          V_DATE,
+          P_USER_ID
+        FROM
+          DUAL;
+
+        -- do the percentage allocation calculation
+        V_TOTAL_AMOUNT := P_TOTALAMOUNT * (C2_DATA.ALLOCATION_PERCENT / 100.0);
+
+        -- keep a running total of the credits so we can compare to the debits at the end
+        V_DEBIT_AMOUNT := V_DEBIT_AMOUNT + V_TOTAL_AMOUNT;
+
+        -- do the exchange rate conversion
+        V_STMT := 'Get converted exchange rate';
+        V_EXCHANGE_RATES := CMN_EXCHANGERATE_PKG.CMN_GET_CONVERTED_VALUES_FCT
+                            ( P_PROJECT_ID,
+                              P_TRANSDATE,
+                              P_CURRENCY_CODE,
+                              V_TOTAL_AMOUNT,
+                              P_EXCHANGE_RATE_TYPE );
+
+        -- BUT convert the amount to the TARGET ENTITIES home currency (instead of the project entities' home currency)
+        IF P_CURRENCY_CODE != V_EXCHANGE_RATES(1).toCurrencyCode THEN
+          V_STMT := 'Get target entities converted exchange rate';
+          V_EXCHANGE_RATES(1).convertedAmount := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                    P_TRANSDATE, P_CURRENCY_CODE,
+                                                    V_HOME_CURRENCY_CODE, V_TOTAL_AMOUNT,
+                                                    P_EXCHANGE_RATE_TYPE);
+          V_EXCHANGE_RATES(1).toCurrencyCode := V_HOME_CURRENCY_CODE;
+        END IF;
+
+        -- insert the currency values
+        FOR i IN 1  .. V_EXCHANGE_RATES.count
+          LOOP
+            V_STMT := 'Insert into trialrun values table';
+            INSERT INTO PAC_CHG_TRIALRUNS_VALUES
+            (
+              ID,
+              TRIALRUN_ID,
+              CURRENCY_TYPE,
+              CURRENCY_CODE,
+              AMOUNT,
+              CREATED_DATE,
+              CREATED_BY,
+              LAST_UPDATED_DATE,
+              LAST_UPDATED_BY
+            )
+            SELECT
+              PAC_CHG_TRIALRUNS_VALUES_S1.NEXTVAL,
+              V_TRIALRUN_ID,
+              V_EXCHANGE_RATES(i).CURRENCYTYPE,
+              V_EXCHANGE_RATES(i).TOCURRENCYCODE,
+              V_EXCHANGE_RATES(i).CONVERTEDAMOUNT,
+              V_DATE,
+              P_USER_ID,
+              V_DATE,
+              P_USER_ID
+            FROM
+              DUAL;
+          END LOOP;
+      END LOOP;
+  END IF;
+
+  -- Determine who pays for the work
+  V_BEST_MATCH_ID := NULL;
+
+  V_STMT := 'Determine charge to allocation rule';
+  FOR C3_DATA IN C3_REC(V_END_DATE)
+  LOOP
+    V_BEST_MATCH_ID :=  C3_DATA.ID;
+    V_HOME_CURRENCY_CODE := C3_DATA.HOME_CURRENCY_CODE;
+    V_STATUS := C3_DATA.STATUS;
+
+    IF C3_REC%ROWCOUNT = 1 THEN
+      EXIT;
+    END IF;
+  END LOOP;
+
+  V_ERROR_CODE := 0;
+
+  IF V_BEST_MATCH_ID IS NULL THEN
+    BEGIN
+      V_STMT := 'Inserting error 1003 into exceptions table';
+      V_ERROR_CODE := 1003;
+      V_CHARGE_NOT_FOUND := 1;
+
+      -- Charge To allocation rule not found
+      INSERT INTO PAC_CHG_EXCEPTIONS
+      (
+        ID,
+        BATCH_ID,
+        SOURCE_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        ERROR_ID,
+        ERROR_MESSAGE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY,
+        SESSION_ID
+      )
+      SELECT
+        PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+        P_SESSION_ID * -1,
+        0,
+        P_TRANS_SOURCE,
+        P_TRANSNO,
+        V_ERROR_CODE,
+        C.DESCRIPTION,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID,
+        P_SESSION_ID
+      FROM CMN_LOOKUPS L,
+           CMN_CAPTIONS_NLS C
+     WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+       AND L.LOOKUP_ENUM = 1003
+       AND L.ID = C.PK_ID
+       AND C.TABLE_NAME = 'CMN_LOOKUPS'
+       AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+    END;
+  ELSIF V_STATUS = 'ONHOLD' THEN
+    BEGIN
+      V_STMT := 'Inserting error 1004 into exceptions table';
+      V_ERROR_CODE := 1004;
+
+      -- charge to allocation rule is on hold
+	  INSERT INTO PAC_CHG_EXCEPTIONS
+      (
+        ID,
+        BATCH_ID,
+        SOURCE_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        ERROR_ID,
+        ERROR_MESSAGE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY,
+        SESSION_ID
+      )
+      SELECT
+        PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+        P_SESSION_ID * -1,
+        0,
+        P_TRANS_SOURCE,
+        P_TRANSNO,
+        V_ERROR_CODE,
+        C.DESCRIPTION,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID,
+        P_SESSION_ID
+      FROM CMN_LOOKUPS L,
+           CMN_CAPTIONS_NLS C
+     WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+       AND L.LOOKUP_ENUM = 1004
+       AND L.ID = C.PK_ID
+       AND C.TABLE_NAME = 'CMN_LOOKUPS'
+       AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+    END;
+  ELSIF V_STATUS = 'INACTIVE' THEN
+    BEGIN
+      V_STMT := 'Inserting error 1005 into exceptions table';
+      V_ERROR_CODE := 1005;
+
+      -- charge to allocation rule is on hold
+	  INSERT INTO PAC_CHG_EXCEPTIONS
+      (
+        ID,
+        BATCH_ID,
+        SOURCE_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        ERROR_ID,
+        ERROR_MESSAGE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY,
+        SESSION_ID
+      )
+      SELECT
+        PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+        P_SESSION_ID * -1,
+        0,
+        P_TRANS_SOURCE,
+        P_TRANSNO,
+        V_ERROR_CODE,
+        C.DESCRIPTION,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID,
+        P_SESSION_ID
+      FROM CMN_LOOKUPS L,
+           CMN_CAPTIONS_NLS C
+     WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+       AND L.LOOKUP_ENUM = 1005
+       AND L.ID = C.PK_ID
+       AND C.TABLE_NAME = 'CMN_LOOKUPS'
+       AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+    END;
+  END IF;
+  
+  IF V_ERROR_CODE != 1003 THEN
+    V_STMT := 'Calculate the charge to allocations';
+    FOR C4_DATA IN C4_REC(V_BEST_MATCH_ID, P_TRANSDATE, V_END_DATE)
+      LOOP
+        V_STMT := 'Get next ID for trial run table';
+        SELECT PAC_CHG_TRIALRUNS_S1.NEXTVAL
+          INTO V_TRIALRUN_ID
+          FROM DUAL;
+
+        V_STMT := 'Insert credit into trial run table';
+        INSERT INTO PAC_CHG_TRIALRUNS
+        (
+          ID,
+          SESSIONID,
+          CHARGEBACK_TYPE,
+          SOURCE_ID,
+          DATES_ID,
+          TRANS_SOURCE,
+          TRANSNO,
+          ENTITY_ID,
+          ACCOUNT_CODE_ID,
+          QUANTITY,
+          ERROR_CODE,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        SELECT
+          V_TRIALRUN_ID,
+          P_SESSION_ID,
+          'D',
+          V_BEST_MATCH_ID,
+          C4_DATA.ID,
+          P_TRANS_SOURCE,
+          P_TRANSNO,
+          C4_DATA.ENTITY_ID,
+          C4_DATA.ACCOUNT_CODE_ID,
+          P_QUANTITY,
+          V_ERROR_CODE,
+          V_DATE,
+          P_USER_ID,
+          V_DATE,
+          P_USER_ID
+        FROM
+          DUAL;
+
+        -- do the percentage allocation calculation
+        V_TOTAL_AMOUNT := P_TOTALAMOUNT * (C4_DATA.ALLOCATION_PERCENT / 100.0);
+
+        -- keep a running total of the credits so we can compare to the debits at the end
+        V_CREDIT_AMOUNT := V_CREDIT_AMOUNT + V_TOTAL_AMOUNT;
+
+        -- do the exchange rate conversion
+        V_STMT := 'Perform exchange rate conversion for charge amount';
+        V_EXCHANGE_RATES := CMN_EXCHANGERATE_PKG.CMN_GET_CONVERTED_VALUES_FCT
+                            ( P_PROJECT_ID,
+                              P_TRANSDATE,
+                              P_CURRENCY_CODE,
+                              V_TOTAL_AMOUNT,
+                              P_EXCHANGE_RATE_TYPE );
+
+        -- BUT convert the amount to the TARGET ENTITIES home currency (instead of the project entities home currency)
+        IF P_CURRENCY_CODE != V_EXCHANGE_RATES(1).toCurrencyCode THEN
+          V_STMT := 'Perform exchange rate conversion for target entities charge amount';
+          V_EXCHANGE_RATES(1).convertedAmount := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                    P_TRANSDATE, P_CURRENCY_CODE,
+                                                    V_HOME_CURRENCY_CODE, V_TOTAL_AMOUNT,
+                                                    P_EXCHANGE_RATE_TYPE);
+          V_EXCHANGE_RATES(1).toCurrencyCode := V_HOME_CURRENCY_CODE;
+        END IF;
+
+        -- insert the currency values
+        FOR i IN 1  .. V_EXCHANGE_RATES.count
+          LOOP
+            V_STMT := 'Insert charge into trial run values table';
+            INSERT INTO PAC_CHG_TRIALRUNS_VALUES
+            (
+              ID,
+              TRIALRUN_ID,
+              CURRENCY_TYPE,
+              CURRENCY_CODE,
+              AMOUNT,
+              CREATED_DATE,
+              CREATED_BY,
+              LAST_UPDATED_DATE,
+              LAST_UPDATED_BY
+            )
+            SELECT
+              PAC_CHG_TRIALRUNS_VALUES_S1.NEXTVAL,
+              V_TRIALRUN_ID,
+              V_EXCHANGE_RATES(i).CURRENCYTYPE,
+              V_EXCHANGE_RATES(i).TOCURRENCYCODE,
+              V_EXCHANGE_RATES(i).CONVERTEDAMOUNT,
+              V_DATE,
+              P_USER_ID,
+              V_DATE,
+              P_USER_ID
+            FROM
+              DUAL;
+          END LOOP;
+      END LOOP;
+  END IF;
+
+
+  IF ROUND(V_CREDIT_AMOUNT, 4) != ROUND(V_DEBIT_AMOUNT, 4) THEN
+    V_STMT := 'Inserting error 1002 into exceptions table';
+    IF V_CREDIT_NOT_FOUND = 1 THEN
+      V_ERROR_CODE := 1000;
+    ELSIF V_CHARGE_NOT_FOUND = 1 THEN
+      V_ERROR_CODE := 1003;
+    ELSE
+      V_ERROR_CODE := 1002;
+    END IF;
+
+    -- debits do not equal credits!
+    INSERT INTO PAC_CHG_EXCEPTIONS
+    (
+      ID,
+      BATCH_ID,
+      SOURCE_ID,
+      TRANS_SOURCE,
+      TRANSNO,
+      ERROR_ID,
+      ERROR_MESSAGE,
+      CREATED_DATE,
+      CREATED_BY,
+      LAST_UPDATED_DATE,
+      LAST_UPDATED_BY,
+      SESSION_ID
+    )
+    SELECT
+      PAC_CHG_EXCEPTIONS_S1.NEXTVAL,
+      P_SESSION_ID * -1,
+      0,
+      P_TRANS_SOURCE,
+      P_TRANSNO,
+      V_ERROR_CODE,
+      C.DESCRIPTION,
+      V_DATE,
+      P_USER_ID,
+      V_DATE,
+      P_USER_ID,
+      P_SESSION_ID
+    FROM CMN_LOOKUPS L,
+          CMN_CAPTIONS_NLS C
+    WHERE L.LOOKUP_TYPE = 'PAC_CHG_EXCEPTIONS'
+      AND L.LOOKUP_ENUM = 1002
+      AND L.ID = C.PK_ID
+      AND C.TABLE_NAME = 'CMN_LOOKUPS'
+      AND C.LANGUAGE_CODE = P_LANGUAGE_CODE;
+
+    V_STMT := 'Updating trial run table with error code 1002';
+    UPDATE PAC_CHG_TRIALRUNS
+       SET ERROR_CODE = V_ERROR_CODE
+     WHERE SESSIONID = P_SESSION_ID
+       AND TRANS_SOURCE =  P_TRANS_SOURCE
+       AND TRANSNO = P_TRANSNO;
+  END IF;
+
+  -- Commits are performed by the calling procedure...
+  --COMMIT;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20781, 'GENERATING GL ALLOCS FAILED : ' || V_STMT || ': ' || SQLERRM);
+END PAC_CHG_GENERATE_GL_ALLOCS_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

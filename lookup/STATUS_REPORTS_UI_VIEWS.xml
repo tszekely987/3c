@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="STATUS_REPORTS_UI_VIEWS" displayAttributeName="name" hiddenAttributeName="id" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List of Status Reports UI Views" languageCode="en" name="Status Reports UI Views"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT
+                    @SELECT:v.ID:ID@,
+                    @SELECT:v.NAME:Name@,
+                    @SELECT:v.CODE:Code@
+FROM ODF_UI_VIEWS v
+WHERE   @FILTER@ 
+    AND v.type= 'projectStatusReports' 
+    AND v.view_mode = 'SAVED'
+    AND v.associated_object_type = 'inv'
+    AND v.view_classifier = 'canvas'
+    AND ( ( v.shared_with != 'SHARED_NONE' 
+            AND ( 
+                CASE
+                    WHEN v.owner = @USER_ID@ THEN 1
+                    WHEN v.owner != @USER_ID@ AND v.shared_with = 'SHARED_NONE' THEN 0
+                    WHEN shared_with = 'SHARED_EVERYONE' THEN 1
+                    WHEN v.owner != @USER_ID@ AND v.shared_with = 'SHARED_SPECIFIC' AND (
+                    ( EXISTS ( SELECT 1 FROM odf_ui_view_share a WHERE a.view_id=v.ID AND a.shared_with_person = @USER_ID@ ) ) OR
+                        ( EXISTS ( SELECT 1
+                            FROM cmn_sec_user_groups g
+                            JOIN odf_ui_view_share a ON a.shared_with_group = g.group_id AND a.shared_with_group IS NOT NULL
+                            WHERE a.view_id = v.id AND g.user_id = @USER_ID@ )
+                        )
+                    ) THEN 1
+                    ELSE 0
+                END
+            ) = 1
+        )
+        OR ( (
+            v.owner = @USER_ID@
+            AND  v.is_system = ( SELECT MIN( v1.is_system )
+                                FROM ODF_UI_VIEWS v1
+                                WHERE v1.type= 'projectStatusReports' 
+                                    AND v1.view_mode = 'SAVED'
+                                    AND v1.associated_object_type = 'inv'
+                                    AND v1.view_classifier = 'canvas' 
+                                    AND v1.owner = @USER_ID@
+                    )
+        	) OR ( 0 = ( SELECT COUNT( v2.owner )
+                            FROM ODF_UI_VIEWS v2 
+                            WHERE v2.type= 'projectStatusReports' 
+                            AND v2.view_mode = 'SAVED'
+                            AND v2.associated_object_type = 'inv'
+                            AND v2.view_classifier = 'canvas' 
+                            AND v2.owner = @USER_ID@ )
+            	AND v.is_system = 1 )
+        )
+    )]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="STATUS_REPORTS_UI_VIEWS_01" languageCode="en" name="STATUS_REPORTS_UI_VIEWS_01"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="STATUS_REPORTS_UI_VIEWS_01" languageCode="en" name="STATUS_REPORTS_UI_VIEWS_01"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="id" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="code" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="id" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="code" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

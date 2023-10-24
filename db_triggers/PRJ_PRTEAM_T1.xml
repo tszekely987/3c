@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>PRJ_PRTEAM_T1</code>
+          <table_name>PRTEAM</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."PRJ_PRTEAM_T1" 
+  BEFORE INSERT OR UPDATE ON PRTEAM
+  FOR EACH ROW
+</description>
+          <trigger_body>BEGIN
+	IF 
+	(
+		INSERTING
+    )
+    THEN
+    		:NEW.SLICE_STATUS := 1;
+            :NEW.HARD_SLICE_STATUS := 1;
+    END IF;
+		
+    IF
+    (
+		
+		UPDATING( 'PRALLOCCURVE' )
+		
+		OR
+		
+		( ( :NEW.PRAVAILSTART IS NULL ) AND ( :OLD.PRAVAILSTART IS NOT NULL ) )
+		OR
+		( ( :NEW.PRAVAILSTART IS NOT NULL ) AND ( :OLD.PRAVAILSTART IS NULL ) ) 
+		OR
+		( :NEW.PRAVAILSTART &lt;&gt; :OLD.PRAVAILSTART )
+		
+		OR
+		
+		( ( :NEW.PRAVAILFINISH IS NULL ) AND ( :OLD.PRAVAILFINISH IS NOT NULL ) ) 
+		OR
+		( ( :NEW.PRAVAILFINISH IS NOT NULL ) AND ( :OLD.PRAVAILFINISH IS NULL ) ) 
+		OR
+		( :NEW.PRAVAILFINISH &lt;&gt; :OLD.PRAVAILFINISH )
+	)
+	THEN	
+    		:NEW.SLICE_STATUS := 1;
+  	END IF;
+  	
+  IF
+  (
+    UPDATING( 'HARD_CURVE' )
+  )
+  THEN
+    :NEW.HARD_SLICE_STATUS := 1;
+  END IF;
+  
+  IF
+  (
+    UPDATING( 'INCIDENT_ACT_CURVE' )
+  )
+  THEN
+    :NEW.INCIDENT_SLICE_STATUS := 1;
+  END IF;
+
+
+END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

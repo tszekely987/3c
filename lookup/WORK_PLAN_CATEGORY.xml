@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="WORK_PLAN_CATEGORY" displayAttributeName="cat_name" hiddenAttributeName="lookup_code" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Lookup for Work Plan Category" languageCode="en" name="Work Plan Category"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:LOOKUP_CODE:LOOKUP_CODE@,
+                        @SELECT:NAME:NAME@, @SELECT:CAT_NAME:CAT_NAME@
+                        from (
+                        select distinct cast (srm_res.id as varchar(60)) lookup_code, srm_res.full_name cat_name, 0 name
+                        from
+                            srm_resources srm_res
+                            join prj_resources prj_res on srm_res.id = prj_res.prid
+                            where
+                            srm_res.is_hidden = 0
+                            and prj_res.prisrole = 1
+                            and srm_res.is_active = 1
+                            and srm_res.resource_type = 0
+                            and 'role'= @WHERE:PARAM:USER_DEF:STRING:CATEGORY_TYPE@
+
+                        union all
+
+                        select cast(id as varchar(60)),name as cat_name, sort_order as name from cmn_lookups_v clv
+                        where lookup_type='SRM_RESOURCE_TYPE'
+                        and is_active = 1
+                        and language_code=@WHERE:PARAM:LANGUAGE@
+                        and 'empType' = @WHERE:PARAM:USER_DEF:STRING:CATEGORY_TYPE@
+
+                        union all
+
+                        select lookup_code, name as cat_name, sort_order as name from cmn_lookups_v clv
+                        where lookup_type='WORK_PLAN_INV_CATEGORY'
+                        and is_active = 1
+                        and language_code=@WHERE:PARAM:LANGUAGE@
+                        and 'invCategory' = @WHERE:PARAM:USER_DEF:STRING:CATEGORY_TYPE@
+                        ) XYZ
+                        WHERE 1 = 1 and @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="WORK_PLAN_CATEGORY_01" languageCode="en" name="WORK_PLAN_CATEGORY_01"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="WORK_PLAN_CATEGORY_01" languageCode="en" name="WORK_PLAN_CATEGORY_01"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="lookup_code" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="lookup_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="lookup_code" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="lookup_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

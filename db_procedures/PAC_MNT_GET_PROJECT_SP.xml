@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_PROJECT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_PROJECT_SP" 
+(
+  ID            NUMBER,
+  LANGUAGE_CODE CMN_LANGUAGES.LANGUAGE_CODE%TYPE,
+  RC1    IN OUT PAC_MNT_GET_PROJECT_SPPkg.RCT1
+)
+AS
+  COMPANY_CODE                pac_mnt_projects.COMPANY_CODE%TYPE;
+  PROJECT_CODE                pac_mnt_projects.PROJECT_CODE%TYPE;
+  is_changeorder              NUMBER(1, 0);
+  approvalstatus              GLOBALPKG.STRING;
+  affiliateproject            pac_mnt_projects.PROJECT_CODE%TYPE;
+  title                       GLOBALPKG.STRING;
+  type_                       GLOBALPKG.STRING;
+  template                    NUMBER(1, 0);
+  status                      GLOBALPKG.STRING;
+  changeorder                 GLOBALPKG.STRING;
+  manager                     pac_mnt_resources.RESOURCE_CODE%TYPE;
+  targetedstartdate           DATE;
+  startdate                   DATE;
+  targetedcompletiondate      DATE;
+  completiondate              DATE;
+  class                       GLOBALPKG.STRING;
+  wipclass                    GLOBALPKG.STRING;
+  locationid                  GLOBALPKG.STRING;
+  departcode                  GLOBALPKG.STRING;
+  budget                      NUMBER(1, 0);
+  forecast                    pac_mnt_projects.forecast%TYPE;
+  poc                         NUMBER(3,0);
+  BILL_TO_COMPANY_CODE        pac_mnt_projects.BILL_TO_COMPANY_CODE%TYPE;
+  amountbilled                NUMBER(32,6);
+  billcycle                   GLOBALPKG.STRING;
+  historymode                 NUMBER;
+  timeincrement               NUMBER(5,0);
+  costplus                    NUMBER(1,0);
+  MASTER_PROJECT_CODE         GLOBALPKG.STRING;
+  new_                        NUMBER(1,0);
+  approved                    NUMBER(1,0);
+--  allowcostclass              NUMBER(1,0);
+  hide_approval_status        NUMBER(1,0);
+  projrevisionid              NUMBER;
+  awaitingapproval            NUMBER;
+  LANGUAGE_ID                 NUMBER;
+  batchbill                   NUMBER(1, 0);
+  ex_allow_expenses           pac_mnt_projects.ex_allow_expenses%TYPE;
+  ex_bill_expenses            pac_mnt_projects.ex_bill_expenses%TYPE;
+  billing_currency_code       pac_mnt_projects.billing_currency_code%TYPE;
+  forecastingOn               nameoptions.project_forecasting%TYPE;
+  v_BILLING_PROJECT_ID        NUMBER;
+  v_BILLING_PROJECT_CODE      pac_mnt_projects.PROJECT_CODE%TYPE;
+  v_SHOW_AFFILIATED_PROJ_LINK NUMBER := 0;
+  v_ALLOCATION_TYPE           GLOBALPKG.STRING;
+
+  StoO_selcnt                 INTEGER;
+BEGIN
+	BEGIN
+    SELECT batchbill,
+           PROJECT_FORECASTING
+      INTO PAC_MNT_GET_PROJECT_SP.batchbill,
+           PAC_MNT_GET_PROJECT_SP.forecastingOn
+      FROM nameoptions;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20017, 'System setup is not found.');
+				RETURN;
+	END;
+
+  BEGIN
+		SELECT
+			COMPANY_CODE,
+			MASTER_PROJECT_CODE,
+			PROJECT_CODE,
+			affiliateproject,
+			I.NAME,
+			type_,
+			p.status,
+			manager,
+      startdate,
+			completedate,
+			class,
+			wipclass,
+			locationid,
+			departcode,
+			budget,
+			poc_method,
+	  	BILL_TO_COMPANY_CODE,
+			amountbilled,
+			billcycle,
+			historymode,
+		 	timeincrement,
+			DECODE(PROJECT_CODE, MASTER_PROJECT_CODE, 0 , 1),
+			changeorder,
+			0,
+		 	DECODE(PAC_MNT_GET_PROJECT_SP.approved, 1, 0 , DECODE(PAC_MNT_GET_PROJECT_SP.awaitingapproval, 1, 0 , 1)),
+			ex_allow_expenses,
+			ex_bill_expenses,
+			costplus,
+			template_only,
+			billing_currency_code,
+          	forecast,
+			BILLING_PROJECT_ID
+		INTO
+			PAC_MNT_GET_PROJECT_SP.COMPANY_CODE,
+			PAC_MNT_GET_PROJECT_SP.MASTER_PROJECT_CODE,
+			PAC_MNT_GET_PROJECT_SP.PROJECT_CODE,
+			PAC_MNT_GET_PROJECT_SP.affiliateproject,
+			PAC_MNT_GET_PROJECT_SP.title,
+			PAC_MNT_GET_PROJECT_SP.type_,
+			PAC_MNT_GET_PROJECT_SP.status,
+			PAC_MNT_GET_PROJECT_SP.manager,
+		 	PAC_MNT_GET_PROJECT_SP.startdate,
+			PAC_MNT_GET_PROJECT_SP.completiondate,
+			PAC_MNT_GET_PROJECT_SP.class,
+			PAC_MNT_GET_PROJECT_SP.wipclass,
+			PAC_MNT_GET_PROJECT_SP.locationid,
+			PAC_MNT_GET_PROJECT_SP.departcode,
+			PAC_MNT_GET_PROJECT_SP.budget,
+			PAC_MNT_GET_PROJECT_SP.poc,
+		 	PAC_MNT_GET_PROJECT_SP.BILL_TO_COMPANY_CODE,
+			PAC_MNT_GET_PROJECT_SP.amountbilled,
+			PAC_MNT_GET_PROJECT_SP.billcycle,
+			PAC_MNT_GET_PROJECT_SP.historymode,
+		 	PAC_MNT_GET_PROJECT_SP.timeincrement,
+			PAC_MNT_GET_PROJECT_SP.is_changeorder,
+			PAC_MNT_GET_PROJECT_SP.changeorder,
+			PAC_MNT_GET_PROJECT_SP.new_,
+		 	PAC_MNT_GET_PROJECT_SP.hide_approval_status,
+			PAC_MNT_GET_PROJECT_SP.ex_allow_expenses,
+			PAC_MNT_GET_PROJECT_SP.ex_bill_expenses,
+			PAC_MNT_GET_PROJECT_SP.costplus,
+			PAC_MNT_GET_PROJECT_SP.template,
+			PAC_MNT_GET_PROJECT_SP.billing_currency_code,
+   		PAC_MNT_GET_PROJECT_SP.forecast,
+			PAC_MNT_GET_PROJECT_SP.v_BILLING_PROJECT_ID
+    FROM PAC_MNT_PROJECTS P,
+	     INV_INVESTMENTS I
+		WHERE 	P.ID = PAC_MNT_GET_PROJECT_SP.ID AND
+		        I.ID = P.ID;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20018, 'PROJECT_CODE is not found.');
+				RETURN;
+	END;
+
+	BEGIN
+    SELECT PROJECT_CODE
+    INTO   PAC_MNT_GET_PROJECT_SP.v_BILLING_PROJECT_CODE
+    FROM   PAC_MNT_PROJECTS
+    WHERE  ID = PAC_MNT_GET_PROJECT_SP.v_BILLING_PROJECT_ID;
+
+    EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+	END;
+
+	BEGIN
+		SELECT  MAX(projrevisionid)
+		INTO 	PAC_MNT_GET_PROJECT_SP.projrevisionid FROM projrevision
+		WHERE 	COMPANY_CODE = PAC_MNT_GET_PROJECT_SP.COMPANY_CODE
+		AND 	PROJECT_CODE = PAC_MNT_GET_PROJECT_SP.PROJECT_CODE;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20019, 'The current projrevision id could not be found.');
+				RETURN;
+	END;
+
+	BEGIN
+		SELECT
+			approved,
+			awaitingapproval
+		INTO
+			PAC_MNT_GET_PROJECT_SP.approved,
+			PAC_MNT_GET_PROJECT_SP.awaitingapproval
+		FROM 	PAC_MNT_PROJECTS
+		WHERE 	COMPANY_CODE = PAC_MNT_GET_PROJECT_SP.COMPANY_CODE
+		AND 	PROJECT_CODE = PAC_MNT_GET_PROJECT_SP.PROJECT_CODE;
+	EXCEPTION
+		WHEN TOO_MANY_ROWS THEN
+			NULL;
+		WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20000, 'The approved and approved status could not be found.' || PAC_MNT_GET_PROJECT_SP.COMPANY_CODE || ' PROJECT_CODE ' || PAC_MNT_GET_PROJECT_SP.PROJECT_CODE || ' rev ' || PAC_MNT_GET_PROJECT_SP.projrevisionid);
+			RETURN;
+	END;
+
+  -- Get the latest dates
+	BEGIN
+		SELECT
+			currenttargetedstartdate,
+			currenttargetedcompldate
+		INTO
+			PAC_MNT_GET_PROJECT_SP.targetedstartdate,
+			PAC_MNT_GET_PROJECT_SP.targetedcompletiondate
+		FROM 	projrevision
+		WHERE 	COMPANY_CODE = PAC_MNT_GET_PROJECT_SP.COMPANY_CODE
+		AND 	PROJECT_CODE = PAC_MNT_GET_PROJECT_SP.PROJECT_CODE
+		AND 	projrevisionid  IN (	SELECT  MAX(projrevisionid)
+		 				FROM 	projrevision
+						WHERE 	COMPANY_CODE = PAC_MNT_GET_PROJECT_SP.COMPANY_CODE
+		 				AND 	PROJECT_CODE = PAC_MNT_GET_PROJECT_SP.PROJECT_CODE
+		 				AND 	datesrevision = 1 );
+	EXCEPTION
+		WHEN TOO_MANY_ROWS THEN
+			NULL;
+		WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20000, 'Revision for dates was not found. ' || COMPANY_CODE || ' ' || PROJECT_CODE);
+			RETURN;
+	END;
+
+  IF PAC_MNT_GET_PROJECT_SP.approved = 1 THEN
+	BEGIN
+		BEGIN
+			PAC_MNT_GET_PROJECT_SP.hide_approval_status := 0;
+			SELECT  CMN_LOOKUPS_V.NAME
+			INTO 	PAC_MNT_GET_PROJECT_SP.approvalstatus
+			FROM 	CMN_LOOKUPS_V
+			WHERE 	CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_MNT_PROJECT_APP_STATUS'
+			AND 	CMN_LOOKUPS_V.LOOKUP_CODE = 'APPROVED'
+			AND 	CMN_LOOKUPS_V.LANGUAGE_CODE = PAC_MNT_GET_PROJECT_SP.LANGUAGE_CODE;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					NULL;
+				WHEN NO_DATA_FOUND THEN
+					RAISE_APPLICATION_ERROR(-20020, 'The approved message does not exist in lookup under PAC_MNT_PROJECT_APP_STATUS.');
+					RETURN;
+		END;
+	END;
+	ELSIF PAC_MNT_GET_PROJECT_SP.awaitingapproval = 1 THEN
+	BEGIN
+		BEGIN
+			PAC_MNT_GET_PROJECT_SP.hide_approval_status := 0;
+			SELECT  CMN_LOOKUPS_V.NAME
+			INTO 	PAC_MNT_GET_PROJECT_SP.approvalstatus
+			FROM 	CMN_LOOKUPS_V
+			WHERE 	CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_MNT_PROJECT_APP_STATUS'
+			AND 	CMN_LOOKUPS_V.LOOKUP_CODE = 'AWAITING_APPROVAL'
+			AND 	CMN_LOOKUPS_V.LANGUAGE_CODE = PAC_MNT_GET_PROJECT_SP.LANGUAGE_CODE;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20021, 'The awaiting approval message does not exist in lookup under PAC_MNT_PROJECT_APP_STATUS.');
+				RETURN;
+		END;
+	END;
+	ELSE
+		PAC_MNT_GET_PROJECT_SP.hide_approval_status := 1;
+	END IF;
+
+	/* If This project is part of a hierarchy or has projects pointing to it populate v_SHOW_AFFILIATED_PROJ_LINK
+	   value to display link to Acctuate Report */
+	IF PAC_MNT_GET_PROJECT_SP.affiliateproject IS NULL Then
+	   BEGIN
+	     SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+           WHERE EXISTS(SELECT 1
+                        FROM PAC_MNT_PROJECTS
+                       WHERE affiliateproject = PAC_MNT_GET_PROJECT_SP.PROJECT_CODE );
+
+		 EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				v_SHOW_AFFILIATED_PROJ_LINK := 0 ;
+	   END;
+
+	   IF StoO_selcnt &gt; 0 Then
+	     v_SHOW_AFFILIATED_PROJ_LINK := 1 ;
+	   End If;
+	ELSE
+	  v_SHOW_AFFILIATED_PROJ_LINK := 1 ;
+	END IF;
+
+  BEGIN
+    SELECT C.NAME
+    INTO   PAC_MNT_GET_PROJECT_SP.v_ALLOCATION_TYPE
+    FROM   WIPCLASS W, CMN_LOOKUPS_V C
+    WHERE  W.WIPCLASS = PAC_MNT_GET_PROJECT_SP.WIPCLASS
+    AND    C.LOOKUP_TYPE = 'PAC_CHG_CHARGEBACK_TYPES'
+    AND    C.LOOKUP_CODE = W.ALLOCATION_TYPE
+    AND    C.LANGUAGE_CODE = PAC_MNT_GET_PROJECT_SP.LANGUAGE_CODE;
+
+    EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+	END;
+
+	OPEN RC1 FOR
+	SELECT
+		PAC_MNT_GET_PROJECT_SP.approvalstatus "Approval_Status",
+		PAC_MNT_GET_PROJECT_SP.COMPANY_CODE "COMPANY_CODE",
+		PAC_MNT_GET_PROJECT_SP.MASTER_PROJECT_CODE "MASTER_PROJECT_CODE",
+		PAC_MNT_GET_PROJECT_SP.affiliateproject "AffProject",
+		PAC_MNT_GET_PROJECT_SP.title "Title",
+		PAC_MNT_GET_PROJECT_SP.type_ "Type_",
+		PAC_MNT_GET_PROJECT_SP.template "Template",
+		PAC_MNT_GET_PROJECT_SP.status "Status",
+		PAC_MNT_GET_PROJECT_SP.manager "Manager",
+		PAC_MNT_GET_PROJECT_SP.targetedstartdate "TargetStart",
+		PAC_MNT_GET_PROJECT_SP.startdate "StartDate",
+		PAC_MNT_GET_PROJECT_SP.targetedcompletiondate "TargetComplete",
+		PAC_MNT_GET_PROJECT_SP.completiondate "Complete",
+		PAC_MNT_GET_PROJECT_SP.PROJECT_CODE "PROJECT_CODE",
+		PAC_MNT_GET_PROJECT_SP.class "Class",
+		PAC_MNT_GET_PROJECT_SP.wipclass "WIPClass",
+		PAC_MNT_GET_PROJECT_SP.locationid "Location",
+		PAC_MNT_GET_PROJECT_SP.departcode "DepartCode",
+		PAC_MNT_GET_PROJECT_SP.budget "Budget",
+--    PAC_MNT_GET_PROJECT_SP.allowcostclass "allowcostclass",
+		PAC_MNT_GET_PROJECT_SP.costplus "CostPlus",
+		PAC_MNT_GET_PROJECT_SP.historymode "HistoryMode",
+		PAC_MNT_GET_PROJECT_SP.timeincrement "TimeIncrement",
+		PAC_MNT_GET_PROJECT_SP.poc "POC",
+		PAC_MNT_GET_PROJECT_SP.BILL_TO_COMPANY_CODE "BILL_TO_COMPANY_CODE",
+		PAC_MNT_GET_PROJECT_SP.amountbilled "AmountBilled",
+		PAC_MNT_GET_PROJECT_SP.billcycle "BillCycle",
+		PAC_MNT_GET_PROJECT_SP.is_changeorder "IsChangeOrder",
+		PAC_MNT_GET_PROJECT_SP.changeorder "ChangeOrder",
+		PAC_MNT_GET_PROJECT_SP.new_ "NewRecord",
+		PAC_MNT_GET_PROJECT_SP.approved "Approved",
+		PAC_MNT_GET_PROJECT_SP.ID "ID",
+		PAC_MNT_GET_PROJECT_SP.hide_approval_status "hideApprovalStatus",
+		PAC_MNT_GET_PROJECT_SP.batchbill "batchbill",
+		EX_ALLOW_EXPENSES "Allow_Expenses",
+		PAC_MNT_GET_PROJECT_SP.ex_bill_expenses "Bill_Expenses",
+		NULL "ProjectToCopyFrom",
+    PAC_MNT_GET_PROJECT_SP.billing_currency_code,
+    PAC_MNT_GET_PROJECT_SP.forecast "Forecast",
+    PAC_MNT_GET_PROJECT_SP.forecastingOn "ForecastingOn",
+		PAC_MNT_GET_PROJECT_SP.v_BILLING_PROJECT_ID "BillingProjectID",
+		PAC_MNT_GET_PROJECT_SP.v_BILLING_PROJECT_CODE "BillingProjectCode",
+    PAC_MNT_GET_PROJECT_SP.v_SHOW_AFFILIATED_PROJ_LINK "ShowAffiliateProjectLink",
+    PAC_MNT_GET_PROJECT_SP.v_ALLOCATION_TYPE "allocationType"
+  FROM DUAL;
+END PAC_MNT_GET_PROJECT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

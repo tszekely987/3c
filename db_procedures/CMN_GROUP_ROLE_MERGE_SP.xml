@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_GROUP_ROLE_MERGE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_GROUP_ROLE_MERGE_SP" (
+   p_group_code               in   varchar2,
+   p_role_code                in   varchar2,
+   p_group_name               in   varchar2,
+   p_group_description        in   varchar2
+)
+is
+   v_role_id                     number;
+   v_group_id                    number;
+   v_cnt                         integer := 0;
+   v_cnt2                        integer := 0;
+   v_group_role_type             varchar(100);
+begin
+  --
+  --  Ensure we have valid params
+  --
+   select   count (*)
+   into     v_cnt
+   from     cmn_sec_groups
+   where    group_code = p_group_code;
+   select   count (*)
+   into     v_cnt2
+   from     cmn_sec_groups
+   where    group_code = p_role_code;
+
+   if (v_cnt = 1 and v_cnt2 = 1)
+   then
+     select   id
+     into     v_group_id
+     from     cmn_sec_groups
+     where    group_code = p_group_code;
+     select   id
+     into     v_role_id
+     from     cmn_sec_groups
+     where    group_code = p_role_code;
+      
+      --
+      --  Move all the users from the role to the group
+      --
+      delete  cmn_sec_user_groups
+      where   user_id in (select  user_id 
+                          from    cmn_sec_user_groups
+                          where   group_id = v_group_id)
+      and     group_id = v_role_id;
+      
+      update  cmn_sec_user_groups
+      set     group_id = v_group_id
+      where   group_id = v_role_id;
+      
+      --
+      --  Move all the system rights from the role to the group
+      --
+      delete  cmn_sec_group_hierarchies
+      where   group_id in (select group_id 
+                          from    cmn_sec_group_hierarchies
+                          where   parent_group_id = v_group_id)
+      and     parent_group_id = v_role_id;
+      
+      update  cmn_sec_group_hierarchies
+      set     parent_group_id = v_group_id
+      where   parent_group_id = v_role_id;
+      
+      --
+      --  Move all the OBS rights from the role to the group
+      --
+      delete  cmn_sec_assgnd_right r
+      where   exists (select  id 
+                      from    cmn_sec_assgnd_right ir
+                      where   ir.principal_id = v_group_id
+                      and     ir.principal_type = 'GROUP'
+                      and     ir.instance_type = r.instance_type
+                      and     ir.instance_id = r.instance_id
+                      and     ir.right_id = r.right_id)
+      and     principal_id = v_role_id
+      and     principal_type = 'GROUP';
+      
+      update  cmn_sec_assgnd_right
+      set     principal_id = v_group_id
+      where   principal_id = v_role_id
+      and     principal_type = 'GROUP';
+
+      cmn_captions_nls_upd_sp (
+         'CMN_SEC_GROUPS',
+         v_group_id,
+         p_group_name,
+         p_group_description, 1);
+         
+      cmn_captions_nls_del_sp (
+         'CMN_SEC_GROUPS',
+         v_role_id);
+         
+      delete from cmn_sec_groups where id = v_role_id;
+
+   ELSE
+      RAISE_APPLICATION_ERROR (-20000, 'RECORD DOES NOT EXIST');
+   END IF;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>RPT_DATEDIFF_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."RPT_DATEDIFF_FCT" (
+	P_INTERVAL_VALUE IN VARCHAR2,  
+	P_DATE_FROM IN DATE,
+	P_DATE_TO IN DATE
+  
+) 
+RETURN NUMBER
+AS
+  result NUMBER;
+  v_interval VARCHAR2(4);
+BEGIN
+  --
+  IF LOWER(P_INTERVAL_VALUE) = 'd' OR LOWER(P_INTERVAL_VALUE) = 'dd' THEN
+  v_interval := 'd';
+  END IF;
+  IF LOWER(P_INTERVAL_VALUE) = 'm' OR LOWER(P_INTERVAL_VALUE) = 'mm' THEN
+  v_interval := 'm';
+  END IF;
+  IF LOWER(P_INTERVAL_VALUE) = 'y' OR LOWER(P_INTERVAL_VALUE) = 'yy' OR LOWER(P_INTERVAL_VALUE) = 'yyyy' THEN
+  v_interval := 'y';
+  END IF;
+  
+  
+  SELECT
+    CASE LOWER(v_interval)
+      WHEN 'm' THEN trunc(MONTHS_BETWEEN(P_DATE_TO, P_DATE_FROM))
+      WHEN 'd' THEN ROUND(P_DATE_TO - P_DATE_FROM) 
+      WHEN 'y' THEN trunc(MONTHS_BETWEEN(P_DATE_TO, P_DATE_FROM)/12)
+      ELSE 0
+    END INTO result 
+  FROM dual;
+  --  
+  RETURN(result);
+  --
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_IMP_INS_TRANSMC_VALUES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_IMP_INS_TRANSMC_VALUES_SP" 
+(
+  nTransImportKey   NUMBER,
+  nTRANSNO          NUMBER,
+  PROJECT_CODE      VARCHAR2,
+  TRANSDATE         DATE,
+  TRANSTYPE         VARCHAR2,
+  RATE_CURRENCY     VARCHAR2,
+  COST_CURRENCY     VARCHAR2,
+  QUANTITY          NUMBER,
+  RATE              NUMBER,
+  AMOUNT            NUMBER,
+  PRICE             NUMBER,
+  FACTORAMOUNT      NUMBER,
+  BURDEN            NUMBER,
+  OVERHEAD          NUMBER,
+  ACTUALCOST        NUMBER,
+  STDCOST           NUMBER,
+  nErrorCode IN OUT NUMBER,
+  nHeaderID     		NUMBER DEFAULT 0
+)
+AS
+  l_exchange_rate_type GLOBALPKG.STRING;
+  exr                  CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  ct                   GLOBALPKG.STRING;
+  fc                   GLOBALPKG.STRING;
+  tc                   GLOBALPKG.STRING;
+  vrates               NUMBER;
+  exrate               NUMBER;
+  exchangeRateID       NUMBER;
+
+  exr_rate CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_actualcost CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_stdcost CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_factor CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_burden CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_overhead CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_emplactual CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_emplstd CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+
+  currencyType VARCHAR2(30);
+  fromCurrency VARCHAR2(30);
+  toCurrency VARCHAR2(30);
+  temp_cost_Exchange_Rate NUMBER;
+  temp_rate_Exchange_Rate NUMBER;
+  temp_rate_exchange_ID NUMBER;
+  temp_cost_exchange_ID NUMBER;
+  temp_Amount ppa_transcontrol_values.amount%TYPE ;
+  tempCurrencyCode ppa_transcontrol_values.currency_code%TYPE;
+  temp_BillRate ppa_transcontrol_values.billrate%TYPE;
+  temp_Price ppa_transcontrol_values.price%TYPE;
+  temp_FactorAmount  ppa_transcontrol_values.factoramount%type := 0;
+  temp_Burden        ppa_transcontrol_values.burden%type := 0;
+  temp_Overhead      ppa_transcontrol_values.overhead%type := 0;
+  temp_TotalAmount   ppa_transcontrol_values.totalamount%type;
+  temp_ActualCost    ppa_transcontrol_values.actualcost%type;
+  temp_StdCost       ppa_transcontrol_values.stdcost%type;
+  temp_TotalCost     ppa_transcontrol_values.totalcost%type;
+  temp_EmplyActualCost ppa_transcontrol_values.actualcost%type;
+  temp_EmplyStdcost   ppa_transcontrol_values.stdcost%type;
+  temp_AmountRemaining ppa_wip_values.AMOUNTREMAINING%type;
+  temp_rate_currency_code ppa_transcontrol_values.rate_currency_code%type;
+  temp_cost_currency_code ppa_transcontrol_values.actcost_currency_code%type;
+  temp_natural_BillRate ppa_transcontrol_values.natural_billrate%type;
+  temp_natural_stdcost ppa_transcontrol_values.natural_stdcost%type;
+  temp_natural_actualcost ppa_transcontrol_values.natural_actualcost%type;
+  round_to_rate NUMBER;
+  round_to_cost NUMBER;
+
+  bFactor INTEGER := 0;
+  bBurden INTEGER := 0;
+  bOverhead INTEGER := 0;
+
+  v_PROJECT_CODE    VARCHAR2(60);
+  PROJECT_ID        NUMBER;
+
+  bValid INTEGER;
+  areValuesPresent INTEGER := 0;
+
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+BEGIN
+  BEGIN
+
+    v_Project_Code := PROJECT_CODE;
+    temp_rate_currency_Code := RATE_CURRENCY;
+    temp_cost_currency_Code := COST_CURRENCY;
+
+    bValid := 1;
+
+    -- get the exchange rate info
+    BEGIN
+      IF TRANSTYPE = 'L' THEN
+        SELECT ID, labor_exchange_rate_type
+          INTO PROJECT_ID, l_exchange_rate_type
+          FROM PAC_MNT_PROJECTS
+          WHERE project_code = v_PROJECT_CODE;
+      ELSIF  TRANSTYPE = 'M' THEN
+        SELECT ID, MATERIALS_exchange_rate_type
+          INTO PROJECT_ID, l_exchange_rate_type
+          FROM PAC_MNT_PROJECTS
+          WHERE project_code = v_PROJECT_CODE;
+      ELSIF  TRANSTYPE = 'Q' THEN
+        SELECT ID, EQUIPMENT_exchange_rate_type
+          INTO PROJECT_ID, l_exchange_rate_type
+          FROM PAC_MNT_PROJECTS
+          WHERE project_code = v_PROJECT_CODE;
+      ELSIF  TRANSTYPE = 'X' THEN
+        SELECT ID, EXPENSE_exchange_rate_type
+          INTO PROJECT_ID, l_exchange_rate_type
+          FROM PAC_MNT_PROJECTS
+          WHERE project_code = v_PROJECT_CODE;
+      END IF;
+
+      -- get currency precision
+      BEGIN
+        SELECT CURRENCY_PRECISION
+          INTO round_to_rate
+          FROM CMN_CURRENCIES
+        WHERE CURRENCY_CODE = temp_rate_currency_Code;
+        EXCEPTION
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          bValid := 0;
+          nErrorCode := 960;
+      END;  -- get currency precision
+
+      IF bValid = 1 THEN
+        BEGIN
+          IF ROUND(FACTORAMOUNT, round_to_rate) &lt;&gt; 0 THEN
+            bFactor := 1;
+          END IF;
+
+          IF ROUND(BURDEN, round_to_rate) &lt;&gt; 0 THEN
+            bBurden := 1;
+          END IF;
+
+          IF ROUND(OVERHEAD, round_to_rate) &lt;&gt; 0 THEN
+            bOverhead := 1;
+          END IF;
+
+          --apply exchange rate to bill_Rate
+          BEGIN
+            exr_rate := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                        PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.temp_rate_currency_Code,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.RATE, L_EXCHANGE_RATE_TYPE );
+          EXCEPTION
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+              bValid := 0;
+              nErrorCode := 962;
+          END;  --apply exchange rate to bill_Rate
+        END;
+      END IF;  -- if bValid = 1
+
+      --apply exchange rate to factor iff necessary
+      IF bFactor &lt;&gt; 0 AND bValid = 1 THEN
+        BEGIN
+          exr_factor := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                        PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.temp_rate_currency_Code,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.FACTORAMOUNT, L_EXCHANGE_RATE_TYPE );
+        EXCEPTION
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            bValid := 0;
+            nErrorCode := 963;
+        END;
+      END IF;
+
+      --apply exchange rate to burden iff necessary
+      IF bBurden &lt;&gt; 0 AND bValid = 1 THEN
+        BEGIN
+          exr_burden := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                        PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.temp_rate_currency_Code,
+                        PAC_IMP_INS_TRANSMC_VALUES_SP.BURDEN, L_EXCHANGE_RATE_TYPE );
+        EXCEPTION
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            bValid := 0;
+            nErrorCode := 964;
+        END;
+      END IF; --apply exchange rate to burden iff necessary
+
+      --apply exchange rate to overhead iff necessary
+      IF bOverhead &lt;&gt; 0 AND bValid = 1 THEN
+        BEGIN
+          exr_overhead := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                          PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                          PAC_IMP_INS_TRANSMC_VALUES_SP.temp_rate_currency_Code,
+                          PAC_IMP_INS_TRANSMC_VALUES_SP.OVERHEAD, L_EXCHANGE_RATE_TYPE );
+        EXCEPTION
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            bValid := 0;
+            nErrorCode := 965;
+        END;
+      END IF;  --apply exchange rate to overhead iff necessary
+
+      -- apply exchange rate to actual cost
+      IF bValid = 1 THEN
+        BEGIN
+          exr_actualCost := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                            PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                            PAC_IMP_INS_TRANSMC_VALUES_SP.COST_CURRENCY,
+                            PAC_IMP_INS_TRANSMC_VALUES_SP.ACTUALCOST, L_EXCHANGE_RATE_TYPE );
+        EXCEPTION
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            bValid := 0;
+            nErrorCode := 966;
+        END;
+      END IF; -- apply exchange rate to actual cost
+
+	  areValuesPresent := 0 ;
+	  BEGIN
+        SELECT  1
+        INTO areValuesPresent
+        FROM DUAL
+          WHERE EXISTS( SELECT 1
+          FROM PPA_TRANSCONTROL_VALUES TCV
+          WHERE TCV.TRANSNO = nTRANSNO
+          AND TCV.CURRENCY_TYPE = 'NATURAL'  );
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          areValuesPresent := 0 ;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          raise_application_error(SQLCODE, SQLERRM);
+          areValuesPresent := 0 ;
+      END;
+
+      -- apply exchange rate to standard cost
+      IF bValid = 1 THEN
+        BEGIN
+          exr_stdCost := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(
+                          PROJECT_ID, PAC_IMP_INS_TRANSMC_VALUES_SP.TRANSDATE,
+                          PAC_IMP_INS_TRANSMC_VALUES_SP.COST_CURRENCY,
+                          PAC_IMP_INS_TRANSMC_VALUES_SP.STDCOST, L_EXCHANGE_RATE_TYPE );
+        EXCEPTION
+          WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+              bValid := 0;
+              nErrorCode := 967;
+        END;
+      END IF;  -- apply exchange rate to standard cost
+      -- I'm not sure if emplyactual and emplystd costs should even be here since
+      --   they = costs if Labor and they don't apply if non-labor, so skipping until
+      --   we get clarification
+      BEGIN
+        for i in 1  .. exr_rate.count
+        loop
+          BEGIN
+            temp_rate_Exchange_ID := exr_rate(i).exchangeRateID;
+            currencyType := exr_rate(i).currencyType;
+            
+            IF temp_rate_Exchange_ID is null then
+              BEGIN
+                IF currencyType = 'HOME' then
+                  BEGIN
+                    nErrorCode := 5000;
+                    exit;
+                  END;
+                END IF;
+              
+                IF currencyType = 'REPORTING' THEN
+                  BEGIN
+                    nErrorCode := 5001;
+                    EXIT;
+                  END;
+                END IF;
+
+		        IF currencyType = 'BILLING' THEN
+                  BEGIN
+                    nErrorCode := 5002;
+                    EXIT;
+                  END;
+                END IF;
+
+                IF currencyType = 'EURO' THEN
+                  BEGIN
+                    nErrorCode := 5003;
+                    exit;
+                  END;
+                END IF; 
+
+                IF currencyType = 'NATURAL' THEN
+                  BEGIN
+                    nErrorCode := 5004;
+                    exit;
+                  END;
+                END IF;
+              END;
+            END IF;
+          END;
+        END LOOP;
+      END;
+
+
+      -- insert 5 rows, 1 for each currency type
+      BEGIN
+	  --If exr_rate doesn't return five rows then raise an error
+        IF nErrorCode is null or nErrorCode = 0 THEN
+          BEGIN
+            FOR i IN 1  .. exr_rate.count
+            LOOP
+              BEGIN
+                -- rate currency precision
+                BEGIN
+                  SELECT CURRENCY_PRECISION
+                    INTO round_to_rate
+                    FROM CMN_CURRENCIES
+                    WHERE CURRENCY_CODE = exr_rate(i).toCurrencyCode;
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    StoO_error := SQLCODE;
+                    StoO_errmsg := SQLERRM;
+                    bValid := 0;
+                    nErrorCode := 961;
+                END;  -- rate currency precision
+
+                -- cost currency precision
+                BEGIN
+                  SELECT CURRENCY_PRECISION
+                    INTO round_to_cost
+                    FROM CMN_CURRENCIES
+                    WHERE CURRENCY_CODE = exr_actualCost(i).toCurrencyCode;
+                EXCEPTION
+                   WHEN OTHERS THEN
+                     StoO_error := SQLCODE;
+                     StoO_errmsg := SQLERRM;
+                     bValid := 0;
+                     nErrorCode := 968;
+                END;  -- cost currency precision
+
+                -- if we are still good to go, then do it...
+                if bValid = 1 THEN
+                  BEGIN
+                    -- setting temp variables which will be used to store into ppa_trans_control_values table START
+                    currencyType := exr_rate(i).currencyType;
+                    fromCurrency := exr_rate(i).fromCurrencyCode;
+                    toCurrency := exr_rate(i).toCurrencyCode;
+                    temp_BillRate := exr_rate(i).convertedAmount;
+                    temp_rate_currency_code := exr_rate(i).toCurrencyCode;
+                    temp_cost_currency_code := exr_actualCost(i).toCurrencyCode;
+                    temp_rate_Exchange_Rate := exr_rate(i).exchangeRate;
+                    temp_rate_Exchange_ID := exr_rate(i).exchangeRateID;
+                    temp_ActualCost := exr_actualcost(i).convertedAmount;
+                    temp_cost_Exchange_Rate := exr_actualcost(i).exchangeRate;
+                    temp_cost_Exchange_ID := exr_actualcost(i).exchangeRateID;
+                    temp_stdcost := exr_stdcost(i).convertedAmount;
+
+                    IF bFactor &lt;&gt; 0 THEN
+                      temp_FactorAmount := exr_factor(i).convertedAmount;
+                    END IF;
+                    IF bBurden &lt;&gt; 0 THEN
+                      temp_Burden := exr_burden(i).convertedAmount;
+                    END IF;
+                    IF bOverhead &lt;&gt; 0 THEN
+                      temp_Overhead := exr_overhead(i).convertedAmount;
+                    END IF;
+
+                    temp_TotalAmount := ROUND(PAC_IMP_INS_TRANSMC_VALUES_SP.QUANTITY * temp_BillRate, NVL(round_to_rate, 2)) +
+                                    temp_Burden + temp_Overhead + temp_FactorAmount;
+
+                    -- insert into transcontrol_values
+                    BEGIN
+                      -- setting temp variables which will be used to store into ppa_trans_control_values table END 
+ 
+                      IF ( areValuesPresent = 0 ) THEN
+                        BEGIN
+	                      IF nHeaderID = 0 THEN
+					        INSERT INTO PPA_TRANSCONTROL_VALUES
+		                    (ID,
+		                    TRANSNO,
+		                    RATE_EXCHANGE_ID,
+		                    AMOUNT,
+		                    CURRENCY_TYPE,
+		                    CURRENCY_CODE,
+		                    RATE_EXCHANGE_RATE,
+		                    RATE_CURRENCY_CODE,
+		                    ACTCOST_CURRENCY_CODE,
+		                    STDCOST_CURRENCY_CODE,
+		                    COST_EXCHANGE_RATE,
+		                    COST_EXCHANGE_ID,
+		                    NATURAL_BILLRATE,
+		                    BILLRATE,
+		                    PRICE,
+		                    FACTORAMOUNT,
+		                    BURDEN,
+		                    OVERHEAD,
+		                    TOTALAMOUNT,
+		                    NATURAL_ACTUALCOST,
+		                    ACTUALCOST,
+		                    NATURAL_STDCOST,
+		                    STDCOST,
+		                    TOTALCOST,
+		                    EMPLYACTUALCOST,
+		                    EMPLYSTDCOST
+		                    )
+		                    VALUES
+		                    (PPA_TRANSCONTROL_VALUES_S1.NEXTVAL,
+		                    nTRANSNO,
+		                    temp_rate_Exchange_ID,
+		                    ROUND(temp_BillRate*QUANTITY, NVL(round_to_rate, 2)),
+		                    currencyType,
+		                    toCurrency,
+		                    temp_rate_Exchange_Rate,
+		                    RATE_CURRENCY,
+		                    COST_CURRENCY,
+		                    COST_CURRENCY,
+		                    temp_cost_exchange_rate,
+		                    temp_cost_exchange_ID,
+		                    RATE,
+		                    temp_BillRate,
+		                    ACTUALCOST,
+		                    temp_FactorAmount,
+		                    temp_Burden,
+		                    temp_overhead,
+		                    temp_TotalAmount,
+		                    ACTUALCOST,
+		                    temp_ActualCost ,
+		                    NVL(STDCOST,0) ,
+		                    temp_StdCost,
+		                    ROUND(temp_ActualCost * QUANTITY,  NVL(round_to_cost, 2)),
+		                    0,
+		                    0
+		                    );
+                          ELSE
+			          INSERT INTO TEMP_IMP_VALIDATE_VALUES
+		                    (ID,
+		                    TRANSNO,
+		                    RATE_EXCHANGE_ID,
+		                    AMOUNT,
+		                    CURRENCY_TYPE,
+		                    CURRENCY_CODE,
+		                    RATE_EXCHANGE_RATE,
+		                    RATE_CURRENCY_CODE,
+		                    ACTCOST_CURRENCY_CODE,
+		                    STDCOST_CURRENCY_CODE,
+		                    COST_EXCHANGE_RATE,
+		                    COST_EXCHANGE_ID,
+		                    NATURAL_BILLRATE,
+		                    BILLRATE,
+		                    PRICE,
+		                    FACTORAMOUNT,
+		                    BURDEN,
+		                    OVERHEAD,
+		                    TOTALAMOUNT,
+		                    NATURAL_ACTUALCOST,
+		                    ACTUALCOST,
+		                    NATURAL_STDCOST,
+		                    STDCOST,
+		                    TOTALCOST,
+		                    EMPLYACTUALCOST,
+		                    EMPLYSTDCOST
+		                    )
+		                    VALUES
+		                    (PPA_TRANSCONTROL_VALUES_S1.NEXTVAL,
+		                    nTRANSNO,
+		                    temp_rate_Exchange_ID,
+		                    ROUND(temp_BillRate*QUANTITY, NVL(round_to_rate, 2)),
+		                    currencyType,
+		                    toCurrency,
+		                    temp_rate_Exchange_Rate,
+		                    RATE_CURRENCY,
+		                    COST_CURRENCY,
+		                    COST_CURRENCY,
+		                    temp_cost_exchange_rate,
+		                    temp_cost_exchange_ID,
+		                    RATE,
+		                    temp_BillRate,
+		                    ACTUALCOST,
+		                    temp_FactorAmount,
+		                    temp_Burden,
+		                    temp_overhead,
+		                    temp_TotalAmount,
+		                    ACTUALCOST,
+		                    temp_ActualCost ,
+		                    NVL(STDCOST,0) ,
+		                    temp_StdCost,
+		                    ROUND(temp_ActualCost * QUANTITY,  NVL(round_to_cost, 2)),
+		                    0,
+		                    0
+		                    );
+					      END IF;
+
+	                    EXCEPTION
+	                      WHEN OTHERS THEN
+	                        StoO_error := SQLCODE;
+	                        StoO_errmsg := SQLERRM;
+	                        bValid := 0;
+	                        nErrorCode := 3001;
+							RAISE;
+				        END;
+				      ELSE
+				        BEGIN
+				  	      UPDATE PPA_TRANSCONTROL_VALUES
+                            SET RATE_EXCHANGE_ID = temp_rate_Exchange_ID,
+                                                AMOUNT = ROUND(temp_BillRate*QUANTITY, NVL(round_to_rate, 2)),
+                                                CURRENCY_TYPE = currencyType,
+                                                CURRENCY_CODE = toCurrency,
+                                                RATE_EXCHANGE_RATE =  temp_rate_Exchange_Rate,
+                                                RATE_CURRENCY_CODE = RATE_CURRENCY,
+                                                ACTCOST_CURRENCY_CODE = COST_CURRENCY,
+                                                STDCOST_CURRENCY_CODE = COST_CURRENCY,
+                                                COST_EXCHANGE_RATE = temp_cost_exchange_rate,
+                                                COST_EXCHANGE_ID = temp_rate_Exchange_ID,
+                                                NATURAL_BILLRATE = RATE,
+                                                BILLRATE = temp_BillRate,
+                                                PRICE = ACTUALCOST,
+                                                FACTORAMOUNT = temp_FactorAmount,
+                                                BURDEN = temp_Burden,
+                                                OVERHEAD = temp_overhead,
+                                                TOTALAMOUNT = ROUND( temp_TotalAmount, NVL( round_to_rate, 2 ) ),
+                                                NATURAL_ACTUALCOST = ACTUALCOST,
+                                                ACTUALCOST = temp_ActualCost ,
+                                                NATURAL_STDCOST = STDCOST ,
+                                                STDCOST = temp_StdCost,
+                                                TOTALCOST = ROUND(temp_ActualCost * QUANTITY,  NVL(round_to_cost, 2)),
+                                                EMPLYACTUALCOST = 0,
+                                                EMPLYSTDCOST = 0
+                            WHERE  TRANSNO = PAC_IMP_INS_TRANSMC_VALUES_SP.nTRANSNO
+                            AND    CURRENCY_TYPE = currencyType ;
+                        EXCEPTION
+                          WHEN OTHERS THEN
+                            StoO_error := SQLCODE;
+                            StoO_errmsg := SQLERRM;
+                            bValid := 0;
+                            nErrorCode := 3002;
+							RAISE;
+                        END ;
+                      END IF;
+                    END;  -- insert into transcontrol_values
+                  END;
+                END IF;  -- if we are still good to go, then do it...
+              END;  -- loop
+            END LOOP;
+          END;
+        END IF;    
+      END;  -- insert 5 rows, 1 for each currency type
+    END;  -- get the exchange rate info
+  END;
+END PAC_IMP_INS_TRANSMC_VALUES_SP;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

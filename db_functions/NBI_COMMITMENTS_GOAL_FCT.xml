@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NBI_COMMITMENTS_GOAL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NBI_COMMITMENTS_GOAL_FCT" (PROJECT_ID NUMBER)RETURN NUMBER
+IS
+  V_RETURN_VALUE NUMBER;
+  V_IS_XDM_INSTALLED CHAR(1);
+BEGIN
+  V_RETURN_VALUE:=0;
+  V_IS_XDM_INSTALLED:='N';
+
+EXECUTE IMMEDIATE 'SELECT NVL (MAX (''Y''), ''N'')  FROM USER_TAB_COLUMNS WHERE TABLE_NAME = ''XDM_ACT_CORPORATE_GOALS'' AND COLUMN_NAME = ''XDM_GOAL_01''' INTO V_IS_XDM_INSTALLED;
+
+IF  V_IS_XDM_INSTALLED ='Y' THEN
+  EXECUTE IMMEDIATE 'SELECT
+    NVL( SUM (NVL( TO_NUMBER (SUBSTR (a.name, (INSTR (a.name, ''-'', 1) + 2))), 0)), 0)  --GOAL_VAL1,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (b.name, (INSTR (b.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL2,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (c.name, (INSTR (c.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL3,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (d.name, (INSTR (d.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL4 ,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (e.name, (INSTR (e.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL5,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (f.name, (INSTR (f.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL6,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (g.name, (INSTR (g.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL7,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (h.name, (INSTR (h.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL8,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (i.name, (INSTR (i.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL9,
+    +NVL( SUM (NVL( TO_NUMBER (SUBSTR (j.name, (INSTR (j.name, ''-'', 1) + 2))), 0)), 0) --GOAL_VAL10
+FROM clb_dms_folders r
+JOIN xdm_act_corporate_goals x ON (x.parent_id = r.id and r.assoc_obj_id=' || PROJECT_ID || '  AND r.folder_type = ''ActivityItemFolder'')
+LEFT OUTER JOIN cmn_lookups_v a ON (x.xdm_goal_01 = a.id  AND a.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v b ON (x.xdm_goal_02 = b.id  AND b.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v c ON (x.xdm_goal_03 = c.id  AND c.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v d ON (x.xdm_goal_04 = d.id  AND d.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v e ON (x.xdm_goal_05 = e.id  AND e.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v f ON (x.xdm_goal_06 = f.id  AND f.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v g ON (x.xdm_goal_07 = g.id  AND g.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v h ON (x.xdm_goal_08 = h.id  AND h.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v i ON (x.xdm_goal_09 = i.id  AND i.language_code = ''en'')
+LEFT OUTER JOIN cmn_lookups_v j ON (x.xdm_goal_10 = j.id  AND j.language_code = ''en'')' INTO V_RETURN_VALUE;
+ELSE
+V_RETURN_VALUE:=0;
+END IF;
+RETURN V_RETURN_VALUE;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

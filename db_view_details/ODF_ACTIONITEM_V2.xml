@@ -1,0 +1,206 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_ACTIONITEM_V2">
+    <indexes/>
+    <text_length>12717</text_length>
+    <text>select   'x' pmd_analytical_partition_by, cal_action_items.id odf_pk, cal_action_items.REMINDER_MINUTE as reminder_minute, cal_action_items.CUR_USER_STATUS_ONLY as user_status_only, (CASE
+          WHEN exists(select id
+                      from  cal_action_item_assignees
+                      where cal_action_item_id = CAL_ACTION_ITEMS.ID
+                      and   assignee_id = user_context.user_id )
+             THEN ( SELECT  NVL( assignees.ai_subject, CAL_ACTION_ITEMS.subject ) subject
+                    FROM    cal_action_item_assignees assignees
+                    WHERE   assignees.cal_action_item_id = CAL_ACTION_ITEMS.ID 
+                    and     assignees.assignee_id = user_context.user_id )
+          ELSE CAL_ACTION_ITEMS.subject
+       END) as subject, cal_action_items.owner_id as owner_id, (CASE
+          WHEN process_handler_id > 0
+             THEN (SELECT rp.process_version_id
+                     FROM bpm_run_steps rs,
+                          bpm_run_processes rp,
+                          bpm_run_step_action_results rsar
+                    WHERE rs.ID = rsar.step_instance_id
+                      AND rsar.id = process_handler_id
+                      AND rs.process_instance_id = rp.ID)
+          ELSE NULL
+       END) as process_version_id, cal_action_items.ai_def_id as ai_def_id, cal_action_items.has_due_time as has_due_time, (CASE
+          WHEN process_handler_id > 0
+          then (SELECT
+          p.name AS process_name
+          FROM
+          BPM_RUN_STEPS rs,
+          BPM_RUN_PROCESSES rp,
+          BPM_DEF_PROCESS_VERSIONS v,
+          BPM_DEF_PROCESSES_V p,
+          BPM_RUN_STEP_ACTION_RESULTS ar
+          WHERE
+          rs.process_instance_id = rp.id AND
+          rp.process_version_id = v.id AND
+          v.process_id = p.id AND
+          ar.step_instance_id = rs.id and
+          ar.id = process_handler_id AND
+          p.language_code = user_context.language_code)
+          ELSE NULL
+          END) as process_name, (CASE
+           WHEN cal_action_items.multiple_assignee = 0
+              THEN cal_virtual_action_items.assignee_last_name
+           ELSE (SELECT NAME
+                   FROM cmn_lookups_v
+                  WHERE lookup_code ='GROUP'
+                  AND lookup_type = 'RIGHT_PRINCIPAL_ASSOC_TYPE'
+                  AND language_code = user_context.language_code )
+        END) as assignee_last_name, cal_action_items.REPEAT_INTERVAL as repeat_interval, cal_action_items.RECURRING_END_DATE as recurring_end_date, cal_action_items.ai_def_type as ai_def_type, cal_action_items.process_handler_id as process_handler_id, cal_action_items.object_id as object_id, created.full_name as created_by, cal_action_items.NEED_REMINDER as need_reminder, cal_virtual_action_items.IS_ESCALATED as is_escalated, cal_action_items.parent_id as parent_id, cal_action_items.priority_code as priority_code, updated.full_name as updated_by, (CASE
+            WHEN (cal_action_items.multiple_assignee = 0)
+              THEN
+                (
+                  CASE WHEN ( cal_action_items.process_handler_id  > 0 )
+                  THEN (
+                        SELECT NAME
+                        FROM cmn_lookups_v
+                        WHERE lookup_code =  cal_virtual_action_items.status_code
+                        AND lookup_type in ( 'CAL_EVENT_STATUS',
+                            ( SELECT DISTINCT status_type_code
+                              FROM BPM_DEF_STEP_AI_ACTIONS bdsaa, BPM_RUN_STEP_ACTION_RESULTS brsar
+                              WHERE bdsaa.step_action_id = brsar.step_action_id
+                              AND brsar.id = CAL_ACTION_ITEMS.process_handler_id ) )
+                              AND language_code = user_context.language_code
+                            )
+                  ELSE (
+                        SELECT NAME
+                        FROM cmn_lookups_v
+                        WHERE lookup_code =  cal_virtual_action_items.status_code
+                        AND lookup_type in ( 'CAL_EVENT_STATUS', 'PROCESS_DEFAULT_AI_STATUS' )
+                        AND language_code = user_context.language_code
+                  ) END
+                )
+            ELSE
+                (
+                  SELECT NAME
+                  FROM cmn_lookups_v
+                  WHERE lookup_code =
+                    (SELECT CASE
+                      WHEN 1 = (SELECT COUNT (DISTINCT status_code) COUNT
+                        FROM cal_action_item_assignees
+                        WHERE cal_action_item_id = cal_action_items.ID)
+                      THEN (SELECT DISTINCT status_code
+                          FROM cal_action_item_assignees
+                          WHERE  cal_action_item_id = cal_action_items.ID)
+                      ELSE 'CAL_OPEN'
+                    END scode
+                  FROM DUAL)
+                  AND lookup_type in ('CAL_EVENT_STATUS',
+                  CASE WHEN ( cal_action_items.process_handler_id  > 0 )
+                  THEN (
+                    SELECT DISTINCT status_type_code
+                    FROM BPM_DEF_STEP_AI_ACTIONS bdsaa, BPM_RUN_STEP_ACTION_RESULTS brsar
+                    WHERE bdsaa.step_action_id = brsar.step_action_id
+                    AND brsar.id = CAL_ACTION_ITEMS.process_handler_id
+                  )
+                  ELSE (
+                    'PROCESS_DEFAULT_AI_STATUS'
+                  ) END
+              )
+              AND language_code = user_context.language_code )
+            END) as status, cal_virtual_action_items.STATUS_CODE as status_code, odf_ca_actionitem.odf_period_end as odf_period_end, odf_ca_actionitem.odf_period_type as odf_period_type, (CASE
+            WHEN exists(select id
+                        from  cal_action_item_assignees
+                        where cal_action_item_id = CAL_ACTION_ITEMS.ID
+                        and   assignee_id = user_context.user_id )
+               THEN ( SELECT  NVL( assignees.ai_description, CAL_ACTION_ITEMS.description ) description
+                      FROM    cal_action_item_assignees assignees
+                      WHERE   assignees.cal_action_item_id = CAL_ACTION_ITEMS.ID
+                      and     assignees.assignee_id = user_context.user_id )
+            ELSE CAL_ACTION_ITEMS.description
+         END) as description, cal_action_items.sub_object_id as sub_object_id, cal_action_items.multiple_assignee as multiple_assignee, cal_virtual_action_items.assoc_object_code as assoc_object_code, odf_ca_actionitem.odf_period_start as odf_period_start, (CASE
+          WHEN object_type = 'CAL_PROJECT'
+            THEN (SELECT name FROM INV_INVESTMENTS WHERE id=object_id)
+          ELSE NULL
+        END) as object_name, (CASE
+        WHEN process_handler_id > 0
+        THEN
+        (select bpmra.last_updated_date from BPM_RUN_ASSIGNEES bpmra, BPM_RUN_STEP_ACTION_RESULTS bpmre
+        where bpmra.pk_id=bpmre.id and CAL_ACTION_ITEMS.id=bpmre.ai_id and bpmra.user_id=user_context.user_id)
+        ELSE
+        (select cmnaia.last_updated_date from CMN_ACTION_ITEM_ASSIGNEES cmnaia
+        where CAL_ACTION_ITEMS.id=cmnaia.cal_action_item_id and cmnaia.user_id=user_context.user_id)
+        END ) as assignee_updt_date, cal_action_items.sub_object_type as sub_object_type, cal_virtual_action_items.last_updated_date as last_updated_date, cal_virtual_action_items.IS_PROXY as is_proxy, (CASE
+              WHEN (cal_virtual_action_items.status_code != 'CAL_CLOSED')
+              THEN (
+                CASE WHEN ( cal_action_items.process_handler_id  > 0 )
+                THEN (
+                  SELECT CASE WHEN BPRA.AI_STATUS_CODE = 'CAL_OPEN' THEN 'OPEN' ELSE 'PENDING' END
+                  FROM BPM_RUN_ASSIGNEES BPRA
+                  WHERE BPRA.USER_ID = user_context.user_id AND BPRA.PK_ID = CAL_ACTION_ITEMS.process_handler_id
+                )
+                ELSE (
+                  SELECT
+                  CASE WHEN CMNAIA.AI_STATUS_CODE = 'CAL_OPEN' THEN 'OPEN' ELSE 'PENDING' END
+                  FROM CMN_ACTION_ITEM_ASSIGNEES CMNAIA
+                  WHERE CMNAIA.USER_ID = user_context.user_id AND CMNAIA.CAL_ACTION_ITEM_ID = CAL_ACTION_ITEMS.ID
+                ) END
+            )
+            ELSE ( 'CLOSED' )
+            END) as ai_state, cal_action_items.IS_RECURRING as is_recurring, cal_virtual_action_items.assignee_id as assignee_id, cal_virtual_action_items.assoc_object_id as assoc_object_id, cal_action_items.object_type as object_type, cal_action_items.REPEAT_TYPE as repeat_type, cal_action_items.DUE_DATE as due_date, cal_action_items.REMINDER_INTERVAL as reminder_interval, cal_virtual_action_items.assoc_object_api_alias as assoc_obj_api_alias, (CASE
+           WHEN cal_action_items.multiple_assignee = 0
+              THEN cal_virtual_action_items.assignee_full_name
+           ELSE (SELECT NAME
+                   FROM cmn_lookups_v
+                  WHERE lookup_code ='GROUP'
+                  AND lookup_type = 'RIGHT_PRINCIPAL_ASSOC_TYPE'
+                  AND language_code = user_context.language_code )
+        END) as assignee_full_name, (CASE
+           WHEN cal_action_items.multiple_assignee = 0
+              THEN cal_virtual_action_items.assignee_first_name
+           ELSE (SELECT NAME
+                   FROM cmn_lookups_v
+                  WHERE lookup_code ='GROUP'
+                  AND lookup_type = 'RIGHT_PRINCIPAL_ASSOC_TYPE'
+                  AND language_code = user_context.language_code )
+        END) as assignee_first_name, (CASE
+          WHEN process_handler_id > 0
+             THEN (SELECT rp.ID process_instance_id
+                     FROM bpm_run_steps rs,
+                          bpm_run_processes rp,
+                          bpm_run_step_action_results rsar
+                    WHERE rs.ID = rsar.step_instance_id
+                      AND rsar.id = process_handler_id
+                      AND rs.process_instance_id = rp.ID)
+          ELSE NULL
+       END) as process_instance_id, CAL_ACTION_ITEMS.created_date as created_date, odf_ca_actionitem.partition_code as partition_code, odf_ca_actionitem.odf_entity_code as odf_entity_code , user_context.user_id odf_user_id from cal_action_items cal_action_items inner join (select u.id user_id, u.user_name, u.locale, l.language_code from cmn_sec_users u, cmn_languages l where u.language_id = l.id) user_context  on user_context.user_id = user_context.user_id  JOIN srm_resources CREATED ON CREATED.user_id=cal_action_items.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=cal_action_items.last_updated_by JOIN cal_action_item_assignee_v cal_virtual_action_items ON cal_virtual_action_items.cal_action_item_id=cal_action_items.id JOIN odf_ca_actionitem odf_ca_actionitem ON odf_ca_actionitem.id=cal_action_items.id  where (cal_action_items.created_by = user_context.user_id
+    OR  cal_action_items.owner_id = user_context.user_id
+    OR  EXISTS
+      (SELECT CA.ASSIGNEE_ID
+       FROM CAL_ACTION_ITEM_ASSIGNEES CA
+       WHERE CA.CAL_ACTION_ITEM_ID = CAL_ACTION_ITEMS.ID AND CA.ASSIGNEE_ID = user_context.user_id)
+    OR 1 = (CASE
+              WHEN cal_action_items.object_type = 'CAL_PROJECT'
+                 THEN (SELECT 1
+                       FROM DUAL
+                       WHERE (cal_action_items.object_id IN (
+                                  SELECT object_instance_id
+                                    FROM cmn_sec_chk_user_v
+                                   WHERE object_code = 'PROJECT'
+                                     AND object_type = 'RECORD'
+                                     AND component_code = 'CMN'
+                                     AND permission_code = 'ProjectParticipant'
+                                     AND user_id = user_context.user_id)
+                              OR 1 in (SELECT distinct 1
+                                   FROM cmn_sec_chk_user_r_v
+                                   WHERE object_code = 'PRJ_PROJECT'
+                                   AND object_type = 'RECORD'
+                                   AND component_code = 'PRJ'
+                                   AND permission_code = 'prProjectViewer'
+                                   AND user_id = user_context.user_id)
+                              OR cal_action_items.object_id in (SELECT object_instance_id
+                                   FROM cmn_sec_chk_user_v
+                                   WHERE object_code = 'PRJ_PROJECT'
+                                   AND object_type = 'RECORD'
+                                   AND component_code = 'PRJ'
+                                   AND permission_code = 'prProjectViewer'
+                                   AND user_id = user_context.user_id)
+                              ))
+              ELSE 1
+           END
+          )
+)</text>
+  </QueryResult>
+</ClarityDBViewQuery>

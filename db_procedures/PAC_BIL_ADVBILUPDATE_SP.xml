@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_ADVBILUPDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_ADVBILUPDATE_SP" (
+COMPANY_CODE 	VARCHAR2 ,
+MASTER_PROJECT_CODE 	VARCHAR2 ,
+billdate 	DATE ,
+billamount 	NUMBER ,
+billed 	NUMBER ,
+atf 	NUMBER ,
+in_invoiceno 	IN VARCHAR2 ,
+event 	VARCHAR2 ,
+TAXCODE 	VARCHAR2 ,
+admincode 	VARCHAR2 ,
+taxoverride 	NUMBER ,
+adminoverride 	NUMBER ,
+notes 	VARCHAR2 ,
+bilschdkey 	NUMBER )
+AS
+invoiceno 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+returncode  NUMBER;
+contractamount  NUMBER(32,6);
+type_ 	GLOBALPKG.STRING;
+approvedamount  NUMBER(32,6);
+unbilledamt   NUMBER(32,6);
+originalamt   NUMBER(32,6);
+originalInvNo 	GLOBALPKG.STRING;
+temp_rc Pac_Bil_Getschapprvdamt_Sppkg.RCT1;
+/* IF ATF is set make sure the Invoice number is entered */
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	Pac_Bil_Advbilupdate_Sp.invoiceno := Pac_Bil_Advbilupdate_Sp.in_invoiceno;
+
+	BEGIN
+	IF  Pac_Bil_Advbilupdate_Sp.atf = 1 AND
+	Pac_Bil_Advbilupdate_Sp.invoiceno IS NULL THEN
+		BEGIN
+		   RAISE_APPLICATION_ERROR(-20999, 'Invoice NUMBER must be entered for ATF transactions');
+	    END;
+
+	ELSE
+		   IF Pac_Bil_Advbilupdate_Sp.atf = 0 AND
+		   	  Pac_Bil_Advbilupdate_Sp.invoiceno IS NOT NULL THEN
+		   BEGIN
+			   RAISE_APPLICATION_ERROR(-20008, 'Invoice NUMBER can only be entered for ATF transactions');
+		   END;
+		   ELSE
+		   	   IF Pac_Bil_Advbilupdate_Sp.billamount &lt; 0 THEN
+		   	   BEGIN
+			     RAISE_APPLICATION_ERROR(-20009, 'Negative Bill Amounts are not allowed');
+		   	   END;
+		   END IF;
+	END IF;
+	END IF;
+	BEGIN
+
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   NVL(billamount, 0),  NVL(RTRIM(invoiceno), ' ')
+			INTO Pac_Bil_Advbilupdate_Sp.originalamt, Pac_Bil_Advbilupdate_Sp.originalInvNo FROM BILLINGSCHEDULE
+			WHERE billed = 0
+			 AND COMPANY_CODE = Pac_Bil_Advbilupdate_Sp.COMPANY_CODE
+			 AND MASTER_PROJECT_CODE = Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE
+			 AND BillingScheduleKey = Pac_Bil_Advbilupdate_Sp.bilschdkey;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+/* The invoice number has changed check for duplicate */
+		IF  Pac_Bil_Advbilupdate_Sp.originalInvNo != Pac_Bil_Advbilupdate_Sp.invoiceno THEN
+			BEGIN
+			Pac_Bil_Chkdupinvno_Sp(invoiceno=&gt;Pac_Bil_Advbilupdate_Sp.invoiceno,
+			 returncode=&gt;Pac_Bil_Advbilupdate_Sp.returncode);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+/* The invoice number has not changed */
+		ELSE
+			Pac_Bil_Advbilupdate_Sp.returncode :=  0;
+		END IF;
+/* Invoice No. is not duplicate */
+/* DO the Check on amount only if it has changed */
+		IF  Pac_Bil_Advbilupdate_Sp.returncode = 0 THEN
+		BEGIN
+			IF  Pac_Bil_Advbilupdate_Sp.billamount != Pac_Bil_Advbilupdate_Sp.originalamt THEN
+			BEGIN
+				BEGIN
+				Pac_Bil_Getcontractamt_Sp(COMPANY_CODE=&gt;Pac_Bil_Advbilupdate_Sp.COMPANY_CODE,
+				 PROJECT_CODE=&gt;Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE,
+				 contractamount=&gt;Pac_Bil_Advbilupdate_Sp.contractamount,
+				 type_=&gt;Pac_Bil_Advbilupdate_Sp.type_);
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  Pac_Bil_Advbilupdate_Sp.type_ = 'C' THEN
+				BEGIN
+					BEGIN
+					Pac_Bil_Getschapprvdamt_Sp(COMPANY_CODE=&gt;Pac_Bil_Advbilupdate_Sp.COMPANY_CODE,
+					 PROJECT_CODE=&gt;Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE,
+					 approvedamount=&gt;Pac_Bil_Advbilupdate_Sp.approvedamount,
+					 RC1=&gt;temp_rc);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+					BEGIN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error  := 0;
+						SELECT   SUM(billamount)
+						INTO Pac_Bil_Advbilupdate_Sp.unbilledamt FROM BILLINGSCHEDULE
+						WHERE billed = 0
+						 AND COMPANY_CODE = Pac_Bil_Advbilupdate_Sp.COMPANY_CODE
+						 AND MASTER_PROJECT_CODE = Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE;
+						StoO_rowcnt := SQL%ROWCOUNT;
+						EXCEPTION
+							WHEN TOO_MANY_ROWS THEN
+								StoO_rowcnt := 2;
+							WHEN NO_DATA_FOUND THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+							WHEN OTHERS THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+					END;
+/* The CONTRACT AMOUNT HAS TO BE GREATER THAN THE TOTAL AMOUNT*/
+					IF  NVL(Pac_Bil_Advbilupdate_Sp.contractamount, 0) &gt; ( NVL(Pac_Bil_Advbilupdate_Sp.approvedamount, 0) + NVL(Pac_Bil_Advbilupdate_Sp.unbilledamt, 0) + NVL(Pac_Bil_Advbilupdate_Sp.billamount, 0) - NVL(Pac_Bil_Advbilupdate_Sp.originalamt, 0) ) THEN
+					BEGIN
+						BEGIN
+						StoO_error   := 0;
+						StoO_rowcnt  := 0;
+						UPDATE BILLINGSCHEDULE
+						SET billdate = Pac_Bil_Advbilupdate_Sp.billdate,
+						billamount = Pac_Bil_Advbilupdate_Sp.billamount,
+						billed = Pac_Bil_Advbilupdate_Sp.billed,
+						atf = Pac_Bil_Advbilupdate_Sp.atf,
+						invoiceno = Pac_Bil_Advbilupdate_Sp.invoiceno,
+						event = Pac_Bil_Advbilupdate_Sp.event,
+						TAXCODE = Pac_Bil_Advbilupdate_Sp.TAXCODE,
+						admincode = Pac_Bil_Advbilupdate_Sp.admincode,
+						taxoverride = Pac_Bil_Advbilupdate_Sp.taxoverride,
+						adminoverride = Pac_Bil_Advbilupdate_Sp.adminoverride,
+						notes = Pac_Bil_Advbilupdate_Sp.notes
+						WHERE COMPANY_CODE = Pac_Bil_Advbilupdate_Sp.COMPANY_CODE
+						 AND MASTER_PROJECT_CODE = Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE
+						 AND BillingScheduleKey = Pac_Bil_Advbilupdate_Sp.bilschdkey;
+						StoO_rowcnt := SQL%ROWCOUNT;
+						EXCEPTION
+							WHEN NO_DATA_FOUND THEN
+								NULL;
+							WHEN OTHERS THEN
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+						END;
+					END;
+					ELSE
+						RAISE_APPLICATION_ERROR(-20010, 'The Amount entered makes the Total greater than the Contract Amount');
+					END IF;
+				END;
+				ELSE
+				BEGIN
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE BILLINGSCHEDULE
+					SET billdate = Pac_Bil_Advbilupdate_Sp.billdate,
+					billamount = Pac_Bil_Advbilupdate_Sp.billamount,
+					billed = Pac_Bil_Advbilupdate_Sp.billed,
+					atf = Pac_Bil_Advbilupdate_Sp.atf,
+					invoiceno = Pac_Bil_Advbilupdate_Sp.invoiceno,
+					event = Pac_Bil_Advbilupdate_Sp.event,
+					TAXCODE = Pac_Bil_Advbilupdate_Sp.TAXCODE,
+					admincode = Pac_Bil_Advbilupdate_Sp.admincode,
+					taxoverride = Pac_Bil_Advbilupdate_Sp.taxoverride,
+					adminoverride = Pac_Bil_Advbilupdate_Sp.adminoverride,
+					notes = Pac_Bil_Advbilupdate_Sp.notes
+					WHERE COMPANY_CODE = Pac_Bil_Advbilupdate_Sp.COMPANY_CODE
+					 AND MASTER_PROJECT_CODE = Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE
+					 AND BillingScheduleKey = Pac_Bil_Advbilupdate_Sp.bilschdkey;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END;
+				END IF;
+			END;
+			ELSE
+			BEGIN
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				UPDATE BILLINGSCHEDULE
+				SET billdate = Pac_Bil_Advbilupdate_Sp.billdate,
+				billamount = Pac_Bil_Advbilupdate_Sp.billamount,
+				billed = Pac_Bil_Advbilupdate_Sp.billed,
+				atf = Pac_Bil_Advbilupdate_Sp.atf,
+				invoiceno = Pac_Bil_Advbilupdate_Sp.invoiceno,
+				event = Pac_Bil_Advbilupdate_Sp.event,
+				TAXCODE = Pac_Bil_Advbilupdate_Sp.TAXCODE,
+				admincode = Pac_Bil_Advbilupdate_Sp.admincode,
+				taxoverride = Pac_Bil_Advbilupdate_Sp.taxoverride,
+				adminoverride = Pac_Bil_Advbilupdate_Sp.adminoverride,
+				notes = Pac_Bil_Advbilupdate_Sp.notes
+				WHERE COMPANY_CODE = Pac_Bil_Advbilupdate_Sp.COMPANY_CODE
+				 AND MASTER_PROJECT_CODE = Pac_Bil_Advbilupdate_Sp.MASTER_PROJECT_CODE
+				 AND BillingScheduleKey = Pac_Bil_Advbilupdate_Sp.bilschdkey;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+			END;
+			END IF;
+		END;
+/* Invoice No. IS duplicate */
+		ELSE
+			RAISE_APPLICATION_ERROR(-20011, 'Invoice Number cannot be Duplicate');
+		END IF;
+	END;
+
+END Pac_Bil_Advbilupdate_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

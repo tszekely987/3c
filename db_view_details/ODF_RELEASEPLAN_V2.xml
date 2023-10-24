@@ -1,0 +1,64 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_RELEASEPLAN_V2">
+    <indexes/>
+    <text_length>4275</text_length>
+    <text>select   'x' pmd_analytical_partition_by, rqp_release_plans.id odf_pk, (select sum(NVL(est_op_cost,0)) + sum(NVL(est_cap_cost,0))
+			from rqp_requirements reqs
+			where reqs.release_id in
+			(select RELEASE_ID
+			FROM RQP_PLANS_RELEASES
+			WHERE RQP_PLANS_RELEASES.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID)) as rqp_est_ttl_cost, rqp_release_plans.CURRENCY_CODE as rqp_currency_code, (select sum(NVL(est_op_cost,0))
+			from rqp_requirements reqs
+			where reqs.release_id in
+			(select RELEASE_ID
+			FROM RQP_PLANS_RELEASES
+			WHERE RQP_PLANS_RELEASES.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID)) as rqp_est_op_cost, odf_ca_releaseplan.odf_period_end as odf_period_end, odf_ca_releaseplan.odf_period_type as odf_period_type, rqp_release_plans.NAME as rqp_name, rqp_release_plans.CODE as rqp_instance_code, odf_ca_releaseplan.odf_period_start as odf_period_start, (select sum(NVL(bgt_size,0))
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_bgt_size, ( SELECT P.PAGE_CODE FROM CMN_PAGES P WHERE P.ID in
+            (SELECT CASE WHEN CMN_PAGES.PRINCIPAL_TYPE = 'SYSTEM' THEN CMN_PAGES.ID
+                    ELSE NVL(CMN_PAGES.ORIGINATING_PAGE_ID,CMN_PAGES.ID) END
+          FROM CMN_INSTANCE_PAGES, CMN_PAGES
+          WHERE CMN_INSTANCE_PAGES.PAGE_FRAME_ID = CMN_PAGES.ID
+              AND CMN_INSTANCE_PAGES.OBJECT_TYPE = 'RQP_RELEASE_PLAN'
+              AND CMN_INSTANCE_PAGES.OBJECT_INSTANCE_ID = RQP_RELEASE_PLANS.ID
+            )
+          ) as page_layout, RQP_RELEASE_PLANS.LAST_UPDATED_DATE as last_updated_date, (select max(end_date)
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_end_date, (select sum(NVL(bgt_op_cost,0)) + sum(NVL(bgt_cap_cost,0))
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_bgt_ttl_cost, (select sum(NVL(bgt_op_cost,0))
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_bgt_op_cost, CREATED.FULL_NAME as created_by, (select sum(NVL(est_cap_cost,0))
+			from rqp_requirements reqs
+			where reqs.release_id in
+			(select RELEASE_ID
+			FROM RQP_PLANS_RELEASES
+			WHERE RQP_PLANS_RELEASES.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID)) as rqp_est_cap_cost, rqp_release_plans.MANAGER_ID as rqp_manager_id, (select sum(NVL(est_size,0))
+			from rqp_requirements reqs
+			where reqs.release_id in
+			(select RELEASE_ID
+			FROM RQP_PLANS_RELEASES
+			WHERE RQP_PLANS_RELEASES.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID)) as rqp_est_size, (select sum(NVL(est_effort,0))
+			from rqp_requirements reqs
+			where reqs.release_id in
+			(select RELEASE_ID
+			FROM RQP_PLANS_RELEASES
+			WHERE RQP_PLANS_RELEASES.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID)) as rqp_est_effort, (select sum(NVL(bgt_cap_cost,0))
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_bgt_cap_cost, UPDATED.FULL_NAME as updated_by, UPDATED.ID as updated_by_id, RQP_RELEASE_PLANS.CREATED_DATE as created_date, CREATED.ID as created_by_id, odf_ca_releaseplan.partition_code as partition_code, (select min(start_date)
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_start_date, (SELECT  v.VALUE
+        FROM    CMN_OPTIONS o, CMN_OPTION_VALUES v
+        WHERE   o.ID = v.OPTION_ID AND v.USER_ID IS NULL
+        AND     o.OPTION_CODE = 'PRJ_EFFORT_DISP_UNIT') as rqp_effort_units, (select sum(NVL(bgt_effort,0))
+			from rqp_plans_releases pr, rqp_releases releases
+			where releases.id = pr.RELEASE_ID
+			and pr.RELEASE_PLAN_ID = RQP_RELEASE_PLANS.ID) as rqp_bgt_effort, odf_ca_releaseplan.odf_entity_code as odf_entity_code  from rqp_release_plans rqp_release_plans JOIN srm_resources CREATED ON CREATED.user_id=rqp_release_plans.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=rqp_release_plans.last_updated_by JOIN odf_ca_releaseplan odf_ca_releaseplan ON odf_ca_releaseplan.id=rqp_release_plans.id  where 1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

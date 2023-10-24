@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_ALLOC_DISCREPANCY_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_ALLOC_DISCREPANCY_FCT" (p_actuals_total FLOAT, p_alloc_total FLOAT)
+RETURN FLOAT
+IS
+  v_deviation         FLOAT;
+  v_percent_deviation FLOAT;
+  v_in_actuals_total  FLOAT;
+  v_in_alloc_total    FLOAT;
+BEGIN
+
+  v_in_actuals_total := NVL(p_actuals_total,0);
+  v_in_alloc_total := NVL(p_alloc_total,0);
+
+  v_deviation := v_in_actuals_total - v_in_alloc_total;
+  
+  IF (v_in_alloc_total &gt; 0)
+  THEN
+    v_percent_deviation := v_deviation / v_in_alloc_total;
+  ELSIF (v_in_actuals_total = 0)
+  THEN
+    v_percent_deviation := 0;
+  ELSE    
+    v_percent_deviation := 1.0;   
+  END IF;
+
+  IF (v_percent_deviation &lt; 0)
+  THEN
+     v_percent_deviation := v_percent_deviation * -1.0;
+  END IF;
+          
+  RETURN v_percent_deviation;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

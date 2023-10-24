@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_BREAK_LOCK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_BREAK_LOCK_SP" (
+   P_TABLE_NAME         VARCHAR2,
+   P_LOCK_NAME          VARCHAR2,
+   P_RECORD_ID          NUMBER,
+   P_RET_VAL     OUT    NUMBER
+)
+/* Description:
+   ------------
+   This function removes a record from PRLOCK to break a lock.
+   It will complete successfully in any case, whether there is no
+   lock in the first place or there is a SQL error.
+
+   Return Values:
+   --------------
+   0 if the lock couldn't be removed (database record locked)
+   1  if the lock was removed or didn't exist in the first place
+
+*/
+IS
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   V_ROWID                       ROWID;
+   V_PRLASTID                    NUMBER;
+   E_RECORD_LOCKED               EXCEPTION;
+BEGIN
+   SELECT   ROWID
+   INTO     V_ROWID
+   FROM     PRLOCK
+   WHERE    (PRTABLENAME = P_TABLE_NAME OR PRTABLENAME IS NULL)
+   AND      PRNAME = P_LOCK_NAME
+   AND      PRRECORDID = P_RECORD_ID
+     FOR UPDATE OF PRRECORDID NOWAIT;
+
+   DELETE
+     FROM PRLOCK
+    WHERE ROWID = V_ROWID;
+
+   P_RET_VAL := 1;
+   
+   commit;
+   
+EXCEPTION
+   WHEN E_RECORD_LOCKED
+   THEN
+      P_RET_VAL := 0;
+   		commit;
+   WHEN OTHERS
+   THEN
+      P_RET_VAL := 1;
+   		commit;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,699 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_BILLINGAPPROVALLIST</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_BILLINGAPPROVALLIST" (
+in_cUserID 	IN VARCHAR2,
+in_cCategory 	IN VARCHAR2 DEFAULT NULL ,
+in_cBiller 	IN VARCHAR2 DEFAULT NULL ,
+in_cLocationID 	IN VARCHAR2 DEFAULT NULL ,
+in_cClient 	IN VARCHAR2 DEFAULT NULL ,
+in_cProject 	IN VARCHAR2 DEFAULT NULL ,
+in_HasBilllingSubProjects VARCHAR2,
+in_ContractAmountEnforced VARCHAR2,
+RC1 	IN OUT REV_BILL_BILLINGAPPROVALLISPkg.RCT1)
+AS
+cCategory 	GLOBALPKG.STRING;
+cBiller 	GLOBALPKG.STRING;
+cLocationID 	GLOBALPKG.STRING;
+cClient 	GLOBALPKG.STRING;
+cProject 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+iLocaleID   NUMBER;
+iNumDecimalDigits   NUMBER;
+iGrouping   NUMBER;
+cDecimalSep 	GLOBALPKG.STRING;
+cThousandSep 	GLOBALPKG.STRING;
+cLanguageCode 	GLOBALPKG.STRING;
+cMultProjectText 	GLOBALPKG.STRING;
+cMatchRevText 	GLOBALPKG.STRING;
+cCreditMemoText 	GLOBALPKG.STRING;
+cMatchingText 	GLOBALPKG.STRING;
+cStdBillText 	GLOBALPKG.STRING;
+cRetainerText 	GLOBALPKG.STRING;
+cContractText 	GLOBALPKG.STRING;
+cWriteUpText 	GLOBALPKG.STRING;
+cWriteDnText 	GLOBALPKG.STRING;
+ProjectCodeForBillingProject GLOBALPKG.STRING;
+EnforceContractAmount NUMBER(1);
+TitleForBillingProject GLOBALPKG.STRING;
+tempBillingProject	   GLOBALPKG.STRING;
+v_HasSubProjects NUMBER(1);
+v_Status  VARCHAR(20);
+tempBillingProjectID NUMBER;
+v_HasBilllingSubProjects GLOBALPKG.STRING;
+v_ContractAmountEnforced GLOBALPKG.STRING;
+  tempId					 NUMBER(10);
+tempBPCode				 GLOBALPKG.STRING;
+tempEnfCtrAmt			 NUMBER(1);
+tempTitle				 GLOBALPKG.STRING;
+tempStatus				 VARCHAR(20);
+tempHasSubPrjs			 NUMBER(1);
+
+UF1_rowid 				ROWID;
+UF1_oval1 				temp_temprev_bill_billingappro.invoiceno%TYPE;
+CURSOR UF1_cursor IS
+	SELECT temp_temprev_bill_billingappro.ROWID,temp_temprev_bill_billingappro.invoiceno
+	FROM temp_temprev_bill_billingappro
+	FOR UPDATE OF temp_temprev_bill_billingappro.ProjectDesc, temp_temprev_bill_billingappro.ISCNTAMTENFORCED, temp_temprev_bill_billingappro.HASBILLINGSUBPRJ;
+
+
+UF2_rowid 	ROWID;
+UF2_oval1 	temp_temprev_bill_billingtemp.PROJECT_ID%TYPE;
+CURSOR UF2_cursor IS
+	SELECT temp_temprev_bill_billingtemp.ROWID, temp_temprev_bill_billingtemp.PROJECT_ID
+	FROM temp_temprev_bill_billingtemp
+	FOR UPDATE OF temp_temprev_bill_billingtemp.BILLING_PROJECT_CODE;
+
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/25/01
+*/
+
+	rev_bill_billingapprovallist.cCategory := rev_bill_billingapprovallist.in_cCategory;
+	rev_bill_billingapprovallist.cBiller := rev_bill_billingapprovallist.in_cBiller;
+	rev_bill_billingapprovallist.cLocationID := rev_bill_billingapprovallist.in_cLocationID;
+	rev_bill_billingapprovallist.cClient := rev_bill_billingapprovallist.in_cClient;
+	rev_bill_billingapprovallist.cProject := rev_bill_billingapprovallist.in_cProject;
+
+    v_HasBilllingSubProjects := in_HasBilllingSubProjects;
+	v_ContractAmountEnforced := in_ContractAmountEnforced;
+
+	IF v_HasBilllingSubProjects = 'A' Then
+	  v_HasBilllingSubProjects := NULL;
+	End If;
+
+	IF v_ContractAmountEnforced = 'A' Then
+	  v_ContractAmountEnforced := NULL;
+	End If;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   LANGUAGE_CODE
+		INTO rev_bill_billingapprovallist.cLanguageCode FROM PAC_CMN_USERS_V users, CMN_LANGUAGES lang
+		WHERE users.RESOURCE_CODE = rev_bill_billingapprovallist.in_cUserID
+		 AND lang.ID = users.LANGUAGE_ID;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cMultProjectText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_BILLING_MISC_VALUES'
+		 AND LOOKUP_CODE = 'MULTIPLEPROJECTS'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cMatchRevText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'MR'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cCreditMemoText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'BC'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cMatchingText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'AY'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cStdBillText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'B'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cRetainerText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'BR'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cContractText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'BP'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cWriteUpText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'AU'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NAME
+		INTO rev_bill_billingapprovallist.cWriteDnText FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+		 AND LOOKUP_CODE = 'AD'
+		 AND LANGUAGE_CODE = rev_bill_billingapprovallist.cLanguageCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	rev_bill_billingapprovallist.cBiller :=  RTRIM(rev_bill_billingapprovallist.cBiller);
+	rev_bill_billingapprovallist.cLocationID :=  RTRIM(rev_bill_billingapprovallist.cLocationID);
+	rev_bill_billingapprovallist.cClient :=  RTRIM(rev_bill_billingapprovallist.cClient);
+	rev_bill_billingapprovallist.cProject :=  RTRIM(rev_bill_billingapprovallist.cProject);
+	rev_bill_billingapprovallist.cCategory :=  RTRIM(rev_bill_billingapprovallist.cCategory);
+	IF  rev_bill_billingapprovallist.cBiller  IN('', 'NULL') THEN
+		rev_bill_billingapprovallist.cBiller :=  NULL;
+	END IF;
+	IF  rev_bill_billingapprovallist.cLocationID  IN('', 'NULL') THEN
+		rev_bill_billingapprovallist.cLocationID :=  NULL;
+	END IF;
+	IF  rev_bill_billingapprovallist.cClient  IN('', 'NULL') THEN
+		rev_bill_billingapprovallist.cClient :=  NULL;
+	END IF;
+	IF  rev_bill_billingapprovallist.cProject  IN('', 'NULL') THEN
+		rev_bill_billingapprovallist.cProject :=  NULL;
+	END IF;
+	IF  rev_bill_billingapprovallist.cCategory  IN('', 'NULL') THEN
+		rev_bill_billingapprovallist.cCategory :=  NULL;
+	END IF;
+
+	DELETE FROM temp_temprev_bill_billingappro;
+	
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	IF ( rev_bill_billingapprovallist.cProject IS NOT NULL ) THEN
+	BEGIN
+	BEGIN
+
+	SELECT ID INTO rev_bill_billingapprovallist.tempId FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = rev_bill_billingapprovallist.cProject;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+	END;
+	PAC_BIL_GET_BILLING_PROJECT_SP( rev_bill_billingapprovallist.tempId,  rev_bill_billingapprovallist.tempBPCode,  rev_bill_billingapprovallist.tempEnfCtrAmt,  rev_bill_billingapprovallist.tempTitle);
+	DELETE FROM TEMP_BIL_SUBPROJECTS;
+	INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+			 SELECT COMPANY_CODE, PROJECT_CODE, ID, ID, ID, 0, NULL FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = REV_BILL_BILLINGAPPROVALLIST.tempBPCode;
+	PAC_BIL_GET_SUBPROJECTS_SP ( 0, REV_BILL_BILLINGAPPROVALLIST.tempStatus, REV_BILL_BILLINGAPPROVALLIST.tempHasSubPrjs ) ;
+
+	BEGIN
+	INSERT INTO temp_temprev_bill_billingappro (InvoiceNo, COMPANY_CODE, Biller, MinProject, MaxProject, ProjectDesc, BillDate, MaxTransType, BillAmount, AdjAmount, billing_currency_code)
+		 SELECT  T.InvoiceNo, T.COMPANY_CODE, T.LASTUPDTDBY_RESOURCE_CODE, MIN(T.PROJECT_CODE),
+		   MAX(T.PROJECT_CODE), MAX(P.title), MIN(T.BillingDate), MAX(T.TransType),
+		   SUM(tval.Amount * SIGN(INSTR( T.TransType, 'B'))), SUM(tval.Amount *
+		   SIGN(INSTR( T.TransType, 'A'))), P.billing_currency_code
+		 FROM  ppa_TransBill T, PAC_MNT_PROJECTS P, ppa_transbill_values tval
+		WHERE  P.COMPANY_CODE = T.COMPANY_CODE
+		 and P.PROJECT_CODE = T.PROJECT_CODE
+		 and (  EXISTS (
+			    SELECT object_id
+				  FROM cmn_sec_chk_user_r_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+				   AND permission_code = 'APPROVE')
+			      OR EXISTS (
+				    SELECT object_id
+				      FROM cmn_sec_chk_user_inst_v0
+				     WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+					   AND permission_code = 'APPROVE'
+				       AND object_instance_id = P.ID)
+            	     )
+		 and NLS_UPPER(T.LASTUPDTDBY_RESOURCE_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cBiller,
+		   T.LASTUPDTDBY_RESOURCE_CODE))
+		 and NLS_UPPER(T.COMPANY_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cClient, T.COMPANY_CODE))
+		 and NLS_UPPER(T.PROJECT_CODE) IN ( SELECT PROJECT_CODE FROM TEMP_BIL_SUBPROJECTS )--= NLS_UPPER(NVL(rev_bill_billingapprovallist.cProject, T.PROJECT_CODE))
+		 and NLS_UPPER(P.locationid) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cLocationID,
+		   P.locationid))
+		 and T.TRANSNO = tval.TRANSNO
+		 and tval.CURRENCY_TYPE = 'BILLING'
+		GROUP BY T.InvoiceNo, T.COMPANY_CODE, T.LASTUPDTDBY_RESOURCE_CODE, P.BILLING_CURRENCY_CODE;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	INSERT INTO temp_temprev_bill_billingtemp (InvoiceNo, PROJECT_ID)
+	SELECT  T.InvoiceNo,  P.ID
+		 FROM ppa_TransBill T, PAC_MNT_PROJECTS P, ppa_transbill_values tval
+		WHERE  P.COMPANY_CODE = T.COMPANY_CODE
+		 and P.PROJECT_CODE = T.PROJECT_CODE
+		 and (  EXISTS (
+			    SELECT object_id
+				  FROM cmn_sec_chk_user_r_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+				   AND permission_code = 'APPROVE')
+			      OR EXISTS (
+				    SELECT object_id
+				      FROM cmn_sec_chk_user_inst_v0
+				     WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+					   AND permission_code = 'APPROVE'
+				       AND object_instance_id = P.ID)
+            	     )
+		 and NLS_UPPER(T.LASTUPDTDBY_RESOURCE_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cBiller,
+		   T.LASTUPDTDBY_RESOURCE_CODE))
+		 and NLS_UPPER(T.COMPANY_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cClient, T.COMPANY_CODE))
+		 and NLS_UPPER(T.PROJECT_CODE) IN ( SELECT PROJECT_CODE FROM TEMP_BIL_SUBPROJECTS )
+		 and NLS_UPPER(P.locationid) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cLocationID,
+		   P.locationid))
+		 and T.TRANSNO = tval.TRANSNO
+		 and tval.CURRENCY_TYPE = 'BILLING'
+		 group by T.INVOICENO, P.ID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+
+	END;
+	ELSE
+	BEGIN
+
+	BEGIN
+
+	INSERT INTO temp_temprev_bill_billingappro (InvoiceNo, COMPANY_CODE, Biller, MinProject, MaxProject, ProjectDesc, BillDate, MaxTransType, BillAmount, AdjAmount, billing_currency_code)
+	SELECT  T.InvoiceNo, T.COMPANY_CODE, T.LASTUPDTDBY_RESOURCE_CODE, MIN(T.PROJECT_CODE),
+		   MAX(T.PROJECT_CODE), MAX(inv.NAME), MIN(T.BillingDate), MAX(T.TransType),
+		   SUM(tval.Amount * SIGN(INSTR( T.TransType, 'B'))), SUM(tval.Amount *
+		   SIGN(INSTR( T.TransType, 'A'))), P.billing_currency_code
+     FROM ppa_TransBill T, pac_mnt_projects P, ppa_transbill_values tval, inv_investments inv
+		WHERE  p.id = inv.id
+		 and P.COMPANY_CODE = T.COMPANY_CODE
+		 and P.PROJECT_CODE = T.PROJECT_CODE
+		 and (  EXISTS (
+			    SELECT object_id
+				  FROM cmn_sec_chk_user_r_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+				   AND permission_code = 'APPROVE')
+			      OR EXISTS (
+				    SELECT object_id
+				      FROM cmn_sec_chk_user_inst_v0
+				     WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+					   AND permission_code = 'APPROVE'
+				       AND object_instance_id = inv.id)
+            	     )
+            	 and NLS_UPPER(T.LASTUPDTDBY_RESOURCE_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cBiller,
+		   T.LASTUPDTDBY_RESOURCE_CODE))
+		 and NLS_UPPER(T.COMPANY_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cClient, T.COMPANY_CODE))
+		 and NLS_UPPER(T.PROJECT_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cProject, T.PROJECT_CODE))
+		 and NLS_UPPER(P.locationid) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cLocationID,
+		   P.locationid))
+		 and T.TRANSNO = tval.TRANSNO
+		 and tval.CURRENCY_TYPE = 'BILLING'
+		GROUP BY T.InvoiceNo, T.COMPANY_CODE, T.LASTUPDTDBY_RESOURCE_CODE, P.BILLING_CURRENCY_CODE;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO temp_temprev_bill_billingtemp (InvoiceNo, PROJECT_ID)
+	SELECT  T.InvoiceNo,  P.ID
+     FROM ppa_TransBill T, pac_mnt_projects P, ppa_transbill_values tval
+		WHERE  P.COMPANY_CODE = T.COMPANY_CODE
+		 and P.PROJECT_CODE = T.PROJECT_CODE
+		 and (  EXISTS (
+			    SELECT object_id
+				  FROM cmn_sec_chk_user_r_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+				   AND permission_code = 'APPROVE')
+			      OR EXISTS (
+				    SELECT object_id
+				      FROM cmn_sec_chk_user_inst_v0
+				     WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = rev_bill_billingapprovallist.in_cUserID)
+					   AND permission_code = 'APPROVE'
+				       AND object_instance_id = P.id)
+            	     )
+		 and NLS_UPPER(T.LASTUPDTDBY_RESOURCE_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cBiller,
+		   T.LASTUPDTDBY_RESOURCE_CODE))
+		 and NLS_UPPER(T.COMPANY_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cClient, T.COMPANY_CODE))
+		 and NLS_UPPER(T.PROJECT_CODE) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cProject, T.PROJECT_CODE))
+		 and NLS_UPPER(P.locationid) = NLS_UPPER(NVL(rev_bill_billingapprovallist.cLocationID,
+		   P.locationid))
+		 and T.TRANSNO = tval.TRANSNO
+		 and tval.CURRENCY_TYPE = 'BILLING'
+		 group by T.INVOICENO, P.ID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	END;
+	END IF;
+	END;
+
+
+	BEGIN
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		PAC_BIL_GET_BILLING_PROJECT_SP( UF2_oval1, REV_BILL_BILLINGAPPROVALLIST.ProjectCodeForBillingProject, REV_BILL_BILLINGAPPROVALLIST.EnforceContractAmount, REV_BILL_BILLINGAPPROVALLIST.TitleForBillingProject );
+		UPDATE temp_temprev_bill_billingtemp
+		SET
+		BILLING_PROJECT_CODE = REV_BILL_BILLINGAPPROVALLIST.ProjectCodeForBillingProject
+		WHERE ROWID = UF2_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	END;
+
+-- category values : B, BR, BP, BC, MR, AU, AD
+
+	IF  rev_bill_billingapprovallist.cCategory IS NOT NULL THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		-- if bill type is Matching Bill   (Fix for bug# 35903)
+		IF  rev_bill_billingapprovallist.cCategory ='AY' THEN
+			BEGIN
+		  		 DELETE FROM temp_temprev_bill_billingappro
+				 WHERE MaxTransType != rev_bill_billingapprovallist.cCategory and (rev_bill_billingapprovallist.cCategory='AY' and DECODE(SUBSTR(InvoiceNo, 1, 5),'MATCH',1,0)=0);
+			END;
+		-- if bill type is Regular Bill  (Fix for bug# 35903)
+        ELSIF rev_bill_billingapprovallist.cCategory ='B' THEN
+		    BEGIN
+
+				 DELETE FROM temp_temprev_bill_billingappro
+				 WHERE MaxTransType != rev_bill_billingapprovallist.cCategory or DECODE(SUBSTR(InvoiceNo, 1, 5),'MATCH',1,0)!=0;
+			END;
+		-- if bill type is other than  Matching and Regular Bills
+		ELSE
+
+		    BEGIN
+
+		DELETE FROM temp_temprev_bill_billingappro
+			WHERE MaxTransType != rev_bill_billingapprovallist.cCategory;
+			END;
+		END IF;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		REV_BILL_BILLINGAPPROVALLIST.EnforceContractAmount := 0;
+		REV_BILL_BILLINGAPPROVALLIST.v_HasSubProjects := 0;
+		SELECT count(DISTINCT( BILLING_PROJECT_CODE )) INTO StoO_rowcnt FROM temp_temprev_bill_billingtemp WHERE INVOICENO = UF1_oval1;
+		IF StoO_rowcnt &gt; 1 THEN
+		BEGIN
+			 REV_BILL_BILLINGAPPROVALLIST.TitleForBillingProject :=  rev_bill_billingapprovallist.cMultProjectText;
+		END;
+		ELSE
+		BEGIN
+			 SELECT DISTINCT( BILLING_PROJECT_CODE ) INTO REV_BILL_BILLINGAPPROVALLIST.tempBillingProject FROM temp_temprev_bill_billingtemp WHERE INVOICENO = UF1_oval1;
+			 SELECT ID INTO REV_BILL_BILLINGAPPROVALLIST.tempBillingProjectID FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = REV_BILL_BILLINGAPPROVALLIST.tempBillingProject;
+			 PAC_BIL_GET_BILLING_PROJECT_SP( REV_BILL_BILLINGAPPROVALLIST.tempBillingProjectID,
+			 						 REV_BILL_BILLINGAPPROVALLIST.ProjectCodeForBillingProject,
+									 REV_BILL_BILLINGAPPROVALLIST.EnforceContractAmount,
+									 REV_BILL_BILLINGAPPROVALLIST.TitleForBillingProject );
+
+			 DELETE FROM TEMP_BIL_SUBPROJECTS;
+			 INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+			 SELECT COMPANY_CODE, PROJECT_CODE, ID, ID, ID, 0, NULL FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = REV_BILL_BILLINGAPPROVALLIST.ProjectCodeForBillingProject;
+
+			 PAC_BIL_GET_SUBPROJECTS_SP ( 0, REV_BILL_BILLINGAPPROVALLIST.v_Status, REV_BILL_BILLINGAPPROVALLIST.v_HasSubProjects ) ;
+		END;
+		END IF;
+		UPDATE temp_temprev_bill_billingappro
+			 SET
+			 PROJECTDESC = REV_BILL_BILLINGAPPROVALLIST.TitleForBillingProject,
+			 ISCNTAMTENFORCED = NVL(REV_BILL_BILLINGAPPROVALLIST.EnforceContractAmount,0),
+			 HASBILLINGSUBPRJ = REV_BILL_BILLINGAPPROVALLIST.v_HasSubProjects
+			 WHERE ROWID = UF1_rowid;
+			 StoO_rowcnt := SQL%ROWCOUNT;
+			 EXCEPTION
+			 	WHEN NO_DATA_FOUND THEN
+					 NULL;
+				WHEN OTHERS THEN
+					 StoO_error := SQLCODE;
+					 StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_temprev_bill_billingappro
+	SET BillAmount = AdjAmount
+	WHERE MaxTransType  IN ('AU', 'AD');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+     -- Removed currency formatting. The data will be formatted on the COMPANY_CODE --	 
+	OPEN RC1 FOR
+	SELECT C.COMPANY_NAME,  T.ProjectDesc,  T.Biller,  DECODE(T.MaxTransType, 'BC',
+	DECODE(1,
+	DECODE(SUBSTR(T.InvoiceNo, 1, 5),'MATCH',1,0)/*expr eq expr*/
+	,rev_bill_billingapprovallist.cMatchRevText,rev_bill_billingapprovallist.cCreditMemoText),
+	   'B',
+	DECODE(1,
+	DECODE(SUBSTR(T.InvoiceNo, 1, 5),'MATCH',1,0)/*expr eq expr*/
+	,rev_bill_billingapprovallist.cMatchingText,rev_bill_billingapprovallist.cStdBillText),
+	   'BR', rev_bill_billingapprovallist.cRetainerText, 'BP', rev_bill_billingapprovallist.cContractText,
+	   'MR', rev_bill_billingapprovallist.cMatchRevText, 'AU', rev_bill_billingapprovallist.cWriteUpText,
+	   'AD', rev_bill_billingapprovallist.cWriteDnText, 'MR', rev_bill_billingapprovallist.cMatchRevText)
+	   "TransType",  T.BillDate,  T.BillAmount,  T.InvoiceNo, T.billing_currency_code, T.ISCNTAMTENFORCED, T.HASBILLINGSUBPRJ
+	   FROM temp_temprev_bill_billingappro T, clntsupp C
+	   WHERE HASBILLINGSUBPRJ = NVL( v_HasBilllingSubProjects, HASBILLINGSUBPRJ)
+	   AND C.COMPANY_CODE = T.COMPANY_CODE
+	   AND ISCNTAMTENFORCED = NVL( v_ContractAmountEnforced, ISCNTAMTENFORCED);
+END rev_bill_billingapprovallist;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

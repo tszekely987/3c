@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RENAME_COLUMN_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RENAME_COLUMN_SP" (
+   P_TABLE_NAME        VARCHAR2,
+   P_OLD_COLUMN_NAME   VARCHAR2,
+   P_NEW_COLUMN_NAME   VARCHAR2
+)
+AUTHID CURRENT_USER
+AS
+   CURSOR C_OLD_COLUMNS
+   IS
+      SELECT   COLUMN_NAME,
+               DATA_TYPE
+      FROM     USER_TAB_COLUMNS
+      WHERE    TABLE_NAME = UPPER (P_TABLE_NAME);
+
+   CURSOR C_TRIGGERS
+   IS
+      SELECT   TRIGGER_NAME,
+               DECODE (TRIGGER_TYPE, 'AFTER EACH ROW', 'AFTER', 'BEFORE EACH ROW', 'BEFORE', 'AFTER') TRIGGER_TYPE,
+               TRIGGERING_EVENT,
+               TABLE_NAME,
+               REFERENCING_NAMES,
+               TRIGGER_BODY
+      FROM     USER_TRIGGERS
+      WHERE    TABLE_NAME = UPPER (P_TABLE_NAME);
+
+   E_TRIGGER_FAILED_COMPILE      EXCEPTION;
+   E_TRIGGER_INVALID             EXCEPTION;
+   PRAGMA EXCEPTION_INIT (E_TRIGGER_FAILED_COMPILE,  -24344);
+   PRAGMA EXCEPTION_INIT (E_TRIGGER_INVALID, -04098);
+   V_FIRST_COL                   BOOLEAN := TRUE;
+   V_CREATE                      VARCHAR2 (32000);
+   V_SELECT                      VARCHAR2 (32000);
+   V_SQL                         VARCHAR2 (32000);
+   V_CURSOR                      VARCHAR2 (32000);
+   V_LONG                        LONG;
+   V_LONG_RAW                    LONG RAW;
+   V_NEW_COLUMN_NAME             VARCHAR2 (30);
+   V_OLD_COLUMN_NAME             VARCHAR2 (30);
+   E_DATATYPE_NOT_SUPPORTED      EXCEPTION;
+   V_DATA_TYPE                   VARCHAR2 (100);
+   V_NO_ACTION_REQUIRED          VARCHAR2 (1);
+   V_TRIGGER_NAME                VARCHAR2 (100);
+   V_TABLE_NAME                  VARCHAR2 (100);
+   V_TRIGGERING_EVENT            VARCHAR2 (32000);
+   V_REFERENCING_NAMES           VARCHAR2 (32000);
+   V_TRIGGER_TYPE                VARCHAR2 (32000);
+   V_TRIGGER_BODY                VARCHAR2 (32000);
+   V_STMT                        VARCHAR2 (100);
+   V_RENAME_SEQUENCE             NUMBER;
+   V_TABLESPACE_SQL				 VARCHAR2 (1000);
+   V_TABLESPACE					 VARCHAR2 (100);
+
+   TYPE T_CURSOR_TYPE IS REF CURSOR;
+
+   C1                            T_CURSOR_TYPE;
+
+   TYPE V_TRIGGER_REC_TYPE IS RECORD(
+      SQL_STMT                      VARCHAR2 (32000));
+
+   TYPE V_LONG_COL_REC_TYPE IS RECORD(
+
+      OLD_LONG_COL                  VARCHAR2 (100),
+      OLD_LONG_TYPE                 VARCHAR2 (100),
+      NEW_LONG_COL                  VARCHAR2 (100),
+      NEW_LONG_TYPE                 VARCHAR2 (100));
+
+   TYPE V_TRIGGER_TAB_TYPE IS TABLE OF V_TRIGGER_REC_TYPE
+      INDEX BY BINARY_INTEGER;
+
+   TYPE V_LONG_COL_TAB_TYPE IS TABLE OF V_LONG_COL_REC_TYPE
+      INDEX BY BINARY_INTEGER;
+
+   V_TRIGGER_TAB                 V_TRIGGER_TAB_TYPE;
+   V_LONG_COL_TAB                V_LONG_COL_TAB_TYPE;
+   V_IDX                         BINARY_INTEGER := 0;
+   V_LONG_IDX                    BINARY_INTEGER := 0;
+   I                             BINARY_INTEGER := 0;
+
+-- Variable related to dropping the foreign keys
+   TYPE V_VARCHAR_TAB_TYPE IS TABLE OF VARCHAR2 (4000)
+      INDEX BY BINARY_INTEGER;
+
+   V_FK_DROP_TAB            	  V_VARCHAR_TAB_TYPE;
+   C_FK_CURSOR          		  T_CURSOR_TYPE;
+   V_FK_SELECT_SQL      		  VARCHAR2 (1000);
+   V_FK_DROP_SQL        		  VARCHAR2 (1000);
+   V_FK_CONSTRAINT          	  VARCHAR2 (1000);
+   V_FK_FROM_TABLE          	  VARCHAR2 (1000);
+-- end variable related to dropping the foreign keys
+
+BEGIN
+   V_STMT := 'Evaluating whether action is required';
+   SELECT   NVL (MAX ('Y'), 'N')
+   INTO     V_NO_ACTION_REQUIRED
+   FROM     DUAL
+   WHERE    EXISTS (SELECT   'NEW COL ALREADY THERE'
+                    FROM     USER_TAB_COLUMNS
+                    WHERE    TABLE_NAME = UPPER (P_TABLE_NAME)
+                    AND      COLUMN_NAME = UPPER (P_NEW_COLUMN_NAME))
+   AND      NOT EXISTS (SELECT   'OLD COLUMN IS STILL THERE'
+                        FROM     USER_TAB_COLUMNS
+                        WHERE    TABLE_NAME = UPPER (P_TABLE_NAME)
+                        AND      COLUMN_NAME = UPPER (P_OLD_COLUMN_NAME));
+
+   IF V_NO_ACTION_REQUIRED = 'Y'
+   THEN
+      V_STMT := 'No action required';
+   ELSE
+
+---- Start of dropping the Foreign key ----
+	   V_STMT := 'CONSTRUCTING THE FOREIGN KEY SELECT SQL';
+	   V_FK_SELECT_SQL :=   ' SELECT DISTINCT CC.CONSTRAINT_NAME CONSTRAINT_NAME, CC.TABLE_NAME FROM_TABLE ' ||
+                            ' FROM USER_CONS_COLUMNS CC, USER_CONS_COLUMNS CPK, USER_CONSTRAINTS C ' ||
+                            ' WHERE    CC.CONSTRAINT_NAME = C.CONSTRAINT_NAME ' ||
+							' AND	   C.CONSTRAINT_TYPE = ''R'' ' ||
+                            ' AND      C.R_CONSTRAINT_NAME = CPK.CONSTRAINT_NAME ' ||
+                            ' AND      CPK.TABLE_NAME = ''' || UPPER(P_TABLE_NAME) || '''';
+
+	   V_STMT := 'CONSTRUCTING THE FOREIGN KEY DROP SQL';
+	   OPEN C_FK_CURSOR FOR
+	      V_FK_SELECT_SQL;
+	   LOOP
+	      FETCH C_FK_CURSOR INTO V_FK_CONSTRAINT, V_FK_FROM_TABLE;
+	      EXIT WHEN C_FK_CURSOR%NOTFOUND;
+         	 V_FK_DROP_SQL := 'ALTER TABLE ' || V_FK_FROM_TABLE || ' DROP CONSTRAINT ' || V_FK_CONSTRAINT;
+			 V_FK_DROP_TAB (NVL (V_FK_DROP_TAB.LAST + 1, 0)) := V_FK_DROP_SQL;
+	   END LOOP;
+	   CLOSE C_FK_CURSOR;
+
+
+	   -- DROP FOREIGN KEYS
+	   V_STMT := 'DROPPING THE FOREIGN KEYS';
+	   IF (NVL (V_FK_DROP_TAB.LAST, -1) &lt;&gt; -1)
+	   THEN
+	      FOR I IN 0 .. V_FK_DROP_TAB.LAST
+	      LOOP
+	         V_FK_DROP_SQL := V_FK_DROP_TAB (I);
+	      	 EXECUTE IMMEDIATE V_FK_DROP_SQL;
+	      END LOOP;
+	   END IF;
+
+---- End of dropping the Foreign key ----
+
+      V_STMT := 'Preserving triggers';
+      V_IDX := 0;
+      OPEN C_TRIGGERS;
+
+      LOOP
+         FETCH C_TRIGGERS INTO V_TRIGGER_NAME,
+                               V_TRIGGER_TYPE,
+                               V_TRIGGERING_EVENT,
+                               V_TABLE_NAME,
+                               V_REFERENCING_NAMES,
+                               V_TRIGGER_BODY;
+         EXIT WHEN C_TRIGGERS%NOTFOUND;
+         V_SQL := NULL;
+         V_SQL :=
+           'CREATE OR REPLACE TRIGGER ' || V_TRIGGER_NAME || CHR (10) || V_TRIGGER_TYPE || ' ' ||
+              V_TRIGGERING_EVENT ||
+              CHR (10) ||
+              'ON ' ||
+              V_TABLE_NAME ||
+              CHR (10) ||
+              V_REFERENCING_NAMES ||
+              CHR (10) ||
+              'FOR EACH ROW ' ||
+              CHR (10) ||
+              V_TRIGGER_BODY;
+         V_TRIGGER_TAB (V_IDX).SQL_STMT := V_SQL;
+         V_STMT := 'Dropping trigger ' || V_TRIGGER_NAME;
+         EXECUTE IMMEDIATE 'DROP TRIGGER ' || V_TRIGGER_NAME;
+         V_IDX := V_IDX + 1;
+      END LOOP;
+
+      CLOSE C_TRIGGERS;
+      V_STMT := 'Add column RENAME_SEQUENCE to original table - for LONG processing';
+      V_SQL := 'ALTER TABLE ' || P_TABLE_NAME || ' ADD (RENAME_SEQUENCE NUMBER)';
+      EXECUTE IMMEDIATE V_SQL;
+      V_STMT := 'Updating original table - RENAME_SEQUENCE';
+      V_SQL := 'UPDATE ' || P_TABLE_NAME || ' SET RENAME_SEQUENCE = CMN_RENAME_S1.NEXTVAL';
+      EXECUTE IMMEDIATE V_SQL;
+      V_STMT := 'Build CREATE TABLE select statement';
+      V_LONG_IDX := 0;
+
+      FOR C_REC IN C_OLD_COLUMNS
+      LOOP
+         IF C_REC.COLUMN_NAME = UPPER (P_OLD_COLUMN_NAME)
+         THEN
+            V_NEW_COLUMN_NAME := UPPER (P_NEW_COLUMN_NAME);
+         ELSE
+            V_NEW_COLUMN_NAME := C_REC.COLUMN_NAME;
+         END IF;
+
+         IF C_REC.DATA_TYPE IN ('LONG', 'LONG RAW')
+         THEN
+            V_OLD_COLUMN_NAME := '''X''';
+            V_LONG_COL_TAB (V_LONG_IDX).OLD_LONG_COL := C_REC.COLUMN_NAME;
+            V_LONG_COL_TAB (V_LONG_IDX).OLD_LONG_TYPE := C_REC.DATA_TYPE;
+            V_LONG_COL_TAB (V_LONG_IDX).NEW_LONG_TYPE := C_REC.DATA_TYPE;
+
+            IF C_REC.COLUMN_NAME = UPPER (P_OLD_COLUMN_NAME)
+            THEN
+               V_LONG_COL_TAB (V_LONG_IDX).NEW_LONG_COL := UPPER (P_NEW_COLUMN_NAME);
+            ELSE
+               V_LONG_COL_TAB (V_LONG_IDX).NEW_LONG_COL := C_REC.COLUMN_NAME;
+            END IF;
+
+            V_LONG_IDX := V_LONG_IDX + 1;
+         ELSE
+            V_OLD_COLUMN_NAME := C_REC.COLUMN_NAME;
+         END IF;
+
+         IF V_FIRST_COL
+         THEN
+            V_FIRST_COL := FALSE;
+			V_STMT := 'GET THE TABLESPACE OF THE TABLE';
+		    V_TABLESPACE_SQL := ' SELECT TABLESPACE_NAME FROM USER_TABLES ' ||
+							   ' WHERE TABLE_NAME = ' || '''' || P_TABLE_NAME || '''';
+		    EXECUTE IMMEDIATE V_TABLESPACE_SQL INTO V_TABLESPACE;
+            V_CREATE := 'CREATE TABLE ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK  ( ' || CHR (10) || V_NEW_COLUMN_NAME;
+            V_SELECT := 'AS SELECT ' || CHR (10) || V_OLD_COLUMN_NAME;
+         ELSE
+            V_CREATE := V_CREATE || ', ' || CHR (10) || V_NEW_COLUMN_NAME;
+            V_SELECT := V_SELECT || ', ' || CHR (10) || V_OLD_COLUMN_NAME;
+         END IF;
+      END LOOP;
+
+      V_STMT := 'Create table (_BAK)';
+      V_SQL := V_CREATE || ') TABLESPACE ' || V_TABLESPACE || CHR (10) || ' ' || V_SELECT || CHR (10) || 'FROM ' || P_TABLE_NAME;
+      EXECUTE IMMEDIATE V_SQL;
+      V_STMT := 'Create unique indexes on RENAME_SEQUENCE on both tables';
+      EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_OLD_U1 ON ' || P_TABLE_NAME || ' (RENAME_SEQUENCE)';
+      EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_NEW_U1 ON ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK (RENAME_SEQUENCE)';
+      V_STMT := 'Process LONG and LONG RAW columns, if they are present';
+
+      IF V_LONG_IDX &lt;&gt; 0
+      THEN
+         FOR I IN 0 .. V_LONG_IDX - 1
+         LOOP
+            V_SQL :=
+               'UPDATE ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK SET ' || V_LONG_COL_TAB (I).NEW_LONG_COL || ' = NULL';
+            EXECUTE IMMEDIATE V_SQL;
+            V_SQL :=
+              'ALTER TABLE ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK MODIFY (' || V_LONG_COL_TAB (I).NEW_LONG_COL ||
+                 ' ' ||
+                 V_LONG_COL_TAB (I).NEW_LONG_TYPE ||
+                 ')';
+            EXECUTE IMMEDIATE V_SQL;
+            V_CURSOR :=
+              'SELECT RENAME_SEQUENCE, ' || V_LONG_COL_TAB (I).OLD_LONG_COL || ' FROM ' ||
+                 P_TABLE_NAME;
+            OPEN C1 FOR
+               V_CURSOR;
+
+            LOOP
+               IF V_LONG_COL_TAB (I).OLD_LONG_TYPE = 'LONG'
+               THEN
+                  FETCH C1 INTO V_RENAME_SEQUENCE, V_LONG;
+                  EXIT WHEN C1%NOTFOUND;
+                  V_SQL :=
+                    'UPDATE ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK B SET ' || V_LONG_COL_TAB (I).NEW_LONG_COL ||
+                       ' = :1 WHERE RENAME_SEQUENCE = ' ||
+                       V_RENAME_SEQUENCE;
+               EXECUTE IMMEDIATE V_SQL USING V_LONG;
+               ELSE
+                  FETCH C1 INTO V_RENAME_SEQUENCE, V_LONG_RAW;
+                  EXIT WHEN C1%NOTFOUND;
+                  V_SQL :=
+                    'UPDATE ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK B SET ' || V_LONG_COL_TAB (I).NEW_LONG_COL ||
+                       ' = :1 WHERE RENAME_SEQUENCE = ' ||
+                       V_RENAME_SEQUENCE;
+               EXECUTE IMMEDIATE V_SQL USING V_LONG_RAW;
+               END IF;
+
+
+               COMMIT;
+            END LOOP;
+
+            CLOSE C1;
+         END LOOP;
+      END IF;
+
+      V_STMT := 'Drop original table';
+      V_SQL := 'DROP TABLE ' || P_TABLE_NAME;
+      EXECUTE IMMEDIATE V_SQL;
+      V_STMT := 'Rename _BAK table to original table';
+      V_SQL := 'RENAME ' || SUBSTR(P_TABLE_NAME, 1, 23) || '_BAK TO ' || P_TABLE_NAME;
+      EXECUTE IMMEDIATE V_SQL;
+      V_STMT := 'Drop column RENAME_SEQUENCE from renamed table';
+      EXECUTE IMMEDIATE 'ALTER TABLE ' || UPPER (P_TABLE_NAME) || ' DROP COLUMN RENAME_SEQUENCE';
+
+	  V_STMT := 'Restore triggers';
+      FOR I IN 0 .. V_IDX - 1
+      LOOP
+         V_SQL := V_TRIGGER_TAB (I).SQL_STMT;
+
+         BEGIN
+            EXECUTE IMMEDIATE V_SQL;
+         EXCEPTION
+            WHEN E_TRIGGER_FAILED_COMPILE
+            THEN
+               NULL;
+            WHEN E_TRIGGER_INVALID
+            THEN
+               NULL;
+            WHEN OTHERS
+            THEN
+               RAISE;
+         END;
+      END LOOP;
+   END IF;-- Action is required
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in CMN_RENAME_COLUMN_SP - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

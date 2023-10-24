@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_ASSGND_OBJ_PERM_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_ASSGND_OBJ_PERM_INS_SP" (
+   P_OBJECT_CODE       IN   VARCHAR2,
+   P_OBJECT_TYPE       IN   VARCHAR2,
+   P_COMPONENT_CODE    IN   VARCHAR2,
+   P_PERMISSION_CODE   IN   VARCHAR2,
+   P_PRINCIPAL_TYPE    IN   VARCHAR2,
+   P_ROLE_CODE         IN   VARCHAR2,
+   P_USER_NAME         IN   VARCHAR2,
+   P_CREATED_BY        IN   NUMBER DEFAULT 1
+)
+IS
+   V_PRINCIPAL_ID                NUMBER;
+   V_ID                          NUMBER;
+   V_CNT                         INTEGER;
+   V_OBJECT_ID                   INTEGER;
+   V_PERMISSION_ID               INTEGER;
+   V_COMPONENT_ID                INTEGER;
+   V_OBJECT_TYPE_ID              INTEGER;
+   V_IS_RIGHT_DEFINITION         INTEGER;
+   E_ERROR                       EXCEPTION;
+   V_PRINCIPAL_TYPE              VARCHAR2 (80);
+   V_ERR                         VARCHAR2 (2000);
+   V_PROC                        VARCHAR2 (100) := 'CMN_SEC_ASSGND_OBJ_PERM_INS_SP: ';
+BEGIN
+   IF (P_PRINCIPAL_TYPE NOT IN ('GROUP', 'RIGHT', 'USER'))
+   THEN
+      V_ERR := 'P_PRINCIPAL_TYPE MUST BE "GROUP", "RIGHT" OR "USER"';
+      RAISE E_ERROR;
+   END IF;
+
+   IF (P_PRINCIPAL_TYPE = 'GROUP')
+   THEN
+      SELECT   NVL (MAX (ID), -9)
+      INTO     V_PRINCIPAL_ID
+      FROM     CMN_SEC_GROUPS
+      WHERE    GROUP_CODE = P_ROLE_CODE;
+
+      IF (V_PRINCIPAL_ID = -9)
+      THEN
+         V_ERR := 'P_ROLE_CODE "' || P_ROLE_CODE || '" DOES NOT EXIST';
+         RAISE E_ERROR;
+      END IF;
+   END IF;
+
+   V_IS_RIGHT_DEFINITION := 0;
+   V_PRINCIPAL_TYPE := P_PRINCIPAL_TYPE;
+   IF (P_PRINCIPAL_TYPE = 'RIGHT')
+   THEN
+      V_PRINCIPAL_TYPE := 'GROUP';
+      V_IS_RIGHT_DEFINITION := 1;
+      SELECT   NVL (MAX (ID), -9)
+      INTO     V_PRINCIPAL_ID
+      FROM     CMN_SEC_GROUPS
+      WHERE    GROUP_CODE = P_ROLE_CODE
+      AND      RIGHT_TYPE IS NOT NULL;
+
+      IF (V_PRINCIPAL_ID = -9)
+      THEN
+         V_ERR := 'P_ROLE_CODE "' || P_ROLE_CODE || '" DOES NOT EXIST OR IS NOT A RIGHT';
+         RAISE E_ERROR;
+      END IF;
+
+      SELECT  NVL (MAX (O.ID), -9)
+      INTO    V_ID
+      FROM    CMN_LOOKUPS L,
+              CMN_COMPONENTS C,
+              CMN_SEC_OBJECTS O,
+              CMN_SEC_PERMISSIONS P,
+              CMN_SEC_OBJ_TYPE_PERM OTP
+      WHERE   C.ID = O.COMPONENT_ID
+      AND     L.ID = O.OBJECT_TYPE_ID
+      AND     L.LOOKUP_TYPE = 'SEC_OBJECT_TYPE'
+      AND     L.LOOKUP_CODE = P_OBJECT_TYPE
+      AND     C.COMPONENT_CODE = P_COMPONENT_CODE
+      AND     O.OBJECT_CODE = P_OBJECT_CODE
+      AND     P.PERMISSION_CODE = P_PERMISSION_CODE
+      AND     P.ID = OTP.PERMISSION_ID
+      AND     O.OBJECT_TYPE_ID = OTP.OBJECT_TYPE_ID;
+
+      IF (V_ID = -9)
+      THEN
+         V_ERR := 'P_OBJECT_CODE "' || P_OBJECT_CODE || 
+                  '" P_PERMISSION_CODE "' || P_PERMISSION_CODE || 
+                  '" P_OBJECT_TYPE "' || P_OBJECT_TYPE || 
+                  '" P_COMPONENT_CODE "' || P_COMPONENT_CODE || '" COMBINATION IS INVALID';
+         RAISE E_ERROR;
+      END IF;
+
+   END IF;
+
+   IF (P_PRINCIPAL_TYPE = 'USER')
+   THEN
+      SELECT   ID
+      INTO     V_PRINCIPAL_ID
+      FROM     CMN_SEC_USERS
+      WHERE    USER_NAME = P_USER_NAME;
+
+      IF (V_PRINCIPAL_ID = -9)
+      THEN
+         V_ERR := 'P_USER_NAME "' || P_USER_NAME || '" DOES NOT EXIST';
+         RAISE E_ERROR;
+      END IF;
+   END IF;
+
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_COMPONENT_ID
+   FROM     CMN_COMPONENTS
+   WHERE    COMPONENT_CODE = P_COMPONENT_CODE;
+
+   IF (V_COMPONENT_ID = -9)
+   THEN
+      V_ERR := 'P_COMPONENT_CODE "' || P_COMPONENT_CODE || '" DOES NOT EXIST';
+      RAISE E_ERROR;
+   END IF;
+
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_OBJECT_TYPE_ID
+   FROM     CMN_LOOKUPS
+   WHERE    LOOKUP_TYPE = 'SEC_OBJECT_TYPE'
+   AND      LOOKUP_CODE = P_OBJECT_TYPE;
+
+   IF (V_OBJECT_TYPE_ID = -9)
+   THEN
+      V_ERR := 'P_OBJECT_TYPE "' || P_OBJECT_TYPE || '" DOES NOT EXIST';
+      RAISE E_ERROR;
+   END IF;
+
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_PERMISSION_ID
+   FROM     CMN_SEC_PERMISSIONS
+   WHERE    PERMISSION_CODE = P_PERMISSION_CODE;
+
+   IF (V_PERMISSION_ID = -9)
+   THEN
+      V_ERR := 'P_PERMISSION_CODE "' || P_PERMISSION_CODE || '" DOES NOT EXIST';
+      RAISE E_ERROR;
+   END IF;
+
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_OBJECT_ID
+   FROM     CMN_SEC_OBJECTS
+   WHERE    OBJECT_CODE = P_OBJECT_CODE
+   AND      COMPONENT_ID = V_COMPONENT_ID
+   AND      OBJECT_TYPE_ID = V_OBJECT_TYPE_ID;
+
+   IF (V_OBJECT_ID = -9)
+   THEN
+      V_ERR := 'P_OBJECT_CODE "' || P_OBJECT_CODE || '" DOES NOT EXIST';
+      RAISE E_ERROR;
+   END IF;
+
+   SELECT   CMN_SEC_ASSGND_OBJ_PERM_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+
+   INSERT INTO CMN_SEC_ASSGND_OBJ_PERM
+               (ID, PRINCIPAL_TYPE, PRINCIPAL_ID, 
+                OBJECT_ID,PERMISSION_ID, IS_RIGHT_DEFINITION,
+                CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)   
+   SELECT V_ID, V_PRINCIPAL_TYPE, V_PRINCIPAL_ID, 
+          V_OBJECT_ID, V_PERMISSION_ID, V_IS_RIGHT_DEFINITION,
+          SYSDATE, P_CREATED_BY, SYSDATE, P_CREATED_BY
+   FROM   DUAL
+   WHERE  NOT EXISTS (SELECT  ID
+                      FROM    CMN_SEC_ASSGND_OBJ_PERM
+                      WHERE   PRINCIPAL_TYPE = V_PRINCIPAL_TYPE
+                      AND     PRINCIPAL_ID = V_PRINCIPAL_ID
+                      AND     OBJECT_ID = V_OBJECT_ID
+                      AND     PERMISSION_ID = V_PERMISSION_ID
+                      AND     IS_RIGHT_DEFINITION = V_IS_RIGHT_DEFINITION);
+                
+EXCEPTION
+   WHEN E_ERROR
+   THEN
+      RAISE_APPLICATION_ERROR (-20001, V_ERR);
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, SQLERRM);
+END;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

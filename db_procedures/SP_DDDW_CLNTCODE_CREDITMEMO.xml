@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_DDDW_CLNTCODE_CREDITMEMO</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_DDDW_CLNTCODE_CREDITMEMO" (
+RESOURCE_CODE 	VARCHAR2 ,
+in_arg1 	IN VARCHAR2  DEFAULT NULL,
+rowcount 	NUMBER ,
+bill_or_match 	VARCHAR2  DEFAULT 'B',
+RC1 	IN OUT SP_DDDW_CLNTCODE_CREDITMEMOPkg.RCT1)
+AS
+arg1 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+pos 	NUMBER(3,0);
+getname 	NUMBER(1,0);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_dddw_clntcode_creditmemo.arg1 := sp_dddw_clntcode_creditmemo.in_arg1;
+	IF  sp_dddw_clntcode_creditmemo.rowcount = 50 THEN
+		NULL;
+	ELSE
+		IF  sp_dddw_clntcode_creditmemo.rowcount = 100 THEN
+			NULL;
+		ELSE
+			IF  sp_dddw_clntcode_creditmemo.rowcount = 200 THEN
+				NULL;
+			END IF;
+		END IF;
+	END IF;
+	IF  sp_dddw_clntcode_creditmemo.bill_or_match = 'B' THEN
+	BEGIN
+		IF  NVL(sp_dddw_clntcode_creditmemo.arg1, '') IS NULL THEN
+			OPEN RC1 FOR
+			SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+			WHERE EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+			 AND invoiceheader.status = '0'
+			 AND invoiceheader.invtype = 'I' )
+			 AND EXISTS (
+			SELECT  1
+			 FROM projstaff
+			WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+			 AND projstaff.billingaccess = 1
+			 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+			   );
+		ELSE
+			IF  INSTR( sp_dddw_clntcode_creditmemo.arg1, '|') &gt; 0 THEN
+			BEGIN
+				IF  INSTR( sp_dddw_clntcode_creditmemo.arg1, '~') &gt; 0 THEN
+					sp_dddw_clntcode_creditmemo.getname :=  1;
+				ELSE
+					sp_dddw_clntcode_creditmemo.getname :=  0;
+				END IF;
+				sp_dddw_clntcode_creditmemo.pos :=  INSTR( sp_dddw_clntcode_creditmemo.arg1,
+				   '|');
+				sp_dddw_clntcode_creditmemo.arg1 :=  SUBSTR(sp_dddw_clntcode_creditmemo.arg1,
+				   1, sp_dddw_clntcode_creditmemo.pos - 1);
+				IF  sp_dddw_clntcode_creditmemo.getname = 0 THEN
+				BEGIN
+					OPEN RC1 FOR
+					SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+					WHERE EXISTS (
+					SELECT  1
+					 FROM invoiceheader
+					WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND invoiceheader.status = '0'
+					 AND invoiceheader.invtype = 'I' )
+					 AND EXISTS (
+					SELECT  1
+					 FROM projstaff
+					WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND projstaff.billingaccess = 1
+					 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+					   )
+					 AND clntsupp.COMPANY_CODE &gt;= sp_dddw_clntcode_creditmemo.arg1
+					ORDER BY 1 ;
+				END;
+				ELSE
+				BEGIN
+					OPEN RC1 FOR
+					SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+					WHERE EXISTS (
+					SELECT  1
+					 FROM invoiceheader
+					WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND invoiceheader.status = '0'
+					 AND invoiceheader.invtype = 'I' )
+					 AND EXISTS (
+					SELECT  1
+					 FROM projstaff
+					WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND projstaff.billingaccess = 1
+					 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+					   )
+					 AND clntsupp.COMPANY_NAME &gt;= sp_dddw_clntcode_creditmemo.arg1
+					ORDER BY 2 ;
+				END;
+				END IF;
+			END;
+			ELSE
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE EXISTS (
+				SELECT  1
+				 FROM invoiceheader
+				WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+				 AND invoiceheader.status = '0'
+				 AND invoiceheader.invtype = 'I' )
+				 AND EXISTS (
+				SELECT  1
+				 FROM projstaff
+				WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+				 AND projstaff.billingaccess = 1
+				 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+				   )
+				 AND clntsupp.COMPANY_CODE = sp_dddw_clntcode_creditmemo.arg1;
+			END IF;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+		IF  NVL(sp_dddw_clntcode_creditmemo.arg1, '') IS NULL THEN
+			OPEN RC1 FOR
+			SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+			WHERE EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+			 AND invoiceheader.status = '9'
+			 AND invoiceheader.invtype = 'I'
+			 AND SUBSTR(invoiceheader.invoiceno, 1, 5) = 'MATCH' )
+			 AND EXISTS (
+			SELECT  1
+			 FROM projstaff
+			WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+			 AND projstaff.billingaccess = 1
+			 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+			   );
+		ELSE
+			IF  INSTR( sp_dddw_clntcode_creditmemo.arg1, '|') &gt; 0 THEN
+			BEGIN
+				IF  INSTR( sp_dddw_clntcode_creditmemo.arg1, '~') &gt; 0 THEN
+					sp_dddw_clntcode_creditmemo.getname :=  1;
+				ELSE
+					sp_dddw_clntcode_creditmemo.getname :=  0;
+				END IF;
+				sp_dddw_clntcode_creditmemo.pos :=  INSTR( sp_dddw_clntcode_creditmemo.arg1,
+				   '|');
+				sp_dddw_clntcode_creditmemo.arg1 :=  SUBSTR(sp_dddw_clntcode_creditmemo.arg1,
+				   1, sp_dddw_clntcode_creditmemo.pos - 1);
+				IF  sp_dddw_clntcode_creditmemo.getname = 0 THEN
+				BEGIN
+					OPEN RC1 FOR
+					SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+					WHERE EXISTS (
+					SELECT  1
+					 FROM invoiceheader
+					WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND invoiceheader.status = '9'
+					 AND invoiceheader.invtype = 'I'
+					 AND SUBSTR(invoiceheader.invoiceno, 1, 5) = 'MATCH' )
+					 AND EXISTS (
+					SELECT  1
+					 FROM projstaff
+					WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND projstaff.billingaccess = 1
+					 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+					   )
+					 AND clntsupp.COMPANY_CODE &gt;= sp_dddw_clntcode_creditmemo.arg1
+					ORDER BY 1 ;
+				END;
+				ELSE
+				BEGIN
+					OPEN RC1 FOR
+					SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+					WHERE EXISTS (
+					SELECT  1
+					 FROM invoiceheader
+					WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND invoiceheader.status = '9'
+					 AND invoiceheader.invtype = 'I'
+					 AND SUBSTR(invoiceheader.invoiceno, 1, 5) = 'MATCH' )
+					 AND EXISTS (
+					SELECT  1
+					 FROM projstaff
+					WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+					 AND projstaff.billingaccess = 1
+					 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+					   )
+					 AND clntsupp.COMPANY_NAME &gt;= sp_dddw_clntcode_creditmemo.arg1
+					ORDER BY 2 ;
+				END;
+				END IF;
+			END;
+			ELSE
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE EXISTS (
+				SELECT  1
+				 FROM invoiceheader
+				WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+				 AND invoiceheader.status = '9'
+				 AND invoiceheader.invtype = 'I'
+				 AND SUBSTR(invoiceheader.invoiceno, 1, 5) = 'MATCH' )
+				 AND EXISTS (
+				SELECT  1
+				 FROM projstaff
+				WHERE projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE
+				 AND projstaff.billingaccess = 1
+				 AND projstaff.RESOURCE_CODE = sp_dddw_clntcode_creditmemo.RESOURCE_CODE
+				   )
+				 AND clntsupp.COMPANY_CODE = sp_dddw_clntcode_creditmemo.arg1;
+			END IF;
+		END IF;
+	END;
+	END IF;
+END sp_dddw_clntcode_creditmemo;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

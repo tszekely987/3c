@@ -1,0 +1,42 @@
+<ClarityDBViewQuery>
+  <QueryResult code="BIZ_RESOURCE_BROWSE_V">
+    <indexes/>
+    <text_length>751</text_length>
+    <text>( 
+select 	
+SRMRES1.id, 
+SRMRES1.last_name last_name, 
+SRMRES1.first_name first_name, 
+CMNV.name person_type, 
+CMNV.language_code LANGUAGE_CODE, 
+max(decode(PRRLEST.PRISPRIMARY,0,null,SRMRES2.last_name)) primary_role, 
+SRMRES1.UNIQUE_NAME, SRMRES1.RESOURCE_TYPE 
+from 
+SRM_RESOURCES SRMRES1, 
+SRM_RESOURCES SRMRES2, 
+PRROLESET     PRRLEST, 
+PRJ_RESOURCES  PRJRES, 
+CMN_LOOKUPS_V  CMNV 
+where 
+SRMRES1.id = PRJRES.prid (+) 
+and NVL(PRJRES.PRISROLE,0) = 0 
+and SRMRES1.id = PRRLEST.PRRESOURCEID (+) 
+and PRRLEST.PRROLEID = SRMRES2.id (+) 
+and SRMRES1.person_type = CMNV.id 
+and SRMRES1.is_active != 0 
+group by 
+SRMRES1.id, 
+SRMRES1.last_name, 
+SRMRES1.first_name, 
+SRMRES1.UNIQUE_NAME, 
+CMNV.name, 
+CMNV.language_code,
+SRMRES1.resource_type
+)
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

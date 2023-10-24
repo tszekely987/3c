@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_CLNTSUPP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_CLNTSUPP_SP" 
+(
+  status_type_in  NUMBER ,
+  locationid_in   VARCHAR2,
+  departcode_in   VARCHAR2,
+  clntwipclass_in VARCHAR2,
+  projclass_in    VARCHAR2,
+  clntclass_in    VARCHAR2,
+  inactivedate_in DATE,
+  clntcode_in     VARCHAR2
+)
+AS
+  var_select  INTEGER :=0;
+  var_inactive_date Date;
+BEGIN
+  var_inactive_date := inactivedate_in;
+  if status_type_in = 2 and var_inactive_date Is Null Then
+    var_inactive_date := SYSDATE;
+  END if;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM locations
+     WHERE locations.locationid = locationid_in;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 1 then
+    raise_application_error(-20772, 'Invalid location.');
+  END if;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM departments
+     WHERE departcode = departcode_in;
+     --and RTRIM(nvl(departcode_in,' ')) != ' ';
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 1 then
+    raise_application_error(-20773, 'Invalid Department.');
+  END IF;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM locationdept
+     WHERE locationid = locationid_in
+       AND departcode = departcode_in;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select !=1 then
+    raise_application_error(-20038, 'Department is invalid for this location.');
+  END if;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM projclass
+     WHERE projclass = projclass_in;
+       -- and RTRIM(nvl(projclass_in,' ')) != ' ';
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 1 then
+    raise_application_error(-20774, 'Invalid PROJECT_CODE Class.');
+  END IF;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM wipclass
+     WHERE wipclass = clntwipclass_in;
+     --and RTRIM(nvl(clntwipclass_in,' ')) != ' ';
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 1 then
+    raise_application_error(-20775, 'Invalid Wip Class.');
+  END IF;
+
+  BEGIN
+    SELECT 1
+      INTO var_select
+      FROM clntclass
+     WHERE clntclass = clntclass_in;
+     --and RTRIM(nvl(clntclass_in,' ')) != ' ';
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 1 then
+    raise_application_error(-20776, 'Invalid COMPANY_CODE Class.');
+  END IF;
+
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

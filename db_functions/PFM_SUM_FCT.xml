@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_SUM_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_SUM_FCT" (p_curve clob , p_start DATE DEFAULT NULL, p_finish DATE DEFAULT NULL)
+   RETURN NUMBER
+/*
+*/
+IS
+ v_return    NUMBER;
+ v_segments  PFM_SEGMENTS;
+ v_start INTEGER;
+ v_finish INTEGER;
+
+BEGIN
+  v_return := 0;
+  v_start := 0;
+  v_finish := 9999999;
+  IF (p_start IS NOT NULL) THEN
+    v_start := PFM_DATE_TO_JULIAN_FCT( p_start );
+  END IF;
+  IF (p_finish IS NOT NULL) THEN
+    v_finish := PFM_DATE_TO_JULIAN_FCT( p_finish );
+  END IF;
+
+  v_segments := PFM_SEGMENTS_FCT( 0, p_curve, v_start, v_finish );
+  v_return := PFM_QUERY_FCT( v_segments, v_start, v_finish );
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

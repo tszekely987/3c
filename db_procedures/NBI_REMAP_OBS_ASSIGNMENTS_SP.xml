@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_REMAP_OBS_ASSIGNMENTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_REMAP_OBS_ASSIGNMENTS_SP" 
+as
+    v_idx   number;
+    v_obs_current_type_id       number;
+    v_obs_current_unit_default  number;
+    v_obs_prev_type_id       number;
+    v_obs_prev_unit_default  number;
+    v_obs_current_column_name   varchar2( 100 );
+    v_obs_prev_column_name      varchar2( 100 );    
+    v_count                     number;
+begin
+    for v_idx in 1 .. 5
+    loop
+        v_obs_current_column_name := 'OBS' || to_char( 6 - v_idx ) || '_UNIT_ID';
+        v_obs_prev_column_name := 'OBS' || to_char( 5 - v_idx ) || '_UNIT_ID';
+        
+        begin
+        select obs_type_id, obs_unit_default
+          into v_obs_prev_type_id, v_obs_prev_unit_default
+          from nbi_cfg_obs_assignments
+         where object_type = 'PROJECT' and
+               obs_column_name = v_obs_prev_column_name;
+        exception
+            when no_data_found then
+                v_obs_prev_type_id := null;
+                v_obs_prev_unit_default := null;
+        end;
+               
+        if v_obs_prev_type_id is null and
+           v_obs_prev_unit_default is null and
+           5 - v_idx &lt;&gt; 0 then
+
+             begin
+             select obs_type_id, obs_unit_default
+               into v_obs_current_type_id, v_obs_current_unit_default
+               from nbi_cfg_obs_assignments
+              where object_type = 'PROJECT' and
+                    obs_column_name = v_obs_current_column_name;
+             exception
+                when no_data_found then
+                     v_obs_current_type_id := null;
+                     v_obs_current_unit_default := null;
+             end;
+                    
+             if v_obs_current_type_id is not null and
+                v_obs_current_unit_default is not null then
+                 update nbi_cfg_obs_assignments
+                    set obs_type_id = v_obs_current_type_id,
+                        obs_unit_default = v_obs_current_unit_default
+                  where object_type = 'PROJECT' and
+                        obs_column_name = v_obs_prev_column_name;
+
+                 update nbi_cfg_obs_assignments
+                    set obs_type_id = null,
+                        obs_unit_default = null
+                  where object_type = 'PROJECT' and
+                        obs_column_name = v_obs_current_column_name;
+             end if;
+        end if;
+    end loop;
+
+    for v_idx in 1 .. 5
+    loop
+        v_obs_current_column_name := 'OBS' || to_char( 6 - v_idx ) || '_UNIT_ID';
+        v_obs_prev_column_name := 'OBS' || to_char( 5 - v_idx ) || '_UNIT_ID';
+        
+        begin
+        select obs_type_id, obs_unit_default
+          into v_obs_prev_type_id, v_obs_prev_unit_default
+          from nbi_cfg_obs_assignments
+         where object_type = 'RESOURCE' and
+               obs_column_name = v_obs_prev_column_name;
+        exception
+            when no_data_found then
+                v_obs_prev_type_id := null;
+                v_obs_prev_unit_default := null;
+        end;
+               
+        if v_obs_prev_type_id is null and
+           v_obs_prev_unit_default is null and
+           5 - v_idx &lt;&gt; 0 then
+
+             begin
+             select obs_type_id, obs_unit_default
+               into v_obs_current_type_id, v_obs_current_unit_default
+               from nbi_cfg_obs_assignments
+              where object_type = 'RESOURCE' and
+                    obs_column_name = v_obs_current_column_name;
+             exception
+                when no_data_found then
+                     v_obs_current_type_id := null;
+                     v_obs_current_unit_default := null;
+             end;
+                    
+             if v_obs_current_type_id is not null and
+                v_obs_current_unit_default is not null then
+                 update nbi_cfg_obs_assignments
+                    set obs_type_id = v_obs_current_type_id,
+                        obs_unit_default = v_obs_current_unit_default
+                  where object_type = 'RESOURCE' and
+                        obs_column_name = v_obs_prev_column_name;
+
+                 update nbi_cfg_obs_assignments
+                    set obs_type_id = null,
+                        obs_unit_default = null
+                  where object_type = 'RESOURCE' and
+                        obs_column_name = v_obs_current_column_name;
+             end if;
+        end if;
+    end loop;
+end;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUTONUM_SEGMENTS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUTONUM_SEGMENTS_INS_SP" (
+   P_SCHEME_ID   IN  NUMBER,
+   P_SEG_CODE    IN  VARCHAR2,
+   P_LENGTH      IN  INTEGER,
+   P_START_VALUE IN  VARCHAR2,
+   P_TEXT_VALUE  IN  VARCHAR2,
+   P_POSITION    IN  INTEGER,
+   P_IS_AUTOEXT  IN  INTEGER
+)
+IS
+   V_POSITION        INTEGER;
+   V_NEXT_ID         NUMBER;
+   V_START_VALUE     NUMBER;
+   V_SEG_CODE        VARCHAR2(30);
+BEGIN
+   V_SEG_CODE := UPPER(P_SEG_CODE);
+
+   IF V_SEG_CODE NOT IN ('TEXT', 'NUMERIC', 'ALPHANUMERIC', 'CREATE_DATE', 'PARENT_REF')
+   THEN
+      RAISE_APPLICATION_ERROR(-20000, 'INVALID SEGMENT TYPE');
+   END IF;
+
+   IF v_seg_code IN ('NUMERIC', 'ALPHANUMERIC')
+   THEN
+     -- Make sure starting number and counter length doesn't exceed length
+     IF LENGTH(P_TEXT_VALUE) &gt; P_LENGTH OR
+        LENGTH(P_START_VALUE) &gt; P_LENGTH
+     THEN
+        RAISE_APPLICATION_ERROR(-20000,
+           'COUNTER STARTING NUMBER AND COUNTER LENGTH ARE INCONSISTENT');
+     END IF;
+   END IF;
+
+   -- Convert alphanumeric value to numeric value for start value
+   IF V_SEG_CODE = 'ALPHANUMERIC'
+   THEN
+      V_START_VALUE := CMN_AUTONUM_TO_NUM_FCT(P_START_VALUE);
+   ELSIF V_SEG_CODE = 'NUMERIC'
+   THEN
+      V_START_VALUE := TO_NUMBER(P_START_VALUE);
+   END IF;
+	
+   -- Fix for bug 92554 Start
+   -- Can't hold value larger than NUMBER(38,0)
+   IF V_START_VALUE = -1 OR V_START_VALUE &gt; 99999999999999999999999999999999999999
+   THEN
+      RAISE_APPLICATION_ERROR(-20000, 'INVALID ALPHANUMERIC LENGTH');
+   END IF;
+   -- Fix for bug 92554 End
+	
+   -- Insert the new record
+   CMN_ID_SP('CMN_AUTONUM_SCHEME_SEGMENTS', V_NEXT_ID);
+
+   v_position := p_position;
+   IF v_position IS NULL OR v_position = 0
+   THEN
+     SELECT MAX(POSITION)
+       INTO V_POSITION
+       FROM CMN_AUTONUM_SCHEME_SEGMENTS
+      WHERE SCHEME_ID = P_SCHEME_ID;
+
+     IF V_POSITION IS NULL
+     THEN
+        V_POSITION := 1;
+     ELSE
+        V_POSITION := V_POSITION + 1;
+     END IF;
+   END IF;
+
+   INSERT INTO CMN_AUTONUM_SCHEME_SEGMENTS (
+      ID,
+      SCHEME_ID,
+      SEGMENT_CODE,
+      POSITION,
+      LENGTH,
+      START_VALUE,
+      NEXT_VALUE,
+      TEXT_VALUE,
+      IS_AUTO_EXTENDED,
+      CREATED_DATE,
+      CREATED_BY,
+      LAST_UPDATED_DATE,
+      LAST_UPDATED_BY
+   )
+   VALUES (
+      V_NEXT_ID,
+      P_SCHEME_ID,
+      V_SEG_CODE,
+      V_POSITION,
+      P_LENGTH,
+      V_START_VALUE,
+      V_START_VALUE,
+      P_TEXT_VALUE,
+      P_IS_AUTOEXT,
+      SYSDATE,
+      1,
+      SYSDATE,
+      1
+   );
+
+   -- Update next value for this scheme
+   CMN_AUTONUM_SCHEMES_UPD_SP(P_SCHEME_ID, NULL, NULL);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

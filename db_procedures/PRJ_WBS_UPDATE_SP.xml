@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_WBS_UPDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_WBS_UPDATE_SP" (
+   p_project_id       IN   NUMBER DEFAULT 0
+)
+IS
+  v_nnbseq_max  NUMBER;
+BEGIN
+  IF NOT(p_project_id IS NULL)
+  THEN
+    BEGIN
+      SELECT NVL(MAX(T.PRWBSSEQUENCE),0) + 1 INTO v_nnbseq_max
+      FROM PRTASK T WHERE T.PRPROJECTID = p_project_id;
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN					
+      v_nnbseq_max := 0;
+    END;
+  ELSE
+    v_nnbseq_max := 0;
+  END IF;
+  
+  -- got some tasks ?!
+  IF (v_nnbseq_max &gt; 0)
+  THEN
+    UPDATE PRTASK SET
+      PRTASK.WBS_PARSEQ = (SELECT NVL(MAX(TP.PRWBSSEQUENCE),-1)
+                           FROM PRTASK TP
+                           WHERE TP.PRPROJECTID = p_project_id
+                           AND TP.PRWBSSEQUENCE &lt; PRTASK.PRWBSSEQUENCE
+                           AND TP.PRWBSLEVEL = (PRTASK.PRWBSLEVEL-1)
+                           AND TP.PRISTASK = 0
+                           )
+      , PRTASK.WBS_NNBSEQ = (SELECT NVL(MIN(TX.PRWBSSEQUENCE), v_nnbseq_max )
+                          FROM PRTASK TX
+                          WHERE TX.PRPROJECTID = p_project_id
+                          AND TX.PRWBSSEQUENCE &gt; PRTASK.PRWBSSEQUENCE
+                          AND TX.PRWBSLEVEL &lt;= PRTASK.PRWBSLEVEL
+                          )
+    WHERE PRTASK.PRPROJECTID = p_project_id;
+  END IF;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

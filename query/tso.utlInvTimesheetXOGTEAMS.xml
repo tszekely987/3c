@@ -1,0 +1,731 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="tso.utlInvTimesheetXOGTEAMS" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nls description="tso.utlInvTimesheetXOGTEAMS" languageCode="en" name="Timesheet XOG Teams"/>
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT @select:dim:user_def:implied:transaction:a.task_id|| a.resource_id|| a.timeperiod_id:dim_id@,
+       @select:dim_prop:user_def:implied:transaction:a.inv_int_id:investment_int_id@,
+       @select:dim_prop:user_def:implied:transaction:a.inv_name:investment_name@,
+       @select:dim_prop:user_def:implied:transaction:UPPER(a.inv_object_code):investment_type_upper@,
+       @select:dim_prop:user_def:implied:transaction:a.timesheet_id:timesheet_id@, 
+       @select:dim_prop:user_def:implied:transaction:a.timeperiod_start:timeperiod_start@, 
+       @select:dim_prop:user_def:implied:transaction:a.timeperiod_finish:timeperiod_finish@, 
+       @select:dim_prop:user_def:implied:transaction:a.resource_id:resource_id@,
+       @select:dim_prop:user_def:implied:transaction:a.version:version@,
+       @select:dim_prop:user_def:implied:transaction:a.asn_id:assignment_id@,
+       @select:dim_prop:user_def:implied:transaction:a.charge_code_id:chargecode_id@,
+       @select:dim_prop:user_def:implied:transaction:a.type_code_id:type_code_id@,
+       @select:dim_prop:user_def:implied:transaction:MAX(a.act_date1):actual_date1@,
+       @select:dim_prop:user_def:implied:transaction:SUM(a.act_amt1):amount1@,
+       @select:dim_prop:user_def:implied:transaction:MAX(a.act_date2):actual_date2@,
+       @select:dim_prop:user_def:implied:transaction:SUM(a.act_amt2):amount2@,
+       @select:dim_prop:user_def:implied:transaction:MAX(a.act_date3):actual_date3@,
+       @select:dim_prop:user_def:implied:transaction:SUM(a.act_amt3):amount3@,
+       @select:dim_prop:user_def:implied:transaction:MAX(a.act_date4):actual_date4@,
+       @select:dim_prop:user_def:implied:transaction:SUM(a.act_amt4):amount4@,
+       @select:dim_prop:user_def:implied:transaction:MAX(a.act_date5):actual_date5@,
+       @select:dim_prop:user_def:implied:transaction:SUM(a.act_amt5):amount5@,
+       @select:dim_prop:user_def:implied:transaction:a.inv_id:investment_id@,
+       @select:dim_prop:user_def:implied:transaction:a.timeperiod_start_date:timeperiod_start_date@,
+       @select:dim_prop:user_def:implied:transaction:a.task_id:task_id@,
+       @select:dim_prop:user_def:implied:transaction:a.task_wbs_seq:task_wbs_sequence@,
+       @select:dim_prop:user_def:implied:transaction:a.task_name:task_name@,
+       @select:dim_prop:user_def:implied:transaction:a.asn_start:assignment_start@,
+       @select:dim_prop:user_def:implied:transaction:a.asn_finish:assignment_finish@,
+       @select:dim_prop:user_def:implied:transaction:a.role_id:role_id@,
+       @select:dim_prop:user_def:implied:transaction:a.trans_class:transaction_class@,
+       @select:dim_prop:user_def:implied:transaction:a.trans_type:transaction_type@
+FROM (
+    SELECT inv.id inv_int_id, inv.code inv_id, inv.name inv_name, inv.odf_object_code inv_object_code, t.prname task_name, t.prexternalid task_id, t.prwbssequence task_wbs_seq, a.prid asn_id, 
+    to_char(a.prstart, 'yyyy-mm-dd')||'T08:00:00' asn_start, to_char(a.prfinish, 'yyyy-mm-dd') || 'T17:00:00' asn_finish,
+    c.prexternalid charge_code_id, tmr.unique_name resource_id, role.unique_name role_id, pacr.transclass trans_class, tc.transtype  trans_type, itc.prexternalid type_code_id,
+    ts.prid timesheet_id, ts.prversion version, tp.prid timeperiod_id, tp.prstart timeperiod_start_date, to_char(tp.prstart, 'yyyy-mm-dd') || 'T00:00:00' timeperiod_start, to_char(tp.prfinish-1, 'yyyy-mm-dd') || 'T00:00:00' timeperiod_finish, s.slice_date,
+    CASE WHEN s.slice_date = tp.prstart THEN to_char(s.slice_date, 'yyyy-mm-dd') ELSE NULL END act_date1,
+    CASE WHEN s.slice_date = tp.prstart THEN 2 ELSE NULL END act_amt1,
+    CASE WHEN s.slice_date = tp.prstart+1 THEN to_char(s.slice_date, 'yyyy-mm-dd') ELSE NULL END act_date2,
+    CASE WHEN s.slice_date = tp.prstart+1 THEN 2 ELSE NULL END act_amt2,
+    CASE WHEN s.slice_date = tp.prstart+2 THEN to_char(s.slice_date, 'yyyy-mm-dd') ELSE NULL END act_date3,
+    CASE WHEN s.slice_date = tp.prstart+2 THEN 2 ELSE NULL END act_amt3,
+    CASE WHEN s.slice_date = tp.prstart+3 THEN to_char(s.slice_date, 'yyyy-mm-dd') ELSE NULL END act_date4,
+    CASE WHEN s.slice_date = tp.prstart+3 THEN 2 ELSE NULL END act_amt4,
+    CASE WHEN s.slice_date = tp.prstart+4 THEN to_char(s.slice_date, 'yyyy-mm-dd') ELSE NULL END act_date5,
+    CASE WHEN s.slice_date = tp.prstart+4 THEN 2 ELSE NULL END act_amt5
+    FROM   INV_INVESTMENTS inv
+    INNER JOIN PRTASK t ON inv.id = t.prprojectid
+    LEFT OUTER JOIN PRCHARGECODE c ON t.prchargecodeid = c.prid
+    INNER JOIN PRASSIGNMENT a ON t.prid = a.prtaskid
+    INNER JOIN SRM_RESOURCES r ON a.prresourceid = r.id
+	INNER JOIN TEAM_DEFINITIONS tm on r.unique_name = tm.code
+	INNER JOIN TEAM_DEF_ALLOCATIONS tma on tm.id = tma.team_def_id
+    INNER JOIN SRM_RESOURCES tmr ON tma.resource_id = tmr.id
+    LEFT OUTER JOIN PAC_MNT_RESOURCES pacr ON tmr.id = pacr.id
+    LEFT OUTER JOIN TRANSCLASS tc ON pacr.transclass = tc.transclass
+    INNER JOIN PRJ_RESOURCES prjr ON tmr.id = prjr.prid AND prjr.prisrole <> 1
+    LEFT OUTER JOIN SRM_RESOURCES role ON prjr.prprimaryroleid = role.id
+    LEFT OUTER JOIN PRTYPECODE itc ON prjr.prtypecodeid = itc.prid
+    INNER JOIN PRJ_BLB_SLICES s ON a.prid = s.prj_object_id
+    INNER JOIN PRJ_BLB_SLICEREQUESTS sr ON s.slice_request_id = sr.id AND sr.request_name IN ('DAILYRESOURCEESTCURVE')
+    INNER JOIN PRTIMEPERIOD tp ON s.slice_date between tp.prstart and tp.prfinish-1
+    INNER JOIN PRTIMESHEET ts ON tp.prid = ts.prtimeperiodid AND tmr.id = ts.prresourceid
+) a
+WHERE @FILTER@
+GROUP BY  a.task_id|| a.resource_id|| a.timeperiod_id, a.inv_int_id, a.inv_id, a.inv_name, a.inv_object_code, a.task_name, a.task_id, a.task_wbs_seq, a.asn_id, a.asn_start, a.asn_finish, a.charge_code_id,
+       a.resource_id, a.role_id, a.trans_class, a.trans_type, a.type_code_id, a.timesheet_id, a.version, a.timeperiod_start, a.timeperiod_finish, a.timeperiod_start_date
+HAVING @HAVING_FILTER@]]></nsql>
+            <attribute id="task_wbs_sequence" required="false">
+              
+              
+              
+              
+              <nls description="Task WBS Sequence" languageCode="en" name="Task WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_name" required="false">
+              
+              
+              
+              
+              <nls description="taskName" languageCode="en" name="taskName"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assignment_start" required="false">
+              
+              
+              
+              
+              <nls description="assignmentStart" languageCode="en" name="assignmentStart"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assignment_finish" required="false">
+              
+              
+              
+              
+              <nls description="assignmentFinish" languageCode="en" name="assignmentFinish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="role_id" required="false">
+              
+              
+              
+              
+              <nls description="roleID" languageCode="en" name="roleID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="transaction_class" required="false">
+              
+              
+              
+              
+              <nls description="Transaction Class" languageCode="en" name="Transaction Class"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="transaction_type" required="false">
+              
+              
+              
+              
+              <nls description="Transaction Type" languageCode="en" name="Transaction Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension ID" languageCode="en" name="Dimension ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_int_id" lookup="INV_BROWSE_INVESTMENT" required="false">
+              
+              
+              
+              
+              <nls description="Investment Internal ID" languageCode="en" name="Investment Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_name" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="projectName" languageCode="en" name="projectName"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Type Upper" languageCode="en" name="Investment Type Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timesheet_id" required="false">
+              
+              
+              
+              
+              <nls description="ID" languageCode="en" name="ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timeperiod_start" required="false">
+              
+              
+              
+              
+              <nls description="start" languageCode="en" name="start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timeperiod_finish" required="false">
+              
+              
+              <nls description="finish" languageCode="en" name="finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_id" lookup="SCH_BROWSE_RESOURCE_BY_CODE" required="false">
+              
+              
+              
+              
+              <nls description="resourceID" languageCode="en" name="resourceID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="version" required="false"/>
+            <attribute id="assignment_id" required="false">
+              
+              
+              
+              
+              <nls description="assignmentID" languageCode="en" name="assignmentID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="chargecode_id" required="false">
+              
+              
+              
+              
+              <nls description="chargeCodeID" languageCode="en" name="chargeCodeID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="type_code_id" required="false">
+              
+              
+              
+              
+              <nls description="typeCodeID" languageCode="en" name="typeCodeID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="actual_date1" required="false">
+              
+              
+              
+              
+              <nls description="actualDate1" languageCode="en" name="actualDate1"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="amount1" required="false"/>
+            <attribute id="actual_date2" required="false">
+              
+              
+              
+              
+              <nls description="actualDate2" languageCode="en" name="actualDate2"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="amount2" required="false"/>
+            <attribute id="actual_date3" required="false">
+              
+              
+              
+              
+              <nls description="actualDate3" languageCode="en" name="actualDate3"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="amount3" required="false"/>
+            <attribute id="actual_date4" required="false">
+              
+              
+              
+              
+              <nls description="actualDate4" languageCode="en" name="actualDate4"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="amount4" required="false"/>
+            <attribute id="actual_date5" required="false">
+              
+              
+              
+              
+              <nls description="actualDate5" languageCode="en" name="actualDate5"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="amount5" required="false"/>
+            <attribute id="investment_id" required="false">
+              
+              
+              
+              
+              <nls description="projectID" languageCode="en" name="projectID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timeperiod_start_date" required="false">
+              
+              
+              
+              
+              <nls description="Timeperiod Start Date" languageCode="en" name="Timeperiod Start Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_id" required="false">
+              
+              
+              
+              
+              <nls description="taskID" languageCode="en" name="taskID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="investmentProperties">
+                
+                
+                
+                
+                <nls description="Investment Properties" languageCode="en" name="Investment Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="investment_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

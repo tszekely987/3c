@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_MAINT_GET_TRANSACTIONDEF</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_MAINT_GET_TRANSACTIONDEF" (
+--in_clntcode 	pac_mnt_projects.COMPANY_CODE%TYPE  DEFAULT NULL,
+--in_projid 	pac_mnt_projects.PROJECT_CODE%TYPE  DEFAULT NULL,
+in_id 	pac_mnt_projects.ID%TYPE,
+language_code 	CMN_LOOKUPS_V.LANGUAGE_CODE%TYPE,
+RC1 	IN OUT REV_MAINT_GET_TRANSACTIONDEPkg.RCT1)
+AS
+COMPANY_CODE 	GLOBALPKG.STRING;
+PROJECT_CODE 	GLOBALPKG.STRING;
+RESOURCE_CODE       pac_mnt_resources.RESOURCE_CODE%TYPE;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+transcostsourcelabor  NUMBER;
+transratesourcelabor  NUMBER;
+transratelocationlabor 	NUMBER(3,0);
+transrateoverridelabor 	NUMBER(1,0);
+transcostsourcematerials  NUMBER;
+transratesourcematerials  NUMBER;
+transratelocationmaterials 	NUMBER(3,0);
+transrateoverridematerials 	NUMBER(1,0);
+transcostsourceequipment  NUMBER;
+transratesourceequipment  NUMBER;
+transratelocationequipment 	NUMBER(3,0);
+transrateoverrideequipment 	NUMBER(1,0);
+transcostsourceexpenses   NUMBER;
+transratesourceexpenses   NUMBER;
+transratelocationexpenses 	NUMBER(3,0);
+transrateoverrideexpenses 	NUMBER(1,0);
+transcostsourcelabor_des 	GLOBALPKG.STRING;
+transratesourcelabor_des 	GLOBALPKG.STRING;
+transcostsourcematerials_des 	GLOBALPKG.STRING;
+transratesourcematerials_des 	GLOBALPKG.STRING;
+transcostsourceequipment_des 	GLOBALPKG.STRING;
+transratesourceequipment_des 	GLOBALPKG.STRING;
+transcostsourceexpenses_des 	GLOBALPKG.STRING;
+transratesourceexpenses_des 	GLOBALPKG.STRING;
+budget 	NUMBER(1,0);
+LANGUAGE_ID   NUMBER;
+id                             pac_mnt_projects.id%TYPE;
+labor_exchange_rate_type         pac_mnt_projects.labor_exchange_rate_type%TYPE;
+MATERIALS_exchange_rate_type         pac_mnt_projects.MATERIALS_exchange_rate_type%TYPE;
+EQUIPMENT_exchange_rate_type         pac_mnt_projects.EQUIPMENT_exchange_rate_type%TYPE;
+EXPENSE_exchange_rate_type         pac_mnt_projects.EXPENSE_exchange_rate_type%TYPE;
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+   BEGIN
+	   SELECT COMPANY_CODE,PROJECT_CODE
+	   INTO   rev_maint_get_transactiondef.COMPANY_CODE,rev_maint_get_transactiondef.PROJECT_CODE
+	   FROM   PAC_MNT_PROJECTS
+	   WHERE  ID = rev_maint_get_transactiondef.in_id;
+   EXCEPTION
+	   	   WHEN NO_DATA_FOUND THEN
+		   		RAISE_APPLICATION_ERROR(-20177,'NO CLIENT/PROJECT FOUND');
+		   WHEN TOO_MANY_ROWS THEN
+		   		RAISE_APPLICATION_ERROR(-20188,'MORE THAN ONE CLIENT/PROJECT FOUND');
+		   WHEN OTHERS THEN
+		   		RAISE_APPLICATION_ERROR(-20199,'ERROR IN GETTING CLIENT/PROJECT FOR GIVEN ID');
+   END;
+--	rev_maint_get_transactiondef.COMPANY_CODE := rev_maint_get_transactiondef.in_clntcode;
+--	rev_maint_get_transactiondef.PROJECT_CODE := rev_maint_get_transactiondef.in_projid;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT
+			p.transcostsourcelabor,
+			p.transratesourcelabor,
+			p.transratelocationlabor,
+		  	p.transrateoverridelabor,
+			p.transcostsourcematerials,
+			p.transratesourcematerials,
+		  	p.transratelocationmaterials,
+			p.transrateoverridematerials,
+			p.transcostsourceequipment,
+		  	p.transratesourceequipment,
+			p.transratelocationequipment,
+			p.transrateoverrideequipment,
+		  	p.transcostsourceexpenses,
+			p.transratesourceexpenses,
+			p.transratelocationexpenses,
+		  	p.transrateoverrideexpenses,
+			budget,
+			p.id,
+			labor_exchange_rate_type,
+			MATERIALS_exchange_rate_type,
+			EQUIPMENT_exchange_rate_type,
+			EXPENSE_exchange_rate_type
+		INTO
+			rev_maint_get_transactiondef.transcostsourcelabor,
+			rev_maint_get_transactiondef.transratesourcelabor,
+			rev_maint_get_transactiondef.transratelocationlabor,
+		 	rev_maint_get_transactiondef.transrateoverridelabor,
+			rev_maint_get_transactiondef.transcostsourcematerials,
+			rev_maint_get_transactiondef.transratesourcematerials,
+		 	rev_maint_get_transactiondef.transratelocationmaterials,
+			rev_maint_get_transactiondef.transrateoverridematerials,
+			rev_maint_get_transactiondef.transcostsourceequipment,
+		 	rev_maint_get_transactiondef.transratesourceequipment,
+			rev_maint_get_transactiondef.transratelocationequipment,
+			rev_maint_get_transactiondef.transrateoverrideequipment,
+		 	rev_maint_get_transactiondef.transcostsourceexpenses,
+			rev_maint_get_transactiondef.transratesourceexpenses,
+			rev_maint_get_transactiondef.transratelocationexpenses,
+		 	rev_maint_get_transactiondef.transrateoverrideexpenses,
+			rev_maint_get_transactiondef.budget,
+			rev_maint_get_transactiondef.id,
+			rev_maint_get_transactiondef.labor_exchange_rate_type,
+			rev_maint_get_transactiondef.MATERIALS_exchange_rate_type,
+			rev_maint_get_transactiondef.EQUIPMENT_exchange_rate_type,
+			rev_maint_get_transactiondef.EXPENSE_exchange_rate_type
+		FROM 	pac_mnt_projects p
+		WHERE 	p.COMPANY_CODE = rev_maint_get_transactiondef.COMPANY_CODE
+		AND 	p.PROJECT_CODE = rev_maint_get_transactiondef.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+		raise_application_error(-20311, 'PROJECT_CODE not found or you are not authorized for this PROJECT_CODE.');
+		RETURN;
+	END IF;
+	IF transratesourcelabor = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transratesourcelabor_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transratesourcelabor_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transratesourcelabor;
+	END IF;
+	IF transratesourcematerials = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transratesourcematerials_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transratesourcematerials_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transratesourcematerials;
+	END IF;
+	IF transratesourceequipment = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transratesourceequipment_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transratesourceequipment_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transratesourceequipment;
+	END IF;
+	IF transratesourceexpenses = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transratesourceexpenses_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transratesourceexpenses_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transratesourceexpenses;
+	END IF;
+	IF transcostsourcelabor = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transcostsourcelabor_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transcostsourcelabor_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transcostsourcelabor;
+	END IF;
+	IF transcostsourcematerials = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transcostsourcematerials_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transcostsourcematerials_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transcostsourcematerials;
+	END IF;
+	IF transcostsourceequipment = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transcostsourceequipment_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transcostsourceequipment_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transcostsourceequipment;
+	END IF;
+	IF transcostsourceexpenses = 0 THEN
+		SELECT 	MAX(CMN_LOOKUPS_V.NAME)
+    		INTO 	transcostsourceexpenses_des
+		FROM  	CMN_LOOKUPS_V
+    		WHERE   CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TRANS_RATE_SOURCE'
+    		AND     CMN_LOOKUPS_V.LANGUAGE_CODE = language_code;
+	ELSE
+		SELECT 	MAX(Description)
+    		INTO 	transcostsourceexpenses_des
+		FROM  	ppa_Matrix
+    		WHERE   MatrixKey = transcostsourceexpenses;
+	END IF;
+	OPEN RC1 FOR
+	SELECT
+		rev_maint_get_transactiondef.COMPANY_CODE "COMPANY_CODE",
+		rev_maint_get_transactiondef.PROJECT_CODE "PROJECT_CODE",
+		rev_maint_get_transactiondef.transratesourcelabor "transratesourcelabor",
+		rev_maint_get_transactiondef.transratesourcelabor_des "transratesourcelabor_des",
+		rev_maint_get_transactiondef.transcostsourcelabor "transcostsourcelabor",
+		rev_maint_get_transactiondef.transcostsourcelabor_des "transcostsourcelabor_des",
+		rev_maint_get_transactiondef.transratelocationlabor "transratelocationlabor",
+		rev_maint_get_transactiondef.transrateoverridelabor "transrateoverridelabor",
+		rev_maint_get_transactiondef.transratesourcematerials "transratesourcematerials",
+		rev_maint_get_transactiondef.transratesourcematerials_des "transratesourcematerials_des",
+		rev_maint_get_transactiondef.transcostsourcematerials "transcostsourcematerials",
+		rev_maint_get_transactiondef.transcostsourcematerials_des "transcostsourcematerials_des",
+		rev_maint_get_transactiondef.transratelocationmaterials "transratelocationmaterials",
+		rev_maint_get_transactiondef.transrateoverridematerials "transrateoverridematerials",
+		rev_maint_get_transactiondef.transratesourceequipment "transratesourceequipment",
+		rev_maint_get_transactiondef.transratesourceequipment_des "transratesourceequipment_des",
+		rev_maint_get_transactiondef.transcostsourceequipment "transcostsourceequipment",
+		rev_maint_get_transactiondef.transcostsourceequipment_des "transcostsourceequipment_des",
+		rev_maint_get_transactiondef.transratelocationequipment "transratelocationequipment",
+		rev_maint_get_transactiondef.transrateoverrideequipment "transrateoverrideequipment",
+		rev_maint_get_transactiondef.transratesourceexpenses "transratesourceexpenses",
+		rev_maint_get_transactiondef.transratesourceexpenses_des "transratesourceexpenses_des",
+		rev_maint_get_transactiondef.transcostsourceexpenses "transcostsourceexpenses",
+		rev_maint_get_transactiondef.transcostsourceexpenses_des "transcostsourceexpenses_des",
+		rev_maint_get_transactiondef.transratelocationexpenses "transratelocationexpenses",
+		rev_maint_get_transactiondef.transrateoverrideexpenses "transrateoverrideexpenses",
+		rev_maint_get_transactiondef.id,
+		rev_maint_get_transactiondef.budget,
+			rev_maint_get_transactiondef.labor_exchange_rate_type,
+			rev_maint_get_transactiondef.MATERIALS_exchange_rate_type,
+			rev_maint_get_transactiondef.EQUIPMENT_exchange_rate_type,
+			rev_maint_get_transactiondef.EXPENSE_exchange_rate_type
+	FROM DUAL;
+END rev_maint_get_transactiondef;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

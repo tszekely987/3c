@@ -1,0 +1,32 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RDM_ROADMAP_MAPPING_V">
+    <indexes/>
+    <text_length>837</text_length>
+    <text>SELECT dm.object,
+       CASE WHEN INSTR(dm.object, '~') &lt;&gt; 0
+            THEN TO_NUMBER(SUBSTR(dm.object, INSTR(dm.object, '~')+1))
+            ELSE 0 END roadmap_key,
+       dm.attribute,
+       dm.type,
+       dm.default_type_code map_value,
+       NULL lower_limit,
+       NULL upper_limit,
+       NULL value 
+FROM   odf_display_mappings dm
+WHERE  dm.object like 'rdm_roadmap_item%'
+UNION ALL
+SELECT dm.object,
+       CASE WHEN INSTR(dm.object, '~') &lt;&gt; 0
+            THEN TO_NUMBER(SUBSTR(dm.object, INSTR(dm.object, '~')+1))
+            ELSE 0 END roadmap_key,
+       dm.attribute,
+       dm.type,
+       m.type_code map_value,
+       m.lo lower_limit,
+       m.hi upper_limit,
+       m.value 
+FROM   odf_display_mappings dm
+       INNER JOIN odf_mappings m ON dm.id = m.display_mappings_id
+WHERE  dm.object like 'rdm_roadmap_item%'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

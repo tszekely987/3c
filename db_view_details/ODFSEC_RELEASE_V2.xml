@@ -1,0 +1,35 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODFSEC_RELEASE_V2">
+    <indexes/>
+    <text_length>1319</text_length>
+    <text>select release.id object_instance_id, a.user_id user_id
+        from cmn_sec_chk_user_v a, rqp_releases release
+        where a.object_code = 'RQP_RELEASE'
+        and a.component_code = 'RQP'
+        and a.permission_code='READ'
+        and a.object_type = 'RECORD'
+        and a.object_instance_id = release.id
+        UNION
+ 		select release.id object_instance_id, a.user_id user_id
+        from cmn_sec_chk_user_v a, inv_investments i, rqp_releases release, odf_objects o, odf_object_extensions e
+        where a.object_code = o.right_code
+        and o.code = e.object_code
+        and e.extension_code = 'inv'
+        and a.component_code = 'INV'
+        and a.permission_code='investmentViewAssignedReleases'
+        and a.object_type = 'RECORD'
+        and a.object_instance_id = i.id
+		and i.id = release.investment_id
+		UNION
+ 		select release.id object_instance_id, a.user_id user_id
+        from cmn_sec_chk_user_r_v a, inv_investments i, rqp_releases release, odf_objects o, odf_object_extensions e
+        where a.component_code = 'INV'
+        and a.permission_code='investmentViewAssignedReleases'
+        and a.object_type = 'RECORD'
+		and i.id = release.investment_id
+		and i.odf_object_code = o.code
+		and a.object_code = o.right_code
+		and o.code = e.object_code
+        and e.extension_code = 'inv'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,27 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODFSEC_INV_V2">
+    <indexes/>
+    <text_length>1072</text_length>
+    <text>select  inv.id object_instance_id, sec.user_id
+        from    inv_investments inv, odf_object_extensions oe,
+                odf_objects o, cmn_sec_chk_user_r_v sec
+        where   inv.odf_object_code = oe.object_code
+        and     o.code = oe.object_code
+        and     oe.extension_code = 'inv'
+        and     sec.object_type = 'RECORD'
+        and     sec.permission_code = 'READ'
+        and     sec.component_code = 'INV'
+        and     (sec.object_code = o.right_code or sec.object_code = concat('odf_cst_', o.right_code))
+        union
+        select  sec.object_instance_id, sec.user_id
+        from    cmn_sec_chk_user_v0 sec, odf_object_extensions oe,
+                odf_objects o, cmn_sec_objects so
+        where   sec.permission_code = 'READ'
+        and     sec.object_id = so.id
+        and     o.code = oe.object_code
+        and     oe.extension_code = 'inv'
+        and     so.object_type_code = 'RECORD'
+        and     so.component_code = 'INV'
+        and     (so.object_code = o.right_code or so.object_code = concat('odf_cst_', o.right_code))</text>
+  </QueryResult>
+</ClarityDBViewQuery>

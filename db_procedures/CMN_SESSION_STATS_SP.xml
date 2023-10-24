@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SESSION_STATS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SESSION_STATS_SP" (P_DELETE_AUDIT_AFTER_X_DAYS INTEGER)
+AS
+   CURSOR C_DATES
+   IS
+      SELECT DISTINCT   TRUNC (SESSION_START_DATE) LOGIN_DATE
+      FROM     CMN_SESSION_AUDITS
+       ORDER BY TRUNC (SESSION_START_DATE);
+
+   V_FROM_DATE                   DATE;
+   V_TO_DATE                     DATE;
+   I                             INTEGER;
+   V_CNT                         INTEGER;
+BEGIN
+   EXECUTE IMMEDIATE 'delete from cmn_session_audits where session_start_date &lt; sysdate - ' ||
+                        P_DELETE_AUDIT_AFTER_X_DAYS;
+   EXECUTE IMMEDIATE 'delete from cmn_session_stats';
+
+   FOR C_DATE_REC IN C_DATES
+   LOOP
+      FOR I IN 1 .. 24
+      LOOP
+         V_TO_DATE := C_DATE_REC.LOGIN_DATE + (I / 24) + 1 / 24;
+         V_FROM_DATE := C_DATE_REC.LOGIN_DATE + (I / 24);
+         SELECT   COUNT (*)
+         INTO     V_CNT
+         FROM     CMN_SESSION_AUDITS
+         WHERE    SESSION_START_DATE BETWEEN V_FROM_DATE AND V_TO_DATE;
+
+         IF V_CNT &gt; 0
+         THEN
+            INSERT INTO CMN_SESSION_STATS
+                        (LOGIN_DATE, FROM_TIME, TO_TIME, SESSION_COUNT)
+                 VALUES (
+                    TO_CHAR (C_DATE_REC.LOGIN_DATE, 'YYYY-MM-DD'),
+                    TO_CHAR (V_FROM_DATE, 'HH24:MI:SS'),
+                    TO_CHAR (V_TO_DATE, 'HH24:MI:SS'),
+                    V_CNT
+                 );
+         END IF;
+      END LOOP;
+   END LOOP;
+
+   COMMIT;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

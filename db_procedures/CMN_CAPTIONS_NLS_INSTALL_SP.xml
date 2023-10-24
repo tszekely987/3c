@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_CAPTIONS_NLS_INSTALL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_CAPTIONS_NLS_INSTALL_SP" (
+   p_table_name    IN   VARCHAR2,
+   p_pk_id         IN   INTEGER,
+   p_name          IN   VARCHAR2,
+   p_description   IN   VARCHAR2,
+   p_updated_by    IN   INTEGER,
+   p_attribute1    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute2    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute3    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute4    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute5    IN   VARCHAR2 DEFAULT NULL,
+   p_language      IN   VARCHAR2,
+   p_id            IN   INTEGER DEFAULT NULL,
+   p_force         IN   INTEGER DEFAULT 0
+)
+IS
+   v_count   NUMBER;
+   v_now     DATE;
+   v_id      NUMBER;
+BEGIN
+   SELECT COUNT (*)
+     INTO v_count
+     FROM cmn_captions_nls
+    WHERE table_name = p_table_name
+      AND pk_id = p_pk_id
+      AND language_code = p_language;
+
+   -- Just to make sure there is not a fractional difference between created_date and last_updated_date.
+   -- If there is we have a problem since we use the equality of these two columns as an indicator that
+   -- that the customer hasn't updated a record. If they have, we don't update it because it would override
+   -- their changes.
+   SELECT SYSDATE INTO v_now FROM DUAL;
+
+   IF (v_count &gt; 0)
+   THEN
+      UPDATE cmn_captions_nls
+         SET name = p_name,
+             description = p_description,
+             created_date = v_now, -- We need to keep the time stamps in sync. This is our indicator that the customer hasn't updated this record.
+             last_updated_date = v_now,
+             last_updated_by = p_updated_by,
+             attribute1 = p_attribute1,
+             attribute2 = p_attribute2,
+             attribute3 = p_attribute3,
+             attribute4 = p_attribute4,
+             attribute5 = p_attribute5
+       WHERE table_name = p_table_name
+         AND pk_id = p_pk_id
+         AND language_code = p_language
+         AND created_date = (case when p_force = 1 then created_date else last_updated_date end); -- If created_date=last_updated_date the customer has not updated the caption.
+   ELSE
+     IF (p_id IS NULL)
+     THEN
+        SELECT cmn_captions_nls_s1.nextval INTO v_id FROM DUAL;
+     ELSE
+        v_id := p_id;
+     END IF;
+
+     INSERT INTO cmn_captions_nls (
+                     id,
+                     table_name,
+                     pk_id,
+                     language_code,
+                     name,
+                     description,
+                     created_date,
+                     created_by,
+                     last_updated_date,
+                     last_updated_by,
+                     attribute1,
+                     attribute2,
+                     attribute3,
+                     attribute4,
+                     attribute5
+                  )
+           VALUES (
+              v_id,
+              p_table_name,
+              p_pk_id,
+              p_language,
+              p_name,
+              p_description,
+              v_now,
+              p_updated_by,
+              v_now,
+              p_updated_by,
+              p_attribute1,
+              p_attribute2,
+              p_attribute3,
+              p_attribute4,
+              p_attribute5
+           );
+   END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="CSK_RPT_TIME_PERIOD" displayAttributeName="description" hiddenAttributeName="time_period_key" objectCode="" sortAttributeName="sort_order" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Report (Time Periods)" languageCode="en" name="Report (Time Periods)"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Datawarehouse" dbVendor="mssql"><![CDATA[SELECT @SELECT:x.time_period_key:time_period_key@,
+       @SELECT:x.record_type:record_type@,
+       @SELECT:x.tp_start_date:start_date@,
+       @SELECT:x.tp_finish_date:finish_date@,
+       @SELECT:x.description:description@,
+       @SELECT:ROW_NUMBER() OVER(ORDER BY x.record_type,x.tp_start_date ASC):sort_order@	   
+FROM  (SELECT 'A' AS record_type,
+              -1 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description			  
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPPreviousPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@  
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT ppm_dwh.dwh_cal_date_add_fct(b.start_date,'DAY',-1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  ppm_dwh.dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'B' AS record_type,
+              -2 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPCurrentPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE  ppm_dwh.dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'C' AS record_type,
+              -3 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPNextPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT ppm_dwh.dwh_cal_date_add_fct(b.finish_date,'DAY',1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  ppm_dwh.dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'D' AS record_type,
+              time_period_key AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@ 
+) x
+WHERE (@WHERE:PARAM:USER_DEF:DATE:start_date@ IS NULL OR x.tp_start_date >= @WHERE:PARAM:USER_DEF:DATE:start_date@)
+AND   (@WHERE:PARAM:USER_DEF:DATE:finish_date@ IS NULL OR x.tp_finish_date <= @WHERE:PARAM:USER_DEF:DATE:finish_date@)
+AND    @FILTER@]]></nsql>
+            <nsql databaseId="Datawarehouse" dbVendor="oracle"><![CDATA[SELECT @SELECT:x.time_period_key:time_period_key@,
+       @SELECT:x.record_type:record_type@,
+       @SELECT:x.tp_start_date:start_date@,
+       @SELECT:x.tp_finish_date:finish_date@,
+       @SELECT:x.description:description@,
+       @SELECT:ROW_NUMBER() OVER(ORDER BY x.record_type,x.tp_start_date ASC):sort_order@	   
+FROM  (SELECT 'A' AS record_type,
+              -1 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description			  
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPPreviousPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@  
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT dwh_cal_date_add_fct(b.start_date,'DAY',-1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'B' AS record_type,
+              -2 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPCurrentPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'C' AS record_type,
+              -3 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPNextPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT dwh_cal_date_add_fct(b.finish_date,'DAY',1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'D' AS record_type,
+              time_period_key AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@ 
+) x
+WHERE (@WHERE:PARAM:USER_DEF:DATE:start_date@ IS NULL OR x.tp_start_date >= @WHERE:PARAM:USER_DEF:DATE:start_date@)
+AND   (@WHERE:PARAM:USER_DEF:DATE:finish_date@ IS NULL OR x.tp_finish_date <= @WHERE:PARAM:USER_DEF:DATE:finish_date@)
+AND    @FILTER@]]></nsql>
+            <nsql databaseId="Datawarehouse" dbVendor="postgres"><![CDATA[SELECT @SELECT:x.time_period_key:time_period_key@,
+       @SELECT:x.record_type:record_type@,
+       @SELECT:x.tp_start_date:start_date@,
+       @SELECT:x.tp_finish_date:finish_date@,
+       @SELECT:x.description:description@,
+       @SELECT:ROW_NUMBER() OVER(ORDER BY x.record_type,x.tp_start_date ASC):sort_order@	   
+FROM  (SELECT 'A' AS record_type,
+              -1 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description			  
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPPreviousPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@  
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT dwh_cal_date_add_fct(b.start_date,'DAY',-1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'B' AS record_type,
+              -2 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPCurrentPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'C' AS record_type,
+              -3 AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name @+@ ' - ' @+@ t.translation AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_lkp_translation t ON  t.translation_key = 'TPNextPeriod'
+                                               AND t.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE  tp.time_period_key = (SELECT a.time_period_key
+                                    FROM   dwh_tme_period a 
+                                    WHERE (SELECT dwh_cal_date_add_fct(b.finish_date,'DAY',1)
+                                           FROM   dwh_tme_period b
+                                           WHERE  dwh_cal_trunc_date_fct(@SYSDATE@) BETWEEN b.start_date AND b.finish_date) BETWEEN a.start_date AND a.finish_date)
+       AND    t.is_active = 1
+       UNION
+       SELECT 'D' AS record_type,
+              time_period_key AS time_period_key,
+              csln.period_name AS start_date,
+              cfln.period_name AS finish_date,
+              tp.start_date AS tp_start_date,
+              tp.finish_date AS tp_finish_date,			  
+              csln.period_name  @+@ ' - ' @+@ cfln.period_name AS description
+       FROM   dwh_tme_period tp
+              INNER JOIN dwh_cmn_period cs ON  tp.start_date = cs.period_start_date
+                                           AND cs.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln csln ON  cs.period_key = csln.period_key
+                                                AND csln.language_code = @WHERE:PARAM:LANGUAGE@
+              INNER JOIN dwh_cmn_period cf ON  tp.finish_date = cf.period_end_date
+                                           AND cf.period_type_key = 'DAILY'
+              INNER JOIN dwh_cmn_period_ln cfln ON  cf.period_key = cfln.period_key
+                                                AND cfln.language_code = @WHERE:PARAM:LANGUAGE@ 
+) x
+WHERE @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="start_date"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="start_date"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Time Period"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Time Periods"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="start_date" defaultValue="" order="1" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Start Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="finish_date" defaultValue="" order="2" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Finish Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="time_period_key" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Time Period Key"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="description" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Time Period" languageCode="en" name="Time Period"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

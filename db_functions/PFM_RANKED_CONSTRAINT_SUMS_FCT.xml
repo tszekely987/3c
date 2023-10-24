@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_RANKED_CONSTRAINT_SUMS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_RANKED_CONSTRAINT_SUMS_FCT" (p_portfolio_id NUMBER, p_plan_id NUMBER, p_user_id NUMBER)
+   RETURN PFM_CONSTRAINT_LIMIT_RANKS PIPELINED
+IS
+  CLR PFM_CONSTRAINT_LIMIT_RANK := PFM_CONSTRAINT_LIMIT_RANK('',-1);
+  FTE_CONVERSION NUMBER := 1;
+  DIVISOR NUMBER := 1;
+  PH_START_DATE DATE;
+  PH_FINISH_DATE DATE;
+  UNIT_TYPE VARCHAR2(32);
+  TARGET_SUM NUMBER := 0;
+  CALCULATED_SUM NUMBER := 0;
+  TARGET_OBJECT_ID INTEGER := 0;
+  TARGET_ATTRIBUTE VARCHAR2(64);
+
+BEGIN
+ 
+ SELECT CAPACITY_UNIT_TYPE, START_DATE, FINISH_DATE INTO UNIT_TYPE, PH_START_DATE, PH_FINISH_DATE FROM PFM_PORTFOLIOS WHERE ID = p_portfolio_id;
+    
+  IF p_plan_id &gt; 0 THEN
+      SELECT START_DATE, FINISH_DATE  INTO PH_START_DATE, PH_FINISH_DATE FROM PFM_PLANS WHERE PORTFOLIO_ID = p_portfolio_id AND ID = p_plan_id;
+  END IF;
+  
+  IF UNIT_TYPE = 'CAPACITY_UNIT_TYPE_FTE' THEN
+      -- Figure out the FTE conversion for the planning horizon using the site calendar (TODO - make a function)
+      select crv_sum_fct( c.sqlcurve, PH_START_DATE, PH_FINISH_DATE ) into FTE_CONVERSION 
+      from prcalendar c where prid = (select prcalendarid from prsite);
+  END IF;
+
+  -- get the attributes
+  FOR ao_rec IN (
+      select distinct code from pfm_inv_constraint_sums where portfolio_id = p_portfolio_id --and plan_id = p_plan_id
+  )
+  LOOP
+    BEGIN
+  --  dbms_output.put_line('ao_rec.code: '|| ao_rec.code);
+    
+    clr.constraint_name := ao_rec.code;
+    IF ao_rec.code = 'resource_demand' THEN
+        TARGET_ATTRIBUTE := 'ROLE_CAPACITY';
+        TARGET_OBJECT_ID := 0;
+    END IF;
+    IF substr(ao_rec.code, 0, 12) = 'odf_pfmrole_' THEN
+        TARGET_ATTRIBUTE := 'ROLE_CAPACITY';
+        TARGET_OBJECT_ID := CAST(substr(ao_rec.code, 13) AS NUMBER);
+    END IF;
+    IF substr(ao_rec.code, length(ao_rec.code)-3) = 'cost' THEN
+         TARGET_ATTRIBUTE := 'TOTAL_COST';
+         TARGET_OBJECT_ID := 0;
+         IF substr(ao_rec.code, length(ao_rec.code)-7) = 'cap_cost' THEN TARGET_ATTRIBUTE := 'CAPITAL_COST'; END IF;
+         IF substr(ao_rec.code, length(ao_rec.code)-6) = 'op_cost'  THEN TARGET_ATTRIBUTE := 'OPERATING_COST'; END IF;
+    END IF;
+    IF substr(ao_rec.code, length(ao_rec.code)-6) = 'benefit' THEN
+         TARGET_ATTRIBUTE := 'BENEFITS';
+         TARGET_OBJECT_ID := 0;
+    END IF;
+    IF TARGET_ATTRIBUTE = 'ROLE_CAPACITY' THEN
+        DIVISOR := FTE_CONVERSION;
+    ELSE 
+        DIVISOR := 1;
+    END IF;
+   -- dbms_output.put_line('TARGET_ATTRIBUTE: '||TARGET_ATTRIBUTE);
+   -- dbms_output.put_line('TARGET_OBJECT_ID: ' || to_char(TARGET_OBJECT_ID));
+  --  dbms_output.put_line('Selecting target sum');
+    select NVL(pfm_sum_fct(clob_curve, PH_START_DATE, PH_FINISH_DATE)/DIVISOR,0) ph_sum into TARGET_SUM 
+    from pfm_clob_curves where table_name='PFM_PORTFOLIOS' and portfolio_id = p_portfolio_id AND plan_id = p_plan_id and attribute = TARGET_ATTRIBUTE and object_id = TARGET_OBJECT_ID;
+    -- dbms_output.put_line('Target sum: '|| to_char(TARGET_SUM));
+    CALCULATED_SUM := 0;
+    
+    IF p_plan_id &gt; 0 THEN
+        FOR ranked_invs IN (select investment_id, coalesce(p.rank, v.rank) rank, ph_curve_sum, code
+                            from (select coalesce(pending_plan.ph_curve_sum, pending_port.ph_curve_sum, pln.ph_curve_sum, port.ph_curve_sum) ph_curve_sum, port.code code, port.instance_id investment_id,   
+			                    port.portfolio_id, coalesce(pln.plan_id, port.plan_id) plan_id, coalesce( pending_plan.user_id, pending_port.user_id, pln.user_id, port.user_id) user_id
+			                    from
+			                    (select s.code, s.instance_id, s.ph_curve_sum, 
+			                        s.portfolio_id, s.plan_id, 0 user_id from
+			                    pfm_inv_constraint_sums s
+			                    where s.portfolio_id=p_portfolio_id
+			                    and s.plan_id = 0 ) port
+			                    left outer join
+			                    (select s.code, s.instance_id, s.ph_curve_sum,
+			                     s.portfolio_id, s.plan_id, 0 user_id from
+			                    pfm_inv_constraint_sums s
+			                    where s.portfolio_id=p_portfolio_id
+			                    and s.plan_id = p_plan_id) pln on port.instance_id = pln.instance_id and port.code = pln.code
+			                    left outer join
+			                    (select s.code, s.instance_id, s.ph_curve_sum, 
+			                     s.portfolio_id, s.plan_id, s.user_id from
+			                    temp_inv_constraint_sums s
+			                    where s.portfolio_id=p_portfolio_id
+			                    and s.plan_id = p_plan_id
+			                    and s.user_id=p_user_id) pending_plan on pln.instance_id = pending_plan.instance_id and pln.code = pending_plan.code
+			                    left outer join
+			                    (select s.code, s.instance_id, s.ph_curve_sum, 
+			                     s.portfolio_id, s.plan_id, s.user_id from
+			                    temp_inv_constraint_sums s
+			                    where s.portfolio_id=p_portfolio_id
+			                    and s.plan_id = p_plan_id
+			                    and s.user_id=p_user_id) pending_port on port.instance_id = pending_port.instance_id and port.code = pending_port.code) inv 
+			             LEFT OUTER JOIN pfm_rank_edits p
+			               ON p.INSTANCE_ID = inv.investment_id 
+			               AND p.portfolio_id = p_portfolio_id
+			               AND p.plan_id = p_plan_id 
+			               AND p.user_id = p_user_id  
+			             LEFT OUTER JOIN pfm_plan_ranking_v v 
+			                ON v.INSTANCE_ID = inv.investment_id 
+			                AND v.context_id = p_plan_id  
+			             where inv.code =  clr.constraint_name
+			             order by rank)
+		LOOP
+		  IF (ranked_invs.rank &gt; 0) THEN
+         	CALCULATED_SUM := CALCULATED_SUM + ranked_invs.ph_curve_sum;
+          END IF;
+		  IF (CALCULATED_SUM &gt; TARGET_SUM) THEN
+		      clr.limit_rank := ranked_invs.rank;
+		      EXIT;  
+		  END IF;
+		END LOOP;	
+		
+		IF (CALCULATED_SUM &lt;= TARGET_SUM) THEN
+            clr.limit_rank := -1;
+        END IF;             
+    ELSE 
+        FOR ranked_invs IN (select investment_id, coalesce(p.rank, v.rank) rank, ph_curve_sum, code
+                            from (select coalesce(pending_plan.ph_curve_sum, pending_port.ph_curve_sum, pln.ph_curve_sum, port.ph_curve_sum) ph_curve_sum, port.code code, port.instance_id investment_id,   
+                                port.portfolio_id, coalesce(pln.plan_id, port.plan_id) plan_id, coalesce( pending_plan.user_id, pending_port.user_id, pln.user_id, port.user_id) user_id
+                                from
+                                (select s.code, s.instance_id, s.ph_curve_sum, 
+                                    s.portfolio_id, s.plan_id, 0 user_id from
+                                pfm_inv_constraint_sums s
+                                where s.portfolio_id=p_portfolio_id
+                                and s.plan_id = 0 ) port
+                                left outer join
+                                (select s.code, s.instance_id, s.ph_curve_sum,
+                                 s.portfolio_id, s.plan_id, 0 user_id from
+                                pfm_inv_constraint_sums s
+                                where s.portfolio_id=p_portfolio_id
+                                and s.plan_id = p_plan_id) pln on port.instance_id = pln.instance_id and port.code = pln.code
+                                left outer join
+                                (select s.code, s.instance_id, s.ph_curve_sum, 
+                                 s.portfolio_id, s.plan_id, s.user_id from
+                                temp_inv_constraint_sums s
+                                where s.portfolio_id=p_portfolio_id
+                                and s.plan_id = p_plan_id
+                                and s.user_id=p_user_id) pending_plan on pln.instance_id = pending_plan.instance_id and pln.code = pending_plan.code
+                                left outer join
+                                (select s.code, s.instance_id, s.ph_curve_sum, 
+                                 s.portfolio_id, s.plan_id, s.user_id from
+                                temp_inv_constraint_sums s
+                                where s.portfolio_id=p_portfolio_id
+                                and s.plan_id = p_plan_id
+                                and s.user_id=p_user_id) pending_port on port.instance_id = pending_port.instance_id and port.code = pending_port.code) inv 
+                         LEFT OUTER JOIN pfm_rank_edits p
+                           ON p.INSTANCE_ID = inv.investment_id 
+                           AND p.portfolio_id = p_portfolio_id
+                           AND p.plan_id = p_plan_id  
+                           AND p.user_id = p_user_id 
+                         LEFT OUTER JOIN pfm_portfolio_ranking_v v 
+                            ON v.INSTANCE_ID = inv.investment_id 
+                            AND v.context_id = p_portfolio_id  
+                         where inv.code =  clr.constraint_name
+                         order by rank)
+        LOOP
+          IF (ranked_invs.rank &gt; 0) THEN
+         	CALCULATED_SUM := CALCULATED_SUM + ranked_invs.ph_curve_sum;
+          END IF;
+          IF (CALCULATED_SUM &gt; TARGET_SUM) THEN
+              clr.limit_rank := ranked_invs.rank;
+              EXIT;  
+          END IF;
+        END LOOP;   
+        
+        IF (CALCULATED_SUM &lt;= TARGET_SUM) THEN
+            clr.limit_rank := -1;
+        END IF;    	
+    END IF;
+    EXCEPTION
+       WHEN  NO_DATA_FOUND then clr.limit_rank := -1;
+       WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: '|| SQLERRM );
+    END;
+    pipe row( clr );
+  END LOOP;
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

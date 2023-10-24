@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_HTML_PORTLET_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_HTML_PORTLET_UPD_SP" (
+   P_PORTLET_CODE		   IN   VARCHAR2,
+   P_HTML_TEXT			   IN   VARCHAR2,
+   P_NAME   					 IN   VARCHAR2,
+   P_DESCRIPTION       IN   VARCHAR2,
+   P_CATEGORY_CODE	   IN   VARCHAR2 DEFAULT '',
+   P_LAST_UPDATED_BY   IN   NUMBER DEFAULT 1
+)
+IS
+   V_CATEGORY_ID            	            NUMBER;
+   V_PORTLET_ID            	              NUMBER;
+   V_SERVICE_ID		         	              NUMBER;
+   V_PORTLET_SERVICE_ID		 	              NUMBER;
+   V_CREATE_DATE                 					DATE := SYSDATE;
+BEGIN
+
+		BEGIN
+			SELECT   ID
+			INTO     V_PORTLET_ID
+			FROM     CMN_PORTLETS
+			WHERE    PORTLET_CODE 		= P_PORTLET_CODE;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'PORTLET DOES NOT EXIST');
+   	END;
+
+		BEGIN
+			SELECT   ID
+			INTO     V_SERVICE_ID
+			FROM     CMN_SERVICES
+			WHERE    SERVICE_CODE 		= 'htmlPortlet' || V_PORTLET_ID;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'SERVICE DOES NOT EXIST');
+   	END;
+
+		BEGIN
+			SELECT  ID
+			INTO    V_PORTLET_SERVICE_ID
+			FROM    CMN_PORTLET_SERVICES
+			WHERE   SERVICE_ID 	= V_SERVICE_ID
+			AND			PORTLET_ID 	= V_PORTLET_ID;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'PORTLET SERVICE DOES NOT EXIST');
+   	END;
+   	
+   	if P_CATEGORY_CODE != ''
+   	then
+			BEGIN
+				SELECT  id
+				INTO    V_CATEGORY_ID
+				FROM    cmn_lookups
+				where		lookup_type = 'CMN_CATEGORIES'
+				and			lookup_code = P_CATEGORY_CODE;
+				
+			EXCEPTION
+				WHEN OTHERS then
+					RAISE_APPLICATION_ERROR (-20006, 'CATEGORY DOES NOT EXIST');
+			END;
+			
+			update 	cmn_portlets
+			set 		category_id = V_CATEGORY_ID,
+							last_updated_date = V_CREATE_DATE,
+							last_updated_by = P_LAST_UPDATED_BY
+			where		id = v_portlet_id;
+				
+   	end if;
+
+		update	cmn_html_retrieve_services
+		set			HTML_TEXT = P_HTML_TEXT,
+						last_updated_date = V_CREATE_DATE,
+						last_updated_by = P_LAST_UPDATED_BY
+		where   portlet_id = V_PORTLET_ID;
+
+		CMN_CAPTIONS_NLS_UPD_SP( 'CMN_PORTLETS', V_PORTLET_ID, P_NAME, P_DESCRIPTION, P_LAST_UPDATED_BY);
+
+		CMN_CAPTIONS_NLS_UPD_SP( 'CMN_SERVICES', V_SERVICE_ID, P_NAME, P_DESCRIPTION, P_LAST_UPDATED_BY );
+
+		CMN_CAPTIONS_NLS_UPD_SP( 'CMN_PORTLET_SERVICES', V_PORTLET_SERVICE_ID, P_NAME, P_DESCRIPTION, P_LAST_UPDATED_BY );
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>ODF_VIEW_CAPTIONS_COPY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."ODF_VIEW_CAPTIONS_COPY_SP" (
+   p_view_code                    in   varchar2,
+   p_object_code                  in   varchar2,
+   p_src_partition                in   varchar2,
+   p_dest_partition               in   varchar2
+)
+is
+  v_cnt                         integer := 0;
+  v_cnt2                        integer := 0;
+  v_src_view_id                 number;
+  v_dest_view_id                number;
+  v_src_id                      number;
+  v_dest_id                     number;
+  v_id_src                      number;
+  v_id_dest                     number;
+  v_cursor                      varchar2 (32000);
+  v_sql                         varchar2 (32000);
+
+  type t_cursor_type is ref cursor;
+  c1                            t_cursor_type;
+
+begin
+  --
+  --  Ensure we have valid params
+  --
+  select   count (*)
+  into     v_cnt
+  from     odf_views
+  where    code            = p_view_code
+  and      object_code     = p_object_code
+  and      partition_code  = p_src_partition;
+
+  select   count (*)
+  into     v_cnt2
+  from     odf_views
+  where    code            = p_view_code
+  and      object_code     = p_object_code
+  and      partition_code  = p_dest_partition;
+  if ( v_cnt &gt; 0 and v_cnt2 &gt; 0 )
+  then
+    select   id
+    into     v_src_view_id
+    from     odf_views
+    where    code            = p_view_code
+    and      object_code     = p_object_code
+    and      view_type       in ('property', 'subObjectList')
+    and      partition_code  = p_src_partition;
+
+    select   id
+    into     v_dest_view_id
+    from     odf_views
+    where    code            = p_view_code
+    and      object_code     = p_object_code
+    and      view_type       in ('property', 'subObjectList')
+    and      partition_code  = p_dest_partition;
+     
+    --
+    --  Use the stored proc to copy the captions
+    --
+    cmn_captions_nls_copy_sp ( 'ODF_VIEWS', v_src_view_id, 'ODF_VIEWS', v_dest_view_id );
+    
+    --
+    --  Loop simply to get the sections
+    --
+    v_cursor :=
+      'select sr.id src_id, s.id dest_id from odf_view_sections s, odf_view_sections sr where sr.display_order = s.display_order and sr.view_id = ' || v_src_view_id || ' and s.view_id = ' || v_dest_view_id;
+
+    open c1 for v_cursor;
+
+    loop
+      fetch c1 into v_src_id, v_dest_id;
+      exit when c1%notfound;
+          
+      cmn_captions_nls_copy_sp ( 'ODF_VIEW_SECTIONS', v_src_id, 'ODF_VIEW_SECTIONS', v_dest_id );
+      
+    end loop;
+    
+    close c1;
+
+    --
+    --  Loop to get the attributes
+    --
+    v_cursor :=
+      'select sr.label_pk_id src_id, d.label_pk_id dest_id ' || 
+              'from odf_view_attributes d, odf_view_attributes sr ' || 
+              'where sr.attribute_code = d.attribute_code and sr.view_id = ' || v_src_view_id || ' and d.view_id = ' || v_dest_view_id;
+
+    open c1 for v_cursor;
+
+    loop
+      fetch c1 into v_src_id, v_dest_id;
+      exit when c1%notfound;
+          
+      cmn_captions_nls_copy_sp ( 'ODF_VIEW_ATTRIBUTES', v_src_id, 'ODF_VIEW_ATTRIBUTES', v_dest_id );
+      
+    end loop;
+    
+    close c1;
+
+    commit;
+
+   else
+      raise_application_error (-20017, 'RECORD DOES NOT EXIST');
+   end if;
+end;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

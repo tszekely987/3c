@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_CONVERT_SECONDS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_CONVERT_SECONDS_FCT" (in_sec IN NUMBER, format IN NUMBER) RETURN VARCHAR2 IS
+
+
+--Function Second_Convert(in_sec in number)
+--           format in number (1 is military, 2 is english)
+--       return varchar2 is
+dayz NUMBER;
+hrs NUMBER;
+mins NUMBER;
+lmin NUMBER;
+sec NUMBER;
+formatType NUMBER;
+holdNo NUMBER;
+DayString VARCHAR(20);
+Rem_sec NUMBER;
+ret_string VARCHAR2(100);
+
+
+BEGIN
+
+   IF format IS NULL THEN
+      formatType := 2;
+   ELSE
+      formatType := format;
+   END IF;
+
+
+   IF in_sec IS NULL OR in_sec = 0 THEN
+      ret_string := '00:00:00';
+      IF formatType = 1 THEN
+        ret_string := '00:00:00';
+      ELSE
+        ret_string := ' ';  --0 Hours 0 Mins 0 Secs
+      END IF;
+   ELSE
+
+      dayz := FLOOR((in_sec/3600)/24);
+      IF dayz = 0 THEN
+     daystring:=' ' ;
+
+      ELSE
+     daystring:= dayz || 'Days';
+      END IF;
+      rem_sec := in_sec-(dayz*24*3600);
+
+      hrs:= FLOOR(rem_sec/3600);
+      rem_sec := rem_sec-(hrs*3600);
+
+      mins:= FLOOR(rem_sec/60);
+      rem_sec := rem_sec-(mins*60);
+
+      ret_string := REPLACE(daystring || ' ' || TO_CHAR(hrs,'00') || ':' || TO_CHAR(mins,'90') || ':' || TO_CHAR(rem_sec,'90'),  ' ','');
+
+
+      IF formatType = 1 THEN
+     ret_string := REPLACE(daystring || TO_CHAR(hrs,'00') || ':' || TO_CHAR(mins,'00') || ':' || TO_CHAR(rem_sec,'00'),  ' ','');
+
+         ret_string := REPLACE(ret_string, 'Days',' Days ');
+      ELSE
+     --ret_string := REPLACE(daystring || to_char(hrs,'00') || ' Hours ' || to_char(mins,'90') || ' Mins ' || to_char(rem_sec,'90') || ' Secs',  ' ','');
+
+         IF dayz = 1 THEN
+            ret_string := dayz || ' day';
+         ELSE
+
+            IF dayz &gt; 1 THEN
+               ret_string := dayz || ' days';
+            ELSE
+               ret_string := ' ';
+            END IF;
+         END IF;
+     /* HOURS  */
+         IF dayz &gt; 0 AND hrs &gt; 0 THEN
+            ret_string := ret_string || ', ' ;
+         END IF ;
+         IF hrs &gt; 0 THEN
+            ret_string := RTRIM(LTRIM(ret_string)) || ' ' || LTRIM(TO_CHAR(hrs,'99'));
+
+
+
+            IF hrs = 1 THEN
+               ret_string := ret_string || ' hour';
+            ELSE
+               ret_string := ret_string || ' hours';
+            END IF;
+         END IF;
+     /* MINUTES  */
+         IF hrs &gt; 0 AND mins &gt; 0 THEN
+            ret_string := ret_string || ', ' ;
+         END IF ;
+         IF mins &gt; 0 THEN       
+            ret_string := RTRIM(ret_string) || ' ' || LTRIM(TO_CHAR(mins,'99'));            
+
+            IF mins = 1 THEN
+               ret_string := ret_string || ' minute';
+            ELSE
+               ret_string := ret_string || ' minutes';
+            END IF;
+         END IF;
+     /* SECONDS  */
+         IF dayz = 0 AND hrs = 0 AND mins = 0 AND rem_sec &gt; 0 THEN
+            ret_string := TO_CHAR(rem_sec,'90');
+            --ret_string := to_char((rem_sec / 60),'.00');
+            IF rem_sec = 1 THEN
+              ret_string := ret_string || ' second';
+            ELSE
+
+              ret_string := ret_string || ' seconds';
+            END IF;
+            
+         END IF;    
+         IF dayz = 0 AND hrs = 0 AND mins = 0 AND rem_sec &gt; 0 AND 1=2 THEN
+            ret_string := ' ';
+         END IF;
+      END IF;
+    END IF;
+    
+
+  RETURN LTRIM(ret_string);
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

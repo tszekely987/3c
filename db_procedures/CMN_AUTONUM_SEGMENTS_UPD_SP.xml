@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUTONUM_SEGMENTS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUTONUM_SEGMENTS_UPD_SP" (
+   P_ID          IN  NUMBER,
+   P_SEG_CODE    IN  VARCHAR2,
+   P_LENGTH      IN  INTEGER,
+   P_START_VALUE IN  VARCHAR2,
+   P_TEXT_VALUE  IN  VARCHAR2,
+   P_IS_AUTOEXT  IN  INTEGER
+)
+IS
+   V_SCHEME_ID       NUMBER;
+   V_START_VALUE     NUMBER;
+   V_SEG_CODE        VARCHAR2(30);
+BEGIN
+   V_SEG_CODE := UPPER(P_SEG_CODE);
+
+   IF V_SEG_CODE NOT IN ('TEXT', 'NUMERIC', 'ALPHANUMERIC', 'CREATE_DATE', 'PARENT_REF')
+   THEN
+      RAISE_APPLICATION_ERROR(-20000, 'INVALID SEGMENT TYPE');
+   END IF;
+
+   IF v_seg_code IN ('NUMERIC', 'ALPHANUMERIC')
+   THEN
+     -- Make sure starting number and counter length doesn't exceed length
+     IF LENGTH(P_TEXT_VALUE) &gt; P_LENGTH OR
+        LENGTH(P_START_VALUE) &gt; P_LENGTH
+     THEN
+        RAISE_APPLICATION_ERROR(-20000,
+           'COUNTER STARTING NUMBER AND COUNTER LENGTH ARE INCONSISTENT');
+     END IF;
+   END IF;
+
+   -- Convert alphanumeric value to numeric value for start value
+   IF V_SEG_CODE = 'ALPHANUMERIC'
+   THEN
+      V_START_VALUE := CMN_AUTONUM_TO_NUM_FCT(P_START_VALUE);
+   ELSIF V_SEG_CODE = 'NUMERIC'
+   THEN
+      V_START_VALUE := TO_NUMBER(P_START_VALUE);
+   END IF;
+
+   -- Fix for bug 92554 Start
+   -- Can't hold value larger than NUMBER(38,0)
+   IF V_START_VALUE = -1 OR V_START_VALUE &gt; 99999999999999999999999999999999999999
+   THEN
+      RAISE_APPLICATION_ERROR(-20000, 'INVALID ALPHANUMERIC LENGTH');
+   END IF;
+   -- Fix for bug 92554 End
+
+   -- Update the segment
+   UPDATE CMN_AUTONUM_SCHEME_SEGMENTS
+   SET    SEGMENT_CODE      = V_SEG_CODE,
+          LENGTH            = P_LENGTH,
+          START_VALUE       = V_START_VALUE,
+          NEXT_VALUE        = V_START_VALUE,
+          TEXT_VALUE        = P_TEXT_VALUE,
+          IS_AUTO_EXTENDED  = P_IS_AUTOEXT,
+          LAST_UPDATED_DATE = SYSDATE,
+          LAST_UPDATED_BY   = 1
+   WHERE  ID                = P_ID;
+
+   -- Update next value for this scheme
+   SELECT SCHEME_ID
+   INTO   V_SCHEME_ID
+   FROM   CMN_AUTONUM_SCHEME_SEGMENTS
+   WHERE  ID = P_ID;
+
+   CMN_AUTONUM_SCHEMES_UPD_SP(V_SCHEME_ID, NULL, NULL);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

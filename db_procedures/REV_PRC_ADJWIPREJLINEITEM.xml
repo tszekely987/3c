@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_ADJWIPREJLINEITEM</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_ADJWIPREJLINEITEM" 
+(
+  adjustgroupno   NUMBER ,
+  in_lastupdateuser   IN VARCHAR2
+)
+AS
+  LASTUPDTDBY_RESOURCE_CODE   GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  applytono   NUMBER;
+  rorigtransactionno  NUMBER;
+  glpostedflag  GLOBALPKG.STRING;
+  transtype   GLOBALPKG.STRING;
+  sourcemodule  NUMBER(5,0);
+  origapplyto   NUMBER;
+  deleteflag  NUMBER(1,0);
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+	rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE := rev_prc_adjwiprejlineitem.in_lastupdateuser;
+	rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE :=  NVL(RTRIM(rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE),
+	   ' ');
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT DISTINCT  Del
+		INTO rev_prc_adjwiprejlineitem.deleteflag
+		FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  rev_prc_adjwiprejlineitem.deleteflag = 1 THEN
+		RETURN ;
+	END IF;
+	SAVEPOINT tran1;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_TransWIPAdjust
+	SET Del = 1,
+	LASTUPDTDBY_RESOURCE_CODE = rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE,
+	LastUpdateDate = SYSDATE
+	WHERE AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT tran1;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT  DISTINCT ApplyTo
+		INTO rev_prc_adjwiprejlineitem.applytono
+		FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno
+		 AND TransDescription = 'R';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT DISTINCT  TransType,  SourceModule,  TransNo
+		INTO rev_prc_adjwiprejlineitem.transtype, rev_prc_adjwiprejlineitem.sourcemodule,
+			 rev_prc_adjwiprejlineitem.rorigtransactionno
+		FROM ppa_TransWIPAdjust
+		WHERE AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno
+		  AND TransDescription = 'RO';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	SAVEPOINT tran2;
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_WIP w
+		WHERE w.TransNo = rev_prc_adjwiprejlineitem.applytono );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP
+		SET Status = 0,
+		LASTUPDTDBY_RESOURCE_CODE = rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE,
+		LastUpdateDate = SYSDATE
+		WHERE TransNo = rev_prc_adjwiprejlineitem.applytono;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+	END;
+/*
+	ELSE
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIPHistory
+		SET Status = 0,
+		LASTUPDTDBY_RESOURCE_CODE = rev_prc_adjwiprejlineitem.LASTUPDTDBY_RESOURCE_CODE,
+		LastUpdateDate = SYSDATE
+		WHERE TransNo = rev_prc_adjwiprejlineitem.applytono;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran2;
+			RETURN ;
+		END;
+		END IF;
+	END;
+*/
+	END IF;
+/*
+	IF  rev_prc_adjwiprejlineitem.transtype = 'X' AND   rev_prc_adjwiprejlineitem.sourcemodule = 3 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        DELETE FROM transexpadjust
+        WHERE transactionno = rev_prc_adjwiprejlineitem.rorigtransactionno;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+      IF  StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT tran2;
+          RETURN ;
+        END;
+      END IF;
+    END;
+	END IF;
+*/
+
+/*
+  BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  apdetails
+		WHERE ROWID IN
+		(SELECT apdetails.ROWID
+		 FROM ppa_TransWIPAdjust T, apdetails
+		 WHERE apdetails.transactionno = T.TransNo
+		 AND T.AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno
+		 AND T.TransType  IN ('L', 'M', 'Q', 'X')
+		 AND apdetails.transource = 'A');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  apdetailsaccts
+		WHERE ROWID IN
+		(SELECT apdetailsaccts.ROWID
+		 FROM ppa_TransWIPAdjust T, apdetailsaccts
+		 WHERE apdetailsaccts.transactionno = T.TransNo
+		 AND T.AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno
+		 AND T.TransType  IN ('L', 'M', 'Q', 'X')
+		 AND apdetailsaccts.transource = 'A');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran2;
+		RETURN ;
+	END;
+	END IF;
+*/
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	DELETE FROM ppa_TransWIPAdjust_values
+	WHERE transno in
+	(select transno from ppa_TransWIPAdjust where AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT tran2;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TransWIPAdjust
+	WHERE AdjustGroupNo = rev_prc_adjwiprejlineitem.adjustgroupno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT tran2;
+	END IF;
+
+END rev_prc_adjwiprejlineitem;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

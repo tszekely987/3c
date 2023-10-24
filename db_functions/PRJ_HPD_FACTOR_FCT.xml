@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_HPD_FACTOR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_HPD_FACTOR_FCT" 
+RETURN NUMBER
+IS
+  V_HPD     NUMBER;
+BEGIN
+
+  -- when in doubt, return 1 for mult / div scaling
+  
+  V_HPD := -1;
+  
+  BEGIN  
+    SELECT  CASE WHEN V.VALUE='days'
+                THEN (SELECT C.HOURS_PER_DAY
+                      FROM PRCalendar c, PRSITE s
+                      WHERE c.prID = s.prCalendarID
+                      AND s.prCalendarID IS NOT NULL)
+                ELSE null 
+            END
+    INTO    V_HPD
+    FROM    CMN_OPTION_VALUES V, CMN_OPTIONS O
+    WHERE   V.OPTION_ID = O.ID AND O.IS_ACTIVE = 1
+    AND     O.OPTION_CODE = 'PRJ_EFFORT_DISP_UNIT';
+    EXCEPTION
+      WHEN OTHERS THEN
+         RETURN 1;
+  END;
+  
+  IF V_HPD &gt; 0 THEN
+   RETURN V_HPD;
+  END IF;
+  
+  RETURN 1;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

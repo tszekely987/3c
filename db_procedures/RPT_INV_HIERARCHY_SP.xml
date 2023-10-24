@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_INV_HIERARCHY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_INV_HIERARCHY_SP" 
+AS
+    v_parent_id NUMERIC;
+    v_child_id NUMERIC;
+    v_inv_hier_id NUMERIC;
+    v_is_parent NUMERIC;
+    v_alloc_pct NUMERIC(32,6);
+    v_level NUMERIC;
+    v_found INTEGER;
+    v_name VARCHAR2(768);
+    v_seq_str VARCHAR2(70);
+    v_sequence INTEGER;
+    v_current_date DATE;
+BEGIN
+    v_current_date := SYSDATE;
+
+    BEGIN
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE rpt_inv_hierarchy';
+    EXCEPTION
+    WHEN OTHERS THEN
+        BEGIN
+            ROLLBACK;
+            GOTO output;
+        END;
+    END; 
+    COMMIT;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor0 IS
+    SELECT h.id inv_hierarchies_id,
+           i.id parent_id,
+           i.id child_id,
+           0 is_parent,
+           1 alloc_pct,
+           1 the_level,
+           i.name
+    FROM   inv_hierarchies h
+           INNER JOIN inv_investments i ON h.child_id = i.id
+           LEFT OUTER JOIN inv_projects p ON i.id = p.prID                     
+    WHERE  NVL(h.parent_id,0) = 0
+    AND    NVL(p.is_template,0) = 0
+    ORDER BY i.name;
+    BEGIN
+    OPEN cursor0;
+    LOOP
+        FETCH cursor0 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_name;
+        EXIT WHEN cursor0%NOTFOUND;
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, TO_CHAR(v_sequence), v_current_date) = -1 THEN
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor1 IS
+    SELECT DISTINCT h.id inv_hierarchies_id,
+           h.parent_id,
+           h.child_id,
+           0 is_parent,
+           h.default_alloc_pct alloc_pct,
+           2 the_level,
+           p.sequence_str,
+           i.name
+    FROM   inv_hierarchies h
+           INNER JOIN rpt_inv_hierarchy p ON h.parent_id = p.parent_id AND p.the_level = 1
+           INNER JOIN inv_investments i ON h.child_id = i.id
+    WHERE  NVL(h.parent_id,0) &lt;&gt; 0
+    ORDER BY p.sequence_str, i.name;
+    BEGIN
+    OPEN cursor1;
+    LOOP
+        FETCH cursor1 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor1%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor2 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id,
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           3 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 2
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor2;
+    LOOP
+        FETCH cursor2 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor2%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor3 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           4 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 3
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor3;
+    LOOP
+        FETCH cursor3 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor3%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor4 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           5 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 4
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor4;
+    LOOP
+        FETCH cursor4 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor4%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor5 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           6 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 5
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor5;
+    LOOP
+        FETCH cursor5 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor5%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor6 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           7 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 6
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor6;
+    LOOP
+        FETCH cursor6 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor6%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor7 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           8 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 7
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor7;
+    LOOP
+        FETCH cursor7 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor7%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor8 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           9 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 8
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor8;
+    LOOP
+        FETCH cursor8 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor8%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+    COMMIT;
+    END;
+
+    v_sequence := 1000000;
+    DECLARE CURSOR cursor9 is
+    SELECT i.id inv_hierarchies_id,
+           z.parent_id, 
+           i.child_id,
+           0 is_parent,
+           z.alloc_pct * i.default_alloc_pct alloc_pct,
+           10 the_level,
+           z.sequence_str,
+           inv.name
+    FROM   rpt_inv_hierarchy z
+           INNER JOIN inv_hierarchies i ON z.child_id = i.parent_id
+           INNER JOIN inv_investments inv ON i.child_id = inv.id
+    WHERE  z.the_level = 9
+    ORDER BY z.sequence_str, inv.name;
+    BEGIN
+    OPEN cursor9;
+    LOOP
+        FETCH cursor9 INTO v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_name;
+        EXIT WHEN cursor9%NOTFOUND;
+        v_seq_str := v_seq_str || TO_CHAR(v_sequence);
+        IF rpt_inv_hierarchy_ins_fct (v_inv_hier_id, v_parent_id, v_child_id, v_is_parent, v_alloc_pct, v_level, v_seq_str, v_current_date) = -1 then
+            GOTO output;
+        END IF;
+        v_sequence := v_sequence + 1;
+    END LOOP;
+
+    COMMIT;
+    END; 
+    &lt;&lt;output&gt;&gt;
+    RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

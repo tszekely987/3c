@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_CURR_REVISION_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_CURR_REVISION_SP" (
+  COMPANY_CODE                    VARCHAR2 ,
+  PROJECT_CODE                    VARCHAR2 ,
+  revision_type            IN OUT NUMBER,
+  increment_revision_if_approved  NUMBER  DEFAULT 1,
+  RESOURCE_CODE                   VARCHAR2  DEFAULT NULL,
+  in_targetedstartdate        IN  DATE  DEFAULT NULL,
+  in_targetedcompldate        IN  DATE  DEFAULT NULL,
+  in_userinitials             IN  VARCHAR2  DEFAULT NULL,
+  projrevisionid              OUT NUMBER)
+AS
+  targetedstartdate               DATE;
+  targetedcompldate               DATE;
+  APPROVEDBY_RESOURCE_CODE        GLOBALPKG.STRING;
+  item_exists                     INTEGER;
+  StoO_error                      INTEGER;
+  StoO_rowcnt                     INTEGER;
+  StoO_crowcnt                    INTEGER := 0;
+  StoO_fetchstatus                INTEGER := 0;
+  StoO_errmsg                     GLOBALPKG.STRING;
+  StoO_sqlstatus                  INTEGER;
+  rowcount                        NUMBER(6);
+  --projrevisionid                NUMBER;
+  highest_overall_projrevisionid  NUMBER;
+  budgetrevision                  NUMBER(1,0);
+  datesrevision                   NUMBER(1,0);
+  highest_budget_revision         NUMBER(5);
+  --logn number;
+  -- 1 - budget 2 - dates, 3 - both If 3, return whether its budget, dates, or both
+  --This procedure retrieves the current budget or dates revision
+  --If the current revision is approved, this procedure will create the next revision
+  --and return that revision
+BEGIN
+	PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate := PAC_MNT_GET_CURR_REVISION_SP.in_targetedstartdate;
+	PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate := PAC_MNT_GET_CURR_REVISION_SP.in_targetedcompldate;
+  PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE := PAC_MNT_GET_CURR_REVISION_SP.RESOURCE_CODE; -- in_userinitials;
+
+	--logn := sqllogfunc('Begining pac_mnt_get_curr_revision_sp');
+
+	IF  PAC_MNT_GET_CURR_REVISION_SP.revision_type NOT IN(1, 2, 3) THEN
+		raise_application_error(-20723, 'Error in PAC_MNT_GET_CURR_REVISION_SP: revision_type must be 1, 2, or 3');
+    RETURN;
+	END IF;
+
+  BEGIN
+    SELECT nvl(MAX(projrevisionid),0)
+      INTO PAC_MNT_GET_CURR_REVISION_SP.projrevisionid
+      FROM projrevision
+     WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+       AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE;
+    SELECT budgetrevision,
+           datesrevision
+      INTO PAC_MNT_GET_CURR_REVISION_SP.budgetrevision,
+           PAC_MNT_GET_CURR_REVISION_SP.datesrevision
+      FROM projrevision
+     WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+       AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+       AND projrevisionid = PAC_MNT_GET_CURR_REVISION_SP.projrevisionid;
+
+		--logn := sqllogfunc('MAX(projrevisionid - 1) '||to_char(PAC_MNT_GET_CURR_REVISION_SP.projrevisionid));
+
+	EXCEPTION
+		WHEN	TOO_MANY_ROWS THEN
+			NULL;
+    WHEN NO_DATA_FOUND THEN
+      PAC_MNT_GET_CURR_REVISION_SP.budgetrevision := 1;
+      PAC_MNT_GET_CURR_REVISION_SP.projrevisionid := 0;
+      INSERT INTO projrevision
+        (COMPANY_CODE,
+        PROJECT_CODE,
+        MASTER_PROJECT_CODE,
+        changeorder,
+        projrevisionid,
+        budgetrevision,
+        datesrevision,
+        currenttargetedstartdate,
+        currenttargetedcompldate,
+        inprogress,
+        awaitingapproval,
+        approved,
+        revisiondatetime,
+        APPROVEDBY_RESOURCE_CODE,
+        costplus,
+        ratematrix)
+      SELECT
+        DISTINCT PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE,
+        PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE,
+        NVL(p.MASTER_PROJECT_CODE, p.PROJECT_CODE),
+        p.changeorder,
+        0,
+        DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 1, 1, 1),
+        DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 2, 1, 0),
+        sysdate,
+        sysdate,
+        0 "inprogress",
+        0 "awaitingapproval",
+        0 "approved",
+        SYSDATE,
+        PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE,
+        p.costplus,
+        p.ratematrix
+      FROM pac_mnt_projects p
+     WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+       AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE;
+			--RAISE_APPLICATION_ERROR(-20724, 'The latest revision is not found');
+			RETURN;
+	END;
+
+  if PAC_MNT_GET_CURR_REVISION_SP.projrevisionid = 0 then
+     PAC_MNT_GET_CURR_REVISION_SP.budgetrevision := 1;
+  end if;
+  IF PAC_MNT_GET_CURR_REVISION_SP.budgetrevision = 1 AND   PAC_MNT_GET_CURR_REVISION_SP.datesrevision = 1 THEN
+		PAC_MNT_GET_CURR_REVISION_SP.revision_type :=  3;
+  ELSIF PAC_MNT_GET_CURR_REVISION_SP.budgetrevision = 1 THEN
+		PAC_MNT_GET_CURR_REVISION_SP.revision_type :=  1;
+  ELSIF PAC_MNT_GET_CURR_REVISION_SP.datesrevision = 1 THEN
+		PAC_MNT_GET_CURR_REVISION_SP.revision_type :=  2;
+	ELSE
+		raise_application_error(-20195, 'The latest revision is not a budget or a dates revision.');
+    RETURN;
+	END IF;
+	--raise_application_error(-20001,'Projrevision ID '||to_char(PAC_MNT_GET_CURR_REVISION_SP.projrevisionid));
+	--Get the current dates revision
+
+  SELECT nvl(MAX(projrevisionid),0)
+    INTO PAC_MNT_GET_CURR_REVISION_SP.projrevisionid FROM projrevision
+   WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+     AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+     AND datesrevision = 1;
+
+  --logn := sqllogfunc('MAX(projrevisionid - 2) '||to_char(PAC_MNT_GET_CURR_REVISION_SP.projrevisionid));
+  IF PAC_MNT_GET_CURR_REVISION_SP.revision_type IN (1, 3) THEN
+		--If budget revision
+		--This may be needed later on a budget revision insert
+		--Make sure the projrevision holds the latest dates revision
+    SELECT currenttargetedstartdate,
+           currenttargetedcompldate
+      INTO PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate,
+           PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate
+      FROM projrevision
+     WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+       AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+       AND projrevisionid = PAC_MNT_GET_CURR_REVISION_SP.projrevisionid;
+
+    -- Get the latest budget revision
+    SELECT nvl(MAX(projrevisionid),0)
+      INTO PAC_MNT_GET_CURR_REVISION_SP.projrevisionid FROM projrevision
+     WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+       AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+       AND budgetrevision = 1;
+		--logn := sqllogfunc('MAX(projrevisionid - 3) '||to_char(PAC_MNT_GET_CURR_REVISION_SP.projrevisionid));
+	END IF;
+
+  IF PAC_MNT_GET_CURR_REVISION_SP.increment_revision_if_approved = 0 THEN
+		--logn := sqllogfunc('PAC_MNT_GET_CURR_REVISION_SP.increment_revision_if_approved = 0 -- returning');
+		--raise_application_error(-20195, 'increment_revision_if_approved = 0.');
+    RETURN;
+	END IF;
+
+  /* we no longe use initials: it is resoruce code
+  --If the latest budget or dates revision (depending on revision_type) is approved,
+	--do the following
+  IF PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE IS NULL THEN
+		BEGIN
+      SELECT initials
+        INTO PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE
+        FROM pac_mnt_resources
+       WHERE RESOURCE_CODE = PAC_MNT_GET_CURR_REVISION_SP.RESOURCE_CODE;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+		END;
+	END IF;
+  */
+
+  SELECT MAX(projrevisionid)
+    INTO PAC_MNT_GET_CURR_REVISION_SP.highest_overall_projrevisionid
+    FROM projrevision
+   WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+     AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE;
+	--logn := sqllogfunc('MAX(projrevisionid - highest_overall_projrevisionid - 4) '||to_char(PAC_MNT_GET_CURR_REVISION_SP.highest_overall_projrevisionid));
+	item_exists := 0;
+
+  BEGIN
+    SELECT 1 INTO item_exists
+    FROM  DUAL
+    WHERE   PAC_MNT_GET_CURR_REVISION_SP.revision_type = 2
+    OR    EXISTS (SELECT  1
+        FROM  projrevision
+        WHERE   COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+        AND   PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+        AND   projrevisionid = PAC_MNT_GET_CURR_REVISION_SP.projrevisionid
+        AND   approved = 0 );
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        item_exists := 0;
+      WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20725, 'Error');
+        RETURN;
+	END;
+
+  -- If current revision is not approved
+  IF item_exists != 0 THEN
+		item_exists := 0;
+		BEGIN
+      SELECT  1 INTO item_exists
+      FROM  DUAL
+      WHERE   EXISTS (SELECT  1
+          FROM projrevision
+          WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+          AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+          AND projrevisionid = PAC_MNT_GET_CURR_REVISION_SP.highest_overall_projrevisionid
+          AND approved = 0 );
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          item_exists := 0;
+		END;
+
+    IF item_exists != 0 THEN
+/*
+RAISE_APPLICATION_ERROR(-20726, 'aaaaa = ' || PAC_MNT_GET_CURR_REVISION_SP.projrevisionid || ' rev type ' || PAC_MNT_GET_CURR_REVISION_SP.revision_type || ' date ' || PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate);
+RETURN;
+*/
+      UPDATE projrevision
+         SET
+				budgetrevision = DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 1, 1 , budgetrevision),
+				datesrevision = DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 2, 1 , datesrevision),
+				currenttargetedstartdate = NVL(PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate, currenttargetedstartdate),
+				currenttargetedcompldate = NVL(PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate, currenttargetedcompldate),
+				revisiondatetime = SYSDATE,
+				APPROVEDBY_RESOURCE_CODE = PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE
+			WHERE	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+			AND 	PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+			AND 	projrevisionid = PAC_MNT_GET_CURR_REVISION_SP.highest_overall_projrevisionid;
+			END IF;
+	-- if current revision is approved
+	ELSE
+		PAC_MNT_GET_CURR_REVISION_SP.projrevisionid :=  PAC_MNT_GET_CURR_REVISION_SP.highest_overall_projrevisionid +  1;
+		--logn := sqllogfunc('MAX(projrevisionid - highest_overall_projrevisionid + 1 - 5) '||to_char(PAC_MNT_GET_CURR_REVISION_SP.projrevisionid));
+		IF PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate IS NULL
+		THEN   SELECT  currenttargetedstartdate
+			   INTO 	PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate
+			   FROM 	projrevision
+			   WHERE 	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+	 		   AND 	PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+			   AND 	projrevisionid IN (SELECT 	MAX(projrevisionid)
+			   					   	   FROM 	projrevision
+			   					  	   WHERE 	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+	 		   						   AND 		PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+									   AND		currenttargetedstartdate IS NOT NULL);
+		END IF;
+		IF PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate IS NULL
+		THEN SELECT  currenttargetedcompldate
+			 INTO 	PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate
+			 FROM 	projrevision
+			 WHERE 	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+	 		 AND 	PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+		     AND 	projrevisionid IN (SELECT 	MAX(projrevisionid)
+			   					   	   FROM 	projrevision
+			   					  	   WHERE 	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+	 		   						   AND 		PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+									   AND		currenttargetedcompldate IS NOT NULL);
+		END IF;
+
+    UPDATE PAC_MNT_PROJECTS SET CURRENTREVISION=PAC_MNT_GET_CURR_REVISION_SP.projrevisionid
+		WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+ 		AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE;
+
+    INSERT INTO projrevision
+			(COMPANY_CODE,
+			PROJECT_CODE,
+			MASTER_PROJECT_CODE,
+			changeorder,
+			projrevisionid,
+			budgetrevision,
+			datesrevision,
+			currenttargetedstartdate,
+			currenttargetedcompldate,
+			inprogress,
+			awaitingapproval,
+			approved,
+			revisiondatetime,
+			APPROVEDBY_RESOURCE_CODE,
+			costplus,
+			ratematrix)
+		SELECT  DISTINCT PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE,
+			PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE,
+			NVL(p.MASTER_PROJECT_CODE, p.PROJECT_CODE),
+			p.changeorder,
+			PAC_MNT_GET_CURR_REVISION_SP.projrevisionid,
+			DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 1, 1, budgetrevision),
+		   	DECODE(PAC_MNT_GET_CURR_REVISION_SP.revision_type, 2, 1, datesrevision),
+			PAC_MNT_GET_CURR_REVISION_SP.targetedstartdate,
+			PAC_MNT_GET_CURR_REVISION_SP.targetedcompldate,
+			0 "inprogress",
+			0 "awaitingapproval",
+			0 "approved",
+			SYSDATE,
+			PAC_MNT_GET_CURR_REVISION_SP.APPROVEDBY_RESOURCE_CODE,
+			p.costplus,
+			p.ratematrix
+		 FROM pac_mnt_projects p
+		 WHERE COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+		 AND PROJECT_CODE = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE;
+
+		 IF  PAC_MNT_GET_CURR_REVISION_SP.revision_type IN (1, 3) AND PAC_MNT_GET_CURR_REVISION_SP.projrevisionid &gt; 0 THEN
+		 	SELECT  MAX(projrevisionid)
+		 	INTO    highest_budget_revision
+			FROM 	projrevision
+			WHERE	COMPANY_CODE = PAC_MNT_GET_CURR_REVISION_SP.COMPANY_CODE
+			AND		PROJECT_CODE	 = PAC_MNT_GET_CURR_REVISION_SP.PROJECT_CODE
+			AND		budgetrevision = 1
+			AND		projrevisionid &lt; PAC_MNT_GET_CURR_REVISION_SP.projrevisionid;
+    END IF;
+	END IF;
+END PAC_MNT_GET_CURR_REVISION_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_ROLE_RIGHT_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_ROLE_RIGHT_DEL_SP" (P_ROLE_OR_RIGHT_CODE IN VARCHAR2)
+IS
+   V_ROLE_OR_RIGHT_ID            NUMBER;
+   V_RIGHT_TYPE                  VARCHAR2 (30);
+BEGIN
+   SELECT   NVL (MAX (ID), -9),
+            NVL (MAX (RIGHT_TYPE), NULL)
+   INTO     V_ROLE_OR_RIGHT_ID,
+            V_RIGHT_TYPE
+   FROM     CMN_SEC_GROUPS
+   WHERE    GROUP_CODE = P_ROLE_OR_RIGHT_CODE
+   AND      GROUP_ROLE_TYPE &lt;&gt; 'GROUP';
+
+   -- If it is a right ...
+   IF V_RIGHT_TYPE IS NOT NULL
+   THEN
+      -- Delete instance right
+      DELETE
+        FROM CMN_SEC_ASSGND_OBJ_PERM
+       WHERE RIGHT_ID = V_ROLE_OR_RIGHT_ID;
+
+      -- Delete permissions for this right
+      DELETE
+        FROM CMN_SEC_ASSGND_OBJ_PERM
+       WHERE PRINCIPAL_TYPE &lt;&gt; 'USER'
+        AND      PRINCIPAL_ID = V_ROLE_OR_RIGHT_ID;
+
+      -- Delete any assignments of this right to roles
+      DELETE
+        FROM CMN_SEC_GROUP_HIERARCHIES
+       WHERE GROUP_ID = V_ROLE_OR_RIGHT_ID;
+   ELSE-- It's a role
+      -- Delete all hierarchies for this role
+      DELETE
+        FROM CMN_SEC_GROUP_HIERARCHIES
+       WHERE PARENT_GROUP_ID = V_ROLE_OR_RIGHT_ID;
+   END IF;
+
+   -- Delete right assignments
+   DELETE
+     FROM CMN_SEC_ASSGND_RIGHT
+    WHERE RIGHT_ID = V_ROLE_OR_RIGHT_ID;
+
+   -- Delete right / role
+   DELETE
+     FROM CMN_SEC_GROUPS
+    WHERE ID = V_ROLE_OR_RIGHT_ID;
+    
+   CMN_CAPTIONS_NLS_DEL_SP('CMN_SEC_GROUPS', V_ROLE_OR_RIGHT_ID);
+
+   COMMIT;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

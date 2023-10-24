@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_GETTASKSNLR</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_GETTASKSNLR" 
+(
+in_ProjectCode	  	VARCHAR2,
+in_TaskID     		VARCHAR2,
+in_TaskName			VARCHAR2,
+in_IsID				NUMBER DEFAULT 0,
+in_IncludeMilestone	NUMBER DEFAULT 0,
+in_languageCode 	VARCHAR2,
+RC1  IN OUT REV_PRC_GETTASKSNLRPkg.RCT1
+)
+AS
+
+tmp_nullTaskName	INTEGER ;
+tmp_nullTaskID    INTEGER;
+tmp_ProjectID   NUMBER ;
+tmp_PrID      NUMBER ;
+tmp_PrName			GLOBALPKG.STRING;
+
+tmp_ChargeCodeID			 INTEGER ;
+tmp_ChargeCodeName			 GLOBALPKG.STRING ;
+tmp_ChargeCodeExtID 		 GLOBALPKG.STRING ;
+tmp_costtype GLOBALPKG.STRING;
+
+
+   CURSOR Browse_Tasks IS
+	 SELECT PRID, PRNAME, PREXTERNALID
+		FROM PRTASK WHERE PRPROJECTID=tmp_projectID
+		AND PRISTASK != 0
+		AND PRISMILESTONE=0
+		AND (tmp_nullTaskID=1 or NLS_UPPER(PREXTERNALID) like NLS_UPPER(in_TaskID) ESCAPE '\')
+		AND (tmp_nullTaskName=1 or NLS_UPPER(PRNAME) like NLS_UPPER(in_TaskName) ESCAPE '\')
+	UNION
+	 SELECT PRID, PRNAME, PREXTERNALID
+		FROM PRTASK WHERE PRPROJECTID=tmp_projectID
+		AND PRISTASK != 0
+		AND PRISMILESTONE=NVL( in_IncludeMilestone, 0 )
+		AND (tmp_nullTaskID=1 or NLS_UPPER(PREXTERNALID) like NLS_UPPER(in_TaskID) ESCAPE '\')
+		AND (tmp_nullTaskName=1 or NLS_UPPER(PRNAME) like NLS_UPPER(in_TaskName) ESCAPE '\') ;
+
+BEGIN
+/*
+   Called From	 	   		  :-  Project browse for NLR ( from transaction detail entry page )
+   Procedure               	  :-
+   Trigger                    :-
+   PMD TransactionId  		  :-
+   WMD ActionId         	  :-
+   Created By             	  :-
+   Modified Date          	  :- 03/22/2002
+*/
+
+ BEGIN
+
+ 	 tmp_nullTaskID := 0 ;
+	 tmp_nullTaskName := 0 ;
+
+ 	 IF REV_PRC_GETTASKSNLR.in_TaskID IS NULL THEN
+	  	 tmp_nullTaskID := 1 ;
+	 END IF ;
+
+ 	 IF REV_PRC_GETTASKSNLR.in_TaskName IS NULL THEN
+	  	 tmp_nullTaskName := 1 ;
+	 END IF ;
+
+ 	 DELETE FROM TEMP_TASKSEARCHNLR ;
+
+	 IF in_IsID = 0 THEN
+	 BEGIN
+ 	 SELECT	INV.ID
+	 	 INTO REV_PRC_GETTASKSNLR.tmp_ProjectID
+	 FROM
+	 	 INV_INVESTMENTS INV,
+ 	 	 PAC_MNT_PROJECTS MP
+	 WHERE
+	 	 INV.ID = MP.ID
+		 AND MP.PROJECT_CODE=REV_PRC_GETTASKSNLR.in_ProjectCode ;
+
+	EXCEPTION
+	   WHEN NO_DATA_FOUND THEN
+	   		RAISE_APPLICATION_ERROR( -20018, 'Project Code Error' ) ;
+	   WHEN OTHERS THEN
+	   		RAISE_APPLICATION_ERROR( -20018, 'Fatal Error getting Project ID from the Project Code' ) ;
+	END ;
+	ELSE
+		REV_PRC_GETTASKSNLR.tmp_ProjectID := to_number(in_ProjectCode) ;
+	END IF ;
+  END ;
+  BEGIN
+      FOR eachRecord IN Browse_Tasks
+      LOOP
+	  	BEGIN
+		  tmp_ChargeCodeID := NULL ;
+		  tmp_ChargeCodeName := NULL ;
+		  tmp_ChargeCodeExtID := NULL ;
+      tmp_costType := NULL;
+	  	  PRJ_GET_TASK_CHARGECODE_SP
+				(
+				  eachRecord.PRID,
+				  tmp_ChargeCodeID,
+				  tmp_ChargeCodeName,
+				  tmp_ChargeCodeExtID ) ;
+       /*
+        Get cost type from task hierarchy, if not present then take it from investment.
+       */
+        SELECT C.COST_TYPE
+             INTO tmp_costType
+         FROM ( SELECT NVL(PT1.COST_TYPE, NVL(PT2.COST_TYPE, P.COST_TYPE)) AS COST_TYPE, 
+                    ROW_NUMBER() OVER (ORDER BY PT2.PRWBSSEQUENCE DESC) ROW_NUM 
+             FROM PAC_MNT_PROJECTS P, PRTASK PT1
+                  LEFT OUTER JOIN PRTASK PT2 ON
+                    PT2.COST_TYPE IS NOT NULL
+                    AND PT2.PRPROJECTID = PT1.PRPROJECTID
+                    AND PT2.PRWBSSEQUENCE &lt;= PT1.PRWBSSEQUENCE
+                    AND PT2.WBS_NNBSEQ &gt; PT1.PRWBSSEQUENCE 
+                    AND PT2.PRID &lt;&gt; PT1.PRID
+             WHERE PT1.PRPROJECTID = P.ID AND
+                   PT1.PRID = eachRecord.PRID
+           ) C 
+         WHERE C.ROW_NUM = 1;
+          
+
+			INSERT INTO TEMP_TASKSEARCHNLR( TASKID, TASKNAME, CHARGECODE_EXTID, CHARGECODE_ID, TASKEXTERNALID, COST_TYPE )
+			VALUES
+			( eachRecord.PRID, eachRecord.PRNAME, tmp_ChargeCodeExtID, tmp_ChargeCodeID, eachRecord.PREXTERNALID, tmp_costType ) ;
+     
+		 EXCEPTION
+			 WHEN OTHERS THEN
+			 	  RAISE_APPLICATION_ERROR( -20103, 'Could not fetch Tasks' ) ;
+  	    END ;
+      END LOOP;
+
+  END ;
+ OPEN RC1 FOR 
+ SELECT TASKID, TASKNAME, CHARGECODE_EXTID, CHARGECODE_ID, TASKEXTERNALID, 
+	(SELECT NAME FROM CMN_LOOKUPS_V WHERE LOOKUP_TYPE = 'LOOKUP_FIN_COSTTYPECODE' AND LANGUAGE_CODE = in_languageCode AND LOOKUP_CODE = COST_TYPE) COST_TYPE
+ FROM TEMP_TASKSEARCHNLR ;
+END REV_PRC_GETTASKSNLR;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

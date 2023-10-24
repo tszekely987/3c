@@ -1,0 +1,22 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CMN_LIC_LOOKUP_V">
+    <indexes/>
+    <text_length>1128</text_length>
+    <text>SELECT lv.ID,lv.LOOKUP_TYPE,lv.LOOKUP_CODE,lv.SORT_ORDER,lv.NAME,lv.DESCRIPTION,lv.LANGUAGE_CODE FROM cmn_lookups_v lv WHERE
+       lv.lookup_type = 'CMN_LIC_RIGHT_TYPE'
+	     AND lv.lookup_code in ('creator','participant','studioDev','viewer')
+	     AND  NOT EXISTS(SELECT COV.VALUE FROM CMN_OPTION_VALUES COV,CMN_OPTIONS CO
+	     WHERE COV.OPTION_ID = CO.ID AND OPTION_CODE = 'CMN_VIEW_LIC_TYPE' AND COV.VALUE = 'new')
+	     UNION
+	SELECT lv.ID,lv.LOOKUP_TYPE,lv.LOOKUP_CODE,lv.SORT_ORDER,lv.NAME,lv.DESCRIPTION,lv.LANGUAGE_CODE FROM cmn_lookups_v lv WHERE
+	     lv.lookup_type = 'CMN_LIC_RIGHT_TYPE'
+	     AND lv.lookup_code in ('full','restricted','vo')
+	     AND  NOT EXISTS(SELECT COV.VALUE FROM CMN_OPTION_VALUES COV,CMN_OPTIONS CO
+	     WHERE COV.OPTION_ID = CO.ID AND OPTION_CODE = 'CMN_VIEW_LIC_TYPE' AND COV.VALUE = 'old')
+		 UNION
+	SELECT lv.ID,lv.LOOKUP_TYPE,lv.LOOKUP_CODE,lv.SORT_ORDER,lv.NAME,lv.DESCRIPTION,lv.LANGUAGE_CODE FROM cmn_lookups_v lv WHERE
+	     lv.lookup_type = 'CMN_LIC_RIGHT_TYPE'
+	     AND lv.lookup_code in ('other')
+	     AND EXISTS ( SELECT 1 FROM cmn_sec_groups WHERE lic_right_type='other')</text>
+  </QueryResult>
+</ClarityDBViewQuery>

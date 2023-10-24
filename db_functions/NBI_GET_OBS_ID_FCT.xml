@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NBI_GET_OBS_ID_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NBI_GET_OBS_ID_FCT" (
+    P_OBJECT_TYPE     IN VARCHAR2,
+    P_OBJECT_ID       IN NUMBER,
+    P_COLUMN_NAME     IN VARCHAR2
+) 
+RETURN  NUMBER
+IS
+    V_OBS_ID            NUMBER;
+BEGIN
+
+  -- get obs unit id for given object id.
+  -- if there is no association for the unit type in NBI_CFG_OBS_ASSIGNMENTS then it will
+  -- return -9 even though there are obs's associated with project.
+  SELECT NVL( MAX( OBS_ASSOCIATIONS.UNIT_ID ), -9 )
+    INTO V_OBS_ID
+    FROM PRJ_OBS_ASSOCIATIONS OBS_ASSOCIATIONS,
+         PRJ_OBS_UNITS OBS_UNITS,
+         NBI_CFG_OBS_ASSIGNMENTS OBS_ASSIGNMENTS
+   WHERE OBS_ASSOCIATIONS.RECORD_ID = P_OBJECT_ID AND
+         OBS_ASSOCIATIONS.TABLE_NAME = DECODE( P_OBJECT_TYPE, 'PROJECT', 'SRM_PROJECTS', 'SRM_RESOURCES' ) AND
+         OBS_ASSOCIATIONS.UNIT_ID = OBS_UNITS.ID AND
+         OBS_ASSIGNMENTS.OBJECT_TYPE = P_OBJECT_TYPE AND
+         OBS_ASSIGNMENTS.OBS_COLUMN_NAME = P_COLUMN_NAME AND
+         OBS_ASSIGNMENTS.OBS_TYPE_ID = OBS_UNITS.TYPE_ID;
+    
+  -- just get the default obs if earlier call returned -9
+  IF V_OBS_ID = -9 THEN
+   SELECT NVL( MAX( OBS_ASSIGNMENTS.OBS_UNIT_DEFAULT ), -9 )
+    INTO V_OBS_ID
+    FROM NBI_CFG_OBS_ASSIGNMENTS OBS_ASSIGNMENTS
+   WHERE OBS_ASSIGNMENTS.OBJECT_TYPE = P_OBJECT_TYPE AND
+         OBS_ASSIGNMENTS.OBS_COLUMN_NAME = P_COLUMN_NAME;
+  END IF;
+          
+  IF V_OBS_ID = -9 THEN
+    RETURN NULL;
+  ELSE
+    RETURN V_OBS_ID;
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

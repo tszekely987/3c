@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_START_DAYS_LATE_PCT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_START_DAYS_LATE_PCT_FCT" (
+    p_child_start IN DATE,       /* If project, project start.  If summary or detail task, task start. */
+    p_child_b_start IN DATE,     /* If project, project baseline start.  If summary or detail task, task baseline start. */ 
+    p_parent_start IN DATE,      /* If project, project start.  If summary task, summary task start.
+                                    If detail task, parent task or project (if detail task is at level 1 of wbs) start. */
+    p_parent_finish IN DATE,     /* If project, project finish.  If summary task, summary task finish.
+                                    If detail task, parent task or project (if detail task is at level 1 of wbs) finish. */
+    p_parent_b_start IN DATE,    /* If project, project baseline start.  If summary task, summary task baseline start.
+                                    If detail task, parent task or project (if detail task is at level 1 of wbs) baseline start. */
+    p_parent_b_finish IN DATE,   /* If project, project baseline finish.  If summary task, summary task baseline finish.
+                                    If detail task, parent task or project (if detail task is at level 1 of wbs) baseline finish. */
+    p_progress IN INTEGER        /* If project, project progress.  If summary or detail task, task status. */
+) 
+    RETURN NUMBER
+IS
+    ccs_date DATE;
+    cbs_date DATE;
+    pcs_date DATE;
+    pbs_date DATE;
+    pbf_date DATE;
+    pcf_date DATE;
+    c_date DATE;
+    days_perc NUMBER;
+    denominator NUMBER;
+
+BEGIN
+    /* ***********************************************************************************************************************************************
+    * If the record is a summary task (prIsTask = 0), use the summary task's dates in the denominator.                                               *
+    * If the record is a detail task (prIsTask = 1) and it's at the top level (prWBSLevel = 1), use the project's dates in the denominator.          *
+    * If the record is a detail task (prIsTask = 1) and it's not at the top level (prWBSLevel &gt; 1), use the summary task's dates in the denominator. *
+    *                                                                                                                                                *
+    * Schedule % (stoplight) and Days Late % (value):                                                                                                *
+    * If there is a Baseline and Start Date is not equal to Baseline Start Date, then ((Start Date - Baseline Start Date) /                          *
+    * (Baseline Finish Date - Baseline Start Date)) * 100 (This calculates days late % positive or negative based on baseline).                      *
+    *                                                                                                                                                *
+    * If there is a Baseline and Start Date equals Baseline Start Date and Project Progress (or Task Status) is 'Not Started'                        *
+    * and the Start Date is before Today's Date, then ((Today's Date - Start Date)/(Baseline Finish Date - Baseline Start Date)) * 100               *
+    * (This calculates days late % positive if the project/task isn't late according to the baseline, but it isn't started and it is                 *
+    * has a start date before today's date).                                                                                                         *
+    *                                                                                                                                                *
+    * If there is no Baseline and Project Progress (or Task Status) is 'Not Started' and the Start Date is before Today's Date,                      *
+    * then ((Today's Date - Start Date)/(Finish Date - Start Date)) * 100  (This calculates days late % positive if there is not any                 *
+    * baseline and the project/task isn't started and it is has a start date before today's date).                                                   *
+    *************************************************************************************************************************************************/
+    ccs_date := TRUNC(p_child_start);
+    cbs_date := TRUNC(p_child_b_start);
+    pcs_date := TRUNC(p_parent_start);
+    pbs_date := TRUNC(p_parent_b_start);
+    pcf_date := cop_calc_finish_fct(p_parent_finish);
+    pbf_date := cop_calc_finish_fct(p_parent_b_finish);
+    c_date := TRUNC(SYSDATE);
+
+    IF cbs_date IS NULL THEN
+        IF p_progress = 0 AND c_date &gt; ccs_date THEN
+            denominator := (pcf_date - pcs_date) + 1;
+            IF denominator &lt;&gt; 0 THEN
+                days_perc := ROUND(((c_date - ccs_date) / denominator) * 100,1);
+            ELSE
+                days_perc := 0;
+            END IF;
+        ELSE
+            days_perc := 0;
+        END IF;
+    ELSE
+        IF cbs_date = ccs_date THEN
+            IF p_progress = 0 AND c_date &gt; ccs_date THEN
+                denominator := (pbf_date - pbs_date) + 1;
+                IF denominator &lt;&gt; 0 THEN
+                    days_perc := ROUND(((c_date - ccs_date) / denominator) * 100,1);
+                ELSE
+                    days_perc := 0;
+                END IF;
+            ELSE
+                days_perc := 0;
+            END IF;
+        ELSE
+            denominator := (pbf_date - pbs_date) + 1;
+            IF denominator &lt;&gt; 0 THEN
+                days_perc := ROUND(((ccs_date - cbs_date) / denominator) * 100,1);
+            ELSE
+                days_perc := 0;
+            END IF;
+        END IF;
+    END IF;
+    RETURN days_perc;
+END COP_START_DAYS_LATE_PCT_FCT;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

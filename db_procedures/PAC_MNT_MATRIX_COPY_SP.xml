@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_COPY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_COPY_SP" (
+  matrixKeySrc         NUMBER,
+  in_matrixName     IN VARCHAR2,
+  matrixType           VARCHAR2,
+  in_matrixLocation IN VARCHAR2,
+  in_matrixComments IN VARCHAR2,
+  matrixSecurity       VARCHAR2,
+  matrixCurrency       VARCHAR2,
+  userName             VARCHAR2 )
+AS
+  matrixName           GLOBALPKG.STRING;
+  matrixLocation       GLOBALPKG.STRING;
+  matrixComments       VARCHAR2(256);
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          GLOBALPKG.STRING;
+  StoO_sqlstatus       INTEGER;
+  matrixKey            NUMBER;
+  userId               NUMBER;
+BEGIN
+	PAC_MNT_MATRIX_COPY_SP.matrixName := PAC_MNT_MATRIX_COPY_SP.in_matrixName;
+	PAC_MNT_MATRIX_COPY_SP.matrixLocation := PAC_MNT_MATRIX_COPY_SP.in_matrixLocation;
+	PAC_MNT_MATRIX_COPY_SP.matrixComments := PAC_MNT_MATRIX_COPY_SP.in_matrixComments;
+
+  PAC_MNT_MATRIX_COPY_SP.matrixName :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_COPY_SP.matrixName), '')));
+  PAC_MNT_MATRIX_COPY_SP.matrixLocation :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_COPY_SP.matrixLocation), '')));
+  PAC_MNT_MATRIX_COPY_SP.matrixComments :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_COPY_SP.matrixComments), '')));
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT  CMNUSERS.id
+      INTO Pac_Mnt_Matrix_Copy_Sp.userId
+      FROM SRM_RESOURCES SRMR, CMN_SEC_USERS CMNUSERS
+     WHERE SRMR.UNIQUE_NAME = RTRIM(LTRIM(Pac_Mnt_Matrix_Copy_Sp.userName))
+       AND SRMR.user_id=CMNUSERS.id;	      
+
+     
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF PAC_MNT_MATRIX_COPY_SP.matrixName IS NULL THEN
+    BEGIN
+      raise_application_error(-20200, 'Matrix name must be specifyed!');
+      RETURN;
+    END;
+	END IF;
+
+  IF PAC_MNT_MATRIX_COPY_SP.matrixType IS NULL THEN
+    BEGIN
+      raise_application_error(-20201, 'Matrix type must be specifyed!');
+      RETURN;
+    END;
+	END IF;
+
+  IF PAC_MNT_MATRIX_COPY_SP.matrixLocation IS NOT NULL THEN
+		BEGIN
+      BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE not EXISTS (
+          SELECT  1
+          FROM locations
+          WHERE locationid = PAC_MNT_MATRIX_COPY_SP.matrixLocation );
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0 THEN
+        BEGIN
+          raise_application_error(-20202, 'Specified location does not exist! Use Browse button to find right location.');
+          RETURN;
+        END;
+      END IF;
+		END;
+  END IF;
+
+  BEGIN
+		BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM ppa_Matrix
+        WHERE Description = PAC_MNT_MATRIX_COPY_SP.matrixName );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20203, 'A Matrix with this name already exists!  Matrix names must be unique.');
+        RETURN;
+      END;
+		END IF;
+  END;
+
+  BEGIN
+		BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  FieldName
+        FROM ppa_MatrixColDef
+        WHERE MatrixKey = PAC_MNT_MATRIX_COPY_SP.matrixKeySrc
+        and FieldName  NOT IN (
+        SELECT  LOWER(LOOKUP_CODE) "CODE"
+        FROM PAC_MNT_MATRIX_TYPE_FIELDS, CMN_LOOKUPS
+        WHERE CMN_LOOKUPS.ID = PAC_MNT_MATRIX_TYPE_FIELDS.FIELD_TYPE_ID
+        and MATRIX_TYPE_ID = (
+        SELECT  ID
+        FROM CMN_LOOKUPS
+        WHERE LOOKUP_TYPE = 'PAC_MATRIX_TYPE'
+        and LOOKUP_CODE = PAC_MNT_MATRIX_COPY_SP.matrixType ) ) );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20204, 'Can not change type! Remove columns containing fields that are not applicable for the new type.');
+        RETURN;
+      END;
+		END IF;
+  END;
+
+  SAVEPOINT Transactn;
+  BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+    INSERT INTO ppa_Matrix (MATRIXKEY, Description, MatrixType, Comments, AccessCode, default_currency_code, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY )
+    VALUES (S_285_1_PPA_MATRIX.nextval, PAC_MNT_MATRIX_COPY_SP.matrixName, PAC_MNT_MATRIX_COPY_SP.matrixType,
+         PAC_MNT_MATRIX_COPY_SP.matrixComments, PAC_MNT_MATRIX_COPY_SP.matrixSecurity, PAC_MNT_MATRIX_COPY_SP.matrixCurrency, SYSDATE, Pac_Mnt_Matrix_Copy_Sp.userId, SYSDATE, Pac_Mnt_Matrix_Copy_Sp.userId);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20205, 'Error Inserting New Matrix');
+        RETURN;
+      END;
+		END IF;
+
+  SELECT S_285_1_PPA_MATRIX.CURRVAL INTO matrixKey FROM dual;
+
+  IF PAC_MNT_MATRIX_COPY_SP.matrixLocation IS NOT NULL THEN
+    BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+
+      INSERT INTO ppa_LocMatrixAssignments (LocationID, MatrixKey, MatrixType)
+      VALUES (PAC_MNT_MATRIX_COPY_SP.matrixLocation, PAC_MNT_MATRIX_COPY_SP.matrixKey, PAC_MNT_MATRIX_COPY_SP.matrixType);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END IF;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20206, 'Error Location Matrix  Assignments');
+        RETURN;
+      END;
+		END IF;
+
+    IF PAC_MNT_MATRIX_COPY_SP.matrixSecurity = 1 THEN
+  	  BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        INSERT INTO pac_mnt_matrix_permisions
+          (ID, MATRIX_ID, USER_ID, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+          SELECT PAC_MNT_MATRIX_PERMISIONS_S1.nextval, 
+		  		 PAC_MNT_MATRIX_COPY_SP.matrixKey, USER_ID,
+                 SYSDATE,
+                 PAC_MNT_MATRIX_COPY_SP.userId,
+                 SYSDATE,
+                 PAC_MNT_MATRIX_COPY_SP.userId
+            FROM pac_mnt_matrix_permisions
+           WHERE MATRIX_ID = PAC_MNT_MATRIX_COPY_SP.matrixKeySrc;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+		END;
+		   
+	  BEGIN		   
+		INSERT INTO pac_mnt_matrix_permisions
+          (ID, MATRIX_ID, USER_ID, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)		
+          SELECT PAC_MNT_MATRIX_PERMISIONS_S1.nextval, PAC_MNT_MATRIX_COPY_SP.matrixKey, PAC_MNT_MATRIX_COPY_SP.userId,
+                 SYSDATE,
+                 PAC_MNT_MATRIX_COPY_SP.userId,
+                 SYSDATE,
+                 PAC_MNT_MATRIX_COPY_SP.userId
+            FROM DUAL;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+	  END;
+    END IF;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20207, 'Error Copy Matrix Security');
+        RETURN;
+      END;
+		END IF;
+
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+      INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        SELECT  S_129_1_PPA_MATRIXCOLDEF.nextval, PAC_MNT_MATRIX_COPY_SP.matrixKey, ColumnNo, ColumnName,
+          FieldName, CompareCol, CompareOp, DataType
+        FROM ppa_MatrixColDef
+        WHERE MatrixKey = PAC_MNT_MATRIX_COPY_SP.matrixKeySrc /*
+        ORDER BY ColumnNo  */;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20208, 'Error Copy Matrix Columns');
+        RETURN;
+      END;
+		END IF;
+
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+      INSERT INTO ppa_MatrixValues (MATRIXROWKEY, MatrixKey, FromDate, ToDate, Value1, Value2, Value3, Value4, Value5, Value6, Value7, Value8, Value9, Value10, NumVal1, NumVal2, NumVal3, StrVal1, matrix_currency_code)
+        SELECT  S_252_1_PPA_MATRIXVALUES.nextval, PAC_MNT_MATRIX_COPY_SP.matrixKey, FromDate, ToDate, Value1,
+          Value2, Value3, Value4, Value5, Value6, Value7, Value8, Value9,
+          Value10, NumVal1, NumVal2, NumVal3, StrVal1, matrix_currency_code
+        FROM ppa_MatrixValues
+        WHERE MatrixKey = PAC_MNT_MATRIX_COPY_SP.matrixKeySrc;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20209, 'Error Copy Matrix Data');
+        RETURN;
+      END;
+		END IF;
+
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      INSERT INTO ppa_MatrixCheckout
+      (MATRIXKEY,RESOURCE_CODE,STARTED,FINISHED)
+      SELECT
+          PAC_MNT_MATRIX_COPY_SP.matrixKey,
+          PAC_MNT_MATRIX_COPY_SP.userName,
+          SYSDATE,
+          NULL from dual
+        WHERE
+        NOT EXISTS (
+        SELECT  1
+        FROM ppa_MatrixCheckout
+        WHERE MatrixKey = PAC_MNT_MATRIX_COPY_SP.matrixKey
+        and RESOURCE_CODE = PAC_MNT_MATRIX_COPY_SP.userName );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error = 0 THEN
+			COMMIT WORK;
+		ELSE
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20210, 'Error locking Copied  Matrix');
+        RETURN;
+      END;
+		END IF;
+END PAC_MNT_MATRIX_COPY_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

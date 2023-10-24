@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="get_data_dump_v1" createdBy="admin" endStep="Finish" source="customer" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Load database dump files names from the c:\apps\dbdump directory, and create a download link to them." languageCode="en" name="Load Database Dump File Names"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="false" name="thisXmlDocument" objectType="xml_document" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="get_dump_file_v1" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls description="Get dump file names" languageCode="en" name="Get dump file names"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:xog="http://www.niku.com/xog" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <!-- Server Variable Info -->
+                          <gel:parameter default="xog" var="XOGUsername"/>
+                          <gel:parameter default="xxx" secure="true" var="XOGPassword"/>
+                          <gel:parameter default="../logs/dbdump_input.xml" var="Infile"/>
+                          <gel:parameter default="../logs/dbdump_output.xml" var="Outfile"/>
+                          <core:invokeStatic className="com.niku.union.config.ConfigurationManager" method="getInstance" var="config"/>
+                          <core:set var="v_IsLocal">0</core:set>
+                          <core:set var="v_file_cnt">1</core:set>
+                          <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getId()}" var="WebServerid"/>
+                          <core:if test="${WebServerid == 'app'}">
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getAddress()}" var="AddressIp"/>
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getEntryUrl()}" var="EntryURL"/>
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(1).getEntryUrl()}" var="NSAEntryURL"/>
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getEntryUrl()}" var="XOGURL"/>
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getPort()}" var="Port"/>
+                            <core:if test="${EntryURL == 'http://localhost' }">
+                              <gel:log level="info" message="NULL ADDRESS IS LOCAL... "/>
+                              <core:set var="v_IsLocal">1</core:set>
+                              <core:set var="AddressIp">${EntryURL}</core:set>
+                            </core:if>
+                            <gel:log level="info" message="WebServerid. : ${WebServerid}"/>
+                            <gel:log level="info" message="AddressIp... : ${AddressIp}"/>
+                            <gel:log level="info" message="Custom Script Version 1.0"/>
+                            <gel:log level="info" message="Object InstanceID: ${gel_objectInstanceId}"/>
+                            <gel:log level="info" message="Process Instance ID: ${gel_processInstanceId}"/>
+                          </core:if>
+                          <!-- Get a DB Connection to Clarity -->
+                          <gel:setDataSource dbId="Niku"/>
+                          <!-- Get a Clarity session ID for use with the XOG -->
+                          <gel:out trim="false">   [sync] Logging into Clarity XOG at ${XOGURL}.</gel:out>
+                          <core:catch var="exception">
+                            <soap:invoke endpoint="${XOGURL}/niku/xog" var="auth">
+                              <soap:message>
+                                <soapenv:Envelope>
+                                  <soapenv:Header/>
+                                  <soapenv:Body>
+                                    <xog:Login>
+                                      <xog:Username>${XOGUsername}</xog:Username>
+                                      <xog:Password>${XOGPassword}</xog:Password>
+                                    </xog:Login>
+                                  </soapenv:Body>
+                                </soapenv:Envelope>
+                              </soap:message>
+                            </soap:invoke>
+                            <!-- Checking whether a sessionID is returned.  If not, it means that Login was not successful. -->
+                            <gel:set asString="true" select="$auth/soapenv:Envelope/soapenv:Body/xog:SessionID/text()" var="sessionID"/>
+                            <core:choose>
+                              <core:when test="${sessionID == null}">
+                                <gel:log level="ERROR">Cannot login to Clarity XOG. Check username and password.</gel:log>
+                                <gel:out trim="false">   [sync] Cannot login to Clarity XOG at ${XOGURL}. Check username and password.</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <!-- Create the XML Main Body -->
+                                <gel:parse var="loadContent">
+                                  <NikuDataBus xsi:noNamespaceSchemaLocation="../xsd/nikuxog_customObjectInstance.xsd">
+                                    <Header action="write" externalSource="NIKU" objectType="customObjectInstance" version="15.5.1.240"/>
+                                    <customObjectInstances objectCode="z_database_dumps"/>
+                                  </NikuDataBus>
+                                </gel:parse>
+                                <!-- Get the current date and time formats for XOG -->
+                                <gel:out trim="false">   [A] Start - Get the current date and time formats for XOG.</gel:out>
+                                <sql:query var="cresult"><![CDATA[
+			select TO_CHAR(sysdate,'MMDDYYYY_HHMM'), sysdate, to_char(sysdate,'YYYY-MM-DD') || 'T00:00:00'
+			from dual
+		]]></sql:query>
+                                <gel:out trim="false">   [A] End - Get the current date and time formats for XOG.</gel:out>
+                                <!-- Assign the dates to variables -->
+                                <core:forEach items="${cresult.rowsByIndex}" trim="true" var="crow">
+                                  <core:set value="${crow[i+0]}" var="v_filedate"/>
+                                  <core:set value="${crow[i+1]}" var="v_sysdate"/>
+                                  <core:set value="${crow[i+2]}" var="v_xogdate"/>
+                                  <gel:log level="info" message="File Date: ${v_filedate}"/>
+                                  <gel:log level="info" message="Sysdate  : ${v_sysdate}"/>
+                                  <gel:log level="info" message="XOG Date : ${v_xogdate}"/>
+                                </core:forEach>
+                                <gel:out trim="false">   [B] Start - Get Files Names</gel:out>
+                                <!-- Get the Next Oracle Database Backups Dumps Auto Number ID -->
+                                <gel:out trim="false">   [C] Start - Get Next database dump autonumber </gel:out>
+                                <sql:query var="dmp_id_data"><![CDATA[	
+			select cps_get_next_autonum('z_database_dumps','code', 'NIKU.ROOT') 
+			from dual
+		]]></sql:query>
+                                <gel:out trim="false">   [C] End - Get Next database dump autonumber </gel:out>
+                                <core:forEach items="${dmp_id_data.rowsByIndex}" trim="true" var="dmp_id_row">
+                                  <core:set value="${dmp_id_row[i+0]}" var="nextDMPID"/>
+                                </core:forEach>
+                                <gel:out trim="false">   [Value] NextDMPID: ${nextDMPID}</gel:out>
+                                <!-- Loop through the C:\apps\dbdumps directory and get all the file names -->
+                                <core:invokeStatic className="java.lang.Runtime" method="getRuntime" var="javaRuntime"/>
+                                <core:new className="java.io.File" var="f">
+                                  <core:arg type="java.lang.String" value="C:/apps/dbdumps"/>
+                                </core:new>
+                                <!--v_dir_input is the input directory-->
+                                <core:invoke method="list" on="${f}" var="fileNames"/>
+                                <core:forEach begin="0" end="${fileNames.size()}" indexVar="i" items="${fileNames}" var="record">
+                                  <core:set value="${fileNames[i]}" var="v_Temp_File_Name_list"/>
+                                  <!--          <core:if test="${v_Temp_File_Name_list.indexOf('.tgz') >= 0}">		-->
+                                  <core:if test="${v_Temp_File_Name_list.indexOf('.tgz') &gt;= 0 or v_Temp_File_Name_list.indexOf('.dmp') &gt;= 0 or v_Temp_File_Name_list.indexOf('.log') &gt;= 0 or v_Temp_File_Name_list.indexOf('.zip') &gt;= 0}">
+                                    <core:set value="${v_Temp_File_Name_list}" var="v_filename"/>
+                                    <core:set value="dbdumps/${v_Temp_File_Name_list}" var="v_urlpath"/>
+                                    <core:set value="${nextDMPID}_${v_file_cnt}" var="v_code"/>
+                                    <!--		<gel:log level="info" message="Next Dumpfile AutoNumber: ${nextDMPID}"/>	-->
+                                    <!--		<gel:log level="info" message="File Date: ${v_filedate}"/>		-->
+                                    <!--		<gel:log level="info" message="Sysdate  : ${v_sysdate}"/>		-->
+                                    <!--		<gel:log level="info" message="XOG Date : ${v_xogdate}"/>		-->
+                                    <!--          	<gel:log level="info" message="FileNames: ${v_filename}"/>		-->
+                                    <!--          	<gel:log level="info" message="URL Path : ${v_urlpath}"/>		-->
+                                    <!--          	<gel:log level="info" message="V_File_Count: ${v_file_cnt}"/>		-->
+                                    <!--		<gel:log level="info" message="v_code: ${v_code}"/>			-->
+                                    <!-- Create the xogInstance XML node -->
+                                    <gel:parse var="xogInstance">
+                                      <instance instanceCode="${v_code}" objectCode="z_database_dumps">
+                                        <CustomInformation>
+                                          <ColumnValue name="partition_code">NIKU.ROOT</ColumnValue>
+                                          <ColumnValue name="name">${v_filename}</ColumnValue>
+                                          <ColumnValue name="code">${v_code}</ColumnValue>
+                                          <ColumnValue name="page_layout">odf.z_database_dumpsFrame</ColumnValue>
+                                          <ColumnValue name="data_dump_url">${v_urlpath}</ColumnValue>
+                                        </CustomInformation>
+                                      </instance>
+                                    </gel:parse>
+                                    <!-- Insert the XML node into the XML Main Body -->
+                                    <gel:set insert="true" select="$loadContent/NikuDataBus/customObjectInstances" value="${xogInstance}"/>
+                                    <core:set value="${v_file_cnt + 1}" var="v_file_cnt"/>
+                                  </core:if>
+                                </core:forEach>
+                                <!-- Start Truncate Oracle Dump File Table -->
+                                <sql:update>
+		truncate table odf_ca_z_database_dumps
+	</sql:update>
+                                <!-- Finish Truncate Oracle Dump File Table -->
+                                <!-- Write the XML input in memory to a file for debugging purposes -->
+                                <gel:serialize fileName="${Infile}" var="${loadContent}"/>
+                                <!-- Call the XOG and process the XML Main Body named loadContent -->
+                                <soap:invoke endpoint="${XOGURL}/niku/xog" var="result">
+                                  <soap:message>
+                                    <soapenv:Envelope>
+                                      <soapenv:Header>
+                                        <xog:Auth>
+                                          <xog:SessionID>${sessionID}</xog:SessionID>
+                                        </xog:Auth>
+                                      </soapenv:Header>
+                                      <soapenv:Body>
+                                        <gel:include select="$loadContent"/>
+                                      </soapenv:Body>
+                                    </soapenv:Envelope>
+                                  </soap:message>
+                                </soap:invoke>
+                                <gel:out>
+                                  <gel:expr select="$result"/>
+                                </gel:out>
+                                <!-- Write the XML output in memory to a file for debugging purposes -->
+                                <gel:serialize fileName="${Outfile}" var="${result}"/>
+                                <!-- Logout XOG to release the session ID -->
+                                <soap:invoke endpoint="${XOGURL}/niku/xog" var="result">
+                                  <soap:message>
+                                    <soapenv:Envelope>
+                                      <soapenv:Header>
+                                        <xog:Auth>
+                                          <xog:SessionID>${sessionID}</xog:SessionID>
+                                        </xog:Auth>
+                                      </soapenv:Header>
+                                      <soapenv:Body>
+                                        <xog:Logout/>
+                                      </soapenv:Body>
+                                    </soapenv:Envelope>
+                                  </soap:message>
+                                </soap:invoke>
+                                <gel:out trim="false">   [sync] XOG logged out.</gel:out>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:catch>
+                        </gel:script>
+                      </scriptText>
+                      <scriptParameter isSecure="false" name="XOGUsername" value="xog"/>
+                      <scriptParameter isSecure="true" name="XOGPassword" value="[AES]PLYw1CujiwebTlE6/0ZzhQ=="/>
+                      <scriptParameter isSecure="false" name="Infile"/>
+                      <scriptParameter isSecure="false" name="Outfile"/>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

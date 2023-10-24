@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_SET_WATERLINE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_SET_WATERLINE_FCT" (p_portfolio_id NUMBER, p_plan_id NUMBER, p_user_id NUMBER, p_code VARCHAR, p_total NUMBER, p_context_type VARCHAR, p_context_id NUMBER)
+   RETURN NUMBER
+IS
+  v_sum NUMBER;
+  v_water_mark NUMBER;
+BEGIN
+  v_sum := 0;
+  v_water_mark := -1;
+  for recs in (
+			select r.rank, q.id, q.curve_sum, q.code from (
+			select  coalesce(pending.ph_curve_sum, pln.ph_curve_sum, port.ph_curve_sum) curve_sum
+			, coalesce(pending.code, pln.code, port.code) code
+			, coalesce(pending.instance_id, pln.instance_id, port.instance_id) id
+			from
+			(select s.code, s.instance_id, s.ph_curve_sum from
+			pfm_inv_constraint_sums s
+			where s.portfolio_id=p_portfolio_id
+			and s.plan_id = 0 ) port
+			left outer join
+			(select s.code, s.instance_id, s.ph_curve_sum from
+			pfm_inv_constraint_sums s
+			where s.portfolio_id=p_portfolio_id
+			and s.plan_id = p_plan_id) pln on port.instance_id = pln.instance_id and port.code = pln.code
+			left outer join
+			(select s.code, s.instance_id, s.ph_curve_sum from
+			temp_inv_constraint_sums s
+			where s.portfolio_id=p_portfolio_id
+			and s.plan_id = p_plan_id
+			and s.user_id=p_user_id) pending on pln.instance_id = pending.instance_id and pln.code = pending.code) q,
+			cmn_instance_rank r, cmn_rank_contexts c
+			where c.context_type=p_context_type
+			and c.context_id=p_context_id
+			and r.context_id=c.id
+			and r.instance_id=q.id
+			and q.code=p_code
+			and r.rank &gt; 0
+			order by rank  
+  )
+  LOOP
+   BEGIN
+	   v_sum := recs.curve_sum + v_sum;
+	   IF v_sum &gt; p_total THEN
+       v_water_mark := recs.rank;
+	     EXIT;
+	   END IF;
+	   EXCEPTION
+	       WHEN  NO_DATA_FOUND then v_water_mark := -2;
+	       WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: '|| SQLERRM );
+   END;  
+  END LOOP;
+  RETURN v_water_mark;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_POSTTOWIP_PV1_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_POSTTOWIP_PV1_SP" 
+(
+  datef               DATE,
+  datet               DATE,
+  codetype            VARCHAR2 DEFAULT 'Batches',
+  in_code          IN VARCHAR2 DEFAULT 'LC030610000',
+  COMPANY_CODE        VARCHAR2 DEFAULT NULL,
+  in_sourceModule  IN PPA_TRANSCONTROL.SOURCEMODULE%TYPE DEFAULT NULL,
+  labor               VARCHAR2 DEFAULT 'L',
+  material            VARCHAR2 DEFAULT 'M',
+  equipment           VARCHAR2 DEFAULT 'Q',
+  expense             VARCHAR2 DEFAULT 'X',
+  batch               VARCHAR2 DEFAULT 'ALL BATCH',
+  in_poc           IN VARCHAR2 DEFAULT NULL,
+  translevel    IN OUT VARCHAR2,
+  levelcode     IN OUT VARCHAR2,
+  minTransDate  IN OUT DATE,
+  maxTransDate  IN OUT DATE,
+  transSumm     IN OUT NUMBER,
+  in_incurredBy	 VARCHAR2,
+  username          IN VARCHAR2
+)
+AS
+  code                 GLOBALPKG.STRING;
+  poc                  GLOBALPKG.STRING;
+  v_sourceModule       PPA_TRANSCONTROL.SOURCEMODULE%TYPE;
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          GLOBALPKG.STRING;
+  StoO_sqlstatus       INTEGER;
+BEGIN
+	code := RTRIM(in_code);
+  poc  := RTRIM(in_poc);
+
+  -- This variable will be used in the crieteria for retrieving the transactions
+  v_sourceModule := NVL(in_sourceModule, 1);
+
+  IF codetype = 'All' THEN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+      SELECT 'All',  'All', MIN(t.transdate) transdatef, MAX(t.transdate) transdatet, COUNT(1) as transsumm  --,  '' as transclass
+        INTO translevel, levelcode, minTransDate, maxTransDate, transSumm  --, transclass
+        FROM ppa_TransControl t
+       WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+         AND TRUNC(t.TransDate) &lt;= TRUNC(datet)
+         AND PAC_FOS_IS_VALID_LOCATION_FCT(username, t.locationid) = 1
+         -- if no sourceModule is passed in then short the sourceModule comparison
+         AND (1 = v_sourceModule OR (t.SOURCEMODULE = in_sourceModule ))
+         AND ((rtrim(t.TransType) IN (labor, material, equipment, expense)
+          OR SUBSTR(t.ExternalBatchID, 1, 3) = poc
+         AND t.SourceModule != 2)
+--       OR EXISTS (SELECT  1
+--       FROM batchheader b
+--      WHERE b.batchid = t.ExternalBatchID
+--       AND b.balancedapproved = 1 )
+      );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+        WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	ELSE
+    IF codetype = 'Locations' THEN
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT t.locationid, 'Locations' levelcode, MIN(t.transdate) transdatef, MAX(t.transdate) transdatet, COUNT(1) as transsumm          --,  '' as transclass
+          INTO translevel, levelcode, minTransDate, maxTransDate, transSumm          --, transclass
+          FROM ppa_TransControl t
+         WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+           AND TRUNC(t.TransDate) &lt;= TRUNC(datet)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(username, t.locationid) = 1
+           -- if no sourceModule is passed in then short the sourceModule comparison
+           AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule )
+					 AND RTRIM(t.LocationID) = code
+           AND ((RTRIM(t.TransType) IN (labor, material, equipment, expense)
+            OR SUBSTR(t.ExternalBatchID, 1, 3) = poc
+           AND t.SourceModule != 2)
+            OR t.SourceModule = 2)
+         GROUP BY t.locationid;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            raise_application_error (-20264, 'No data was found');
+            RETURN;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    ELSE
+      IF codetype = 'Clients' THEN
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+
+          SELECT t.COMPANY_CODE, 'Clients' levelcode, MIN(t.transdate) transdatef, MAX(t.transdate) transdatet, COUNT(1) as transsumm
+						INTO translevel, levelcode, minTransDate, maxTransDate, transSumm
+            FROM ppa_TransControl t
+           WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+             AND TRUNC(t.TransDate) &lt;= TRUNC(datet)
+             AND PAC_FOS_IS_VALID_LOCATION_FCT(username, t.locationid) = 1
+             -- if no sourceModule is passed in then short the sourceModule comparison
+             AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule)
+						 AND RTRIM(t.COMPANY_CODE) = code
+             AND ((RTRIM(t.TransType) IN (labor, material, equipment, expense)
+              OR SUBSTR(t.ExternalBatchID, 1, 3) = poc
+             AND t.SourceModule != 2)
+              OR t.SourceModule = 2)
+           GROUP BY t.COMPANY_CODE;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      ELSE
+        IF codetype = 'Projects' THEN
+          BEGIN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+
+            SELECT t.COMPANY_CODE || ':' || t.PROJECT_CODE translevel, 'Projects' levelcode, MIN(t.transdate) transdatef, MAX(t.transdate) transdatet, COUNT(1) as transsumm
+							INTO translevel, levelcode, minTransDate, maxTransDate, transSumm
+              FROM ppa_TransControl t
+             WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+               AND TRUNC(t.TransDate) &lt;= TRUNC(datet)
+               AND PAC_FOS_IS_VALID_LOCATION_FCT(username, t.locationid) = 1
+               -- if no sourceModule is passed in then short the sourceModule comparison
+               AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule)
+							 AND t.PROJECT_CODE = code
+--							 AND RTRIM(t.COMPANY_CODE) = COMPANY_CODE
+               AND ((RTRIM(t.TransType) IN (labor, material, equipment, expense)
+                OR SUBSTR(t.ExternalBatchID, 1, 3) = poc
+							 AND t.SourceModule != 2)
+                OR t.SourceModule = 2)
+              GROUP BY t.COMPANY_CODE || ':' || t.PROJECT_CODE;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+        ELSE
+          IF codetype = 'Employees' THEN
+            BEGIN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+
+              SELECT t.RESOURCE_CODE, 'Employees' levelcode, MIN(t.transdate) transdatef, MAX(t.transdate) transdatet, COUNT(1) as transsumm
+								INTO translevel, levelcode, minTransDate, maxTransDate, transSumm
+                FROM ppa_TransControl t
+               WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+                 AND TRUNC(t.TransDate) &lt;= TRUNC(datet)
+                 AND PAC_FOS_IS_VALID_LOCATION_FCT(username, t.locationid) = 1
+                 -- if no sourceModule is passed in then short the sourceModule comparison
+                 AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule)
+								 AND RTRIM(t.RESOURCE_CODE) = code
+								 AND ((Rtrim(t.TransType)  IN (labor, material, equipment, expense)
+                  OR SUBSTR(t.ExternalBatchID, 1, 3) = poc
+								 AND t.SourceModule != 2)
+                  OR t.SourceModule = 2)
+                GROUP BY t.RESOURCE_CODE;
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN TOO_MANY_ROWS THEN
+                  StoO_rowcnt := 2;
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+                WHEN OTHERS THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+            END;
+             ELSE
+								IF  codetype = 'incurredBy' THEN
+								BEGIN
+											StoO_rowcnt := 0;
+											StoO_selcnt := 0;
+											StoO_error  := 0;
+											SELECT in_incurredBy,  'IncurredBy' levelcode,  MIN(transdate) transdatef,  MAX(transdate) transdatet,  COUNT(1) as transsumm
+											--,  '' as transclass
+											INTO translevel, levelcode, minTransDate, maxTransDate, transSumm
+											--, transclass
+						          			FROM ppa_TransControl t, PPA_TRANSCONTROLAPINFO tinfo
+											WHERE TRUNC(t.TransDate) &gt;= TRUNC(datef)
+											 AND  TRUNC(t.TransDate) &lt;= TRUNC(datet)
+											 -- if no sourceModule is passed in then short the sourceModule comparison
+									 		 AND ( 1=v_sourceModule OR t.SOURCEMODULE = in_sourceModule )
+								             AND ((RTRIM(t.TransType) IN (labor, material, equipment, expense) 
+											 	   OR SUBSTR(ExternalBatchID, 1, 3) = poc
+									           	   AND t.SourceModule != 2)
+									           OR t.SourceModule = 2)
+											 AND t.PPA_TRANSCONTROLAPINFO_ID = tinfo.ID
+											 AND tinfo.INCURRED_BY = in_incurredBy ;
+											StoO_rowcnt := SQL%ROWCOUNT;
+											EXCEPTION
+												WHEN TOO_MANY_ROWS THEN
+													StoO_rowcnt := 2;
+												WHEN NO_DATA_FOUND THEN
+													StoO_rowcnt := 0;
+													StoO_selcnt := 0;
+													raise_application_error (-20264, 'No data was found');
+													RETURN;
+												WHEN OTHERS THEN
+													StoO_rowcnt := 0;
+													StoO_selcnt := 0;
+													StoO_error := SQLCODE;
+													StoO_errmsg := SQLERRM;
+								END;
+							END IF;
+          END IF;
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+END PAC_PRC_POSTTOWIP_PV1_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

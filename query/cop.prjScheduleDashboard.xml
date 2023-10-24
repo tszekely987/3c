@@ -1,0 +1,1064 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.prjScheduleDashboard" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Schedule Dashboard" languageCode="en" name="Schedule Dashboard"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:a.dim_id:dim_id@, 
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.level_name:level_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.level_id:level_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.start_date:start_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.finish_date:finish_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.baseline_start:baseline_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.baseline_finish:baseline_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.project_manager:project_manager@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.manager_id:manager_filter@,  
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.progress_status:progress_status@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.work_status_id:work_status_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.work_status:work_status@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.is_milestone:is_milestone@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.pct_complete:pct_complete@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.wbs_sequence:wbs_sequence@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.project_int_id:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.project_filter:project_filter@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.task_int_id:task_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.linkcode:linkcode@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:@UPPER@(a.odf_object_code):investment_type_upper@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.is_project:is_project@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.is_subproj:is_subproj@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:a.hg_has_children:hg_has_children@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.overall_status:overall_status@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.days_late:days_late@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.days_late_pct:days_late_pct@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.days_late:schedule_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:a.days_late_pct:schedule_pct_sl@
+FROM (
+-- Project Level
+SELECT 'L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) dim_id,  
+       i.name level_name,
+       i.code level_id,
+       i.schedule_start start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(i.schedule_finish) finish_date, 
+       pv.baseline_start baseline_start,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(pv.baseline_finish) baseline_finish,
+       mgr.full_name project_manager,
+       i.manager_id manager_id,
+       ip.name progress_status,
+       pv.obj_work_status work_status_id,
+       ws.name work_status,   
+       0 is_milestone,	   
+       0 wbs_sequence, 
+       pv.percent_complete pct_complete,
+       idl.days_late days_late,
+       idl.days_late_pct days_late_pct,
+       @NVL@(sr.cop_overall_status,-99) overall_status,
+       i.id project_int_id,
+       i.id project_filter,	   
+       NULL task_int_id,
+       'projectProperties' linkcode,
+       i.odf_object_code odf_object_code,
+       1 is_project,
+       0 is_subproj,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   prtask ct 
+                  WHERE  ct.prprojectid = i.id) > 0
+            THEN  'L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id)
+            WHEN (SELECT COUNT(*)
+                  FROM   prsubproject sp
+                  INNER  JOIN prtask sptasks ON sptasks.prid = sp.prtaskid
+                  WHERE  sptasks.prprojectid = i.id) > 0
+            THEN  'L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id)
+            ELSE  NULL  END hg_has_children
+       FROM  inv_investments i
+       INNER JOIN odf_project_v2 pv ON pv.odf_pk = i.id
+       INNER JOIN cop_inv_days_late_v idl ON idl.investment_id = i.id	   
+       LEFT  OUTER JOIN srm_resources mgr ON i.manager_id = mgr.user_id
+       LEFT  OUTER JOIN cmn_lookups_v ip ON  ip.lookup_type = 'INVESTMENT_OBJ_PROGRESS' 
+                                         AND ip.lookup_enum = i.progress
+                                         AND ip.language_code = @WHERE:PARAM:LANGUAGE@ 
+       LEFT  OUTER JOIN cop_prj_statusrpt_latest_v lsr ON  lsr.investment_id = i.id
+                                                       AND lsr.report_order = 1
+       LEFT  OUTER JOIN odf_cop_prj_statusrpt_v2 sr ON  sr.odf_pk = lsr.report_id 
+                                                    AND sr.odf_parent_id = lsr.investment_id
+       LEFT  OUTER JOIN cmn_lookups_v ws ON  ws.lookup_type = 'OBJ_INVESTMENT_WORK_STATUS' 
+                                         AND ws.lookup_code = pv.obj_work_status
+                                         AND ws.language_code = @WHERE:PARAM:LANGUAGE@													
+       WHERE i.is_active = 1
+       AND   pv.is_template = 0       
+       AND   i.odf_object_code = 'project'
+       AND   (pv.is_program = 0 OR
+             @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:show_programs@,1) = 1)
+       AND   (@WHERE:PARAM:USER_DEF:INTEGER:status@ IS NULL OR (CASE WHEN i.status IN (1,5,8) THEN 1 ELSE 0 END) = @WHERE:PARAM:USER_DEF:INTEGER:status@)
+       AND   @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL
+       AND   (@NVL@(@WHERE:PARAM:USER_DEF:INTEGER:INVESTMENT_OBS@,0) = 0 OR 
+              i.id IN (SELECT obsa.record_id
+                       FROM   prj_obs_associations obsa
+                       INNER  JOIN prj_obs_units_flat obsf ON obsa.unit_id = obsf.unit_id
+                       WHERE  (obsa.table_name LIKE 'INV%' OR obsa.table_name = 'SRM_PROJECTS')
+                       AND    obsf.branch_unit_id = @WHERE:PARAM:USER_DEF:INTEGER:INVESTMENT_OBS@) )
+       AND   @WHERE:SECURITY:PROJECT:i.id@					   
+UNION  ALL
+-- WBS Level 
+SELECT 'L2-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) @+@ @NVL@(@SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,11,7),'0000000') @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prid) dim_id,
+       tasks.prname level_name,
+       tasks.prexternalid level_id,
+       tasks.prstart start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(tasks.prfinish) finish_date,
+       base.start_date baseline_start,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(base.finish_date) baseline_finish,
+       NULL project_manager,
+       i.manager_id manager_id,
+       ts.name progress_status,
+       cusinv.obj_work_status work_status_id,
+       NULL work_status,	   
+       tasks.prismilestone is_milestone,
+       tasks.prwbssequence wbs_sequence,
+       tasks.prpctcomplete pct_complete,
+       tdl.days_late days_late,
+       tdl.days_late_pct days_late_pct,
+       NULL overall_status,
+       i.id project_int_id,
+       CASE WHEN @DBUSER@.CMN_TO_NUMBER_FCT(@SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,11,7)) = i.id THEN i.id ELSE  @DBUSER@.CMN_TO_NUMBER_FCT(@SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,11,7)) END project_filter,	   
+       tasks.prid task_int_id, 
+       'taskProperties' linkcode,
+       i.odf_object_code odf_object_code,
+       0 is_project,
+       0 is_subproj,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   prtask ct 
+                  WHERE  ct.prprojectid = tasks.prprojectid
+                  AND    ct.wbs_parseq = tasks.prwbssequence) > 0
+            THEN  'L2-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) @+@ @NVL@(@SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,11,7),'0000000') @+@ @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,18,7) @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prwbssequence)			
+            ELSE  NULL  END hg_has_children
+       FROM  prtask tasks 
+       INNER JOIN inv_investments i ON i.id = tasks.prprojectid
+       INNER JOIN cop_tsk_days_late_v tdl ON tdl.task_id = tasks.prid
+       LEFT  OUTER JOIN cmn_lookups_v ts ON  ts.lookup_type = 'prTaskStatus' 
+                                         AND ts.lookup_enum = tasks.prstatus 
+                                         AND ts.language_code = @WHERE:PARAM:LANGUAGE@ 
+       LEFT  OUTER JOIN prj_baseline_details base ON  base.object_type = 'TASK' 
+                                                  AND base.is_current = 1 
+                                                  AND base.object_id = tasks.prid
+       LEFT  OUTER JOIN prsubproject sp ON  sp.prtaskid = tasks.prid 
+       LEFT  OUTER JOIN odf_ca_inv cusinv ON cusinv.id = i.id
+       WHERE @NVL@(sp.prtaskid,0) = 0
+       AND   ( ('L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) = @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,1,10) AND tasks.wbs_parseq = -1)
+               OR ('L2-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) = @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,1,10) AND @DBUSER@.CMN_TO_CHAR_FCT(tasks.wbs_parseq) = @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,25,7)) )             			   
+UNION  ALL
+-- Subproject Level
+SELECT 'L9-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) dim_id,  
+       i.name level_name,
+       i.code level_id,
+       i.schedule_start start_date,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(i.schedule_finish) finish_date, 
+       pv.baseline_start baseline_start,
+       @DBUSER@.COP_CALC_FINISH_TIME_FCT(pv.baseline_finish) baseline_finish,
+       mgr.full_name project_manager,
+       i.manager_id manager_id,
+       ip.name  progress_status,
+       pv.obj_work_status work_status_id,
+       ws.name work_status,	   
+       0 is_milestone,
+       9999 wbs_sequence, 
+       pv.percent_complete pct_complete,
+       idl.days_late days_late,
+       idl.days_late_pct days_late_pct,
+       @NVL@(sr.cop_overall_status,-99) overall_status,   
+       i.id project_int_id,
+       tasks.prprojectid project_filter,	   
+       NULL task_int_id,
+       'projectProperties' linkcode,
+       i.odf_object_code odf_object_code,
+       1 is_project,
+       1 is_subproj,
+       CASE WHEN (SELECT COUNT(*) 
+                  FROM   prtask ct 
+                  WHERE  ct.prprojectid = sp.prrefprojectid) > 0
+            THEN  'L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(i.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) @+@ @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,11,7)			
+            ELSE  NULL  END hg_has_children
+       FROM  prsubproject sp
+       INNER JOIN inv_investments i ON  i.id = sp.prrefprojectid
+       INNER JOIN prtask tasks ON tasks.prid = sp.prtaskid
+       INNER JOIN odf_project_v2 pv ON pv.odf_pk = i.id
+       INNER JOIN cop_inv_days_late_v idl ON idl.investment_id = sp.prrefprojectid 
+       LEFT  OUTER JOIN cop_prj_statusrpt_latest_v lsr ON  lsr.investment_id = i.id
+                                                       AND lsr.report_order = 1
+       LEFT  OUTER JOIN odf_cop_prj_statusrpt_v2 sr ON  sr.odf_pk = lsr.report_id 
+                                                    AND sr.odf_parent_id = lsr.investment_id
+       LEFT  OUTER JOIN srm_resources mgr ON i.manager_id = mgr.user_id
+       LEFT  OUTER JOIN cmn_lookups_v ip ON  ip.lookup_type = 'INVESTMENT_OBJ_PROGRESS' 
+                                         AND ip.lookup_enum = i.progress
+                                         AND ip.language_code = @WHERE:PARAM:LANGUAGE@
+       LEFT  OUTER JOIN cmn_lookups_v ws ON  ws.lookup_type = 'OBJ_INVESTMENT_WORK_STATUS' 
+                                         AND ws.lookup_code = pv.obj_work_status
+                                         AND ws.language_code = @WHERE:PARAM:LANGUAGE@
+       WHERE i.is_active = 1
+       AND   pv.is_template = 0
+       AND   pv.is_program = 0
+       AND   i.odf_object_code = 'project'
+       AND   ('L1-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(tasks.prprojectid) = @SUBSTR@(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@,1,10))
+) A
+WHERE 1=1
+AND @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="level_name" required="false">
+              
+              
+              
+              
+              <nls description="Project / WBS" languageCode="en" name="Project / WBS"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="level_id" required="false">
+              
+              
+              
+              
+              <nls description="Project / Task ID" languageCode="en" name="Project / Task ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_start" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Start" languageCode="en" name="Baseline Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_finish" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Finish" languageCode="en" name="Baseline Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_filter" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="progress_status" required="false">
+              
+              
+              
+              
+              <nls description="Project Progress or Task Status" languageCode="en" name="Project Progress or Task Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="work_status_id" lookup="OBJ_INVESTMENT_WORK_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Work Status Filter" languageCode="en" name="Work Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="work_status" required="false">
+              
+              
+              
+              
+              <nls description="Work Status" languageCode="en" name="Work Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_milestone" required="false">
+              
+              
+              
+              
+              <nls description="Milestone" languageCode="en" name="Milestone"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pct_complete" required="false">
+              
+              
+              
+              
+              <nls description="% Complete" languageCode="en" name="% Complete"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wbs_sequence" required="false">
+              
+              
+              
+              
+              <nls description="WBS Sequence" languageCode="en" name="WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_filter" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Task Internal ID" languageCode="en" name="Task Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="linkcode" required="false">
+              
+              
+              
+              
+              <nls description="Link Code (Internal)" languageCode="en" name="Link Code (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_project" required="false">
+              
+              
+              
+              
+              <nls description="Gantt Icon" languageCode="en" name="Gantt Icon"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="IcoGantt"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="is_subproj" required="false">
+              
+              
+              
+              
+              <nls description="Subprojects Icon" languageCode="en" name="Subprojects Icon"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="IcoSubProjects"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="hg_has_children" required="false">
+              
+              
+              
+              
+              <nls description="Has Child Records (Internal)" languageCode="en" name="Has Child Records (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="overall_status" required="false">
+              
+              
+              
+              
+              <nls description="Overall Status" languageCode="en" name="Overall Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="color">
+                <mapping hi="-99" lo="-99" mappingCode="mapping-1" typeCode="white"/>
+                <mapping hi="40" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="90" lo="40" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100" lo="90" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="days_late" required="false">
+              
+              
+              
+              
+              <nls description="Days Late" languageCode="en" name="Days Late"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="days_late_pct" required="false">
+              
+              
+              
+              
+              <nls description="Days Late %" languageCode="en" name="Days Late %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-999999" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="999999" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule_pct_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule %" languageCode="en" name="Schedule %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-999999" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="999999" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_status" lookup="COP_PORTLET_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Investment Status Filter" languageCode="en" name="Investment Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_investment_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_show_programs" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Include Programs Filter" languageCode="en" name="Include Programs Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hg_row_id" required="false">
+              
+              
+              
+              
+              <nls description="Row ID (Internal)" languageCode="en" name="Row ID (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.wbsTaskList" code="gantt">
+                
+                
+                
+                
+                <nls description="Gantt" languageCode="en" name="Gantt"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="projmgr.organizerTaskListReturn" dataSource="static" paramCode="return_to"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="drillpos"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

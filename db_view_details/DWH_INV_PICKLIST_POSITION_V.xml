@@ -1,0 +1,88 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_PICKLIST_POSITION_V">
+    <indexes/>
+    <text_length>4460</text_length>
+    <text>SELECT ((plc.id || pld.id) || i.id) || '0000000' AS picklist_position_key,
+    plc.id AS picklist_context_key,
+    plc.object_code AS object_code_key,
+    ( SELECT nls.name
+           FROM cmn_captions_nls nls
+          WHERE nls.table_name = 'ODF_OBJECTS' AND nls.pk_id = o.id AND nls.language_code = lang.language_code) AS object_code,
+    plc.is_active,
+    (plc.object_code || pld.id) || l.lookup_code AS picklist_key,
+    pld.id AS picklist_def_key,
+    pld.name AS picklist,
+    lt.id AS lookup_type_key,
+    ( SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+          WHERE cmn_captions_nls.table_name = 'CMN_LOOKUP_TYPES' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = lt.id) AS lookup_type,
+    l.lookup_code AS lookup_code_key,
+    ( SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+          WHERE cmn_captions_nls.table_name = 'CMN_LOOKUPS' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = l.id) AS lookup_code,
+    i.id AS investment_key,
+    i.name AS investment_name,
+    0 AS task_key,
+    '' AS task_name,
+    1 position,
+    lang.language_code_key,
+    lang.language_code,
+    GREATEST(ip.last_updated_date, pld.last_updated_date, l.last_updated_date, i.last_updated_date) AS clarity_updated_date,
+    GREATEST(ip.created_date, pld.created_date, l.created_date, i.created_date) AS clarity_created_date 
+   FROM odf_picklist_contexts plc
+     inner JOIN ( SELECT l_1.id AS language_code_key,
+                         l_1.language_code
+                  from   cmn_languages l_1
+                  WHERE  l_1.is_dw_enabled = 1) lang ON 1 = 1
+     inner JOIN odf_item_values ip ON plc.id = ip.context_id
+     inner JOIN odf_picklist_defs pld ON plc.id = pld.context_id AND ip.picklist_def_id = pld.id
+     inner JOIN odf_objects o ON plc.object_code = o.code 
+     inner JOIN cmn_lookup_types lt ON pld.lookup_type = lt.lookup_type
+     inner JOIN cmn_lookups l ON lt.lookup_type = l.lookup_type AND l.lookup_code = ip.lookup_code
+     inner JOIN inv_investments i ON ip.instance_id = i.id
+  WHERE (plc.object_code in ('idea','project')) OR (plc.object_code IN ( SELECT odf_objects.code
+           FROM odf_objects
+          WHERE odf_objects.template_extension = 'inv_extension'))
+UNION ALL
+ SELECT ((plc.id || pld.id) || i.id) || t.prid AS picklist_position_key,
+    plc.id AS picklist_context_key,
+    plc.object_code AS object_code_key,
+    ( SELECT nls.name
+           FROM cmn_captions_nls nls
+          WHERE nls.table_name = 'ODF_OBJECTS' AND nls.pk_id = o.id AND nls.language_code = lang.language_code) AS object_code,
+    plc.is_active,
+    (plc.object_code || pld.id) || l.lookup_code AS picklist_key,
+    pld.id AS picklist_def_key,
+    pld.name AS picklist,
+    lt.id AS lookup_type_key,
+    ( SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+          WHERE cmn_captions_nls.table_name = 'CMN_LOOKUP_TYPES' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = lt.id) AS lookup_type,
+    l.lookup_code AS lookup_code_key,
+    ( SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+          WHERE cmn_captions_nls.table_name = 'CMN_LOOKUPS' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = l.id) AS lookup_code,
+    i.id AS investment_key,
+    i.name AS investment_name,
+    t.prid AS task_key,
+    t.prname AS task_name,
+    1 position,
+    lang.language_code_key,
+    lang.language_code,
+    GREATEST(ip.last_updated_date, pld.last_updated_date, l.last_updated_date, i.last_updated_date, t.last_updated_date) AS clarity_updated_date,
+    GREATEST(ip.created_date, pld.created_date, l.created_date, i.created_date, t.created_date) AS clarity_created_date
+   FROM odf_picklist_contexts plc
+     JOIN ( SELECT l_1.id AS language_code_key,
+            l_1.language_code
+           FROM cmn_languages l_1
+          WHERE l_1.is_dw_enabled = 1) lang ON 1 = 1
+     JOIN odf_item_values ip ON plc.id = ip.context_id
+     JOIN odf_objects o ON plc.object_code = o.code
+     JOIN odf_picklist_defs pld ON plc.id = pld.context_id AND ip.picklist_def_id = pld.id
+     JOIN cmn_lookup_types lt ON pld.lookup_type = lt.lookup_type
+     JOIN cmn_lookups l ON lt.lookup_type = l.lookup_type AND l.lookup_code = ip.lookup_code
+     JOIN prtask t ON ip.instance_id = t.prid
+     JOIN inv_investments i ON t.prprojectid = i.id
+  WHERE plc.object_code = 'task'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

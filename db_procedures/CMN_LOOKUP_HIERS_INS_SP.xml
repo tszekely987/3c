@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUP_HIERS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUP_HIERS_INS_SP" (
+     P_LOOKUP_TYPE                     IN    VARCHAR2,
+     P_LOOKUP_ID                           IN    NUMBER,
+     P_PARENT_LOOKUP_CODE     IN    VARCHAR2,
+     P_LOOKUP_LEVEL                   IN    NUMBER,
+     P_CREATED_BY                       IN    NUMBER
+   )
+   IS
+      V_PARENT_LOOKUP_CODE  VARCHAR2( 30 );
+      V_PARENT_LEVEL                 NUMBER;
+      V_PARENT_LOOKUP_ID         NUMBER;
+   BEGIN
+       V_PARENT_LOOKUP_CODE := TRIM( P_PARENT_LOOKUP_CODE );
+       
+       IF V_PARENT_LOOKUP_CODE IS NOT NULL THEN       
+	    SELECT A.ID, A.LOOKUP_LEVEL  INTO V_PARENT_LOOKUP_ID, V_PARENT_LEVEL
+           FROM CMN_LOOKUPS A, CMN_LIST_OF_VALUES B, CMN_LIST_OF_VALUES C
+           WHERE A.LOOKUP_CODE = V_PARENT_LOOKUP_CODE
+           AND A.LOOKUP_TYPE = B.LOOKUP_TYPE_CODE
+	    AND B.ID = C.PARENT_ID
+	    AND C.LOOKUP_TYPE_CODE = P_LOOKUP_TYPE;
+           
+           IF V_PARENT_LEVEL != P_LOOKUP_LEVEL - 1 THEN
+                   RAISE_APPLICATION_ERROR (-20000, 'PARENT BELONGS TO THE WRONG LEVEL');
+           END IF;
+    
+           /* Now insert one row for each ancestor */
+           INSERT INTO CMN_LOOKUP_FLAT_HIERS
+                         (ID,
+                          PARENT_LOOKUP_ID,
+                          LOOKUP_ID,
+                          LOOKUP_LEVEL,
+                          CREATED_DATE,
+                          CREATED_BY,
+                          LAST_UPDATED_DATE,
+                          LAST_UPDATED_BY
+                         )
+                SELECT CMN_LOOKUP_FLAT_HIERS_S1.NEXTVAL,
+                       FH.PARENT_LOOKUP_ID,
+                       P_LOOKUP_ID,
+                       FH.LOOKUP_LEVEL,
+                       SYSDATE,
+                       P_CREATED_BY,
+                       SYSDATE,
+                       P_CREATED_BY
+                  FROM CMN_LOOKUP_FLAT_HIERS FH
+                 WHERE FH.LOOKUP_ID = V_PARENT_LOOKUP_ID;
+      END IF;
+      
+         INSERT INTO CMN_LOOKUP_FLAT_HIERS (
+                        ID,
+                        PARENT_LOOKUP_ID,
+                        LOOKUP_ID,
+                        LOOKUP_LEVEL,
+                        CREATED_DATE,
+                        CREATED_BY,
+                        LAST_UPDATED_DATE,
+                        LAST_UPDATED_BY
+                     )
+              VALUES (
+                 CMN_LOOKUP_FLAT_HIERS_S1.NEXTVAL,
+                 P_LOOKUP_ID,
+                 P_LOOKUP_ID,
+                 P_LOOKUP_LEVEL,
+                 SYSDATE,
+                 P_CREATED_BY,
+                 SYSDATE,
+                 P_CREATED_BY
+              );      
+   END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_SETUP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_SETUP_SP" (
+   P_JOB_RUN_ID    IN   NUMBER,
+   P_JOB_USER_ID   IN   NUMBER,
+   P_POPULATE_UNIV_CALENDAR   IN   NUMBER,
+   P_POPULATE_INV_HIERARCHY   IN   NUMBER,
+   P_POPULATE_WBS_INDEX       IN   NUMBER,
+   P_POPULATE_SKILLS_INDEX    IN   NUMBER,
+   P_POPULATE_OBS             IN   NUMBER
+)
+IS
+BEGIN
+
+  IF P_POPULATE_UNIV_CALENDAR = 1 THEN
+    RPT_CALENDAR_SP;
+  END IF;
+  IF P_POPULATE_INV_HIERARCHY = 1 THEN
+    RPT_PROGRAM_HIERARCHY_SP;
+    RPT_INV_HIERARCHY_SP;
+  END IF;
+  IF P_POPULATE_WBS_INDEX = 1 THEN
+    RPT_WBSINDEX_SP;
+  END IF;
+  IF P_POPULATE_SKILLS_INDEX = 1 THEN
+    RPT_RES_SKILLS_INDEX_SP;
+  END IF;
+  IF P_POPULATE_OBS = 1 THEN
+    NBI_POPULATE_OBS_DIM_SP;
+  END IF;
+
+  COMMIT;
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in RPT_SETUP_SP - ' || SQLERRM
+      );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

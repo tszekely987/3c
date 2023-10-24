@@ -1,0 +1,27 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_BENEFITPLAN_V">
+    <indexes/>
+    <text_length>3407</text_length>
+    <text>select fin_plans.id odf_pk, FIN_PLANS.ID as clarity_benefitplan_key, FIN_PLANS.ID as benefitplan_key, FIN_BENEFIT_PLAN_DETAILS.ID as benefitplan_detail_key, FIN_BENEFIT_PLAN_DETAILS.ID as clarity_benefitplan_detail_key, fin_plans.OBJECT_ID as investment_key, fin_plans.NAME as plan_name, fin_plans.CODE as plan_id, fin_plans.DESCRIPTION as description, fin_plans.PERIOD_TYPE_CODE as fiscal_period_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'PERIOD_TYPE' and rownum = 1 and LOOKUP_CODE = fin_plans.PERIOD_TYPE_CODE) as period_type_code_caption, ENTITY.HOME_CURRENCY_CODE as home_currency_code, NVL((SELECT MAX(1)
+      FROM fin_plans fbplan
+      WHERE fbplan.plan_type_code IN ('BUDGET','FORECAST')
+      AND fbplan.is_plan_of_record = 1
+      AND fbplan.benefit_plan_id = fin_plans.id
+      ),0) as is_plan_of_record, PROJECTS.BILLING_CURRENCY_CODE as billing_currency_code, fin_plans.START_PERIOD_ID as start_period_key, (select CMN_DATE_TRUNC_FCT( start_date ) from biz_com_periods biz_com_periods where biz_com_periods.id = fin_plans.start_period_id) as plan_start_date, fin_plans.END_PERIOD_ID as finish_period_key, (select COP_CALC_FINISH_FCT( end_date )  from biz_com_periods biz_com_periods where biz_com_periods.id = fin_plans.end_period_id) as plan_finish_date, FIN_BENEFIT_PLAN_DETAILS.detail as detail, (
+        CASE
+        WHEN FIN_BENEFIT_PLAN_DETAILS.CREATED_DATE IS NULL
+          THEN FIN_PLANS.CREATED_DATE
+        ELSE
+          GREATEST(FIN_PLANS.CREATED_DATE, FIN_BENEFIT_PLAN_DETAILS.CREATED_DATE)
+        END
+      ) as clarity_created_date, (
+        CASE
+        WHEN FIN_BENEFIT_PLAN_DETAILS.LAST_UPDATED_DATE IS NULL
+          THEN FIN_PLANS.LAST_UPDATED_DATE
+        ELSE
+          GREATEST(FIN_PLANS.LAST_UPDATED_DATE, FIN_BENEFIT_PLAN_DETAILS.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, odf_ca_benefitplandetail.obj_benefit_class as benefit_class_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_BENEFITDETAIL_CLASS' and rownum = 1 and LOOKUP_CODE = odf_ca_benefitplandetail.obj_benefit_class) as obj_benefit_class_caption, odf_ca_benefitplandetail.obj_benefit_subclass as benefit_subclass_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_BENEFITDETAIL_SUBCLASS' and rownum = 1 and LOOKUP_CODE = odf_ca_benefitplandetail.obj_benefit_subclass) as obj_benefit_subclass_caption, dataw_context.language_code, dataw_context.id language_id from fin_plans fin_plans inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN inv_investments INVESTMENTS ON INVESTMENTS.id=FIN_PLANS.object_id JOIN pac_mnt_projects PROJECTS ON PROJECTS.id=FIN_PLANS.object_id JOIN entity ENTITY ON ENTITY.entity=INVESTMENTS.entity_code JOIN fin_benefit_plan_details FIN_BENEFIT_PLAN_DETAILS ON FIN_BENEFIT_PLAN_DETAILS.PLAN_ID=FIN_PLANS.ID JOIN odf_ca_benefitplandetail ODF_CA_BENEFITPLANDETAIL ON ODF_CA_BENEFITPLANDETAIL.ID=FIN_BENEFIT_PLAN_DETAILS.ID  where FIN_PLANS.SUB_PLAN_TYPE = 1
+      and ( 0 = (select FIN_PLANS_POR_ONLY from DWH_SETTINGS) or NVL((SELECT MAX(1) FROM fin_plans fbplan WHERE fbplan.plan_type_code IN ('BUDGET','FORECAST') AND fbplan.is_plan_of_record = 1 AND fbplan.benefit_plan_id = fin_plans.id ),0) = 1 ) and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

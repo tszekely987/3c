@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_PROJECT_SUBMIT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_PROJECT_SUBMIT_SP" (
+  in_clntcode   IN VARCHAR2  DEFAULT NULL,
+  in_projid   IN VARCHAR2  DEFAULT NULL,
+  in_emplycode  IN VARCHAR2  DEFAULT NULL)
+AS
+  COMPANY_CODE  GLOBALPKG.STRING;
+  PROJECT_CODE  GLOBALPKG.STRING;
+  RESOURCE_CODE   GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  budgetratesourcelabor   NUMBER;
+  budgetcostsourcelabor   NUMBER;
+  budgetratelocationlabor   NUMBER(3,0);
+  budgetrateoverridelabor   NUMBER(1,0);
+  budgetcostsourcematerials   NUMBER;
+  budgetratesourcematerials   NUMBER;
+  budgetratelocationmaterials   NUMBER(3,0);
+  budgetrateoverridematerials   NUMBER(1,0);
+  budgetcostsourceequipment   NUMBER;
+  budgetratesourceequipment   NUMBER;
+  budgetratelocationequipment   NUMBER(3,0);
+  budgetrateoverrideequipment   NUMBER(1,0);
+  budgetlevellabor  NUMBER(3,0);
+  budgetlevelmaterial   NUMBER(3,0);
+  budgetlevelequipment  NUMBER(3,0);
+  transratesourcelabor  NUMBER;
+  transcostsourcelabor  NUMBER;
+  transratelocationlabor  NUMBER(3,0);
+  transrateoverridelabor  NUMBER(1,0);
+  transcostsourcematerials  NUMBER;
+  transratesourcematerials  NUMBER;
+  transratelocationmaterials  NUMBER(3,0);
+  transrateoverridematerials  NUMBER(1,0);
+  transcostsourceequipment  NUMBER;
+  transratesourceequipment  NUMBER;
+  transratelocationequipment  NUMBER(3,0);
+  transrateoverrideequipment  NUMBER(1,0);
+  approved  NUMBER(1,0);
+  awaitingapproval  NUMBER(1,0);
+  retcode   NUMBER;
+  projrevisionid  NUMBER;
+  revision_type   NUMBER;
+  poc_method  NUMBER(3,0);
+  type_   GLOBALPKG.STRING;
+  budget  NUMBER(1,0);
+  budget_summary_units  NUMBER(32,6);
+  budget_detail_units   NUMBER(32,6);
+  budget_summary_amount   NUMBER(32,6);
+  budget_detail_amount  NUMBER(32,6);
+  v_billing_project_id NUMBER(32);
+  v_id NUMBER(32);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE := PAC_MNT_PROJECT_SUBMIT_SP.in_clntcode;
+	PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE := PAC_MNT_PROJECT_SUBMIT_SP.in_projid;
+	PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE := PAC_MNT_PROJECT_SUBMIT_SP.in_emplycode;
+	PAC_MNT_PROJECT_SUBMIT_SP.revision_type :=  3;
+	BEGIN
+
+     PAC_MNT_GET_CURR_REVISION_SP(
+	 COMPANY_CODE=&gt;PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE,
+	 PROJECT_CODE=&gt;PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE,
+	 revision_type=&gt;PAC_MNT_PROJECT_SUBMIT_SP.revision_type,
+	 increment_revision_if_approved=&gt;0,
+	 RESOURCE_CODE=&gt;PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE,
+	 IN_TARGETEDSTARTDATE=&gt;NULL,
+	 IN_TARGETEDCOMPLDATE=&gt;NULL,
+	 IN_USERINITIALS=&gt;NULL,
+	 PROJREVISIONID=&gt;PAC_MNT_PROJECT_SUBMIT_SP.projrevisionid);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  PAC_MNT_PROJECT_SUBMIT_SP.projrevisionid = -1 THEN
+		RETURN ;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   budget,  poc_method,  type_,  budgetratesourcelabor,  budgetcostsourcelabor,
+		  budgetratelocationlabor,  budgetrateoverridelabor,  budgetcostsourcematerials,
+		  budgetratesourcematerials,  budgetratelocationmaterials,  budgetrateoverridematerials,
+		  budgetcostsourceequipment,  budgetratesourceequipment,  budgetratelocationequipment,
+		  budgetrateoverrideequipment,  budgetlevellabor,  budgetlevelmaterial,  budgetlevelequipment,
+		  transratesourcelabor,  transcostsourcelabor,  transratelocationlabor,  transrateoverridelabor,
+		  transcostsourcematerials,  transratesourcematerials,  transratelocationmaterials,
+		  transrateoverridematerials,  transcostsourceequipment,  transratesourceequipment,
+		  transratelocationequipment,  transrateoverrideequipment
+		INTO PAC_MNT_PROJECT_SUBMIT_SP.budget, PAC_MNT_PROJECT_SUBMIT_SP.poc_method, PAC_MNT_PROJECT_SUBMIT_SP.type_, PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcelabor, PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcelabor,
+		 PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationlabor, PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverridelabor, PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcematerials,
+		 PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcematerials, PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationmaterials, PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverridematerials,
+		 PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourceequipment, PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourceequipment, PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationequipment,
+		 PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverrideequipment, PAC_MNT_PROJECT_SUBMIT_SP.budgetlevellabor, PAC_MNT_PROJECT_SUBMIT_SP.budgetlevelmaterial, PAC_MNT_PROJECT_SUBMIT_SP.budgetlevelequipment,
+		 PAC_MNT_PROJECT_SUBMIT_SP.transratesourcelabor, PAC_MNT_PROJECT_SUBMIT_SP.transcostsourcelabor, PAC_MNT_PROJECT_SUBMIT_SP.transratelocationlabor, PAC_MNT_PROJECT_SUBMIT_SP.transrateoverridelabor,
+		 PAC_MNT_PROJECT_SUBMIT_SP.transcostsourcematerials, PAC_MNT_PROJECT_SUBMIT_SP.transratesourcematerials, PAC_MNT_PROJECT_SUBMIT_SP.transratelocationmaterials,
+		 PAC_MNT_PROJECT_SUBMIT_SP.transrateoverridematerials, PAC_MNT_PROJECT_SUBMIT_SP.transcostsourceequipment, PAC_MNT_PROJECT_SUBMIT_SP.transratesourceequipment,
+     PAC_MNT_PROJECT_SUBMIT_SP.transratelocationequipment, PAC_MNT_PROJECT_SUBMIT_SP.transrateoverrideequipment
+    FROM pac_mnt_projects
+		WHERE COMPANY_CODE = PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE
+		 AND PROJECT_CODE = PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+BEGIN
+		SELECT BILLING_PROJECT_ID, ID INTO PAC_MNT_PROJECT_SUBMIT_SP.v_billing_project_id, PAC_MNT_PROJECT_SUBMIT_SP.v_id FROM PAC_MNT_PROJECTS 
+		WHERE PROJECT_CODE = PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE;
+			
+		IF  ((PAC_MNT_PROJECT_SUBMIT_SP.type_ = 'P') 
+			AND (PAC_MNT_PROJECT_SUBMIT_SP.v_billing_project_id IS NULL 
+			OR PAC_MNT_PROJECT_SUBMIT_SP.v_billing_project_id = PAC_MNT_PROJECT_SUBMIT_SP.v_id )) THEN
+		BEGIN
+			BEGIN
+			BEGIN
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			StoO_rowcnt := 0;
+			SELECT 1 INTO StoO_selcnt
+			FROM DUAL
+			WHERE NOT EXISTS (
+				SELECT  1
+				 FROM projcntrts
+				WHERE COMPANY_CODE = PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE
+				 AND PROJECT_CODE = PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+			BEGIN
+				raise_application_error(-20230, 'A contracted PROJECT_CODE cannot be submitted for approval without a contract.');
+				RETURN ;
+			END;
+			END IF;
+			END;
+		END;
+		END IF;
+	END;
+	IF  PAC_MNT_PROJECT_SUBMIT_SP.revision_type  IN(1, 3) THEN
+	BEGIN
+		BEGIN
+		 PAC_MNT_VALIDATE_BUDGET_SP(budgetratesourcelabor=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcelabor,
+		 budgetcostsourcelabor=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcelabor,
+		 budgetratelocationlabor=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationlabor,
+		 budgetrateoverridelabor=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverridelabor,
+		 budgetcostsourcematerials=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcematerials,
+		 budgetratesourcematerials=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcematerials,
+		 budgetratelocationmaterials=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationmaterials,
+		 budgetrateoverridematerials=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverridematerials,
+		 budgetcostsourceequipment=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourceequipment,
+		 budgetratesourceequipment=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourceequipment,
+		 budgetratelocationequipment=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationequipment,
+		 budgetrateoverrideequipment=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetrateoverrideequipment,
+		 budgetlevellabor=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetlevellabor,
+		 budgetlevelmaterial=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetlevelmaterial,
+		 budgetlevelequipment=&gt;PAC_MNT_PROJECT_SUBMIT_SP.budgetlevelequipment,
+		 RETCODE=&gt;PAC_MNT_PROJECT_SUBMIT_SP.retcode);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  PAC_MNT_PROJECT_SUBMIT_SP.retcode = -1 THEN
+			RETURN ;
+		END IF;
+	END;
+	END IF;
+	IF  PAC_MNT_PROJECT_SUBMIT_SP.revision_type  IN(2, 3) AND PAC_MNT_PROJECT_SUBMIT_SP.budget = 1 THEN
+	BEGIN
+		IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcelabor IS NULL THEN
+		BEGIN
+			raise_application_error(-20231, 'Rate source for labor cannot be empty for budget entry definition.');
+			RETURN ;
+		END;
+		ELSE
+			IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcelabor IS NULL THEN
+			BEGIN
+				raise_application_error(-20232, 'Cost source for labor cannot be empty for budget entry definition.');
+				RETURN ;
+			END;
+			ELSE
+				IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationlabor IS NULL THEN
+				BEGIN
+					raise_application_error(-20233, 'Cost and rate location for labor cannot be empty for budget entry definition.');
+					RETURN ;
+				END;
+				ELSE
+					IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourcematerials IS NULL THEN
+					BEGIN
+						raise_application_error(-20234, 'Rate source for material cannot be empty for budget entry definition.');
+						RETURN ;
+					END;
+					ELSE
+						IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourcematerials IS NULL THEN
+						BEGIN
+							raise_application_error(-20235, 'Cost source for material cannot be empty for budget entry definition.');
+							RETURN ;
+						END;
+						ELSE
+							IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationmaterials IS NULL THEN
+							BEGIN
+								raise_application_error(-20236, 'Cost and rate location for material cannot be empty for budget entry definition.');
+								RETURN ;
+							END;
+							ELSE
+								IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratesourceequipment IS NULL THEN
+								BEGIN
+									raise_application_error(-20237, 'Rate source for equipment cannot be empty for budget entry definition.');
+									RETURN ;
+								END;
+								ELSE
+									IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetcostsourceequipment IS NULL THEN
+									BEGIN
+										raise_application_error(-20238, 'Cost source for equipment cannot be empty for budget entry definition.');
+										RETURN ;
+									END;
+									ELSE
+										IF  PAC_MNT_PROJECT_SUBMIT_SP.budgetratelocationequipment IS NULL THEN
+										BEGIN
+											raise_application_error(-20239, 'Cost and rate location for equipment cannot be empty for budget entry definition.');
+											RETURN ;
+										END;
+										END IF;
+										END IF;
+										END IF;
+									END IF;
+								END IF;
+							END IF;
+						END IF;
+					END IF;
+				END IF;
+		END;
+		END IF;
+		IF  PAC_MNT_PROJECT_SUBMIT_SP.projrevisionid &gt; 0 THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE projrevision
+			SET awaitingapproval = 1,
+			RESOURCE_CODE = PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE,
+			AWAITAPPRVL_RESOURCE_CODE = PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE,
+			needapprovaldatetime = SYSDATE
+			WHERE COMPANY_CODE = PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE
+			 AND PROJECT_CODE = PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE
+			 AND projrevisionid = PAC_MNT_PROJECT_SUBMIT_SP.projrevisionid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE pac_mnt_projects
+			SET awaitingapproval = 1,
+			RESOURCE_CODE = PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE,
+			AWAITAPPRVL_RESOURCE_CODE = PAC_MNT_PROJECT_SUBMIT_SP.RESOURCE_CODE,
+			needapprovaldatetime = SYSDATE
+			WHERE COMPANY_CODE = PAC_MNT_PROJECT_SUBMIT_SP.COMPANY_CODE
+			 AND PROJECT_CODE = PAC_MNT_PROJECT_SUBMIT_SP.PROJECT_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+END PAC_MNT_PROJECT_SUBMIT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_DEP_LOOKUP_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_DEP_LOOKUP_FCT" (
+   P_LANGUAGE_CODE IN VARCHAR2,
+   P_LOOKUP_CODE IN VARCHAR2,
+   P_EXIT_LT_CODE IN VARCHAR2,
+   P_ENTRY_LT_CODE IN VARCHAR2 DEFAULT NULL,
+   P_ROOT_NODE IN VARCHAR2 DEFAULT NULL
+)
+   RETURN  VARCHAR2
+AS
+   V_LOOKUP_NAME    VARCHAR2(80);
+   V_STR_RESULTS VARCHAR2(4000);
+   TYPE t_cursor_type IS REF CURSOR;
+   v_cursor_var   t_cursor_type;  -- declare cursor variable
+BEGIN
+
+  IF( P_ROOT_NODE IS NULL )
+     THEN
+          -- Get the complete path if no root node
+        OPEN v_cursor_var FOR  
+            SELECT  l.name 
+         FROM
+              cmn_lookups_v l,
+              cmn_lookup_flat_hiers f,
+              cmn_lookups l2,
+              cmn_lookup_flat_hiers f2
+              WHERE l.id = f.parent_lookup_id
+              AND l.language_code =  P_LANGUAGE_CODE
+              AND f.lookup_id = l2.id
+              AND l2.lookup_level &gt;= l.lookup_level
+              AND l2.id = f2.parent_lookup_id
+              AND f2.lookup_id = l2.id
+              AND l2.lookup_type = P_EXIT_LT_CODE
+              AND l2.lookup_code = P_LOOKUP_CODE;
+
+     ELSE
+       -- get the path from the root node if specified
+       OPEN v_cursor_var FOR  
+         SELECT   l.name
+            FROM
+            cmn_lookups_v l,
+            cmn_lookup_flat_hiers f,
+            cmn_lookups l2,
+            cmn_lookup_flat_hiers f2,
+            cmn_lookups l3,
+            cmn_lookup_flat_hiers f3
+            WHERE l.id = f.parent_lookup_id
+            AND l.language_code =  P_LANGUAGE_CODE
+            AND f.lookup_id = l2.id
+            AND l2.id = f2.parent_lookup_id
+            AND f2.lookup_id = l2.id
+            AND l2.lookup_type =  P_EXIT_LT_CODE
+            AND l3.lookup_code =  P_ROOT_NODE
+            AND l3.id = f3.parent_lookup_id
+            AND f3.lookup_id = l2.id
+            AND l3.lookup_level &lt;  l.lookup_level
+            AND l2.lookup_code = P_LOOKUP_CODE;
+
+   END IF;
+          
+  LOOP
+  FETCH v_cursor_var INTO V_LOOKUP_NAME;
+     EXIT WHEN v_cursor_var%NOTFOUND;
+    
+     V_STR_RESULTS  := V_STR_RESULTS ||  '\' || V_LOOKUP_NAME;
+  END LOOP;
+  CLOSE v_cursor_var; 
+   
+   RETURN  V_STR_RESULTS;
+END CMN_DEP_LOOKUP_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

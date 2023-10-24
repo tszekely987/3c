@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="PROCESS_AI_STATUS" displayAttributeName="status_name" hiddenAttributeName="status_code" objectCode="" sortAttributeName="status_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Process Actionitem Statuses" languageCode="en" name="Process Actionitem Statuses"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:status_code:status_code@,          
+        @SELECT:name:status_name@,          
+        @SELECT:description:status_description@,@SELECT:LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+		,@SELECT:ID:LANGUAGE_ID@,
+		@SELECT:LANGUAGE_CODE:LANGUAGE_CODE@
+FROM
+(select a.status_code, l.name, l.description,l.LAST_UPDATED_DATE LAST_UPDATED_DATE,lang.ID ID,l.language_code LANGUAGE_CODE
+ from bpm_def_objects o, bpm_def_step_ai_actions a, cmn_lookups_v l,CMN_LANGUAGES lang
+ where o.object_name = @where:param:xml:string:/data/objectCode/@value@ and
+       ((o.pk_id = @where:param:xml:integer:/data/step_id/@value@ and o.table_name = 'BPM_DEF_STEPS') OR 
+        (o.pk_id = @where:param:xml:integer:/data/process_version_id/@value@ and o.table_name = 'BPM_DEF_PROCESS_VERSIONS')) and
+       o.src_pk_id = a.step_action_id and o.src_table_name = 'BPM_DEF_STEP_ACTIONS' and
+       l.lookup_type = a.status_type_code and
+       l.lookup_code = a.status_code
+ and
+              l.language_code = @WHERE:PARAM:LANGUAGE@
+			  AND l.LANGUAGE_CODE = lang.LANGUAGE_CODE	
+union
+    select lv.LOOKUP_CODE status_code, lv.name, lv.description,lv.LAST_UPDATED_DATE LAST_UPDATED_DATE,lang.ID ID,lv.language_code LANGUAGE_CODE from CMN_LOOKUPS_V lv,CMN_LANGUAGES lang
+    where lv.LOOKUP_TYPE = 'CAL_ACTIONITEM_STATUS'
+    and lv.LOOKUP_CODE = 'CAL_OPEN'
+	AND lv.LANGUAGE_CODE = lang.LANGUAGE_CODE
+    and lv.language_code = @WHERE:PARAM:LANGUAGE@) XYZ
+WHERE 1 = 1 and @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="status_name"/>
+              <displayedSuggestionAttribute value="status_description"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="status_name"/>
+              <searchedSuggestionAttribute value="status_description"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Process Actionitem Statuses" languageCode="en" name="Process Actionitem Statuses"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Process Actionitem Statuses" languageCode="en" name="Process Actionitem Statuses"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="status_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Status" languageCode="en" name="Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="status_description" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Description" languageCode="en" name="Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="status_code" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: status_code" languageCode="en" name="[hidden]: status_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="status_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Status" languageCode="en" name="Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="status_description" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Description" languageCode="en" name="Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_ROLL_ASSIGN_ACTCOST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_ROLL_ASSIGN_ACTCOST_SP" 
+	(
+		P_ROLLOVER_FINISH_DATE    DATE DEFAULT NULL,
+		P_ROLLOVER_START_DATE     DATE DEFAULT NULL
+	)
+	AS
+	BEGIN
+        LOOP
+            UPDATE PRASSIGNMENT /*+ INDEX (PRASSIGNMENT PRASSIGNMENT_N5)*/ SET ODF_SS_ACTCOST_CURVE = 3 
+            WHERE PRSTART &lt; P_ROLLOVER_FINISH_DATE AND PRFINISH &gt; P_ROLLOVER_START_DATE
+              AND ODF_SS_ACTCOST_CURVE IS NULL 
+              AND ROWNUM &lt;= 10000;
+            EXIT WHEN SQL%ROWCOUNT = 0;
+            COMMIT;
+        END LOOP;
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

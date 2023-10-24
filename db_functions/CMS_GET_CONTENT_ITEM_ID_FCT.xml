@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMS_GET_CONTENT_ITEM_ID_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMS_GET_CONTENT_ITEM_ID_FCT" (
+  p_item_id         in number,
+  p_item_table_name in varchar2 default null,
+  p_code            in varchar2,
+  p_type            in varchar2,
+  p_table_name      in varchar2 default null
+   )
+   RETURN number
+IS
+  v_table_name varchar2(30);
+  v_code_column varchar2(30);
+  v_dynamic_sql varchar2(500);
+  v_id number;
+BEGIN
+  SELECT table_name, code_column
+    INTO v_table_name, v_code_column
+    FROM cms_content_types
+   WHERE type = p_type;
+
+    IF p_type = 'PROCESS' THEN
+      SELECT bdp.id into v_id
+      FROM bpm_def_processes bdp, bpm_def_process_versions bdpv
+      WHERE bdp.process_code = p_code and bdp.id = bdpv.process_id;
+    ELSIF p_type = 'VIEW' THEN
+      SELECT v.id into v_id
+      FROM ODF_OBJECT_CUSTOM_VIEWS_V v
+      WHERE v.view_code = p_code
+      AND v.table_name = p_table_name
+      AND v.language_code = 'en';
+    ELSIF p_type = 'LOOKUP' THEN
+      v_dynamic_sql := 'SELECT  id FROM ' || v_table_name || ' WHERE upper(' || v_code_column || ') = upper(''' || p_code || ''')';
+      EXECUTE IMMEDIATE v_dynamic_sql INTO v_id;
+    ELSIF p_type = 'ATTRIBUTE' THEN
+      v_dynamic_sql := 'SELECT  attr.id FROM ' || v_table_name || ' attr, ' || p_item_table_name || ' child WHERE child.id = ' || p_item_id || ' AND UPPER(' || v_code_column || ') = UPPER(''' || p_code || ''') AND attr.object_name = ( SELECT parent.code FROM ' || p_item_table_name || ' parent WHERE parent.id = child.parent_item_id)';
+      EXECUTE IMMEDIATE v_dynamic_sql INTO v_id;
+    ELSE
+      v_dynamic_sql := 'SELECT  id FROM ' || v_table_name || ' WHERE ' || v_code_column || ' = ''' || p_code || '''';
+      EXECUTE IMMEDIATE v_dynamic_sql INTO v_id;
+    END IF;
+
+  RETURN v_id;
+
+EXCEPTION
+  WHEN OTHERS
+    THEN
+      RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

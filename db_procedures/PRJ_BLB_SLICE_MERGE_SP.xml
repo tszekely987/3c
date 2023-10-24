@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_SLICE_MERGE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_SLICE_MERGE_SP" 
+	(
+		P_TABLE_NAME			VARCHAR2 DEFAULT 'PRJ_BLB_SLICES'
+	)
+	AS
+  V_SQL                       VARCHAR2(3000);
+  V_DELETE_OUTOFRANGE_LOW     VARCHAR2(2000);
+  V_DELETE_OUTOFRANGE_HIGH    VARCHAR2(2000);
+  V_DELETE_SELECTED_UNMATCHED VARCHAR2(2000);
+  V_MERGE       VARCHAR2(2000);
+  V_DENORMALIZED_CNT SIMPLE_INTEGER:=0;
+  V_TABLE_NAME VARCHAR2(1000);
+
+	BEGIN
+
+    update temp_blb_processed set new_request = 0 where new_request is null;
+
+    /*
+    */
+    V_TABLE_NAME := UPPER( P_TABLE_NAME );
+
+    IF UPPER( V_TABLE_NAME ) = 'PRJ_FISCAL_BLB_SLICES' THEN
+      /*
+        Build the sql statements necessary to support fiscal time slicing
+      */
+      --
+      -- This statement removes slices that may exist prior to the date range for new slice requests
+      --
+      V_DELETE_OUTOFRANGE_LOW
+        := 'delete from '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' join biz_com_periods b on s.period_id = b.id '
+        || ' where p.new_request = 1 and b.end_date &lt; p.from_date )';
+
+      --
+      -- This statement removes slices that may exist after the date range for new slice requests
+      --
+      V_DELETE_OUTOFRANGE_HIGH
+        := 'delete from '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' join biz_com_periods b on s.period_id = b.id '
+        || ' where p.new_request = 1 and b.start_date &gt;= p.to_date )';
+
+      --
+      -- This statement removes slices for a specific date range that are no longer matched by the new slices to be inserted
+      --
+      V_DELETE_SELECTED_UNMATCHED
+       := 'delete from  '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' join biz_com_periods b on s.period_id = b.id '
+        || ' left outer join temp_fiscal_blb_slices t on s.slice_request_id = t.slice_request_id and s.prj_object_id = t.prj_object_id and s.period_id = t.period_id '
+        || ' where b.start_date &lt;= p.to_date and b.end_date &gt;= p.from_date and t.slice_request_id is null )';
+
+      --
+      -- This statement merges the new slices in the source temporary table with the slices in the target table
+      --
+      V_MERGE
+        := 'merge /*+ NOPARALLEL */ into ' || V_TABLE_NAME || ' s using temp_fiscal_blb_slices t '
+        || ' on ( s.slice_request_id = t.slice_request_id and s.prj_object_id = t.prj_object_id and s.period_id = t.period_id ) '
+        || ' when matched then '
+        || '  update set s.slice = t.slice, s.created_date = t.created_date where s.slice &lt;&gt; t.slice '
+        || ' when not matched then '
+        || ' insert ( slice_request_id, prj_object_id, period_id, slice, created_date ) '
+        || ' values ( t.slice_request_id, t.prj_object_id, t.period_id, t.slice, t.created_date ) ';
+
+    ELSE
+      /*
+        Build the sql necessary to support regular old slices ... although some may be denormalized
+      */
+      -- determine if the table has the denormalized columns on it
+      select count(*) into v_denormalized_cnt from user_tab_columns where table_name = UPPER( V_TABLE_NAME ) and column_name in ('INVESTMENT_ID', 'RESOURCE_ID','ROLE_ID');
+      --
+      -- This statement removes slices that may exist prior to the date range for new slice requests
+      --
+      V_DELETE_OUTOFRANGE_LOW
+        := 'delete from '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' where p.new_request = 1 and s.slice_date &lt; p.from_date )';
+
+      --
+      -- This statement removes slices that may exist after the date range for new slice requests
+      --
+      V_DELETE_OUTOFRANGE_HIGH
+        := 'delete from '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' where p.new_request = 1 and s.slice_date &gt;= p.to_date )';
+
+      --
+      -- This statement removes slices for a specific date range that are no longer matched by the new slices to be inserted
+      --
+      V_DELETE_SELECTED_UNMATCHED
+       := 'delete from  '
+        || ' ( select /*+ NOPARALLEL */ s.* from temp_blb_processed p join ' || V_TABLE_NAME || ' s on s.slice_request_id = p.slice_request_id and s.prj_object_id = p.prj_object_id '
+        || ' left outer join temp_blb_slices t on s.slice_request_id = t.slice_request_id and s.prj_object_id = t.prj_object_id and s.slice_date = t.slice_date '
+        || ' where s.slice_date &gt;= p.from_date and s.slice_date &lt; p.to_date and t.slice_request_id is null )';
+
+      --
+      -- This statement merges the new slices in the source temporary table with the slices in the target table
+      --
+      IF( V_DENORMALIZED_CNT = 0 ) THEN
+          V_MERGE
+            := 'merge /*+ NOPARALLEL */ into ' || V_TABLE_NAME || ' s using temp_blb_slices t '
+            || ' on ( s.slice_request_id = t.slice_request_id and s.prj_object_id = t.prj_object_id and s.slice_date = t.slice_date ) '
+            || ' when matched then '
+            || '  update set s.slice = t.slice, s.created_date = t.created_date where s.slice &lt;&gt; t.slice '
+            || ' when not matched then '
+            || ' insert ( slice_request_id, prj_object_id, slice_date, slice, created_date ) '
+            || ' values ( t.slice_request_id, t.prj_object_id, t.slice_date, t.slice, t.created_date ) ';
+      ELSE
+          V_MERGE
+            := ' merge /*+ NOPARALLEL */ into ' || V_TABLE_NAME || ' s using temp_blb_slices t '
+            || ' on ( s.slice_request_id = t.slice_request_id and s.prj_object_id = t.prj_object_id and s.slice_date = t.slice_date ) '
+            || ' when matched then '
+            || '  update set s.slice = t.slice, s.role_id = t.role_id, s.created_date = t.created_date where ( s.slice &lt;&gt; t.slice or s.role_id &lt;&gt; t.role_id ) '
+            || ' when not matched then '
+            || ' insert ( slice_request_id, prj_object_id, slice_date, investment_id, resource_id, role_id, slice, created_date ) '
+            || ' values ( t.slice_request_id, t.prj_object_id, t.slice_date, t.investment_id, t.resource_id, t.role_id, t.slice, t.created_date ) ';
+      END IF;
+    END IF; -- end of sql creation
+
+    V_SQL:= 'BEGIN '
+          || V_DELETE_OUTOFRANGE_LOW || '; '
+          || V_DELETE_OUTOFRANGE_HIGH || '; '
+          || V_DELETE_SELECTED_UNMATCHED || '; '
+          || V_MERGE || '; '
+          || ' END;';
+
+    EXECUTE IMMEDIATE V_SQL;
+    COMMIT;
+    execute immediate 'TRUNCATE TABLE TEMP_BLB_PROCESSED';
+    execute immediate 'TRUNCATE TABLE TEMP_BLB_SLICES';
+    execute immediate 'TRUNCATE TABLE TEMP_FISCAL_BLB_SLICES';
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

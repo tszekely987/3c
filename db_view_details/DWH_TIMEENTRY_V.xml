@@ -1,0 +1,44 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_TIMEENTRY_V">
+    <indexes/>
+    <text_length>4393</text_length>
+    <text>select prtimeentry.prid odf_pk, PRTIMEENTRY.PRID as timeentry_key, PRTIMEENTRY.PRID as clarity_timeentry_key, NVL(PRTIMEENTRY.PRTIMESHEETID,0) as timesheet_key, NVL(PRTIMEENTRY.INCIDENT_ID,0) as incident_key, NVL(PRTIMEENTRY.ROLE_ID,0) as role_key, 
+        ROLEUSER.FULL_NAME
+      role_id_caption, INCIDENT.INCIDENT_CODE as incident_id, INCIDENT.SUBJECT as incident_name, NVL(PRASSIGNMENT.PRID,0) as assignment_key, NVL(PRTASK.PRID,0) as task_key, 
+        PRTASK.PRNAME
+      dwh_taskid_caption, PRTASK.prExternalID as task_id, NVL(PRTIMEENTRY.PRCHARGECODEID,0) as charge_code_key, 
+        (SELECT prName FROM prchargecode WHERE prID = PRTIMEENTRY.prChargeCodeID)
+      charge_code_id_caption, NVL(PRTIMEENTRY.PRTYPECODEID,0) as input_type_code_key, 
+        (SELECT prName FROM prtypecode WHERE prID = PRTIMEENTRY.prTypeCodeID)
+      type_code_id_caption, NVL(INV.ID,0) as investment_key, 
+        INV.CODE
+      incident_inv_id_caption, INV.name as investment_name, PRTIMEENTRY.USER_LOV1 as user_value1_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'PRTIMEENTRY_USER_LOV1' and rownum = 1 and LOOKUP_CODE = PRTIMEENTRY.USER_LOV1) as user_value1_caption, PRTIMEENTRY.USER_LOV2 as user_value2_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'PRTIMEENTRY_USER_LOV2' and rownum = 1 and LOOKUP_CODE = PRTIMEENTRY.USER_LOV2) as user_value2_caption, CASE WHEN NVL(PRTIMEENTRY.incident_id,0) != 0 THEN 'INCIDENT' 
+                         WHEN INV.odf_object_code = 'project' THEN 'TASK' 
+                         WHEN INV.odf_object_code IN (SELECT OBJ.code FROM ODF_OBJECTS OBJ WHERE OBJ.template_extension = 'inv_extension')  THEN 'TASK' 
+                         WHEN NVL(PRTIMEENTRY.prAssignmentID,0) = 0 THEN 'INDIRECT' ELSE 'OTHER' END as time_record_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'DWH_TME_RECORD_TYPES' and rownum = 1 and LOOKUP_CODE = CASE WHEN NVL(PRTIMEENTRY.incident_id,0) != 0 THEN 'INCIDENT' 
+                         WHEN INV.odf_object_code = 'project' THEN 'TASK' 
+                         WHEN INV.odf_object_code IN (SELECT OBJ.code FROM ODF_OBJECTS OBJ WHERE OBJ.template_extension = 'inv_extension')  THEN 'TASK' 
+                         WHEN NVL(PRTIMEENTRY.prAssignmentID,0) = 0 THEN 'INDIRECT' ELSE 'OTHER' END) as time_record_type_key_caption, (
+        CASE WHEN PRTIMEENTRY.PRASSIGNMENTID IS NOT NULL AND INV.ODF_OBJECT_CODE = 'project' THEN
+                  PRTASK.PRNAME
+             WHEN PRTIMEENTRY.PRASSIGNMENTID IS NOT NULL AND INV.ODF_OBJECT_CODE != 'project' THEN
+                  INV.NAME
+             WHEN PRTIMEENTRY.INCIDENT_ID IS NOT NULL THEN
+			      INCIDENT.SUBJECT
+             ELSE cc.PRNAME
+        END
+      ) as description, (
+        CASE
+        WHEN INCIDENT.LAST_UPDATED_DATE IS NULL
+          THEN PRTIMEENTRY.PRMODTIME
+        ELSE
+          GREATEST(PRTIMEENTRY.PRMODTIME, INCIDENT.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, dataw_context.language_code, dataw_context.id language_id from prtimeentry prtimeentry inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN prtimesheet PRTIMESHEET ON PRTIMESHEET.PRID=prtimeentry.PRTIMESHEETID JOIN prtimeperiod PRTIMEPERIOD ON PRTIMEPERIOD.PRID=PRTIMESHEET.PRTIMEPERIODID LEFT OUTER JOIN srm_resources ROLEUSER ON PRTIMEENTRY.ROLE_ID = ROLEUSER.ID LEFT OUTER JOIN imm_incidents INCIDENT ON PRTIMEENTRY.INCIDENT_ID = INCIDENT.ID LEFT OUTER JOIN prassignment prassignment ON PRTIMEENTRY.prassignmentid = PRASSIGNMENT.PRID LEFT OUTER JOIN prtask prtask ON PRTASK.PRID = PRASSIGNMENT.PRTASKID LEFT OUTER JOIN prchargecode cc ON cc.PRID = PRTIMEENTRY.prchargecodeid LEFT OUTER JOIN prtypecode tc ON tc.PRID = PRTIMEENTRY.prtypecodeid LEFT OUTER JOIN inv_investments INV ON INV.ID = NVL(PRTIMEENTRY.INCIDENT_INVESTMENT_ID , PRTASK.prProjectID)  where 1 = 1
+      AND PRTIMEPERIOD.prID IN ( SELECT prID from prTimePERIOD WHERE prSTART BETWEEN
+      ( SELECT FROM_DATE FROM PRJ_BLB_SLICEREQUESTS WHERE IS_DWH_REQUEST = 1 AND REQUEST_NAME = 'DAILYRESOURCETIMECURVE' )
+      AND
+      ( SELECT FROM_DATE + NUM_PERIODS FROM PRJ_BLB_SLICEREQUESTS WHERE IS_DWH_REQUEST = 1 AND REQUEST_NAME = 'DAILYRESOURCETIMECURVE' )
+      ) and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

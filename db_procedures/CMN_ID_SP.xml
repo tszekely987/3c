@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ID_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ID_SP" (
+   P_TABLE_NAME IN VARCHAR2,
+   P_NEXT_ID OUT INTEGER,
+   P_CACHE_SIZE IN INTEGER DEFAULT 1,
+   P_SEQUENCE_NAME IN VARCHAR2 DEFAULT NULL
+)
+AS
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   V_NEW_NEXT_ID                 INTEGER;
+   V_PRCOUNTER_ENTRY_EXISTS      VARCHAR2 (1);
+   V_TABLE_NAME                  VARCHAR2 (100);
+   V_SEQUENCE_NAME               VARCHAR2 (100);
+   V_DUMMY_ID                    INTEGER;
+   v_current_id INTEGER;
+   v_cached_size_increase_id INTEGER;
+
+BEGIN
+   P_NEXT_ID := 0;
+   v_current_id := 0;
+   v_cached_size_increase_id := 0;
+   V_TABLE_NAME := UPPER (P_TABLE_NAME);
+   V_SEQUENCE_NAME := UPPER (P_SEQUENCE_NAME);
+
+   IF V_SEQUENCE_NAME IS NULL
+   THEN
+      V_SEQUENCE_NAME := CMN_GET_SEQUENCE_FCT (V_TABLE_NAME);
+   END IF;
+
+   IF (V_SEQUENCE_NAME IS NOT NULL)
+   THEN
+      IF (P_CACHE_SIZE &gt; 1)
+      THEN
+        BEGIN
+          LOOP
+            EXECUTE IMMEDIATE 'SELECT ' || V_SEQUENCE_NAME || '.NEXTVAL FROM DUAL' INTO v_current_id;
+            EXECUTE IMMEDIATE 'ALTER SEQUENCE ' || V_SEQUENCE_NAME || ' INCREMENT BY ' || ( p_cache_size - 1 );
+            EXECUTE IMMEDIATE 'SELECT ' || V_SEQUENCE_NAME || '.NEXTVAL FROM DUAL' INTO v_cached_size_increase_id;
+            EXECUTE IMMEDIATE 'ALTER SEQUENCE ' || V_SEQUENCE_NAME || ' INCREMENT BY 1 ORDER ';
+            EXECUTE IMMEDIATE 'SELECT ' || V_SEQUENCE_NAME || '.CURRVAL FROM DUAL' INTO p_next_id;
+            EXIT WHEN p_next_id = v_current_id + p_cache_size - 1;
+          END LOOP;
+          p_next_id := p_next_id - p_cache_size + 1;
+       END;
+      ELSE
+         EXECUTE IMMEDIATE 'SELECT ' || V_SEQUENCE_NAME || '.NEXTVAL FROM DUAL'
+            INTO P_NEXT_ID;
+      END IF;
+   ELSE
+      SELECT   NVL (MAX ('Y'), 'N')
+      INTO     V_PRCOUNTER_ENTRY_EXISTS
+      FROM     PRCOUNTER
+      WHERE    UPPER (PRNAME) = V_TABLE_NAME;
+
+      IF V_PRCOUNTER_ENTRY_EXISTS = 'Y'
+      THEN
+         /* Don't get into a dead lock situation - try to lock before
+the update */
+
+         SELECT   (PRLASTID + 1)
+         INTO     P_NEXT_ID
+         FROM     PRCOUNTER
+         WHERE    UPPER (PRNAME) = V_TABLE_NAME
+           FOR UPDATE OF PRLASTID NOWAIT;
+
+         UPDATE PRCOUNTER
+            SET PRLASTID = PRLASTID + P_CACHE_SIZE
+          WHERE UPPER (PRNAME) = V_TABLE_NAME;
+      ELSE
+         INSERT INTO PRCOUNTER
+              VALUES (V_TABLE_NAME, 5000000 - 1 + P_CACHE_SIZE);
+
+         P_NEXT_ID := 5000000;
+      END IF;
+
+      COMMIT;
+   END IF;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

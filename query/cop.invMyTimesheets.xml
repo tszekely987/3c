@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.invMyTimesheets" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="My Timesheets" languageCode="en" name="My Timesheets"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:TIMESHEETS:a.resource_int_id @+@ a.timeperiod_int_id @+@ @NVL@(a.timesheet_int_id,0):dim_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.timeperiod_int_id:timeperiod_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.timesheet_int_id:timesheet_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.resource_int_id:resource_int_id@,       
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.resource_id:resource_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.period_start_date:time_period_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.period_end_date:time_period_end@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:a.timesheet_status_name:timesheet_status@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:@DBUSER@.CMN_DATEDIFF_FCT(a.period_end_date + 1,a.period_start_date):period_duration@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:
+               CASE WHEN (a.period_end_date - a.period_start_date) = 2 AND TO_CHAR(a.period_start_date,'D') = '7' THEN 1
+                    WHEN (a.period_end_date - a.period_start_date) = 1 AND TO_CHAR(a.period_start_date,'D') = '1' THEN 1
+                    WHEN (a.period_end_date - a.period_start_date) = 1 AND TO_CHAR(a.period_start_date,'D') = '7' THEN 1
+                    ELSE 0 END:is_weekend@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:
+               CASE WHEN a.timesheet_status = 1 OR a.period_end_date > @SYSDATE@ THEN 0
+                    WHEN (a.period_end_date - a.period_start_date) = 2 AND TO_CHAR(a.period_start_date,'D') = '7' THEN 0
+                    ELSE 1 END:action_required@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TIMESHEETS:
+               CASE WHEN a.timesheet_status = 1 THEN 1  -- submitted
+                    WHEN a.period_end_date > @SYSDATE@ THEN 0  -- current                    
+                    ELSE 2 END:status_sl@
+FROM  (SELECT ts.prid timesheet_int_id,
+              r.id resource_int_id, 
+              r.unique_name resource_id,
+              r.full_name resource_name,			  
+              tp.prid timeperiod_int_id,
+              tp.prstart period_start_date,
+              tp.prfinish - 1 period_end_date,
+              ts.prstatus timesheet_status,
+              st.name timesheet_status_name			  
+       FROM   prtimesheet ts
+       INNER  JOIN prtimeperiod tp ON ts.prtimeperiodid = tp.prid
+       INNER  JOIN srm_resources r ON ts.prresourceid = r.id
+       LEFT   OUTER JOIN cmn_lookups_v st ON  ts.prstatus = st.lookup_enum
+                                          AND st.language_code = @WHERE:PARAM:LANGUAGE@
+                                          AND st.lookup_type = 'TIMESHEET_STATUS'	   
+       WHERE  r.resource_type = 0
+       AND    r.user_id = @WHERE:PARAM:USER_ID@
+       AND    r.is_active = 1
+       AND    tp.prisopen = 1	   
+       AND    ts.prisadjustment = 0
+       AND    ts.prstatus < 3
+       AND    tp.prstart BETWEEN ADD_MONTHS(@SYSDATE@,@NVL@(@WHERE:PARAM:USER_DEF:INTEGER:months@,-3)) AND @SYSDATE@ 
+       UNION
+       SELECT NULL timesheet_int_id,
+              r.id resource_int_id,
+              r.unique_name resource_id,
+              r.full_name resource_name,			  
+              tp.prid timeperiod_int_id,
+              tp.prstart period_start_date,
+              tp.prfinish - 1 period_end_date,
+              0 timesheet_status,
+              st.name timesheet_status_name			  
+       FROM   srm_resources r
+       INNER  JOIN prj_resources rm ON r.id = rm.prID
+       LEFT   OUTER JOIN srm_resources rr ON rm.prprimaryroleid = rr.id
+       LEFT   OUTER JOIN cmn_sec_users u  ON r.user_id = u.id
+       INNER  JOIN (SELECT r1.id resource_id,
+                           tp1.prid period_id
+                    FROM   srm_resources r1
+                    INNER  JOIN prj_resources rm1 ON  r1.id = rm1.prID
+                    INNER  JOIN prtimeperiod tp1  ON  @NVL@(r1.date_of_hire,TO_DATE('01/01/1900','MM/DD/YYYY')) < tp1.prfinish - 1
+                                                  AND @NVL@(r1.date_of_termination,TO_DATE('12/31/2100','MM/DD/YYYY')) > tp1.prstart
+                    LEFT   OUTER JOIN prtimesheet ts1 ON  r1.id = ts1.prresourceid
+                                                      AND tp1.prid = ts1.prtimeperiodid
+                    WHERE  rm1.prisopen = 1
+                    AND    rm1.prtrackmode IN (1,2)
+                    AND    rm1.prisrole = 0
+                    AND    tp1.prisopen = 1					
+                    AND    @NVL@(ts1.prID,0) = 0
+                    AND    r1.is_active = 1
+                    AND    r1.user_id = @WHERE:PARAM:USER_ID@
+                  ) miss ON r.id = miss.resource_id
+       INNER  JOIN prtimeperiod tp ON miss.period_id = tp.prid
+       LEFT   OUTER JOIN cmn_lookups_v st ON  st.lookup_enum = 0
+                                          AND st.language_code = @WHERE:PARAM:LANGUAGE@
+                                          AND st.lookup_type = 'TIMESHEET_STATUS'	   
+       WHERE  tp.prstart BETWEEN ADD_MONTHS(@SYSDATE@,(@NVL@(@WHERE:PARAM:USER_DEF:INTEGER:months@,-3))) AND @SYSDATE@
+       AND    tp.prisopen = 1	   
+) a
+WHERE  @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timeperiod_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Time Period Internal ID" languageCode="en" name="Time Period Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timesheet_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Timesheet Internal ID" languageCode="en" name="Timesheet Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Resource Internal ID" languageCode="en" name="Resource Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_id" required="false">
+              
+              <nls description="Resource ID" languageCode="en" name="Resource ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="time_period_start" required="false">
+              
+              
+              
+              
+              <nls description="Period Start" languageCode="en" name="Period Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="time_period_end" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Period End" languageCode="en" name="Period End"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="timesheet_status" required="false">
+              
+              
+              
+              
+              <nls description="Timesheet Status" languageCode="en" name="Timesheet Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="period_duration" required="false">
+              
+              
+              
+              
+              <nls description="Days" languageCode="en" name="Days"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_weekend" required="false">
+              
+              
+              
+              
+              <nls description="Weekend" languageCode="en" name="Weekend"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="action_required" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Action Required" languageCode="en" name="Action Required"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_sl" required="false">
+              
+              
+              
+              
+              <nls description="Status Icon" languageCode="en" name="Status Icon"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="StatusMilestone" type="image">
+                <mapping hi="0" lo="0" mappingCode="mapping-1" typeCode="StatusMilestone"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-2" typeCode="CalAccepted"/>
+                <mapping hi="2" lo="2" mappingCode="mapping-3" typeCode="RedCircle"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_months" required="false">
+              
+              
+              
+              
+              <nls description="Number of Months Filter" languageCode="en" name="Number of Months Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

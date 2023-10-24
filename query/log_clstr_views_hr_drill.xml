@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_views_hr_drill" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Cluster views hourly drilldown"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:LOG:ID:LOGID@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:HOST_NAME:HOST_NAME@,   @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:ACTION_METHOD:ACTION_METHOD@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:START_TIME:START_TIME@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:FINISH_TIME:FINISH_TIME@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:URL_ACTION:URL_ACTION@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:SESSION_COOKIE:SESSION_COOKIE@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:ELAPSED_SECS:ELAPSED_SECS@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:USER_NAME:USER_NAME@
+FROM
+(SELECT Z.ID, 
+        Z.HOST_NAME, 
+	Z.ACTION_METHOD, 
+	Z.START_TIME - LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 START_TIME,
+        Z.FINISH_TIME - LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 FINISH_TIME,
+        Z.URL_SHORT URL_ACTION,
+        substr(Z.session_cookie,-16) SESSION_COOKIE,
+        round(Z.elapsed_time/1000,1) ELAPSED_SECS,
+        NVL(U.USER_NAME, 'UNKNOWN') USER_NAME
+  FROM LOG_DETAILS Z
+  LEFT OUTER JOIN LOG_SESSIONS S ON (Z.SESSION_COOKIE = S.TOKEN)
+  LEFT OUTER JOIN CMN_SEC_USERS U ON (S.USER_ID = U.ID)
+  WHERE    Z.LOG_DATE=TRUNC(@WHERE:PARAM:XML:DATE:/data/log_hour/@value@)
+  AND      URL_ACTION NOT IN ('/niku/xog','/niku/soap')
+  AND      Z.HOST_NAME=@WHERE:PARAM:XML:STRING:/data/hostname/@value@
+  AND      Z.FINISH_TIME BETWEEN @WHERE:PARAM:XML:DATE:/data/log_hour/@value@ AND @WHERE:PARAM:XML:DATE:/data/log_hour/@value@ + 1/24
+)
+WHERE @FILTER@]]></nsql>
+            <attribute id="logid" required="false"/>
+            <attribute id="host_name" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="host_name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="action_method" required="false"/>
+            <attribute id="start_time" required="false"/>
+            <attribute id="finish_time" required="false"/>
+            <attribute id="url_action" required="false"/>
+            <attribute id="session_cookie" required="false"/>
+            <attribute id="user_name" required="false"/>
+            <attribute id="elapsed_secs" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

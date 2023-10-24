@@ -1,0 +1,43 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RESOURCE_V">
+    <indexes/>
+    <text_length>6399</text_length>
+    <text>select srm_resources.id odf_pk, SRM_RESOURCES.ID as resource_key, SRM_RESOURCES.ID as clarity_resource_key, srm_resources.UNIQUE_NAME as resource_id, srm_resources.LAST_NAME as last_name, srm_resources.FIRST_NAME as first_name, SRM_RESOURCES.middle_name as middle_name, srm_resources.FULL_NAME as resource_name, srm_resources.EMAIL as email_address, srm_resources.PERSON_TYPE as employment_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and rownum = 1 and ID = srm_resources.PERSON_TYPE) as person_type_caption, srm_resources.USER_ID as user_key, srm_resources.DEFINED_TEAM_ID as team_def_key, (CASE WHEN SRM_RESOURCES.DEFINED_TEAM_ID IS NOT NULL THEN 1 ELSE 0 END) as is_team, USERS.USER_NAME as user_name, CMN_DATE_TRUNC_FCT(SRM_RESOURCES.DATE_OF_HIRE) as hire_date, COP_CALC_FINISH_FCT(SRM_RESOURCES.DATE_OF_TERMINATION) as termination_date, NVL(MANAGERS.ID, 0) as resource_manager_key, 
+       MANAGERS.FULL_NAME
+      manager_id_caption, NVL(BOOKMGR.ID, 0) as booking_manager_key, 
+       BOOKMGR.FULL_NAME
+      book_manager_id_caption, srm_resources.IS_ACTIVE as is_active, srm_resources.IS_EXTERNAL as is_external, srm_resources.RESOURCE_TYPE as resource_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'RESOURCE_TYPE' and rownum = 1 and LOOKUP_ENUM = srm_resources.RESOURCE_TYPE) as resource_type_caption, USERS.TIMEZONE as user_timezone, USERS.locale as user_locale, pac_mnt_resources.active as is_financially_active, users.language_id as user_language_key, 
+       (select CMN_CAPTIONS_NLS.NAME FROM CMN_CAPTIONS_NLS CMN_CAPTIONS_NLS WHERE CMN_CAPTIONS_NLS.TABLE_NAME = 'CMN_LANGUAGES' AND CMN_CAPTIONS_NLS.PK_ID = USERS.language_id
+        AND CMN_CAPTIONS_NLS.LANGUAGE_CODE = dataw_context.language_code)
+      dw_language_key_caption, (select language_code from CMN_LANGUAGES where USERS.language_id = CMN_LANGUAGES.id) as user_language_code, srm_contacts.country_id as country_key, 
+       (SELECT cmn_captions_nls.name FROM cmn_captions_nls CMN_CAPTIONS_NLS WHERE cmn_captions_nls.table_name = 'CMN_COUNTRIES'
+        AND cmn_captions_nls.pk_id = srm_contacts.country_id AND cmn_captions_nls.language_code = dataw_context.language_code)
+      dw_country_id_caption, NVL((select entity.id from entity where pac_mnt_resources.departcode = departments.departcode and departments.entity_id = entity.id), 0) as entity_key, 
+       (select entity.shortdesc from entity where pac_mnt_resources.departcode = departments.departcode and departments.entity_id = entity.id)
+      dw_entity_id_caption, NVL((select locations.id from locations where pac_mnt_resources.locationid = locations.locationid), 0) as location_key, 
+       (select locations.shortdesc from locations where pac_mnt_resources.locationid = locations.locationid)
+      dw_location_id_caption, NVL((select departments.id from departments where pac_mnt_resources.departcode = departments.departcode), 0) as department_key, 
+       (select departments.shortdesc from departments where pac_mnt_resources.departcode = departments.departcode)
+      dw_department_id_caption, NVL((select transclass.id from transclass
+                           where pac_mnt_resources.transclass = transclass.transclass), 0) as transaction_class_key, 
+       (select transclass.shortdesc from transclass where pac_mnt_resources.transclass = transclass.transclass)
+      dw_transclass_id_caption, NVL((select pac_fos_resource_class.id from pac_fos_resource_class where pac_mnt_resources.resource_class = pac_fos_resource_class.resource_class), 0) as resource_class_key, 
+       (select pac_fos_resource_class.description from pac_fos_resource_class where pac_mnt_resources.resource_class = pac_fos_resource_class.resource_class)
+      dw_resclass_id_caption, NVL((select apmaster.id from apmaster where pac_mnt_resources.vendor_code = apmaster.vendor_code), 0) as vendor_key, 
+       (select apmaster.address_name from apmaster where pac_mnt_resources.vendor_code = apmaster.vendor_code)
+      dw_vendor_id_caption, NVL(users.company_id, 0) as company_key, 
+       (select company_name from srm_companies where users.company_id = srm_companies.id)
+      dw_company_id_caption, prj_resources.prCategory as category, NVL(prj_resources.prPrimaryRoleID, 0) as primary_role_key, 
+       (select full_name from srm_resources where prj_resources.prPrimaryRoleID = srm_resources.id)
+      prprimaryroleid_caption, prj_resources.prIsRole as is_role, prj_resources.prtypecodeid as input_type_code_key, 
+       (select prname from prtypecode where prj_resources.prtypecodeid = prtypecode.prid)
+      prtypecodeid_caption, prj_resources.prIsOpen as is_open_for_te, prj_resources.prTrackMode as track_mode_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'prTrackMode' and rownum = 1 and LOOKUP_ENUM = prj_resources.prTrackMode) as prtrackmode_caption, SRM_RESOURCES.CREATED_DATE as clarity_created_date, (
+        CASE
+        WHEN pac_mnt_resources.last_updated_date IS NULL
+          THEN SRM_RESOURCES.LAST_UPDATED_DATE
+        ELSE
+          GREATEST(SRM_RESOURCES.LAST_UPDATED_DATE, pac_mnt_resources.last_updated_date)
+        END
+      ) as clarity_updated_date, NVL(USERS.USER_UID, '-1') as user_uid, odf_ca_resource.clr_experience as clr_experience, dataw_context.language_code, dataw_context.id language_id from srm_resources srm_resources inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN prj_resources prj_resources ON prj_resources.prid=srm_resources.id JOIN odf_ca_resource odf_ca_resource ON odf_ca_resource.id=srm_resources.id LEFT OUTER JOIN cmn_sec_users USERS ON SRM_RESOURCES.USER_ID = USERS.ID LEFT OUTER JOIN srm_resources MANAGERS ON SRM_RESOURCES.MANAGER_ID = MANAGERS.USER_ID LEFT OUTER JOIN srm_resources BOOKMGR ON SRM_RESOURCES.BOOK_MANAGER_ID = BOOKMGR.USER_ID LEFT OUTER JOIN srm_contacts srm_contacts ON srm_resources.id = srm_contacts.principal_id AND srm_contacts.principal_type='RESOURCE' LEFT OUTER JOIN pac_mnt_resources pac_mnt_resources ON SRM_RESOURCES.ID = pac_mnt_resources.ID LEFT OUTER JOIN departments departments ON SRM_RESOURCES.id = pac_mnt_resources.id and pac_mnt_resources.departcode = departments.departcode  where SRM_RESOURCES.IS_HIDDEN = 0 and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_FOS_IS_VALID_LOC_GL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_FOS_IS_VALID_LOC_GL_FCT" 
+ (P_RESOURCE_CODE VARCHAR2,
+  P_LOCATION_ID   VARCHAR2,
+  P_DEFAULT_ENTITY     VARCHAR2,
+  P_SECURITY_LEVEL NUMERIC,
+  P_RESOURCE_ENTITY VARCHAR2)
+  RETURN INTEGER
+IS
+
+  V_RETURN_VALUE   INTEGER := 0;
+  V_COUNT          INTEGER := 0;
+BEGIN
+
+  IF P_SECURITY_LEVEL = 0 THEN -- if there is no security, return TRUE to give them access to this location
+    V_RETURN_VALUE := 1;
+  ELSE
+    BEGIN
+      IF P_RESOURCE_ENTITY = P_DEFAULT_ENTITY AND P_SECURITY_LEVEL = 2 THEN  -- if resource belongs to parent entity, give them access
+        V_RETURN_VALUE := 1;
+      ELSE
+        BEGIN
+          SELECT COUNT(1)                             -- otherwise, they only get access if they belong to the
+            INTO V_RETURN_VALUE                       --   same entity as this location
+            FROM LOCATIONS
+           WHERE LOCATIONID = P_LOCATION_ID
+             AND ENTITY = P_RESOURCE_ENTITY;
+
+          EXCEPTION
+            WHEN OTHERS THEN
+              RETURN 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+        END;
+      END IF;
+    END;
+  END IF;
+
+  IF NVL(V_RETURN_VALUE, 0) &gt; 1 THEN
+    V_RETURN_VALUE := 1;
+  END IF;
+
+  RETURN NVL(V_RETURN_VALUE, 0);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

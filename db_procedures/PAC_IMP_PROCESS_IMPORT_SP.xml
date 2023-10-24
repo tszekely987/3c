@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_IMP_PROCESS_IMPORT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_IMP_PROCESS_IMPORT_SP" 
+(  P_BATCH_HEADER NUMBER DEFAULT 0 )
+AS
+  iRowsProcessed  NUMBER;
+  iErrorRows  NUMBER;
+
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+
+  TEMP_RC   Imp_Processtransimporttablepkg.RCT2;
+  noOfTransactions NUMBER;
+  noOfFailures NUMBER;
+
+BEGIN
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+
+  PAC_IMP_NPMTRANSIMPORT_SP( p_job_run_id =&gt; NULL, p_job_user_id =&gt; null );
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+        RAISE_APPLICATION_ERROR(-20000, StoO_errmsg || ' - ' || 'Error calling PAC_IMP_NPMTRANSIMPORT_SP!');
+  END;
+
+END PAC_IMP_PROCESS_IMPORT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

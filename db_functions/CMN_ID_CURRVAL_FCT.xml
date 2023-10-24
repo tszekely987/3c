@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_ID_CURRVAL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_ID_CURRVAL_FCT" (
+   P_TABLE_NAME      IN   VARCHAR2,
+   P_SEQUENCE_NAME   IN   VARCHAR2 DEFAULT NULL
+)
+   RETURN INTEGER
+IS
+   V_CURR_ID                     INTEGER;
+   V_TABLE_NAME                  VARCHAR2 (100);
+   V_SEQUENCE_NAME               VARCHAR2 (100);
+BEGIN
+   V_CURR_ID := 0;
+   V_TABLE_NAME := UPPER (P_TABLE_NAME);
+   V_SEQUENCE_NAME := UPPER (P_SEQUENCE_NAME);
+
+   IF V_SEQUENCE_NAME IS NULL
+   THEN
+      V_SEQUENCE_NAME := CMN_GET_SEQUENCE_FCT (V_TABLE_NAME);
+   END IF;
+
+   IF (V_SEQUENCE_NAME IS NOT NULL)
+   THEN
+      EXECUTE IMMEDIATE 'SELECT ' || V_SEQUENCE_NAME || '.CURRVAL FROM DUAL'
+         INTO V_CURR_ID;
+   ELSE/* Check PRCOUNTER */
+      SELECT   NVL (MAX (PRLASTID), 0)
+      INTO     V_CURR_ID
+      FROM     PRCOUNTER
+      WHERE    UPPER(PRNAME) = P_TABLE_NAME;
+   END IF;
+
+   IF V_CURR_ID IS NULL
+   THEN
+      V_CURR_ID := 0;
+   END IF;
+
+   RETURN V_CURR_ID;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

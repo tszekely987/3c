@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_MULT_PROJ_SUMMARY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_MULT_PROJ_SUMMARY_SP" 
+(
+  BILLING_SESSION_KEY NUMBER ,
+  cLanguageCode VARCHAR2 DEFAULT 'en',
+  RC1   IN OUT PAC_BIL_MULT_PROJ_SUMMARY_Pkg.RCT1,
+  RC2   IN OUT PAC_BIL_MULT_PROJ_SUMMARY_Pkg.RCT2,
+  RC3   IN OUT PAC_BIL_MULT_PROJ_SUMMARY_Pkg.RCT3,
+  RC4   IN OUT PAC_BIL_MULT_PROJ_SUMMARY_Pkg.RCT4,
+  RC5   IN OUT PAC_BIL_MULT_PROJ_SUMMARY_Pkg.RCT5
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg VARCHAR2(255);
+  StoO_sqlstatus  INTEGER;
+  iCurrRevision   NUMBER;
+  dPerBegDate   DATE;
+  PTDSumm     NUMBER(32,6);
+  BudgetSumm    NUMBER(32,6);
+  BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  currencyPrecisionBilling CMN_CURRENCIES.CURRENCY_PRECISION%type;
+  v_MASTER_PROJECT_CODE pac_mnt_projects.PROJECT_CODE%TYPE;
+  v_PROJECT_CODE      pac_mnt_projects.PROJECT_CODE%TYPE;
+  v_COMPANY_CODE GLOBALPKG.STRING;
+  v_Status  INTEGER;
+  v_HasSubProjects INTEGER;
+  v_SBudget    GLOBALPKG.STRING;
+
+  v_ERROR_CODE   INTEGER;
+  v_STMT       GLOBALPKG.STRING;
+BEGIN
+	PAC_BIL_MULT_PROJ_SUMMARY_SP.dPerBegDate :=  TO_DATE(RPAD(TO_CHAR(SYSDATE,'mm/dd/yyyy'),
+	   10, ' '), 'mm/dd/yyyy');
+	PAC_BIL_MULT_PROJ_SUMMARY_SP.dPerBegDate :=  PAC_BIL_MULT_PROJ_SUMMARY_SP.dPerBegDate
+	   + ( TO_NUMBER(TO_CHAR( PAC_BIL_MULT_PROJ_SUMMARY_SP.dPerBegDate, 'DD'))
+	   - 1 ) * ( -1 );
+
+	v_STMT := 'Error selecting COMPANY_CODE';
+
+	SELECT DISTINCT COMPANY_CODE
+	  INTO v_COMPANY_CODE
+	  FROM OLB_BILLINGCHECKOUT O
+	  WHERE O.ACTIONID = PAC_BIL_MULT_PROJ_SUMMARY_SP.BILLING_SESSION_KEY ;
+
+	v_STMT := 'Error selecting BILLING_CURRENCY_CODE';
+
+	SELECT DISTINCT BILLING_CURRENCY_CODE
+	  INTO BillingCurrencyCode
+	  FROM Pac_Mnt_Projects P,
+	  	   OLB_BILLINGCHECKOUT O
+	  WHERE O.ACTIONID = PAC_BIL_MULT_PROJ_SUMMARY_SP.BILLING_SESSION_KEY AND
+	  		O.PROJECT_CODE = P.PROJECT_CODE ;
+
+    currencyPrecisionBilling := 0;
+
+	currencyPrecisionBilling := CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( BillingCurrencyCode );
+
+	v_STMT := 'Error selecting Master Project Code';
+
+	BEGIN
+	  SELECT O.PROJECT_CODE
+	    INTO v_MASTER_PROJECT_CODE
+	    FROM OLB_BILLINGCHECKOUT O,
+	  	     PAC_MNT_PROJECTS P
+	    WHERE O.ACTIONID = PAC_BIL_MULT_PROJ_SUMMARY_SP.BILLING_SESSION_KEY AND
+	  	   	  O.PROJECT_CODE = P.PROJECT_CODE AND
+	  		  NVL( P.BILLING_PROJECT_ID, P.ID ) = P.ID AND
+			  EXISTS ( SELECT 1
+				         FROM PAC_MNT_PROJECTS P2
+					     WHERE P2.BILLING_PROJECT_ID = P.ID AND
+					   		   P2.ID != P.ID ) ;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+	      NULL;
+	END;
+
+	v_STMT := 'Error deleting from TEMP_BIL_SUBPROJECTS';
+    DELETE FROM TEMP_BIL_SUBPROJECTS;
+
+	IF v_MASTER_PROJECT_CODE IS NOT NULL Then
+	  v_STMT := 'Error inserting Into TEMP_BIL_SUBPROJECTS';
+	  /* Insert top level project first. Then we'll get all the subprojects. */
+  	  INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+	 						 	        BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+	    SELECT COMPANY_CODE, PROJECT_CODE, ID, ID,
+		       BILLING_PROJECT_ID, 0, NULL
+		  FROM PAC_MNT_PROJECTS P
+		  WHERE NLS_UPPER( PROJECT_CODE ) = NLS_UPPER( v_MASTER_PROJECT_CODE );
+
+	  -- Accumulate all the sub projects for the master in TEMP_BIL_SUBPROJECTS. 0 means don't get WIP totals
+      PAC_BIL_GET_SUBPROJECTS_SP ( 0, v_Status, v_HasSubProjects ) ;
+	END IF;
+
+	v_STMT := 'Error deleting from temp_tempwte_ProjSumActivity';
+	DELETE FROM temp_tempwte_ProjSumActivity;
+
+	v_STMT := 'Error inserting into temp_tempwte_ProjSumActivity';
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LineType, Category, Budget, PTD, MTD, Unbilled)
+	  SELECT PROJECT_CODE, 0, 'L', 0, 0, 0, 0
+	    FROM OLB_BILLINGCHECKOUT ;
+
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LineType, Category, Budget, PTD, MTD, Unbilled)
+	  SELECT PROJECT_CODE, 0, 'M', 0, 0, 0, 0
+	    FROM OLB_BILLINGCHECKOUT ;
+
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LineType, Category, Budget, PTD, MTD, Unbilled)
+	  SELECT PROJECT_CODE, 0, 'Q', 0, 0, 0, 0
+	    FROM OLB_BILLINGCHECKOUT ;
+
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LineType, Category, Budget, PTD, MTD, Unbilled)
+	  SELECT PROJECT_CODE, 0, 'X', 0, 0, 0, 0
+	    FROM OLB_BILLINGCHECKOUT ;
+
+	/* ajoy Determine the max revision for the budget
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LineType, Category, Budget, PTD, MTD, Unbilled, Sunbilled)
+	  SELECT  B.PROJECT_CODE, -1, BUDGETHEADERTYPE, 0, 0, 0, 0, MAX( PROJREVISIONID )
+		 FROM BUDGETHEADER B,
+		 	  OLB_BILLINGCHECKOUT O
+		WHERE O.ACTIONID = PAC_BIL_MULT_PROJ_SUMMARY_SP.BILLING_SESSION_KEY
+		  and O.COMPANY_CODE = B.COMPANY_CODE
+		  and O.PROJECT_CODE = B.PROJECT_CODE
+		  and Currency_Type = 'BILLING'
+		GROUP BY B.PROJECT_CODE,
+			  	 B.BUDGETHEADERTYPE  ;*/
+
+	/* ajoy Now use the current revision from the -1 LineType records to get the total budget
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, LINETYPE, CATEGORY, BUDGET, PTD, MTD, UNBILLED)
+	  SELECT  B.PROJECT_CODE, 1, B.BUDGETHEADERTYPE, SUM( B.REVENUE ), 0, 0, 0
+		 FROM BUDGETHEADER B,
+		 	  TEMP_TEMPWTE_PROJSUMACTIVITY T
+		WHERE T.PROJECT_CODE = B.PROJECT_CODE
+		  AND B.CURRENCY_TYPE = 'BILLING'
+		  AND B.PROJREVISIONID = T.SUNBILLED
+		  AND T.LINETYPE = -1
+		  AND T.CATEGORY = B.BUDGETHEADERTYPE
+		GROUP BY B.PROJECT_CODE,
+			  	 B.BUDGETHEADERTYPE  ;*/
+
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, Category, PTD, MTD, Unbilled, Budget, LineType)
+	  SELECT  O.PROJECT_CODE, RTRIM(W.TransType), SUM(WV.TotalAmount), SUM(WV.TotalAmount
+		   * ( SIGN(1 + SIGN(TRUNC(W.TransDate - (PAC_BIL_MULT_PROJ_SUMMARY_SP.dPerBegDate))))
+		   )), SUM(WV.AmountRemaining), 0, 2
+		 FROM PPA_WIP W,
+			  PPA_WIP_VALUES WV,
+		 	  OLB_BILLINGCHECKOUT O
+		 WHERE O.ACTIONID = PAC_BIL_MULT_PROJ_SUMMARY_SP.BILLING_SESSION_KEY
+		 AND   WV.TRANSNO = W.TRANSNO
+         AND   WV.CURRENCY_TYPE = 'BILLING'
+		 and   W.PROJECT_CODE = O.PROJECT_CODE
+		 and ( BITAND(W.Status,3) ) = 0
+		GROUP BY O.PROJECT_CODE,
+			  	 W.TransType;
+
+	v_STMT := 'Error updating temp_tempwte_ProjSumActivity';
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET PROJECT_CODE = v_MASTER_PROJECT_CODE
+	  WHERE PROJECT_CODE IN ( SELECT DISTINCT PROJECT_CODE FROM TEMP_BIL_SUBPROJECTS) ;
+
+	v_STMT := 'Error inserting into temp_tempwte_ProjSumActivity';
+	/* now, aggregate them */
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, WORK_PROJECT_CODE, Category, Budget, PTD, MTD, Unbilled,
+		   									  LineType, HAS_BILLING_SUBPROJECTS)
+	  SELECT  PROJECT_CODE, PROJECT_CODE, Category, NVL( SUM(Budget), 0), NVL( SUM(PTD), 0), NVL( SUM(MTD), 0), NVL( SUM(Unbilled), 0),
+		   10, 0
+		FROM temp_tempwte_ProjSumActivity
+		WHERE LINETYPE IN ( 0, 1, 2 )
+		GROUP BY PROJECT_CODE,
+			  	 Category;
+
+	v_STMT := 'Error updating temp_tempwte_ProjSumActivity';
+
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET Variance_ = Budget - PTD
+	  WHERE LineType = 10;
+
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET SBUDGET = NVL(RTRIM(SUBSTR('1 2 3 4 5 6', ( ( INSTR( 'L M Q X Z ZC', RTRIM(CATEGORY)))), 2)), '6')
+	  WHERE LineType = 10;
+
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET Category = (SELECT LV.NAME
+		   	   		   	   FROM CMN_LOOKUPS_V lv
+						   WHERE lv.LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE' AND
+						   		 lv.LANGUAGE_CODE = RTRIM(PAC_BIL_MULT_PROJ_SUMMARY_SP.cLanguageCode) AND
+								 lv.LOOKUP_CODE = temp_tempwte_ProjSumActivity.Category)
+	  WHERE LineType = 10;
+
+	v_STMT := 'Error inserting into temp_tempwte_ProjSumActivity';
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, SBUDGET, LINETYPE )
+	  SELECT  PROJECT_CODE, MIN(SBUDGET), -2
+		FROM temp_tempwte_ProjSumActivity
+		WHERE LineType = 10
+		GROUP BY PROJECT_CODE ;
+
+	v_STMT := 'Error updating temp_tempwte_ProjSumActivity';
+	/* Now distinguish the hierarchy projects from the stand alone ones here */
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET LineType = 12
+	  WHERE LineType = 10 AND
+	  		PROJECT_CODE NOT IN ( SELECT DISTINCT PROJECT_CODE FROM TEMP_BIL_SUBPROJECTS) ;
+
+
+	/* Calc Project Sub Totals for Stand Alone Projects. This is line type 13 */
+	INSERT INTO temp_tempwte_ProjSumActivity (PROJECT_CODE, WORK_PROJECT_CODE, Category, Budget, PTD, MTD, Unbilled, Variance_, PctComplete, LineType)
+	SELECT  PROJECT_CODE, PROJECT_CODE, '', SUM(Budget), SUM(PTD), SUM(MTD), SUM(Unbilled), SUM(Budget) - SUM(PTD), 0, 13
+		 FROM temp_tempwte_ProjSumActivity
+		 WHERE Linetype = 12
+		 GROUP BY PROJECT_CODE ;
+
+	/* Blank out project code for UI display purposes */
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET PROJECT_CODE = NULL
+	  WHERE	LINETYPE IN ( 10, 12 ) AND
+	  		PROJECT_CODE || SBUDGET NOT IN ( SELECT PROJECT_CODE || SBUDGET
+						 				   	   FROM temp_tempwte_ProjSumActivity
+											   WHERE LINETYPE = -2 );
+
+	v_STMT := 'Error updating temp_tempwte_ProjSumActivity';
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET HAS_BILLING_SUBPROJECTS = NVL( v_HasSubProjects, 0)
+	  WHERE	LineType = 10 AND
+	  		PROJECT_CODE = v_MASTER_PROJECT_CODE ;
+
+	/* Calc Grand Total for Billing Project and hierarchy */
+	v_STMT := 'Error inserting into temp_tempwte_ProjSumActivity';
+	INSERT INTO temp_tempwte_ProjSumActivity (Category, Budget, PTD, MTD, Unbilled, Variance_, PctComplete, LineType)
+	SELECT  '', SUM(Budget), SUM(PTD), SUM(MTD), SUM(Unbilled), SUM(Budget) - SUM(PTD), 0, 11
+		 FROM temp_tempwte_ProjSumActivity
+		 WHERE Linetype = 10;
+
+	/* Calc Grand Total for Stand Alone Projects */
+	INSERT INTO temp_tempwte_ProjSumActivity (Category, Budget, PTD, MTD, Unbilled, Variance_, PctComplete, LineType)
+	SELECT  '', SUM(Budget), SUM(PTD), SUM(MTD), SUM(Unbilled), SUM(Budget) - SUM(PTD), 0, 14
+		 FROM temp_tempwte_ProjSumActivity
+		 WHERE Linetype = 12 ;
+
+	v_STMT := 'Error updating temp_tempwte_ProjSumActivity';
+	UPDATE temp_tempwte_ProjSumActivity
+	  SET PctComplete = ROUND(( PTD / Budget ) * 100, currencyPrecisionBilling)
+	  WHERE LineType IN ( 10, 11, 12, 13, 14 )
+	    and NVL(Budget, 0) != 0;
+
+	IF v_MASTER_PROJECT_CODE IS NULL Then
+	  SELECT MIN( PROJECT_CODE )
+	    INTO v_PROJECT_CODE
+		FROM temp_tempwte_ProjSumActivity ;
+	ELSE v_PROJECT_CODE := v_MASTER_PROJECT_CODE ;
+	END IF;
+
+	/* Result Set details for Master Billing Project and Sub Projects*/
+	OPEN RC1 FOR
+	  SELECT Category,  Budget,  PTD,  MTD,  PctComplete,  Variance_,  Unbilled, PROJECT_CODE, HAS_BILLING_SUBPROJECTS
+	    FROM temp_tempwte_ProjSumActivity
+	    WHERE LineType = 10
+	    ORDER BY SBUDGET, Category ;
+
+	/* Result Set totals for Master Billing Project and Sub Projects*/
+	OPEN RC2 FOR
+	  SELECT Budget,  PTD,  MTD,  NVL( PctComplete, 0),  Variance_,  Unbilled
+	    FROM temp_tempwte_ProjSumActivity
+	    WHERE LineType = 11
+ 	    ORDER BY Category ;
+
+	/* Result Set details for Stand Alone Billing Project and Sub Projects
+	   12 is line items. 13 is sub project totals */
+	OPEN RC3 FOR
+	  SELECT Category,  Budget,  PTD,  MTD,  PctComplete,  Variance_,  Unbilled, PROJECT_CODE, HAS_BILLING_SUBPROJECTS, LINETYPE
+	    FROM temp_tempwte_ProjSumActivity
+	    WHERE LineType IN ( 12, 13 )
+	    ORDER BY WORK_PROJECT_CODE, LineType, SBUDGET, Category ;
+
+	/* Result Set totals for Stand Alone Billing Project and Sub Projects*/
+	OPEN RC4 FOR
+	  SELECT Budget,  PTD,  MTD,  NVL( PctComplete, 0),  Variance_, Unbilled
+	    FROM temp_tempwte_ProjSumActivity
+	    WHERE LineType = 14
+	    ORDER BY Category ;
+
+	OPEN RC5 FOR
+	SELECT BILLING_CURRENCY_CODE
+	  FROM PAC_MNT_PROJECTS
+	  WHERE PROJECT_CODE = v_PROJECT_CODE ;
+
+  DELETE FROM TEMP_BIL_SUBPROJECTS;
+  DELETE FROM temp_tempwte_ProjSumActivity ;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+	  NULL;
+    WHEN OTHERS THEN
+	  If v_ERROR_CODE IS NULL Then
+	    v_ERROR_CODE := -20993 ;
+		v_STMT := SQLERRM;
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  Else
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  End If;
+
+END PAC_BIL_MULT_PROJ_SUMMARY_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

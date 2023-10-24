@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_FEATURE_ARTIFACT_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_FEATURE_ARTIFACT_DELETE_SP" (
+	P_FEATURE_CODE  VARCHAR2,
+	P_FEATURE_ARTIFACT_TYPE  VARCHAR2,
+	P_FEATURE_ARTIFACT_CODE  VARCHAR2	
+	
+	)
+	IS
+	F_ID NUMBER;
+	DELETED_ROWS NUMBER := 0;
+	
+	BEGIN
+		SELECT ID INTO F_ID
+		FROM CMN_FEATURES 
+		WHERE CODE = P_FEATURE_CODE ;
+				
+		-- check if feature exists then try to delete a record from cmn_feature_artifacts table.
+		IF F_ID IS NOT NULL
+		THEN
+			DELETE CMN_FEATURE_ARTIFACTS WHERE FEATURE_ID = F_ID AND CODE = P_FEATURE_ARTIFACT_CODE AND TYPE = P_FEATURE_ARTIFACT_TYPE;
+			DELETED_ROWS := sql%rowcount;
+			-- if no rows deleted with given input raise error
+			IF DELETED_ROWS = 0
+			THEN
+				RAISE_APPLICATION_ERROR (-20006, 'Zero artifacts deleted as no artifact exists with the code: ' || P_FEATURE_ARTIFACT_CODE || ' and type:' || P_FEATURE_ARTIFACT_TYPE);
+			END IF;
+		END IF;
+		
+		EXCEPTION
+		-- raise error when feature not exists
+		WHEN NO_DATA_FOUND THEN
+			IF F_ID IS NULL
+			THEN
+				RAISE_APPLICATION_ERROR (-20006, 'Artifact can not be deleted as no feature exists with the code: ' || P_FEATURE_CODE);
+			END IF;
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

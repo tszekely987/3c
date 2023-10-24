@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_INSERT_PROJ_ACCESS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_INSERT_PROJ_ACCESS_SP" 
+(
+  IN_ID   VARCHAR2 ,
+  RESOURCE_CODE    VARCHAR2,
+  projectaccess    NUMBER,
+  billingaccess    NUMBER,
+  individualtogo   NUMBER,
+  projectapproval  NUMBER,
+  billingapproval  NUMBER,
+  projecttogo      NUMBER,
+  forecastaccess   NUMBER,
+  forecastapproval NUMBER,
+  update_resource_code VARCHAR2 DEFAULT NULL
+)
+AS
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_errmsg      GLOBALPKG.STRING;
+  COMPANY_CODE     GLOBALPKG.STRING;
+  PROJECT_CODE     GLOBALPKG.STRING;
+BEGIN
+  BEGIN
+    SELECT COMPANY_CODE,
+           PROJECT_CODE
+      INTO PAC_MNT_INSERT_PROJ_ACCESS_SP.COMPANY_CODE,
+           PAC_MNT_INSERT_PROJ_ACCESS_SP.PROJECT_CODE
+      FROM PAC_MNT_PROJECTS
+     WHERE ID = PAC_MNT_INSERT_PROJ_ACCESS_SP.IN_ID;
+     EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+         RAISE_APPLICATION_ERROR(-20177,'NO CLIENT/PROJECT FOUND');
+		   WHEN TOO_MANY_ROWS THEN
+         RAISE_APPLICATION_ERROR(-20188,'MORE THAN ONE CLIENT/PROJECT FOUND');
+		   WHEN OTHERS THEN
+         RAISE_APPLICATION_ERROR(-20199,'ERROR IN GETTING CLIENT/PROJECT FOR GIVEN ID');
+  END;
+  BEGIN
+    SELECT 1
+     INTO StoO_error
+     FROM PAC_MNT_RESOURCES PR,SRM_RESOURCES SR
+     WHERE PR.ID = SR.ID 
+	 AND PR.RESOURCE_CODE = PAC_MNT_INSERT_PROJ_ACCESS_SP.RESOURCE_CODE
+	 AND SR.RESOURCE_TYPE = 0;
+     EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+         RAISE_APPLICATION_ERROR(-20518,'RESOURCE DOES NOT EXISTS');
+	   WHEN OTHERS THEN
+         RAISE_APPLICATION_ERROR(-20221,'ERROR SELECTING');
+  END;
+  BEGIN
+    StoO_error   := 0;
+    IF PAC_MNT_INSERT_PROJ_ACCESS_SP.update_resource_code IS NULL THEN
+	    INSERT INTO projstaff (COMPANY_CODE, PROJECT_CODE, RESOURCE_CODE, projectaccess,
+            billingaccess, individualtogo, projectapproval, billingapproval, projecttogo,
+            forecastaccess, forecastapproval)
+    	VALUES (PAC_MNT_INSERT_PROJ_ACCESS_SP.COMPANY_CODE, PAC_MNT_INSERT_PROJ_ACCESS_SP.PROJECT_CODE,
+            PAC_MNT_INSERT_PROJ_ACCESS_SP.RESOURCE_CODE, PAC_MNT_INSERT_PROJ_ACCESS_SP.projectaccess,
+            PAC_MNT_INSERT_PROJ_ACCESS_SP.billingaccess, PAC_MNT_INSERT_PROJ_ACCESS_SP.individualtogo,
+            PAC_MNT_INSERT_PROJ_ACCESS_SP.projectapproval, PAC_MNT_INSERT_PROJ_ACCESS_SP.billingapproval,
+            PAC_MNT_INSERT_PROJ_ACCESS_SP.projecttogo,
+            NVL(PAC_MNT_INSERT_PROJ_ACCESS_SP.forecastaccess,0),
+			NVL(PAC_MNT_INSERT_PROJ_ACCESS_SP.forecastapproval,0));
+	ELSE
+		UPDATE projstaff 
+		SET PROJECTACCESS=PAC_MNT_INSERT_PROJ_ACCESS_SP.projectaccess
+			, PROJECTAPPROVAL=PAC_MNT_INSERT_PROJ_ACCESS_SP.projectapproval
+			, BILLINGACCESS=PAC_MNT_INSERT_PROJ_ACCESS_SP.billingaccess
+			, BILLINGAPPROVAL=PAC_MNT_INSERT_PROJ_ACCESS_SP.billingapproval
+			, PROJECTTOGO=PAC_MNT_INSERT_PROJ_ACCESS_SP.projecttogo
+			, INDIVIDUALTOGO=PAC_MNT_INSERT_PROJ_ACCESS_SP.individualtogo
+			, FORECASTACCESS = NVL(PAC_MNT_INSERT_PROJ_ACCESS_SP.forecastaccess,0)
+			, FORECASTAPPROVAL = NVL(PAC_MNT_INSERT_PROJ_ACCESS_SP.forecastapproval,0)
+			, COMPANY_CODE=PAC_MNT_INSERT_PROJ_ACCESS_SP.COMPANY_CODE
+			, PROJECT_CODE= PAC_MNT_INSERT_PROJ_ACCESS_SP.PROJECT_CODE
+			, RESOURCE_CODE=PAC_MNT_INSERT_PROJ_ACCESS_SP.RESOURCE_CODE
+		WHERE COMPANY_CODE=PAC_MNT_INSERT_PROJ_ACCESS_SP.COMPANY_CODE
+		AND PROJECT_CODE=PAC_MNT_INSERT_PROJ_ACCESS_SP.PROJECT_CODE
+		AND RESOURCE_CODE=PAC_MNT_INSERT_PROJ_ACCESS_SP.update_resource_code;
+	END IF;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+END PAC_MNT_INSERT_PROJ_ACCESS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

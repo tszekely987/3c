@@ -1,0 +1,27 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RES_D_AVAIL_HRS_V">
+    <indexes/>
+    <text_length>558</text_length>
+    <text>SELECT r.id RESOURCE_ID,
+       c.start_date DAILY_START_DATE,
+       0 AVAIL_HOURS
+FROM   srm_resources r, rpt_calendar c
+WHERE  r.resource_type &lt;= 1
+AND    c.period_type = 'DAILY'
+UNION
+SELECT r.id RESOURCE_ID,
+       s.slice_date DAILY_START_DATE,
+       SUM(s.slice) AVAIL_HOURS
+FROM   srm_resources r
+       INNER JOIN prj_blb_slices s ON r.id = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name = 'DAILYRESOURCEAVAILCURVE')
+AND   (r.resource_type &lt;= 1)
+GROUP BY r.id, s.slice_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,21 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_VIEW_MAX_PART_DEPTH_V">
+    <indexes/>
+    <text_length>848</text_length>
+    <text>select max(depth) depth, pf.child_partition_code partition_code, view_code, object_code, view_type
+from  odf_view_partition_depth_v ovp, (select partition_code, child_partition_code
+                                       from   cmn_partitions_flat pfi, cmn_partitions p
+                                       where  p.code = partition_code
+                                       and    p.is_active = 1
+                                       union
+                                       select 'NIKU.ROOT', code child_partition_code
+                                       from cmn_partitions pi) pf
+where ovp.partition_code = pf.partition_code
+group by pf.child_partition_code, view_code, object_code, view_type
+union 
+select -1 depth, partition_code, v.code view_code, object_code, view_type
+from   odf_views v
+where  partition_code = 'NIKU.ROOT'
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

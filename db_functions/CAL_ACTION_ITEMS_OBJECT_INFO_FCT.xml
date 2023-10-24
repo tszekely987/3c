@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CAL_ACTION_ITEMS_OBJECT_INFO_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CAL_ACTION_ITEMS_OBJECT_INFO_FCT" ( type varchar2, process_handler_id Number )
+RETURN VARCHAR2
+IS
+    v_ai_object_code varchar2(30);
+    v_ai_object_id varchar2(30);
+    v_result varchar2(30);
+BEGIN
+    SELECT
+		o.object_type_code, o.object_id into v_ai_object_code, v_ai_object_id
+	FROM
+		bpm_run_objects o,
+		bpm_run_steps s,
+		bpm_run_step_action_results ar,
+		odf_objects oc
+	WHERE
+		o.pk_id = s.process_instance_id and o.table_name = 'BPM_RUN_PROCESSES' and
+        o.src_table_name is null and o.object_type_code not in ('process', 'actionitem') and
+		o.parent_object_id is null and ar.step_instance_id = s.id and
+        oc.code = o.object_type_code and ar.id = process_handler_id;
+
+    IF ( type = 'id' )
+    THEN
+      v_result :=v_ai_object_id;
+    ELSIF ( type = 'code' )
+    THEN
+      v_result :=v_ai_object_code;
+    END IF;
+
+    return v_result;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

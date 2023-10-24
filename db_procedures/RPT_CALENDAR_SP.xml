@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_CALENDAR_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_CALENDAR_SP" 
+AS
+    v_count INTEGER;
+    c_fte NUMERIC(18,6);
+    p_fte NUMERIC(18,6);
+    c_week_start INTEGER;
+    p_week_start INTEGER;
+    v_from_date DATE;
+    v_to_date DATE;
+    v_periods NUMERIC(18,0);
+    v_entity NUMERIC(18,0);
+	v_enable_plan_actuals INTEGER;
+    BEGIN
+    SELECT NVL(enable_plan_actuals,0)
+	INTO   v_enable_plan_actuals
+	FROM   dwh_settings;
+    SELECT entity_key
+    INTO   v_entity
+    FROM   dwh_settings;
+    IF v_entity IS NULL THEN
+        DBMS_OUTPUT.PUT_LINE ('Entity has not been setup in Data Warehouse Settings');
+        RAISE_APPLICATION_ERROR (-20000, 'Entity has not been setup in Data Warehouse Settings');
+        RETURN;
+    END IF;
+
+    SELECT prWeekStart + 1 /* 1=Sunday */
+    INTO   c_week_start
+    FROM   prSite;
+    
+    BEGIN
+    SELECT NVL(MIN(CAST(TO_CHAR(start_date,'D') AS INTEGER)),c_week_start)
+    INTO   p_week_start
+    FROM   rpt_calendar
+    WHERE  period_type = 'WEEKLY';
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+        BEGIN
+            p_week_start := c_week_start;
+        END;
+    END;
+
+    /* Delete weekly records if the week start day changes */
+    IF c_week_start &lt;&gt; p_week_start THEN
+        DELETE FROM rpt_calendar WHERE period_type = 'WEEKLY';
+    END IF;
+
+	IF v_enable_plan_actuals = 1 THEN
+	    SELECT from_date,
+               from_date + num_periods
+	    INTO   v_from_date,
+		       v_to_date
+        FROM   prj_blb_slicerequests
+        WHERE  request_name = 'DAILYRESOURCETIMECURVE';
+	ELSE
+        SELECT MIN(period_start),
+               MAX(period_finish)
+        INTO   v_from_date,
+               v_to_date
+        FROM  (SELECT p.id period_key,
+                      p.start_date period_start,
+                      p.end_date period_finish,
+                      r.row_count,
+                      ROW_NUMBER() OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+               FROM   biz_com_periods p,
+                      dwh_settings s,
+                     (SELECT MIN (from_date) from_date,
+                             MAX (num_periods) row_count
+                      FROM   prj_blb_slicerequests
+                      WHERE  is_dwh_request = 1
+                      AND    request_name LIKE '%dwh_fiscal') r
+               WHERE  p.entity_id = s.entity_key
+               AND    p.period_type = CASE WHEN (SELECT COUNT (1)
+                                                 FROM   biz_com_periods
+                                                 WHERE  period_type = 'MONTHLY'
+                                                 AND    entity_id = (SELECT entity_key FROM dwh_settings)) &gt; 0
+                                           THEN 'MONTHLY' ELSE '13_PERIODS_PER_YEAR' END
+               AND p.start_date &gt;= r.from_date) d
+        WHERE d.row_key &lt;= d.row_count;
+	END IF;
+    IF v_from_date IS NULL THEN
+        SELECT from_date,
+               from_date + num_periods
+        INTO   v_from_date,
+               v_to_date
+        FROM   prj_blb_slicerequests
+        WHERE  request_name = 'DAILYRESOURCETIMECURVE';
+    END IF;
+
+    DELETE FROM rpt_calendar WHERE period_type = 'DAILY' AND (start_date &gt; v_to_date OR start_date &lt; v_from_date);
+    v_count := 0;
+    WHILE v_from_date + v_count &lt; v_to_date
+    LOOP
+        c_fte := 0;
+        BEGIN
+        SELECT NVL(f.fte,0),
+               NVL(c.fte,-1)
+        INTO   c_fte,
+               p_fte
+        FROM  (SELECT CASE WHEN fte_conversion = 1 THEN 0 ELSE fte_conversion END fte
+                      FROM TABLE(crv_calendar_fct('DAY',v_from_date + v_count,v_from_date + v_count,NULL,'DEFAULT','FTE_CALENDAR'))) f
+               LEFT OUTER JOIN rpt_calendar c ON c.period_type = 'DAILY'
+                                             AND c.start_date = (v_from_date + v_count);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+                c_fte := 0;
+            END;
+        END;
+        IF p_fte = -1 THEN
+            BEGIN
+            INSERT INTO rpt_calendar
+                (
+                 period_type,
+                 start_date,
+                 end_date,
+                 fte,
+                 created_date,
+                 last_updated_date
+                )
+            VALUES
+                (
+                 'DAILY',
+                 v_from_date + v_count,
+                 v_from_date + v_count,
+                 c_fte / 3600,
+                 SYSDATE,
+                 SYSDATE
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        ELSIF c_fte &lt;&gt; p_fte THEN
+            BEGIN
+            UPDATE rpt_calendar
+            SET    fte = c_fte / 3600,
+                   created_date = NVL(created_date, SYSDATE),
+                   last_updated_date = SYSDATE
+            WHERE  start_date = (v_from_date + v_count)
+            AND    period_type = 'DAILY';
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        END IF;
+        v_count := v_count + 1;
+    END LOOP;
+
+    SELECT MIN(from_date),
+           MAX(num_periods)
+    INTO   v_from_date,
+           v_periods
+    FROM   prj_blb_slicerequests
+    WHERE  is_dwh_request = 1
+    AND    period = 3;
+ 
+    IF TO_CHAR(v_from_date,'MM') &lt;= '03' THEN
+        v_from_date := TO_DATE('01/01/' || TO_CHAR(v_from_date,'YYYY'),'MM/DD/YYYY');
+    ELSIF TO_CHAR(v_from_date,'MM') &lt;= '06' THEN
+        v_from_date := TO_DATE('04/01/' || TO_CHAR(v_from_date,'YYYY'),'MM/DD/YYYY');
+    ELSIF TO_CHAR(v_from_date,'MM') &lt;= '09' THEN
+        v_from_date := TO_DATE('07/01/' || TO_CHAR(v_from_date,'YYYY'),'MM/DD/YYYY');
+    ELSE
+        v_from_date := TO_DATE('10/01/' || TO_CHAR(v_from_date,'YYYY'),'MM/DD/YYYY');
+    END IF;
+    v_to_date := ADD_MONTHS(v_from_date,v_periods);
+    IF TO_CHAR(v_to_date,'MM') &lt;= '03' THEN
+        v_to_date := TO_DATE('03/31/' || TO_CHAR(v_to_date,'YYYY'),'MM/DD/YYYY');
+    ELSIF TO_CHAR(v_to_date,'MM') &lt;= '06' THEN
+        v_to_date := TO_DATE('06/30/' || TO_CHAR(v_to_date,'YYYY'),'MM/DD/YYYY');
+    ELSIF TO_CHAR(v_to_date,'MM') &lt;= '09' THEN
+        v_to_date := TO_DATE('09/30/' || TO_CHAR(v_to_date,'YYYY'),'MM/DD/YYYY');
+    ELSE
+        v_to_date := TO_DATE('12/31/' || TO_CHAR(v_to_date,'YYYY'),'MM/DD/YYYY');
+    END IF;
+    DELETE FROM rpt_calendar WHERE period_type = 'QUARTERLY' AND (start_date &gt; v_to_date OR start_date &lt; v_from_date);
+    v_count := 0;
+    WHILE ADD_MONTHS(v_from_date,v_count) &lt;= v_to_date
+    LOOP
+        c_fte := 0;
+        BEGIN
+        SELECT NVL(f.fte,0),
+               NVL(c.fte,-1)
+        INTO   c_fte,
+               p_fte
+        FROM  (SELECT fte_conversion fte FROM TABLE(crv_calendar_fct('QUARTER',ADD_MONTHS(v_from_date,v_count),ADD_MONTHS(v_from_date,v_count+3)-1,NULL,'DEFAULT','FTE_CALENDAR'))) f
+               LEFT OUTER JOIN rpt_calendar c ON c.period_type = 'QUARTERLY'
+                                             AND c.start_date = ADD_MONTHS(v_from_date,v_count);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+                c_fte := 0;
+            END;
+        END;
+        IF p_fte = -1 THEN
+            BEGIN
+            INSERT INTO rpt_calendar
+                (
+                 period_type,
+                 start_date,
+                 end_date,
+                 fte,
+                 created_date,
+                 last_updated_date
+                )
+            VALUES
+                (
+                 'QUARTERLY',
+                 ADD_MONTHS(v_from_date,v_count),
+                 ADD_MONTHS(v_from_date,v_count + 3) - 1,
+                 c_fte / 3600,
+                 SYSDATE,
+                 SYSDATE
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        ELSIF c_fte &lt;&gt; p_fte THEN
+            BEGIN
+            UPDATE rpt_calendar
+            SET    fte = c_fte / 3600,
+                   created_date = NVL(created_date, SYSDATE),
+                   last_updated_date = SYSDATE
+            WHERE  start_date = ADD_MONTHS(v_from_date,v_count)
+            AND    period_type = 'QUARTERLY';
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        END IF;
+        v_count := v_count + 3;
+    END LOOP;
+
+    SELECT MIN(from_date),
+           MAX(num_periods)
+    INTO   v_from_date,
+           v_periods
+    FROM   prj_blb_slicerequests
+    WHERE  is_dwh_request = 1
+    AND    period = 3;
+
+    v_to_date := ADD_MONTHS(v_from_date, v_periods) - 1;
+    DELETE FROM rpt_calendar WHERE period_type = 'MONTHLY' AND (start_date &gt; v_to_date OR start_date &lt; v_from_date);
+    v_count := 0;
+    WHILE ADD_MONTHS(v_from_date, v_count) &lt;= v_to_date
+    LOOP
+        BEGIN
+        SELECT NVL(f.fte,0),
+               NVL(c.fte,-1)
+        INTO   c_fte,
+               p_fte
+        FROM  (SELECT fte_conversion fte FROM TABLE(crv_calendar_fct('MONTH',ADD_MONTHS(v_from_date,v_count),ADD_MONTHS(v_from_date,v_count+1)-1,NULL,'DEFAULT','FTE_CALENDAR'))) f
+               LEFT OUTER JOIN rpt_calendar c ON c.period_type = 'MONTHLY'
+                                             AND c.start_date = ADD_MONTHS(v_from_date,v_count);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+                c_fte := 0;
+            END;
+        END;
+        IF p_fte = -1 THEN
+            BEGIN
+            INSERT INTO rpt_calendar
+                (
+                 period_type,
+                 start_date,
+                 end_date,
+                 fte,
+                 created_date,
+                 last_updated_date
+                )
+            VALUES
+                (
+                 'MONTHLY',
+                 ADD_MONTHS(v_from_date,v_count),
+                 ADD_MONTHS(v_from_date,v_count + 1) - 1,
+                 c_fte / 3600,
+                 SYSDATE,
+                 SYSDATE
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        ELSIF c_fte &lt;&gt; p_fte THEN
+            BEGIN
+            UPDATE rpt_calendar
+            SET    fte = c_fte / 3600,
+                   created_date = NVL(created_date, SYSDATE),
+                   last_updated_date = SYSDATE
+            WHERE  start_date = ADD_MONTHS(v_from_date,v_count)
+            AND    period_type = 'MONTHLY';
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        END IF;
+        v_count := v_count + 1;
+    END LOOP;
+
+    SELECT MIN(from_date),
+           MAX(num_periods)
+    INTO   v_from_date,
+           v_periods
+    FROM   prj_blb_slicerequests
+    WHERE  is_dwh_request = 1
+    AND    period = 1;
+
+    v_to_date := (v_from_date + (v_periods * 7)) - 1;
+    DELETE FROM rpt_calendar WHERE period_type = 'WEEKLY' AND (start_date &gt; v_to_date OR start_date &lt; v_from_date);
+    v_count := 0;
+    WHILE v_from_date + (v_count * 7) &lt;= v_to_date
+    LOOP
+        BEGIN
+        SELECT NVL(f.fte,0),
+               NVL(c.fte,-1)
+        INTO   c_fte,
+               p_fte
+        FROM  (SELECT fte_conversion fte FROM TABLE(crv_calendar_fct('WEEK',v_from_date + (v_count * 7),v_from_date + (v_count * 7) + 6,NULL,'DEFAULT','WEEK_START=PRSITE,FTE_CALENDAR'))) f
+               LEFT OUTER JOIN rpt_calendar c ON c.period_type = 'WEEKLY'
+                                             AND c.start_date = v_from_date + (v_count * 7);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+                c_fte := 0;
+            END;
+        END;
+        IF p_fte = -1 THEN
+            BEGIN
+            INSERT INTO rpt_calendar
+                (
+                 period_type,
+                 start_date,
+                 end_date,
+                 fte,
+                 created_date,
+                 last_updated_date
+                )
+            VALUES
+                (
+                 'WEEKLY',
+                 v_from_date + (v_count * 7),
+                 v_from_date + ((v_count * 7) + 6),
+                 c_fte / 3600,
+                 SYSDATE,
+                 SYSDATE
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        ELSIF c_fte &lt;&gt; p_fte THEN
+            BEGIN
+            UPDATE rpt_calendar
+            SET    fte = c_fte / 3600,
+                   created_date = NVL(created_date, SYSDATE),
+                   last_updated_date = SYSDATE
+            WHERE  start_date = v_from_date + (v_count * 7)
+            AND    period_type = 'WEEKLY';
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        END IF;
+        v_count := v_count + 1;
+    END LOOP;
+
+    SELECT MIN(from_date),
+           MAX(num_periods)
+    INTO   v_from_date,
+           v_periods
+    FROM   prj_blb_slicerequests
+    WHERE  is_dwh_request = 1
+    AND    period = 3;
+    v_to_date := TO_DATE('12/31/' || TO_CHAR(ADD_MONTHS(v_from_date,v_periods),'YYYY'),'MM/DD/YYYY');
+    v_from_date := TO_DATE('01/01/' || TO_CHAR(v_from_date,'YYYY'),'MM/DD/YYYY');
+    DELETE FROM rpt_calendar WHERE period_type = 'ANNUALLY' AND (start_date &gt; v_to_date OR start_date &lt; v_from_date);
+    v_count := 0;
+    WHILE ADD_MONTHS(v_from_date,v_count) &lt;= v_to_date
+    LOOP
+        BEGIN
+        SELECT NVL(f.fte,0),
+               NVL(c.fte,-1)
+        INTO   c_fte,
+               p_fte
+        FROM  (SELECT fte_conversion fte FROM TABLE(crv_calendar_fct('YEAR',ADD_MONTHS(v_from_date,v_count),ADD_MONTHS(v_from_date,v_count+12)-1,NULL,'DEFAULT','FTE_CALENDAR'))) f
+               LEFT OUTER JOIN rpt_calendar c ON c.period_type = 'ANNUALLY'
+                                             AND c.start_date = ADD_MONTHS(v_from_date,v_count);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+            BEGIN
+                c_fte := 0;
+            END;
+        END;
+        IF p_fte = -1 THEN
+            BEGIN
+            INSERT INTO rpt_calendar
+                (
+                 period_type,
+                 start_date,
+                 end_date,
+                 fte,
+                 created_date,
+                 last_updated_date
+                )
+            VALUES
+                (
+                 'ANNUALLY',
+                 ADD_MONTHS(v_from_date, v_count),
+                 ADD_MONTHS(v_from_date, v_count + 12) - 1,
+                 c_fte / 3600,
+                 SYSDATE,
+                 SYSDATE
+                );
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        ELSIF c_fte &lt;&gt; p_fte THEN
+            BEGIN
+            UPDATE rpt_calendar
+            SET    fte = c_fte /3600,
+                   created_date = NVL(created_date, SYSDATE),
+                   last_updated_date = SYSDATE
+            WHERE  start_date = ADD_MONTHS(v_from_date, v_count)
+            AND    period_type = 'ANNUALLY';
+            EXCEPTION
+                WHEN OTHERS THEN
+                BEGIN
+                    ROLLBACK;
+                    GOTO Output;
+                END;
+            END;
+            COMMIT;
+        END IF;
+        v_count := v_count + 12;
+    END LOOP;
+    &lt;&lt;Output&gt;&gt;
+    RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

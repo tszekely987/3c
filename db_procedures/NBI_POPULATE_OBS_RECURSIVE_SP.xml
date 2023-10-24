@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_POPULATE_OBS_RECURSIVE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_POPULATE_OBS_RECURSIVE_SP" (
+   P_PARENT_UNIT_ID   IN   NUMBER,
+   P_UNIT_VALUES      IN   NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE,
+   P_UNIT_IDS         IN   NBI_UTILS_PKG.NBI_NUMBER_TAB_TYPE
+)
+AS
+   CURSOR C_CHILD_UNITS (C_PARENT_ID NUMBER)
+   IS
+      SELECT   U.TYPE_ID,
+               U.ID UNIT_ID,
+               U.NAME,
+               U.DEPTH,
+               NBI_OBS_UNIT_ISLEAF_FCT (U.ID) IS_LEAF,
+               T.NAME TYPE_NAME
+      FROM     PRJ_OBS_UNITS U,
+               PRJ_OBS_TYPES T
+      WHERE    U.PARENT_ID = C_PARENT_ID
+      AND      T.ID = U.TYPE_ID
+       ORDER BY U.TYPE_ID,
+                T.ID;
+
+   V_UNIT_VALUES                 NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE;
+   V_UNIT_IDS                    NBI_UTILS_PKG.NBI_NUMBER_TAB_TYPE;
+   V_PATH                        VARCHAR2 (2000);
+   V_STMT                        VARCHAR2 (200);
+BEGIN
+   FOR I IN 1 .. 10
+   LOOP
+      V_UNIT_VALUES (I) := NULL;
+      V_UNIT_IDS (I) := NULL;
+   END LOOP;
+
+   V_UNIT_VALUES := P_UNIT_VALUES;
+   V_UNIT_IDS := P_UNIT_IDS;
+   V_STMT := 'Looping over child units';
+
+   FOR C_CHILD_UNIT_REC IN C_CHILD_UNITS (P_PARENT_UNIT_ID)
+   LOOP
+      V_UNIT_VALUES (C_CHILD_UNIT_REC.DEPTH) := C_CHILD_UNIT_REC.NAME;
+      V_UNIT_IDS (C_CHILD_UNIT_REC.DEPTH) := C_CHILD_UNIT_REC.UNIT_ID;
+
+      FOR I IN 1 .. 10
+      LOOP
+         IF V_UNIT_VALUES (I) IS NULL
+         THEN
+            EXIT;
+         END IF;
+
+         IF I = 1
+         THEN
+            IF V_UNIT_VALUES (1) IS NOT NULL
+            THEN
+               V_PATH := 'ALL/' || V_UNIT_VALUES (1);
+            END IF;
+         ELSE
+            V_PATH := V_PATH || '/' || V_UNIT_VALUES (I);
+         END IF;
+      END LOOP;
+
+      V_STMT := 'Inserting OBS dimension';
+
+      INSERT INTO NBI_DIM_OBS
+                  (
+                     OBS_TYPE_ID,
+                     OBS_TYPE_NAME,
+                     OBS_UNIT_ID,
+                     IS_LEAF,
+                     PATH,
+                     LEVEL0_NAME,
+                     LEVEL1_NAME,
+                     LEVEL2_NAME,
+                     LEVEL3_NAME,
+                     LEVEL4_NAME,
+                     LEVEL5_NAME,
+                     LEVEL6_NAME,
+                     LEVEL7_NAME,
+                     LEVEL8_NAME,
+                     LEVEL9_NAME,
+                     LEVEL10_NAME,
+                     LEVEL0_UNIT_ID,
+                     LEVEL1_UNIT_ID,
+                     LEVEL2_UNIT_ID,
+                     LEVEL3_UNIT_ID,
+                     LEVEL4_UNIT_ID,
+                     LEVEL5_UNIT_ID,
+                     LEVEL6_UNIT_ID,
+                     LEVEL7_UNIT_ID,
+                     LEVEL8_UNIT_ID,
+                     LEVEL9_UNIT_ID,
+                     LEVEL10_UNIT_ID,
+                     HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+                  )
+         SELECT   C_CHILD_UNIT_REC.TYPE_ID,
+                  C_CHILD_UNIT_REC.TYPE_NAME,
+                  C_CHILD_UNIT_REC.UNIT_ID,
+                  C_CHILD_UNIT_REC.IS_LEAF,
+                  V_PATH,
+                  'ALL',
+                  V_UNIT_VALUES (1),
+                  V_UNIT_VALUES (2),
+                  V_UNIT_VALUES (3),
+                  V_UNIT_VALUES (4),
+                  V_UNIT_VALUES (5),
+                  V_UNIT_VALUES (6),
+                  V_UNIT_VALUES (7),
+                  V_UNIT_VALUES (8),
+                  V_UNIT_VALUES (9),
+                  V_UNIT_VALUES (10),
+                  0,
+                  V_UNIT_IDS (1),
+                  V_UNIT_IDS (2),
+                  V_UNIT_IDS (3),
+                  V_UNIT_IDS (4),
+                  V_UNIT_IDS (5),
+                  V_UNIT_IDS (6),
+                  V_UNIT_IDS (7),
+                  V_UNIT_IDS (8),
+                  V_UNIT_IDS (9),
+                  V_UNIT_IDS (10),
+                  C_CHILD_UNIT_REC.DEPTH,
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+         FROM     DUAL
+         WHERE    NOT EXISTS (SELECT   'obs ALL entry exists'
+                              FROM     NBI_DIM_OBS
+                              WHERE    OBS_TYPE_ID = C_CHILD_UNIT_REC.TYPE_ID
+                              AND      OBS_UNIT_ID = C_CHILD_UNIT_REC.UNIT_ID);
+
+      V_STMT := 'Calling NBI_POPULATE_OBS_RECURSIVE_SP recursively';
+      NBI_POPULATE_OBS_RECURSIVE_SP (C_CHILD_UNIT_REC.UNIT_ID, V_UNIT_VALUES, V_UNIT_IDS);
+   END LOOP;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_POPULATE_OBS_RECURSIVE_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

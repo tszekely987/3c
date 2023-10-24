@@ -1,0 +1,25 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_D_PLAN_UNITS_V">
+    <indexes/>
+    <text_length>672</text_length>
+    <text>SELECT i.id PROJECT_ID,
+       dc.start_date MONTH_START_DATE,
+       SUM(NVL(CASE WHEN fp.plan_type_code = 'FORECAST' THEN s.slice ELSE 0 END,0)) FORECAST_UNITS,
+       SUM(NVL(CASE WHEN fp.plan_type_code = 'BUDGET' THEN s.slice ELSE 0 END,0)) BUDGET_UNITS
+FROM   inv_investments i, fin_plans fp, fin_cost_plan_details fd, odf_ssl_cst_dtl_units s,
+       rpt_calendar dc
+WHERE  i.id = fp.object_id
+AND    fp.plan_type_code IN ('FORECAST','BUDGET')
+AND    fp.is_plan_of_record = 1
+AND    fp.id = fd.plan_id
+AND    fd.id = s.prj_object_id
+AND    dc.start_date BETWEEN s.start_date and s.finish_date - 1
+AND    dc.period_type = 'DAILY'
+GROUP BY i.id, dc.start_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

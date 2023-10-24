@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>ODF_AUD_STATIC_LOV_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."ODF_AUD_STATIC_LOV_FCT" (
+  P_LOOKUP_TYPE IN VARCHAR2,
+  P_CODE_VALUE IN VARCHAR2,
+  P_ID_VALUE IN NUMBER,
+  P_ENUM_VALUE IN NUMBER,
+  P_LANGUAGE_CODE IN VARCHAR2 DEFAULT 'en')
+RETURN VARCHAR2
+IS
+  V_RETURN_VALUE VARCHAR2(2100);
+BEGIN
+  IF P_ID_VALUE IS NOT NULL THEN
+     select id 
+    into V_RETURN_VALUE 
+    from ODF_AUD_LOOKUP_CAPTIONS 
+    where is_latest=1 and language_code=P_LANGUAGE_CODE and pk_id= P_ID_VALUE;
+  ELSIF P_ENUM_VALUE IS NOT NULL THEN
+    select id 
+    into V_RETURN_VALUE 
+    from ODF_AUD_LOOKUP_CAPTIONS 
+    where is_latest=1 and language_code=P_LANGUAGE_CODE and pk_id = (select id from cmn_lookups where lookup_type=P_LOOKUP_TYPE and lookup_enum= P_ENUM_VALUE); 
+  ELSE
+    select id 
+    into V_RETURN_VALUE 
+    from ODF_AUD_LOOKUP_CAPTIONS 
+    where is_latest=1 and language_code=P_LANGUAGE_CODE and pk_id = (select id from cmn_lookups where lookup_type=P_LOOKUP_TYPE and lookup_code= P_CODE_VALUE); 
+  END IF;
+  RETURN V_RETURN_VALUE;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

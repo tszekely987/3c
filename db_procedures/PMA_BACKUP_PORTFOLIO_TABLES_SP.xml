@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PMA_BACKUP_PORTFOLIO_TABLES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PMA_BACKUP_PORTFOLIO_TABLES_SP" 
+AS
+v_backup_table_exists number := 0;
+v_backup_table_prefix varchar2(20) := 'XBKP_';
+v_backup_table_suffix varchar2(20) := '';
+v_orig_table_substr_len number := 25;
+v_source_table_name varchar2(30);
+v_backup_table_name varchar2(30);
+v_where_clause varchar2(300);
+c_default_where_clause varchar2(40) := ' WHERE 1 = 1';
+c_scn_nested_whr_cl varchar2(100) := ' WHERE scenario_id IN ( SELECT id FROM CAP_SCENARIOS WHERE portfolio_id IS NOT NULL )';
+c_scn_whr_cl varchar2(40) := ' WHERE portfolio_id IS NOT NULL';
+c_odf_exp_whr_cl varchar2(255) := ' WHERE UPPER(object_code) LIKE ''SCENARIO%'' OR UPPER(object_code) LIKE ''PORTFOLIO%''';
+BEGIN
+  FOR table_rec IN (
+    SELECT upper(user_tables_main.table_name) source_table_name
+           , (v_backup_table_prefix || substr(upper(user_tables_main.table_name), 1, v_orig_table_substr_len) || v_backup_table_suffix) backup_table_name
+           , ( SELECT CASE
+                        WHEN EXISTS ( SELECT user_tables_bkup.table_name
+                                        FROM user_tables user_tables_bkup
+                                       WHERE upper(user_tables_bkup.table_name) = (v_backup_table_prefix || substr(upper(user_tables_main.table_name), 1, v_orig_table_substr_len) || v_backup_table_suffix)
+                                   )
+                        THEN 1
+                        ELSE 0
+                      END
+                 FROM dual
+             ) backup_table_exists
+      FROM user_tables user_tables_main
+     WHERE upper(user_tables_main.table_name) IN (
+            'PMA_EF_CANDIDATES',
+            'PMA_EF_INVESTMENTS',
+            'PMA_PINNED_INVESTMENTS',
+            'PMA_PORTFOLIO_CONTENTS',
+            'PMA_PORTFOLIO_ROLES',
+            'PMA_PRTFLIO_INCL_CTNT_TYPES',
+            'PMA_PORTFOLIOS',
+            'CAP_SCENARIO_MEMBERS',
+            'PMA_SCENARIO_CONSTRAINTS',
+            'PMA_SCENARIO_OPT_PARAMS',
+            'CAP_SCENARIOS',
+            'ODF_FILTER_EXPRESSIONS'
+           )
+  ORDER BY source_table_name
+  )
+  LOOP
+  BEGIN
+    v_source_table_name := table_rec.source_table_name;
+    v_backup_table_name := table_rec.backup_table_name;
+    v_backup_table_exists := table_rec.backup_table_exists;
+
+    --support re-runnability. if a previous execution of this procedure (which is executed as part of a unsuccessful
+    --previous upgrade attempt) already created the backup, don't do it again
+    IF (v_backup_table_exists = 0) THEN
+      IF (v_source_table_name IN ('PMA_EF_CANDIDATES', 'PMA_EF_INVESTMENTS', 'PMA_PINNED_INVESTMENTS',
+                                  'PMA_PORTFOLIO_CONTENTS', 'PMA_PORTFOLIO_ROLES', 'PMA_PRTFLIO_INCL_CTNT_TYPES',
+                                  'PMA_PORTFOLIOS'
+                                 )
+      )  THEN
+        v_where_clause := c_default_where_clause;
+      ELSIF (v_source_table_name IN ('CAP_SCENARIO_MEMBERS', 'PMA_SCENARIO_CONSTRAINTS', 'PMA_SCENARIO_OPT_PARAMS')) THEN
+        v_where_clause := c_scn_nested_whr_cl;
+      ELSIF (v_source_table_name ='CAP_SCENARIOS') THEN
+        v_where_clause := c_scn_whr_cl;
+      ELSIF (v_source_table_name ='ODF_FILTER_EXPRESSIONS') THEN
+        v_where_clause := c_odf_exp_whr_cl;
+      END IF;
+
+      EXECUTE IMMEDIATE 'CREATE TABLE ' || v_backup_table_name || ' AS ( SELECT * FROM ' || v_source_table_name || v_where_clause || ' )';
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20799, 'Error occured while creating backup table ' || v_backup_table_name || '. Error Message: ' || SUBSTR(SQLERRM, 1, 500));
+  END;
+END LOOP;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

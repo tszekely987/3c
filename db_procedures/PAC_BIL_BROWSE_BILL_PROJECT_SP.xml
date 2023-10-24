@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_BROWSE_BILL_PROJECT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_BROWSE_BILL_PROJECT_SP" (
+IN_COMPANY_CODE 	IN VARCHAR2,
+IN_PROJECT_TYPE 	IN VARCHAR2,
+IN_CURRENCY_CODE 	IN VARCHAR2,
+IN_PROJECT_CODE 	IN VARCHAR2,
+IN_PROJECT_TITLE 	IN VARCHAR2,
+IN_PROJECT_ID		IN NUMBER,
+RC1 	IN OUT Pac_Bil_Browse_Bil_Project_Pkg.RCT1)
+AS
+
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	Globalpkg.STRING;
+
+T_IN_PROJECT_TITLE Globalpkg.STRING;
+T_IN_PROJECT_CODE Globalpkg.STRING;
+
+v_ERROR_CODE     INTEGER;
+v_STMT		 	 Globalpkg.STRING;
+v_Status     	 NUMBER;
+v_HasSubProjects NUMBER;
+
+BEGIN
+
+  DELETE FROM TEMP_BIL_SUBPROJECTS ;
+
+  v_STMT := 'Error inserting into TEMP_BIL_SUBPROJECTS';
+  v_ERROR_CODE := NULL;
+
+  /* Insert top level project first. Then we'll get all the subprojects. */
+  INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+	 						 	      BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+    SELECT P.COMPANY_CODE, P.PROJECT_CODE, P.ID, P.ID,
+	       P.BILLING_PROJECT_ID, 0, NULL
+	  FROM PAC_MNT_PROJECTS P
+	  WHERE P.ID = Pac_Bil_Browse_Bill_Project_Sp.IN_PROJECT_ID ;
+
+  -- Accumulate all the sub projects for the master in TEMP_BIL_SUBPROJECTS. 0 means don't get WIP totals
+  BEGIN
+    Pac_Bil_Get_Subprojects_Sp ( 0, v_Status, v_HasSubProjects ) ;
+  END;
+
+  v_STMT := 'Error Selecting Billing Projects';
+  v_ERROR_CODE := NULL;
+  
+  T_IN_PROJECT_CODE := IN_PROJECT_CODE ;
+  T_IN_PROJECT_TITLE := IN_PROJECT_TITLE ;
+  
+  IF T_IN_PROJECT_CODE = '*' THEN
+  	 T_IN_PROJECT_CODE := '';
+  END IF ;
+
+  IF T_IN_PROJECT_TITLE = '*' THEN
+  	 T_IN_PROJECT_TITLE := '';
+  END IF ;
+
+  OPEN RC1 FOR
+    SELECT PROJECT_CODE,
+  		   INV.NAME,
+		   P.ID
+	  FROM PAC_MNT_PROJECTS P,
+	       INV_INVESTMENTS INV
+	  WHERE INV.ID = P.ID AND
+	        P.COMPANY_CODE = IN_COMPANY_CODE AND
+	        P.TYPE_ = IN_PROJECT_TYPE AND
+	        P.BILLING_CURRENCY_CODE = IN_CURRENCY_CODE AND
+		    P.ID NOT IN ( SELECT T.PROJECT_ID FROM TEMP_BIL_SUBPROJECTS T ) AND
+		    P.STATUS != 'C' AND
+		    P.APPROVED = 1 AND
+			NLS_UPPER( PROJECT_CODE ) LIKE NVL( NLS_UPPER( T_IN_PROJECT_CODE || '%' ), NLS_UPPER( PROJECT_CODE ) ) AND
+			NLS_UPPER( INV.NAME ) LIKE NVL( NLS_UPPER( T_IN_PROJECT_TITLE || '%' ), NLS_UPPER( INV.NAME ) )
+	UNION
+	SELECT UPPER( I.CODE ),
+		   I.NAME,
+		   I.ID
+	  FROM INV_INVESTMENTS I
+	  WHERE I.ID = Pac_Bil_Browse_Bill_Project_Sp.IN_PROJECT_ID AND
+	  		NLS_UPPER( I.CODE ) LIKE NVL( NLS_UPPER( T_IN_PROJECT_CODE || '%' ), NLS_UPPER( I.CODE ) ) AND
+			NLS_UPPER( I.NAME ) LIKE NVL( NLS_UPPER( T_IN_PROJECT_TITLE || '%' ), NLS_UPPER( I.NAME ) ) ;
+
+  DELETE FROM TEMP_BIL_SUBPROJECTS ;
+
+  EXCEPTION
+  WHEN OTHERS THEN
+	IF v_ERROR_CODE IS NULL THEN
+	  v_ERROR_CODE := SQLCODE ;
+	  v_STMT := SQLERRM;
+      RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	ELSE
+      RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	END IF;
+
+END Pac_Bil_Browse_Bill_Project_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_RESSUPP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_RESSUPP_SP" 
+(
+  locationid_in       VARCHAR2 DEFAULT NULL,
+  departcode_in       VARCHAR2 DEFAULT NULL,
+  resourceclass_in    VARCHAR2 DEFAULT NULL,
+  transactionclass_in VARCHAR2 DEFAULT NULL,
+  vendor_code_in      VARCHAR2 DEFAULT NULL,
+  resource_id_in      NUMBER
+)
+AS
+  var_select  INTEGER := 0;
+  var_inactive_date DATE;
+  var_resource_transtype Globalpkg.STRING;
+  var_resourceclass_transtype PAC_FOS_RESOURCE_CLASS.RESOURCE_TYPE%TYPE;
+  var_transclass_transtype TRANSCLASS.TRANSTYPE%TYPE;
+
+BEGIN
+  -- TODO: Do we need this for resource
+  PAC_MNT_ISSYSCURRENABLED_SP;
+  
+  IF (locationid_in IS NOT NULL) THEN
+    BEGIN
+      SELECT 1 INTO var_select
+        FROM LOCATIONS
+       WHERE LOCATIONS.locationid = locationid_in;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+	  	  RAISE PAC_GLOBAL_ERRORS.InvalidLocation;
+    END;
+  END IF;
+
+  IF (departcode_in IS NOT NULL) THEN
+  BEGIN
+      SELECT 1 INTO var_select
+        FROM DEPARTMENTS
+       	WHERE departcode = departcode_in;
+	  EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+			 RAISE PAC_GLOBAL_ERRORS.InvalidDepartment;
+      END;
+   END IF;
+   
+  IF (locationid_in IS NOT NULL AND departcode_in IS NOT NULL) THEN
+    BEGIN
+  	  SELECT 1 INTO var_select 
+	    FROM LOCATIONDEPT 
+		WHERE (LOCATIONDEPT.LOCATIONID = locationid_in 
+		   AND LOCATIONDEPT.DEPARTCODE = departcode_in);
+	  EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+			 RAISE PAC_GLOBAL_ERRORS.MM_LocationAndDepartment;
+    END;
+  END IF;
+   
+
+   BEGIN
+     SELECT DECODE(RESOURCE_TYPE,0,'L',
+		   	  DECODE(RESOURCE_TYPE,1,'Q',
+		   		DECODE(RESOURCE_TYPE,2,'M',
+            	  DECODE(RESOURCE_TYPE,3,'X', ''))))
+		   INTO var_resource_transtype
+		   FROM SRM_RESOURCES WHERE id = resource_id_in;
+	 EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+	   		RAISE PAC_GLOBAL_ERRORS.ResourceNotFound;
+   END;
+
+   IF (var_resource_transtype = '') THEN
+   	  RAISE PAC_GLOBAL_ERRORS.InvalidResourceType;
+   END IF;
+   
+   IF (resourceclass_in IS NOT NULL) THEN
+     BEGIN
+       SELECT resource_type INTO var_resourceclass_transtype
+         FROM PAC_FOS_RESOURCE_CLASS
+         WHERE resource_class = resourceclass_in;
+
+	   IF (var_resourceclass_transtype != var_resource_transtype) THEN
+	   	  RAISE PAC_GLOBAL_ERRORS.MM_TransType_ResAndResClass;
+	   END IF;
+
+       EXCEPTION
+         WHEN NO_DATA_FOUND THEN
+	     	  RAISE PAC_GLOBAL_ERRORS.InvalidResourceClass;
+     END;
+   END IF;
+
+   IF (transactionclass_in IS NOT NULL) THEN
+     BEGIN
+       SELECT TRANSTYPE INTO var_transclass_transtype
+         FROM TRANSCLASS
+         WHERE TRANSCLASS = transactionclass_in;
+
+	   IF (var_transclass_transtype != var_resource_transtype) THEN
+	   	  RAISE PAC_GLOBAL_ERRORS.MM_TransType_ResAndTransClass;
+	   END IF;
+
+       EXCEPTION
+         WHEN NO_DATA_FOUND THEN
+           	  RAISE PAC_GLOBAL_ERRORS.InvalidTransactionClass;
+     END;
+   END IF;
+
+   IF (vendor_code_in IS NOT NULL) THEN
+     BEGIN
+       SELECT 1 INTO var_select
+         FROM APMASTER
+        WHERE vendor_code = vendor_code_in;
+       EXCEPTION
+         WHEN NO_DATA_FOUND THEN
+		 	  RAISE PAC_GLOBAL_ERRORS.InvalidVendor;
+      END;
+    END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

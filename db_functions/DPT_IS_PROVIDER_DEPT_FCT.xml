@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>DPT_IS_PROVIDER_DEPT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."DPT_IS_PROVIDER_DEPT_FCT" (departmentId NUMBER) RETURN NUMBER IS
+      isProvider NUMBER;
+      /******************************************************************************
+         NAME:       DPT_IS_PROVIDER_DEPT_FCT
+         PURPOSE: return 1 if a department is a provider, 0 otherwise
+         			Checks if a service has the department as its owning department    
+      ******************************************************************************/
+        BEGIN
+          isProvider := 0;
+          SELECT decode(a.is_provider, 0, 0, 1) INTO isProvider 
+      	FROM (SELECT count(unit_id) is_provider 
+      		 		 FROM prj_obs_associations assoc, departments dept				  
+      				 WHERE dept.ID = departmentId 
+      				 AND assoc.table_name = 'INV_SERVICE' 
+      				 AND assoc.unit_id = dept.OBS_UNIT_ID) a;
+         
+         RETURN isProvider;
+         EXCEPTION
+           WHEN NO_DATA_FOUND THEN
+             NULL;
+           WHEN OTHERS THEN
+             -- Consider logging the error and then re-raise
+             RAISE;
+         RETURN isProvider;
+             
+      END DPT_IS_PROVIDER_DEPT_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

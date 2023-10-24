@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>AUDIT_COSTPLAN_DETAIL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."AUDIT_COSTPLAN_DETAIL_FCT" (p_charge_code_id NUMBER, p_department_id NUMBER, p_input_type_code_id NUMBER, p_location_id NUMBER, p_resource_class_id NUMBER, p_resource_id NUMBER, p_role_id NUMBER, p_transaction_class_id NUMBER, p_cost_type_id NUMBER, p_lov1_id NUMBER, p_lov2_id NUMBER, p_description varchar2, p_lang_code varchar2 DEFAULT 'en')
+   	 	RETURN NVARCHAR2
+	 	IS
+   	 	v_cp_group_attr_values nvarchar2(2000);
+     
+      	BEGIN
+
+		/* Find the grouping attribute values and return the concatenated value for given input cost plan detail record */
+		
+   		select 
+   		 trim(';' from (trim(' ' from replace((coalesce(chg.prname,'-')||'; '|| coalesce(dpt.departcode,'-')||'; '|| 
+   		 coalesce(csttyp.name,'-')||'; '|| coalesce(typ.prname,'-')||'; '||coalesce(loc.locationid,'-')||'; '|| 
+   		 coalesce(res.full_name,'-')||'; '|| coalesce(rol.full_name,'-')||'; '|| coalesce(trn.description,'-')||'; '||
+		 coalesce(rescls.description,'-')||'; '|| coalesce(lov1.name,'-')||'; '|| coalesce(lov2.name,'-')||'; '),'-; ','')))) || 
+		 (case when p_description is not null then ' : ' || coalesce(p_description,'') else '' end) into v_cp_group_attr_values
+		from dual		
+		left join prchargecode chg on chg.prid = p_charge_code_id
+		left join departments dpt on dpt.id = p_department_id
+		left join prtypecode typ on typ.prid = p_input_type_code_id
+		left join locations loc on loc.id = p_location_id
+		left join pac_fos_resource_class rescls on rescls.id = p_resource_class_id
+		left join srm_resources res on res.id = p_resource_id
+		left join srm_resources rol on rol.id = p_role_id
+		left join transclass trn on trn.id = p_transaction_class_id
+		left join cmn_lookups_v csttyp on csttyp.id = p_cost_type_id and csttyp.lookup_type = 'LOOKUP_FIN_COSTTYPECODE' and csttyp.language_code = p_lang_code
+		left join cmn_lookups_v lov1 on lov1.id = p_lov1_id and lov1.lookup_type = 'FIN_BROWSE_USER_LOV1' and lov1.language_code = p_lang_code
+		left join cmn_lookups_v lov2 on lov2.id = p_lov2_id and lov2.lookup_type = 'FIN_BROWSE_USER_LOV2' and lov2.language_code = p_lang_code;
+
+   		RETURN (case when length(v_cp_group_attr_values) &gt; 496 then substr(v_cp_group_attr_values,1,496) || '...' else v_cp_group_attr_values end);
+		END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

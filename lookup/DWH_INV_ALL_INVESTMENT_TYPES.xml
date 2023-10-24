@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="DWH_INV_ALL_INVESTMENT_TYPES" displayAttributeName="investment_type" hiddenAttributeName="investment_type_key" objectCode="" sortAttributeName="sort_order" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List of all investment types including custom investments" languageCode="en" name="Data Warehouse All Investment Types"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:a.investment_type_key:investment_type_key@,
+       @SELECT:a.investment_type:investment_type@,
+       @SELECT:a.last_updated_date:last_updated_date@,
+       @SELECT:CASE WHEN a.sort_order = 1 THEN a.sort_order ELSE ROW_NUMBER() OVER(PARTITION BY lang.id ORDER BY a.sort_order, a.investment_type) END:sort_order@,
+       @SELECT:1:is_active@,
+       @SELECT:LANG.LANGUAGE_CODE:LANGUAGE_CODE@,
+       @SELECT:LANG.ID:LANGUAGE_ID@
+FROM   (SELECT lkp.lookup_code AS investment_type_key, 
+               nls.name AS investment_type,
+               lkp.last_updated_date AS last_updated_date,
+               nls.language_code AS language_code,
+               1 AS sort_order
+        FROM   cmn_lookups lkp
+               INNER JOIN cmn_captions_nls nls ON nls.pk_id = lkp.id
+        WHERE  lkp.lookup_type = 'PMA_INVESTMENT_TYPE'
+        AND    lkp.lookup_code = 'all'
+        UNION  ALL
+        SELECT o.code AS investment_type_key,
+               c.name AS investment_type,
+               c.last_updated_date AS last_updated_date,
+               c.language_code AS language_code,
+               2 AS sort_order
+        FROM   odf_objects o 
+               INNER JOIN cmn_captions_nls c ON c.pk_id = o.ID
+               INNER JOIN odf_object_extensions oe ON oe.object_code = o.code
+        WHERE  o.is_customizable = 1
+        AND    o.is_dw_enabled = 1
+        AND    oe.extension_code = 'inv'
+        AND    c.table_name = 'ODF_OBJECTS') a
+        INNER JOIN cmn_languages lang ON lang.language_code = a.language_code
+WHERE   lang.language_code = @WHERE:PARAM:LANGUAGE@
+AND     lang.is_dw_enabled = 1  
+AND     @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="investment_type"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="investment_type"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Investment Type" languageCode="en" name="Select Investment Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Investment Types" languageCode="en" name="Select Investment Types"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="investment_type" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type" languageCode="en" name="Investment Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="investment_type_key" order="2" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: Investment Type ID" languageCode="en" name="[hidden]: Investment Type ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="investment_type" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type" languageCode="en" name="Investment Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="sort_order" order="3" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: Sort Order" languageCode="en" name="[hidden]: Sort Order"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

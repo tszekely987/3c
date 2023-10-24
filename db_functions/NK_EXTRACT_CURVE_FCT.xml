@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_EXTRACT_CURVE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_EXTRACT_CURVE_FCT" ( P_CURVE IN BLOB, P_NAME VARCHAR )
+RETURN BLOB
+IS
+  foo number;
+  V_CURVE BLOB := P_CURVE;
+  V_OUTPUT_CURVE BLOB;
+  idx number; v_idx integer := 0; b_idx number := 1; c_idx integer:= 0; total_objs integer; name_size integer;
+  curve varchar2(32000);
+  v_name varchar2(1000);
+
+BEGIN
+  idx := 1; b_idx := 1; c_idx := 1;
+
+  IF( P_CURVE IS NULL ) THEN
+    RETURN NULL;
+  END IF;
+
+  -- version 7e ~
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- version number
+  CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, foo );
+  -- start 3a :
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- class id (1)
+  CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+
+  -- start 7b {
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- number of objects
+  CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, total_objs );
+
+  WHILE(c_idx &lt;= total_objs) LOOP
+    -- key name size
+    CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, name_size );
+    -- get the bytes for the name
+    CRV_SQL_CURVE_PKG.READ_BYTES(v_curve, b_idx, curve, idx, name_size * 2, v_name);
+    v_name := UTL_I18N.RAW_TO_CHAR(v_name, 'AL32UTF8');
+
+    -- check the type, if 0 or 1 then nothing to do
+    CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+
+    IF(foo &gt; 1) THEN
+      -- curve size
+      CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, foo );
+
+      -- read the curve
+      IF( v_name = p_name ) THEN
+        -- Create a temporary blob to receive the curve;  Make sure it is cached (second param)
+        DBMS_LOB.CREATETEMPORARY(V_OUTPUT_CURVE,TRUE,DBMS_LOB.call);
+        DBMS_LOB.COPY(V_OUTPUT_CURVE, V_CURVE, foo, 1, b_idx);
+        RETURN V_OUTPUT_CURVE;
+      END IF;
+      b_idx := b_idx + (foo);
+      idx := idx + (foo*2);
+    END IF;
+
+    c_idx := c_idx + 1;
+  END LOOP;
+
+  RETURN NULL;
+
+-- safety check if anything goes wrong just return null
+EXCEPTION
+ WHEN OTHERS THEN
+   RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

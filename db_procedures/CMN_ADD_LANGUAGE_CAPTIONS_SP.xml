@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ADD_LANGUAGE_CAPTIONS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ADD_LANGUAGE_CAPTIONS_SP" (
+   p_language_code    in varchar2
+)
+is
+
+  cursor  c_captions is
+  select  name, 
+          description,
+          table_name,
+          pk_id,
+          attribute1,
+          attribute2,
+          attribute3,
+          attribute4,
+          attribute5
+  from    cmn_captions_nls
+  where   language_code = 'en';  
+
+begin
+
+  for c_rec in c_captions
+  loop
+    insert  into cmn_captions_nls (id, pk_id, name, description, language_code, table_name, 
+                                   created_date, created_by, last_updated_date, last_updated_by, 
+                                   attribute1, attribute2, attribute3, attribute4, attribute5)
+    select  cmn_captions_nls_s1.nextval, c_rec.pk_id, c_rec.name, c_rec.description, p_language_code, c_rec.table_name, 
+            sysdate, 1, sysdate, 1, 
+            c_rec.attribute1, c_rec.attribute2, c_rec.attribute3, c_rec.attribute4, c_rec.attribute5 
+    from    dual
+    where   not exists (select  id
+                        from    cmn_captions_nls
+                        where   pk_id = c_rec.pk_id
+                        and     table_name = c_rec.table_name
+                        and     language_code = p_language_code );
+
+  end loop;
+
+  update  cmn_captions_nls
+  set     description = name
+  where   table_name = 'ODF_VIEW_ATTRIBUTES_DESC'
+  and     name != description;
+
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

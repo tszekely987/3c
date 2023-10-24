@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_GET_OBJECT_NAME_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_GET_OBJECT_NAME_FCT" (
+  pp_Id IN NUMBER
+)
+ RETURN VARCHAR2 IS
+
+ v_text1 VARCHAR2(200);
+ v_tried NUMBER;
+ v_text2 VARCHAR2(200);
+ v_testValue NUMBER;
+ v_return VARCHAR2(200);
+ p_Object VARCHAR2(30);
+ p_Id NUMBER;
+ BEGIN
+
+
+ v_text1:= '';
+ v_tried := 0;
+ p_Object := '';
+    
+ SELECT COUNT(*) INTO v_testValue FROM BPM_RUN_OBJECTS WHERE Pk_Id = pp_id AND Type_code = 'BPM_POT_PRIMARY';
+
+
+ IF v_testValue = 0 THEN
+   v_return := ' ';
+ ELSE
+   SELECT Object_type_code, Object_Id INTO p_Object, p_id FROM BPM_RUN_OBJECTS WHERE Pk_Id = pp_id AND Type_code = 'BPM_POT_PRIMARY';
+
+
+
+
+   IF p_object = 'document' THEN
+      SELECT COUNT(*) INTO v_testValue FROM CLB_DMS_FILES WHERE Id = p_id;
+      IF v_testValue &gt; 0 THEN
+         SELECT Name INTO v_text1 FROM CLB_DMS_FILES WHERE Id = p_id;
+      END IF;
+      v_tried:=1;   
+   END IF;
+   IF p_object = 'idea' THEN
+
+      SELECT COUNT(*) INTO v_testValue FROM Inv_Investments WHERE odf_object_code = 'idea' AND id = p_id;
+
+      IF v_testValue &gt; 0 THEN
+     SELECT name INTO v_text1 FROM Inv_Investments WHERE odf_object_code = 'idea' AND id = p_id;
+
+      END IF;
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'project' THEN
+      SELECT COUNT(*) INTO v_testValue FROM Inv_Investments WHERE odf_object_code = 'project' AND Id = p_id;
+
+      IF v_testValue &gt; 0 THEN
+     SELECT Name INTO v_text1 FROM Inv_Investments WHERE odf_object_code = 'project' AND Id = p_id;
+
+      END IF;
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'program' THEN
+      SELECT COUNT(*) INTO v_testValue FROM Inv_Investments WHERE odf_object_code = 'project' AND Id = p_id;
+
+
+      IF v_testValue &gt; 0 THEN   
+        SELECT Name INTO v_text1 FROM Inv_Investments WHERE odf_object_code = 'project' AND Id = p_id;
+
+      END IF;
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'asset' THEN
+      SELECT COUNT(*) INTO v_testValue FROM Inv_Investments WHERE odf_object_code = 'asset' AND Id = p_id;
+
+
+      IF v_testValue &gt; 0 THEN
+     SELECT Name INTO v_text1 FROM Inv_Investments WHERE odf_object_code = 'asset' AND Id = p_id;
+
+      END IF;
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'service' THEN
+      SELECT COUNT(*) INTO v_testValue FROM Inv_Investments WHERE odf_object_code = 'service' AND Id = p_id;
+
+      IF v_testValue &gt; 0 THEN   
+
+     SELECT Name INTO v_text1 FROM Inv_Investments WHERE odf_object_code = 'service' AND Id = p_id;
+
+      END IF;   
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'incident' THEN
+      SELECT COUNT(*) INTO v_testValue FROM imm_Incidents WHERE Id = p_id;
+      IF v_testValue &gt; 0 THEN
+         SELECT Subject INTO v_text1 FROM imm_Incidents WHERE Id = p_id;
+      END IF;
+      v_tried:=1;   
+
+   END IF;
+    
+   IF p_object = 'issue' THEN
+      SELECT COUNT(*) INTO v_testValue FROM RIM_Risks_And_Issues WHERE id = p_id;
+
+      IF v_testValue &gt; 0 THEN
+     SELECT name INTO v_text1 FROM RIM_Risks_And_Issues WHERE id = p_id;
+      END IF;
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'risk' THEN
+
+      SELECT COUNT(*) INTO v_testValue FROM RIM_Risks_And_Issues WHERE id = p_id;
+      IF v_testValue &gt; 0 THEN
+     SELECT name INTO v_text1 FROM RIM_Risks_And_Issues WHERE id = p_id;
+      END IF;   
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'scenario' THEN
+      SELECT COUNT(*) INTO v_testValue FROM cap_scenarios WHERE Id = p_id;
+      IF v_testValue &gt; 0 THEN   
+     SELECT Name INTO v_text1 FROM cap_scenarios WHERE Id = p_id;
+
+      END IF;   
+      v_tried:=1;   
+   END IF;
+    
+   IF p_object = 'timesheet' THEN
+      SELECT COUNT(*) INTO v_testValue FROM PrTimeSheet T WHERE t.Prid = p_id;
+      IF v_testValue &gt; 0 THEN   
+     SELECT First_name || ' ' || Last_name INTO v_text1 FROM PrTimeSheet T INNER JOIN Srm_Resources R ON R.Id = T.PRRESOURCEID WHERE t.Prid = p_id;
+
+      END IF;   
+      v_tried:=1;   
+   END IF;
+
+                
+
+   IF v_tried=0 THEN
+      --v_text2:= 'SELECT NAME FROM odf_ca_' || p_object || ' WHERE Id= ' || p_id ;
+
+      --dbms_output.put_line ('text2:=' ||v_text2); 
+
+      EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM odf_ca_' || p_object || ' WHERE Id= ' || p_id INTO v_testValue;
+
+
+      --dbms_output.put_line ('COUNT ...  text1:=' ||v_testValue);
+
+    
+      IF v_testValue &gt; 1 THEN
+    EXECUTE IMMEDIATE 'SELECT NAME FROM odf_ca_' || p_object || ' WHERE Id=' || p_id INTO v_text1;
+
+        v_tried:=1;
+      END IF;
+            
+   END IF;
+
+   IF (v_tried = 1 AND LENGTH(TRIM(v_text1)) &lt;2) OR v_tried = 0 OR LENGTH(TRIM(v_text1)) &lt; 2 OR v_text1 IS NULL THEN
+
+
+      v_text1 := INITCAP(p_object);
+      --dbms_output.put_line ('Nope ...  text1:=' ||v_text1);
+   END IF;          
+
+
+   v_return := v_text1;
+
+   END IF;
+
+IF v_return IS NULL OR v_return = '' THEN
+   v_text1 := INITCAP(p_object);
+END IF;
+
+
+--dbms_output.put_line ('v_return:=' ||v_return);   
+            
+RETURN v_return;
+
+
+   EXCEPTION
+     WHEN NO_DATA_FOUND THEN
+     dbms_output.put_line ('No Data....');
+     v_return:= 'na';   
+
+     WHEN OTHERS THEN
+     dbms_output.put_line ('No Data 2....');
+     v_return:= 'N/A';
+
+     RETURN v_return;   
+     RETURN v_return;
+
+       -- Consider logging the error and then re-raise
+       RAISE;
+
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_GET_PLAIN_TEXT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_GET_PLAIN_TEXT_FCT" ( P_RICH_TEXT CLOB )
+RETURN CLOB
+IS
+ plain_text clob;
+BEGIN
+	SELECT json_value(P_RICH_TEXT,'$.plainText') INTO plain_text FROM dual;
+	IF P_RICH_TEXT IS NOT NULL AND plain_text IS NULL AND INSTR(P_RICH_TEXT, '&lt;plain-text&gt;') &gt; 0 THEN
+        SELECT SUBSTR(P_RICH_TEXT,INSTR(P_RICH_TEXT, '&lt;plain-text&gt;')+LENGTH('&lt;plain-text&gt;'), INSTR(P_RICH_TEXT, '&lt;/plain-text&gt;')-(INSTR(P_RICH_TEXT, '&lt;plain-text&gt;')+LENGTH('&lt;plain-text&gt;'))) INTO plain_text FROM dual;
+	END IF;
+	RETURN COALESCE(plain_text,P_RICH_TEXT);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

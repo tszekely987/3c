@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PRT_FACTS_REORDER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PRT_FACTS_REORDER" AS
+v_third_column_team_id VARCHAR2(255);
+v_n1_index_ts_name VARCHAR2(255);
+v_n2_index_ts_name VARCHAR2(255);
+v_n3_index_ts_name VARCHAR2(255);
+v_n4_index_ts_name VARCHAR2(255);
+v_u2_index_ts_name VARCHAR2(255);
+v_indexes_exists	number;
+v_default_ts_name VARCHAR2(255);
+BEGIN
+    /* This procedure is required to order the columns correctly in NBI_PRT_FACT table.
+     During Datamart Refactoring work, I noticed that the TEAM_ID column is towards the end of the table in certain schemas ( old customers from 7.0 days)
+     and as the third column in recent versions. Datamart is using BULK collect with INSERT and the order of columns in the table should be preserved.
+	 This procedure gets called as post-upgrade script ONLY if the column ordering is different.
+     
+    */
+	-- Check to make sure the TEAM_ID column ordering is different.
+    SELECT NVL(COLUMN_NAME,'NA') COLUMN_NAME INTO v_third_column_team_id 
+    FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'NBI_PRT_FACTS' AND COLUMN_ID = 3;
+    
+    SELECT DEFAULT_TABLESPACE INTO v_default_ts_name from user_users;
+
+	IF v_third_column_team_id &lt;&gt; 'TEAM_ID' THEN
+    BEGIN
+-- Do this check to avoid no_data_found error is indexes don't exist.
+    SELECT COUNT(1) INTO v_indexes_exists FROM user_indexes   WHERE  table_name = 'NBI_PRT_FACTS' AND index_name IN ('NBI_PRT_FACTS_N1','NBI_PRT_FACTS_N2','NBI_PRT_FACTS_N3','NBI_PRT_FACTS_N4','NBI_PRT_FACTS_U2');
+    IF v_indexes_exists = 5 THEN
+	SELECT NVL(tablespace_name,'')  into v_n1_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N1';
+	SELECT NVL(tablespace_name,'')  into v_n2_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N2';
+	SELECT NVL(tablespace_name,'')  into v_n3_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N3';
+	SELECT NVL(tablespace_name,'')  into v_n4_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N4';
+	SELECT NVL(tablespace_name,'')  into v_u2_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_U2';
+    ELSE
+    v_n1_index_ts_name :=v_default_ts_name;
+    v_n2_index_ts_name :=v_default_ts_name;
+    v_n3_index_ts_name :=v_default_ts_name;
+    v_n4_index_ts_name :=v_default_ts_name;
+    v_u2_index_ts_name :=v_default_ts_name;
+    END IF;
+
+	--Drop the indices
+    CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N1');
+    CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N2');
+    CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N3');
+    CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N4');
+    CMN_DROP_INDEX_SP('NBI_PRT_FACTS_U2');
+    -- Rename, Reorder the table columns using temp table
+    --Begin table organization
+    DBMS_MVIEW.BEGIN_TABLE_REORGANIZATION(USER,'NBI_PRT_FACTS');
+
+    EXECUTE IMMEDIATE 'RENAME NBI_PRT_FACTS   TO NBI_PRT_FACTS_TEMP';
+    EXECUTE IMMEDIATE 'CREATE TABLE NBI_PRT_FACTS AS 
+	   SELECT PROJECT_ID,RESOURCE_ID,TEAM_ID,TASK_ID,PRJ_OBJECT_ID,FACT_DATE,ALLOCATED_QTY,ETC_QTY,ACTUAL_QTY,BASE_QTY
+	   FROM NBI_PRT_FACTS_TEMP';
+    --End table organization after renaming new table to original table name
+    DBMS_MVIEW.BEGIN_TABLE_REORGANIZATION(USER,'NBI_PRT_FACTS');
+    --COMMIT;
+    --Recreate the indices
+	CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N1','','PROJECT_ID, FACT_DATE',v_n1_index_ts_name);
+	CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N2','','RESOURCE_ID, FACT_DATE',v_n2_index_ts_name);
+	CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N3','','PRJ_OBJECT_ID, FACT_DATE',v_n3_index_ts_name);
+	CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N4','','PROJECT_ID, RESOURCE_ID, FACT_DATE, TASK_ID',v_n4_index_ts_name);
+	CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_U2','UNIQUE','PROJECT_ID, TEAM_ID, FACT_DATE, TASK_ID',v_u2_index_ts_name);
+    -- Drop the temp table
+    CMN_DROP_TABLE_SP('NBI_PRT_FACTS_TEMP');
+    END;
+	END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,766 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="TASK_AVAILABLE_RESOURCES_API" displayAttributeName="name" hiddenAttributeName="prid" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List resources available for assignment to a task" languageCode="en" name="Available Resources for a Task - API only"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[
+                  SELECT @SELECT:q.prid:prid@, @SELECT:q.unique_name:userid@, @SELECT:q.name:name@, @SELECT:q.availstart:start_date@, @SELECT:q.availfinish:finish_date@
+                , @SELECT:q.email:email@, @SELECT:q.resource_type:resource_type@, @SELECT:q.resource_type_caption:resource_type_caption@
+                , @SELECT:q.person_type:person_type@, @SELECT:q.person_type_caption:person_type_caption@
+                , @SELECT:q.role_id:role_id@, @SELECT:q.role_id_caption:role_id_caption@, @SELECT:q.role_caption:role_caption@
+                , @SELECT:q.team_member:team_member@, @SELECT:q.team_member_caption:team_member_caption@
+                , @SELECT:q.isrole:is_role@, @SELECT:q.is_role_caption:is_role_caption@, @SELECT:q.language_id:language_id@
+                , @SELECT:q.language_code:language_code@, @SELECT:q.last_updated_date:last_updated_date@
+                , @SELECT:q.resource_id:resource_id@
+ FROM (
+   select CONCAT('T', team.prid) prid
+        ,1 team_member
+        ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 1 ) team_member_caption
+        ,@NVL@(team.requirement_name, sres.full_name) name
+        ,@NVL@(TEAM.PRAVAILSTART, INV.SCHEDULE_START) availstart
+        ,@NVL@(TEAM.PRAVAILFINISH, INV.SCHEDULE_FINISH) availfinish
+        ,team.prroleid role_id
+        ,(select full_name from srm_resources where team.prroleid is not null and id = team.prroleid) role_caption
+        ,(select unique_name from srm_resources where pres.prprimaryroleid is not null and id = team.prroleid) role_id_caption
+        ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type) resource_type_caption
+        ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,team.last_updated_date
+        ,sres.id resource_id
+    from prteam team, inv_investments inv, srm_resources sres, prj_resources pres, cmn_languages lang
+   where inv.id = @WHERE:PARAM:USER_DEF:integer:projectid@
+     and team.prprojectid = inv.id
+     and sres.id = team.prresourceid
+     @BROWSE-ONLY: and sres.is_active = 1 :BROWSE-ONLY@
+     and pres.prid = sres.id
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@
+
+@BROWSE-ONLY:
+    UNION
+
+  select CONCAT('R', sres.id) prid
+         ,0 team_member
+         ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 0 ) team_member_caption
+         ,sres.full_name name
+         ,null availStart
+         ,null availFinish
+         ,pres.prprimaryroleid role_id
+         ,(select case when pres.prisrole = 0 then r.FULL_NAME else p.FULL_NAME end FULL_NAME
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_caption
+	     ,(select case when pres.prisrole = 0 then r.unique_name else p.unique_name end unique_name
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_id_caption
+         ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type) resource_type_caption
+         ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,sres.last_updated_date
+        ,sres.id resource_id
+    from srm_resources sres, prj_resources pres, cmn_languages lang
+      ,(select id
+         from srm_resources
+        where exists (select 1
+        								from CMN_SEC_CHK_NO_USER_GLB_R_V0
+        							 where user_id = @WHERE:PARAM:USER_ID@
+        								 and object_id = 664 and permission_code IN ( 'ResourceHardBook', 'ResourceSoftBook' ))
+        UNION
+        select object_instance_id
+          from CMN_SEC_CHK_USER_V0
+         where user_id = @WHERE:PARAM:USER_ID@ and object_id = 664 and permission_code IN ('ResourceHardBook', 'ResourceSoftBook' )
+        ) rights
+   where exists (select 1 from inv_investments where id = @WHERE:PARAM:USER_DEF:integer:projectid@ and assgn_pool=1)
+     and sres.id = pres.prid
+     and not exists (select 'x' from prteam where prprojectid = @WHERE:PARAM:USER_DEF:integer:projectid@ and prresourceid = sres.id)
+     and sres.is_active = 1
+     and sres.id = rights.id
+     and sres.is_hidden = 0
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@  :BROWSE-ONLY@
+ ) Q
+WHERE 1=1
+  @BROWSE-ONLY: AND exists ( select 1
+  							from CMN_SEC_CHK_NO_USER_GLB_R_V0 where user_id = @WHERE:PARAM:USER_ID@
+  								and object_id = 663 and permission_code in ('ProjectTaskManagement', 'ProjectEditManagement')
+                 union
+                select 1
+                  from CMN_SEC_CHK_USER_V0
+                 where user_id = @WHERE:PARAM:USER_ID@
+                   and object_id = 663
+                   and permission_code in ('ProjectTaskManagement','ProjectEditManagement')
+                   and object_instance_id = @WHERE:PARAM:USER_DEF:integer:projectid@) :BROWSE-ONLY@
+  AND @FILTER@
+                ]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT @SELECT:q.prid:prid@, @SELECT:q.unique_name:userid@, @SELECT:q.name:name@, @SELECT:q.availstart:start_date@, @SELECT:q.availfinish:finish_date@
+                , @SELECT:q.email:email@, @SELECT:q.resource_type:resource_type@, @SELECT:q.resource_type_caption:resource_type_caption@
+                , @SELECT:q.person_type:person_type@, @SELECT:q.person_type_caption:person_type_caption@
+                , @SELECT:q.role_id:role_id@, @SELECT:q.role_id_caption:role_id_caption@, @SELECT:q.role_caption:role_caption@
+                , @SELECT:q.team_member:team_member@, @SELECT:q.team_member_caption:team_member_caption@
+                , @SELECT:q.isrole:is_role@, @SELECT:q.is_role_caption:is_role_caption@, @SELECT:q.language_id:language_id@
+                , @SELECT:q.language_code:language_code@, @SELECT:q.last_updated_date:last_updated_date@
+                , @SELECT:q.resource_id:resource_id@
+ FROM (
+   select concat('T', team.prid) prid
+        ,1 team_member
+        ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 1 ) team_member_caption
+        ,@NVL@(team.requirement_name, sres.full_name) name
+        ,@NVL@(TEAM.PRAVAILSTART, INV.SCHEDULE_START) availstart
+        ,@NVL@(TEAM.PRAVAILFINISH, INV.SCHEDULE_FINISH) availfinish
+        ,team.prroleid role_id
+        ,(select full_name from srm_resources where team.prroleid is not null and id = team.prroleid) role_caption
+        ,(select unique_name from srm_resources where pres.prprimaryroleid is not null and id = team.prroleid) role_id_caption
+        ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type) resource_type_caption
+        ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,team.last_updated_date
+        ,sres.id resource_id
+    from prteam team, inv_investments inv, srm_resources sres, prj_resources pres, cmn_languages lang
+   where inv.id = @WHERE:PARAM:USER_DEF:integer:projectid@
+     and team.prprojectid = inv.id
+     and sres.id = team.prresourceid
+     @BROWSE-ONLY: and sres.is_active = 1 :BROWSE-ONLY@
+     and pres.prid = sres.id
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@
+
+@BROWSE-ONLY:
+    UNION
+
+  select concat('R', sres.id) prid
+         ,0 team_member
+         ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 0 ) team_member_caption
+         ,sres.full_name name
+         ,null availStart
+         ,null availFinish
+         ,pres.prprimaryroleid role_id
+         ,(select case when pres.prisrole = 0 then r.FULL_NAME else p.FULL_NAME end FULL_NAME
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_caption
+	     ,(select case when pres.prisrole = 0 then r.unique_name else p.unique_name end unique_name
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_id_caption
+         ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type) resource_type_caption
+         ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,sres.last_updated_date
+        ,sres.id resource_id
+    from srm_resources sres, prj_resources pres, cmn_languages lang
+      ,(select id
+         from srm_resources
+        where exists (select 1
+        								from CMN_SEC_CHK_NO_USER_GLB_R_V0
+        							 where user_id = @WHERE:PARAM:USER_ID@
+        								 and object_id = 664 and permission_code IN ( 'ResourceHardBook', 'ResourceSoftBook' ))
+        UNION
+        select object_instance_id
+          from CMN_SEC_CHK_USER_V0
+         where user_id = @WHERE:PARAM:USER_ID@ and object_id = 664 and permission_code IN ('ResourceHardBook', 'ResourceSoftBook' )
+        ) rights
+   where exists (select 1 from inv_investments where id = @WHERE:PARAM:USER_DEF:integer:projectid@ and assgn_pool=1)
+     and sres.id = pres.prid
+     and not exists (select 'x' from prteam where prprojectid = @WHERE:PARAM:USER_DEF:integer:projectid@ and prresourceid = sres.id)
+     and sres.is_active = 1
+     and sres.id = rights.id
+     and sres.is_hidden = 0
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@ :BROWSE-ONLY@
+ ) Q
+WHERE 1=1
+  @BROWSE-ONLY: AND exists ( select 1
+  							from CMN_SEC_CHK_NO_USER_GLB_R_V0 where user_id = @WHERE:PARAM:USER_ID@
+  								and object_id = 663 and permission_code in ('ProjectTaskManagement', 'ProjectEditManagement')
+                 union
+                select 1
+                  from CMN_SEC_CHK_USER_V0
+                 where user_id = @WHERE:PARAM:USER_ID@    and object_id = 663
+                   and permission_code in ('ProjectTaskManagement', 'ProjectEditManagement')
+                   and object_instance_id = @WHERE:PARAM:USER_DEF:integer:projectid@) :BROWSE-ONLY@
+  AND @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[
+                  SELECT @SELECT:q.prid:prid@, @SELECT:q.unique_name:userid@, @SELECT:q.name:name@, @SELECT:q.availstart:start_date@, @SELECT:q.availfinish:finish_date@
+ , @SELECT:q.email:email@, @SELECT:q.resource_type:resource_type@, @SELECT:q.resource_type_caption:resource_type_caption@
+                , @SELECT:q.person_type:person_type@, @SELECT:q.person_type_caption:person_type_caption@
+                , @SELECT:q.role_id:role_id@, @SELECT:q.role_id_caption:role_id_caption@, @SELECT:q.role_caption:role_caption@
+                , @SELECT:q.team_member:team_member@, @SELECT:q.team_member_caption:team_member_caption@
+                , @SELECT:q.isrole:is_role@, @SELECT:q.is_role_caption:is_role_caption@, @SELECT:q.language_id:language_id@
+                , @SELECT:q.language_code:language_code@, @SELECT:q.last_updated_date:last_updated_date@
+                , @SELECT:q.resource_id:resource_id@
+ FROM (
+   select CONCAT('T', team.prid) prid
+        ,1 team_member
+        ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 1 ) team_member_caption
+        ,@NVL@(team.requirement_name, sres.full_name) as name
+        ,@NVL@(TEAM.PRAVAILSTART, INV.SCHEDULE_START) availstart
+        ,@NVL@(TEAM.PRAVAILFINISH, INV.SCHEDULE_FINISH) availfinish
+        ,team.prroleid role_id
+        ,(select full_name from srm_resources where team.prroleid = id) role_caption
+        ,(select unique_name from srm_resources where team.prroleid = id) role_id_caption
+        ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type::text) resource_type_caption
+        ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,team.last_updated_date
+        ,sres.id resource_id
+    from prteam team, inv_investments inv, srm_resources sres, prj_resources pres, cmn_languages lang
+   where inv.id = @WHERE:PARAM:USER_DEF:integer:projectid@
+     and team.prprojectid = inv.id
+     and sres.id = team.prresourceid
+     @BROWSE-ONLY: and sres.is_active = 1 :BROWSE-ONLY@
+     and pres.prid = sres.id
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@
+
+@BROWSE-ONLY:
+    UNION
+
+  select CONCAT('R',sres.id) prid
+         ,0 team_member
+         ,sres.unique_name unique_name
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = 0 ) team_member_caption
+         ,sres.full_name as name
+         ,null availStart
+         ,null availFinish
+         ,pres.prprimaryroleid role_id
+         ,(select case when pres.prisrole = 0 then r.FULL_NAME else p.FULL_NAME end FULL_NAME
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_caption
+	     ,(select case when pres.prisrole = 0 then r.unique_name else p.unique_name end unique_name
+             from srm_resources r, srm_resources p
+	         where pres.prprimaryroleid = r.id
+	         and p.id = pres.prid) role_id_caption
+         ,sres.email email
+        ,pres.prisrole isrole
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'PSP_YESNO' and lookup_enum = pres.prisrole ) is_role_caption
+        ,sres.resource_type resource_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'RESOURCE_TYPE' and lookup_code = sres.resource_type::text) resource_type_caption
+         ,sres.person_type person_type
+        ,(select name from CMN_LOOKUPS_V where language_code = lang.language_code and lookup_type = 'SRM_RESOURCE_TYPE' and id = sres.person_type) person_type_caption
+        ,lang.id language_id
+        ,lang.language_code language_code
+        ,sres.last_updated_date
+        ,sres.id resource_id
+    from srm_resources sres, prj_resources pres, cmn_languages lang
+,(select id
+ from srm_resources
+  where exists (select 1
+ from CMN_SEC_CHK_NO_USER_GLB_R_V0
+ where user_id = @WHERE:PARAM:USER_ID@
+ and object_id = 664 and permission_code IN ( 'ResourceHardBook', 'ResourceSoftBook' ))
+ UNION
+ select object_instance_id
+ from CMN_SEC_CHK_USER_V0
+ where user_id = @WHERE:PARAM:USER_ID@ and object_id = 664 and permission_code IN ('ResourceHardBook', 'ResourceSoftBook' )
+        ) rights
+   where exists (select 1 from inv_investments where id = @WHERE:PARAM:USER_DEF:integer:projectid@ and assgn_pool=1)
+     and sres.id = pres.prid
+     and not exists (select 'x' from prteam where prprojectid = @WHERE:PARAM:USER_DEF:integer:projectid@ and prresourceid = sres.id)
+     and sres.is_active = 1
+     and sres.id = rights.id
+     and sres.is_hidden = 0
+     and lang.language_code = @WHERE:PARAM:LANGUAGE@ :BROWSE-ONLY@
+ ) Q
+WHERE 1=1
+  @BROWSE-ONLY: AND exists ( select 1
+  							from CMN_SEC_CHK_NO_USER_GLB_R_V0 where user_id = @WHERE:PARAM:USER_ID@
+  								and object_id = 663 and permission_code in ('ProjectTaskManagement', 'ProjectEditManagement')
+                 union
+                select 1
+                  from CMN_SEC_CHK_USER_V0
+                 where user_id = @WHERE:PARAM:USER_ID@
+                   and object_id = 663
+                   and permission_code in ('ProjectTaskManagement','ProjectEditManagement')
+                   and object_instance_id = @WHERE:PARAM:USER_DEF:integer:projectid@) :BROWSE-ONLY@
+  AND @FILTER@
+                ]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+              <displayedSuggestionAttribute value="userid"/>
+              <displayedSuggestionAttribute value="role_caption"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+              <searchedSuggestionAttribute value="userid"/>
+              <searchedSuggestionAttribute value="role_caption"/>
+              <searchedSuggestionAttribute value="role_id_caption"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Task Available Resources" languageCode="en" name="Task Available Resources"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Task Available Resources" languageCode="en" name="Task Available Resources"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="userid" defaultValue="" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Id" languageCode="en" name="Id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="start_date" defaultValue="" order="2" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Start" languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="finish_date" defaultValue="" order="3" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Finish" languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="resource_type" defaultValue="" lookupCode="RESOURCE_TYPE" order="6" widgetType="select">
+                
+                
+                
+                
+                <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="person_type" defaultValue="" lookupCode="SRM_RESOURCE_TYPE" order="7" widgetType="select">
+                
+                
+                
+                
+                <nls description="Employment" languageCode="en" name="Employment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="role_id" defaultValue="" lookupCode="SCH_BROWSE_ROLE" order="5" widgetType="select">
+                
+                
+                
+                
+                <nls description="Role ID" languageCode="en" name="Role ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="team_member" defaultValue="" lookupCode="PSP_YESNO" order="8" widgetType="select">
+                
+                
+                
+                
+                <nls description="Team Member" languageCode="en" name="Team Member"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="is_role" defaultValue="" lookupCode="PSP_YESNO" order="9" widgetType="select">
+                
+                
+                
+                
+                <nls description="Is Role" languageCode="en" name="Is Role"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="prid" languageCode="en" name="prid"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="start_date" order="4" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Start" languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="finish_date" order="5" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Finish" languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="email" order="6" widgetType="text">
+                
+                
+                
+                
+                <nls description="Email" languageCode="en" name="Email"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="role_caption" order="7" widgetType="text">
+                
+                
+                
+                
+                <nls description="Role" languageCode="en" name="Role"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="team_member_caption" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Team Member" languageCode="en" name="Team Member"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="rallyPPMFullSyncChkz" createdBy="admin" endStep="Finish" source="customer" startEvent="update" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls description="Run the OOB Rally Sync job (Project/Task) initiated by a checkbox on the Project in Modern UX. Can add an additional script step to push/pull custom fields to/from Rally." languageCode="en" name="Rally Project Full Sync Chk"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <StartCondition><![CDATA[( (project.run_sync__oldValue != project.run_sync) && ( project.run_sync == 1 ) )]]></StartCondition>
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisProject" objectType="project" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="runSyncJob"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="runSyncJob" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="Run the Agile Sync job" languageCode="en" name="Run Sync Job"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="syncRally" jobDefinitionCode="rallySync" synchronized="true" type="BPM_SAT_JOB">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Sync Rally"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="select_proj_datewindow" value="1"/>
+                      <Param name="select_proj_status" value="active"/>
+                      <Param name="select_proj_work_status" value="0"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="unchkRunSync"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="unchkRunSync" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls languageCode="en" name="Uncheck Run Sync"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="unchkRunSync" objectMethod="run_sync" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Uncheck Run Sync"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="0"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        <jobDefinitions update="true"/>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="3" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

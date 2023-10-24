@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>DPT_IS_CONSUMER_DEPT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."DPT_IS_CONSUMER_DEPT_FCT" ( departmentId number)  RETURN NUMBER IS
+      isConsumer NUMBER;
+      /******************************************************************************
+         NAME:       DPT_IS_CONSUMER_DEPT_FCT
+         PURPOSE: return 1 if a department is a consumer, 0 otherwise
+         			Checks if a row exists in the subscription table for the department provided    
+      ******************************************************************************/
+      BEGIN
+         isConsumer := 0;
+          SELECT decode(a.is_consumer, 0, 0, 1) INTO isConsumer 
+      	FROM (SELECT count(department_id) is_consumer 
+      		 		 FROM dpt_subscriptions WHERE table_name = 'INV_SERVICES' 
+      				 AND department_id = departmentId) a;
+         
+         RETURN isConsumer;
+         EXCEPTION
+           WHEN NO_DATA_FOUND THEN
+             NULL;
+           WHEN OTHERS THEN
+             -- Consider logging the error and then re-raise
+             RAISE;
+         RETURN isConsumer;   
+      END DPT_IS_CONSUMER_DEPT_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

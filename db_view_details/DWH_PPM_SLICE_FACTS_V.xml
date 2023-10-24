@@ -1,0 +1,64 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_PPM_SLICE_FACTS_V">
+    <indexes/>
+    <text_length>3658</text_length>
+    <text>SELECT S.SLICE_REQUEST_KEY,
+       S.OBJECT_KEY,
+       S.SLICE_DATE,
+       S.SLICE,
+       S.FACT_TYPE,
+       S.IS_BASELINE,
+       S.CREATED_DATE
+FROM  (WITH SLICE_REQUESTS AS
+            (SELECT id slice_request_key,
+                    CASE WHEN request_name IN ('MONTHLYRESOURCEACTCURVE',
+                                               'WEEKLYRESOURCEACTCURVE',
+                                               'MONTHLYRESOURCEESTCURVE',
+                                               'WEEKLYRESOURCEESTCURVE',
+                                               'WEEKLYRESOURCEBASECURVE',
+                                               'MONTHLYRESOURCEBASECURVE',
+                                               'MONTHLYBASEASSIGNCOSTS',
+                                               'WEEKLYBASEASSIGNCOSTS',
+                                               'assignment::actcost_curve::dwh_month',
+                                               'assignment::actcost_curve::dwh_week',
+                                               'assignment::etccost_curve::dwh_month',
+                                               'assignment::etccost_curve::dwh_week') THEN 1
+                         WHEN request_name IN ('MONTHLYRESOURCEAVAILCURVE',
+                                               'WEEKLYRESOURCEAVAILCURVE') THEN 2
+                         WHEN request_name IN ('MONTHLYRESOURCEALLOCCURVE',
+                                               'WEEKLYRESOURCEALLOCCURVE',
+                                               'baseline::current_team_usage::dwh_month',
+                                               'baseline::current_team_usage::dwh_week',
+                                               'baseline::current_team_cost::dwh_month',
+                                               'baseline::current_team_cost::dwh_week',
+                                               'WEEKLYRESOURCEHARDALLOC',
+                                               'MONTHLYRESOURCEHARDALLOC',
+                                               'team::alloccost_curve::dwh_month',
+                                               'team::alloccost_curve::dwh_week',
+                                               'team::hardallccost_curve::dwh_month',
+                                               'team::hardallccost_curve::dwh_week') THEN 3
+                         WHEN request_name IN ('DAILYRESOURCETIMECURVE') THEN 4
+                         ELSE 0 END fact_type,
+                    CASE WHEN request_name IN ('WEEKLYRESOURCEBASECURVE',
+                                               'MONTHLYRESOURCEBASECURVE',
+                                               'MONTHLYBASEASSIGNCOSTS',
+                                               'WEEKLYBASEASSIGNCOSTS',
+                                               'baseline::current_team_usage::dwh_month',
+                                               'baseline::current_team_usage::dwh_week',
+                                               'baseline::current_team_cost::dwh_month',
+                                               'baseline::current_team_cost::dwh_week') THEN 1
+                         ELSE 0 END is_baseline
+             FROM   prj_blb_slicerequests
+             WHERE  is_dwh_request = 1)
+             SELECT SR.SLICE_REQUEST_KEY,
+                    S.PRJ_OBJECT_ID OBJECT_KEY,
+                    S.SLICE_DATE,
+                    S.SLICE,
+                    SR.FACT_TYPE,
+                    SR.IS_BASELINE,
+                    S.CREATED_DATE
+             FROM   SLICE_REQUESTS SR         
+                    INNER JOIN PRJ_BLB_SLICES S ON SR.SLICE_REQUEST_KEY = S.SLICE_REQUEST_ID
+			 WHERE  S.SLICE &lt;&gt; 0) S</text>
+  </QueryResult>
+</ClarityDBViewQuery>

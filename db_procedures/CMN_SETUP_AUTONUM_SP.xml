@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SETUP_AUTONUM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SETUP_AUTONUM_SP" (
+   P_OBJECT_CODE    IN VARCHAR2,
+   P_ATTRIBUTE_CODE IN VARCHAR2,
+   P_CREATED_BY     IN NUMBER
+)
+IS
+  l_is_autonumbered NUMERIC := -1;
+
+BEGIN
+
+  BEGIN
+    SELECT is_autonumbered
+      INTO l_is_autonumbered
+      FROM ODF_ATTRIBUTE_AUTONUMBERING
+     WHERE object_code = p_object_code
+       AND attribute_code = p_attribute_code;
+  EXCEPTION
+    WHEN NO_DATA_FOUND
+    THEN NULL;
+  END;
+
+  IF l_is_autonumbered = -1
+  THEN
+    INSERT INTO ODF_ATTRIBUTE_AUTONUMBERING (
+      Object_Code, Attribute_Code, Is_Autonumbered,
+      Created_Date, Created_By, Last_Updated_Date, Last_Updated_By )
+    VALUES (
+      p_object_code, p_attribute_code, 1,
+      SYSDATE, p_created_by, SYSDATE, p_created_by );
+
+    CMN_AUTONUM_OBJECTS_INS_SP (
+      p_object_code =&gt; p_object_code
+    , p_attribute_code =&gt; p_attribute_code
+    , p_object_name =&gt; 'System Default'
+    , p_object_desc =&gt; 'System Default'
+    , p_is_active =&gt; 1
+    , p_created_by =&gt; p_created_by );
+
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

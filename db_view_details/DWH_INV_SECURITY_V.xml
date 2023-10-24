@@ -1,0 +1,29 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_SECURITY_V">
+    <indexes/>
+    <text_length>642</text_length>
+    <text>SELECT 	0 INVESTMENT_KEY,
+		u.id USER_KEY,
+		u.USER_NAME,
+		u.USER_UID,
+		s.INVESTMENT_TYPE_KEY,
+		s.PERMISSION_KEY,
+		1 GLOBAL_VIEW_RIGHT
+FROM   	CMN_SEC_USERS u
+JOIN 	DWH_INV_SEC_GBL_PERMS_V s ON u.id = s.user_key
+WHERE  u.user_status_id = 200
+UNION 
+SELECT 	 s.INVESTMENT_KEY,
+		u.id USER_KEY,
+		u.USER_NAME,
+		u.USER_UID,
+		s.INVESTMENT_TYPE_KEY,
+		s.PERMISSION_KEY,
+		0 GLOBAL_VIEW_RIGHT
+FROM   	CMN_SEC_USERS u
+JOIN   	DWH_INV_SEC_INST_PERMS_V s ON (u.id = s.user_key
+		and not exists ( select 1 from DWH_INV_SEC_GBL_PERMS_V a where a.user_key=s.user_key and a.INVESTMENT_TYPE_KEY=s.INVESTMENT_TYPE_KEY)
+)
+WHERE   u.user_status_id = 200</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,52 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_BASELINE_V2">
+    <indexes/>
+    <text_length>4121</text_length>
+    <text>select   'x' pmd_analytical_partition_by, prj_baselines.id odf_pk, BASEREC.FINISH_DATE as baseline_finish, PRJ_BASELINES.CODE as code, (CASE WHEN CURRENT_REVISION=1
+        THEN NVL(EVREC.ITD_BCWP,0) - NVL(EVREC.ITD_ACWP,0)
+        ELSE NULL END) as ev_cv, project_id.odf_period_end as odf_period_end, project_id.odf_period_type as odf_period_type, PRJ_BASELINES.description as description, (CASE WHEN CURRENT_REVISION=1 AND NVL(EVREC.ITD_ACWP,0) > 0
+        THEN NVL(EVREC.ITD_BCWP,0) / EVREC.ITD_ACWP
+        ELSE NULL END) as ev_cpi, PROJECT_NAME as project_name, PRJ_BASELINES.CURRENCY_CODE as currency_code, (CASE WHEN CURRENT_REVISION=1
+        THEN EVREC.ITD_ACWP
+        ELSE NULL END) as ev_acwp, project_id.odf_period_start as odf_period_start, PRJ_BASELINES.project_id as project_id, (CASE WHEN CURRENT_REVISION=1 AND NVL(EVREC.ITD_BCWS,0) > 0
+        THEN NVL(EVREC.ITD_BCWP,0) / EVREC.ITD_BCWS
+        ELSE NULL END) as ev_spi, PRJ_BASELINES.last_updated_date as last_updated_date, (BASEREC.USAGE_SUM / 3600) / PRJ_HPD_FACTOR_FCT() as baseline_usage, BASEREC.COST_SUM as baseline_cost, prj_baselines.OBJECT_TYPE as object_type, PRJ_BASELINES.current_revision as current_revision, PROJECT_UNIQUE_NAME as project_unique_name, (CASE WHEN CURRENT_REVISION=1
+        THEN EVREC.LAST_UPDATED_DATE
+        ELSE NULL END) as ev_last_calc, created.full_name as created_by, (CASE WHEN CURRENT_REVISION=1
+        THEN EVREC.ITD_BCWS
+        ELSE NULL END) as ev_bcws, BASEREC.COST_SUM as ev_bac, (CASE WHEN CURRENT_REVISION=1
+        THEN EVREC.ITD_BCWP
+        ELSE NULL END) as ev_bcwp, (CASE WHEN CURRENT_REVISION=1
+        THEN NVL(EVREC.ITD_BCWP,0) - NVL(EVREC.ITD_BCWS,0)
+        ELSE NULL END) as ev_sv, BASEREC.START_DATE as baseline_start, updated.full_name as updated_by, PRJ_BASELINES.name as name, PRJ_BASELINES.created_date as created_date, odf_ca_baseline.partition_code as partition_code, (CASE WHEN CURRENT_REVISION=1
+            AND NVL(EVREC.ITD_ACWP,0) > 0
+            AND NVL(EVREC.ITD_BCWP,0) > 0
+          THEN EVREC.ITD_ACWP + ( ( (EVREC.BAC - EVREC.ITD_BCWP) * EVREC.ITD_ACWP ) / ( EVREC.ITD_BCWP ))
+        ELSE NULL END) as ev_eac, project_id.entity as odf_entity_code  from odf_ca_baseline odf_ca_baseline, (select   'x' pmd_analytical_partition_by, inv_investments.id odf_pk, odf_ca_inv.odf_period_type as odf_period_type, odf_ca_inv.odf_period_start as odf_period_start, inv_investments.entity_code as entity, odf_ca_inv.odf_period_end as odf_period_end from inv_investments inv_investments JOIN odf_ca_inv odf_ca_inv ON odf_ca_inv.id=inv_investments.id where 1 = 1 )  project_id,  (select prj_baselines.id
+      , INV.NAME as project_name
+      , INV.CURRENCY_CODE as currency_code
+      , prj_baselines.PROJECT_ID as project_id
+      , prj_baselines.CODE as code
+      , INV.CODE as project_unique_name
+      , prj_baselines.NAME as name
+      , prj_baselines.object_type as object_type
+      , CASE WHEN INV.BASELINE_ID = PRJ_BASELINES.ID THEN 1 ELSE 0 END current_revision
+      , prj_baselines.last_updated_date as last_updated_date
+      , prj_baselines.DESCRIPTION as description
+      , prj_baselines.created_date as created_date
+      , prj_baselines.created_by as created_by
+      , prj_baselines.last_updated_by as last_updated_by
+      , odf_ca_inv.odf_object_code as object_code
+      from prj_baselines
+      , inv_investments INV
+      , odf_ca_inv
+      where prj_baselines.PROJECT_ID=inv.id and prj_baselines.object_type=NLS_UPPER(odf_ca_inv.odf_object_code)
+      and inv.id=odf_ca_inv.id) PRJ_BASELINES
+      LEFT OUTER JOIN PRJ_BASELINE_DETAILS BASEREC ON (BASEREC.BASELINE_ID =
+        PRJ_BASELINES.ID AND BASEREC.OBJECT_TYPE = NLS_UPPER(PRJ_BASELINES.OBJECT_CODE))
+      LEFT OUTER JOIN PRJ_EV_HISTORY EVREC ON EVREC.OBJECT_ID=PRJ_BASELINES.PROJECT_ID AND 'PROJECT'=EVREC.OBJECT_TYPE AND 0=EVREC.PERIOD_NUMBER
+      , SRM_RESOURCES CREATED
+      , SRM_RESOURCES UPDATED where PRJ_BASELINES.CREATED_BY = CREATED.USER_ID
+      AND PRJ_BASELINES.LAST_UPDATED_BY = UPDATED.USER_ID and prj_baselines.id = odf_ca_baseline.id and PRJ_BASELINES.project_id = project_id.odf_pk</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,21 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_X_TRANS_I_TOTAL_FACTS_V">
+    <indexes/>
+    <text_length>925</text_length>
+    <text>SELECT w.investment_id investment_key,
+       SUM(CASE WHEN w.transtype = 'L' THEN wv.totalcost ELSE 0 END) actual_labor_cost,
+       SUM(CASE WHEN w.transtype = 'Q' THEN wv.totalcost ELSE 0 END) actual_equip_cost,
+       SUM(CASE WHEN w.transtype = 'X' THEN wv.totalcost ELSE 0 END) actual_expense_cost,
+       SUM(CASE WHEN w.transtype = 'M' THEN wv.totalcost ELSE 0 END) actual_material_cost,
+       SUM(wv.totalcost) actual_total_cost,
+       SUM(CASE WHEN NVL(w.cost_type,'X') = 'CAPITAL' THEN wv.totalcost ELSE 0 END) actual_cap_cost,
+       SUM(CASE WHEN NVL(w.cost_type,'X') = 'OPERATING'  THEN wv.totalcost ELSE 0 END) actual_oper_cost,
+       MAX(w.lastupdatedate) last_updated_date
+FROM   dwh_tmp_record_keys rk
+       INNER JOIN ppa_wip w ON rk.record_key = w.investment_id
+       INNER JOIN ppa_wip_values wv ON w.transno = wv.transno
+WHERE  wv.currency_type = 'HOME'
+AND    w.status = 0
+GROUP BY w.investment_id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

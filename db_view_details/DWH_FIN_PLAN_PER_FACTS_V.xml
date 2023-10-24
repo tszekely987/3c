@@ -1,0 +1,179 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_PLAN_PER_FACTS_V">
+    <indexes/>
+    <text_length>9833</text_length>
+    <text>SELECT p.object_id investment_key,
+          p.id plan_key,
+          s.plan_detail_key,
+          s.period_key,
+          s.plan_units plan_units,
+          s.plan_cost plan_cost,
+          s.billing_plan_cost billing_plan_cost,
+          s.plan_revenue plan_revenue,
+          s.billing_plan_revenue billing_plan_revenue,
+          GREATEST(d.last_updated_date,p.last_updated_date) clarity_updated_date
+     FROM (WITH plans
+                AS (SELECT fpd.id
+                    FROM   fin_plans fp
+                           INNER JOIN fin_cost_plan_details fpd ON (fp.id = fpd.plan_id AND fpd.parent_detail_id is null
+                                                               AND fp.is_plan_of_record = (SELECT CASE WHEN fin_plans_por_only = 1
+                                                                                                       THEN 1 ELSE fp.is_plan_of_record END
+                                                                                           FROM   dwh_settings))),
+                plan_details
+                   AS (SELECT fpd.id plan_detail_key,
+                              p.id period_key,
+                              p.end_date - 1 period_finish,
+                              1 field,
+                              s.slice 
+                              * (CASE
+                                    WHEN s.finish_date - 1 &lt; p.end_date - 1
+                                    THEN
+                                       s.finish_date
+                                    ELSE
+                                       p.end_date
+                                 END
+                                 - CASE
+                                      WHEN s.start_date &lt; p.start_date
+                                      THEN
+                                         p.start_date
+                                      ELSE
+                                         s.start_date
+                                   END)
+                                 slice 
+                         FROM plans fpd
+                              INNER JOIN odf_ssl_cst_dtl_units s ON fpd.id = s.prj_object_id
+                              INNER JOIN biz_com_periods p ON p.entity_id = (SELECT entity_key FROM dwh_settings)
+                                                          AND p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                                          AND s.start_date &lt; p.end_date
+                                                          AND s.finish_date > p.start_date
+                       UNION ALL 
+                       SELECT fpd.id plan_detail_key,
+                              p.id period_key,
+                              p.end_date - 1 period_finish,
+                              3 field,
+                              s.slice 
+                              * (CASE
+                                    WHEN s.finish_date - 1 &lt; p.end_date - 1
+                                    THEN
+                                       s.finish_date
+                                    ELSE
+                                       p.end_date
+                                 END
+                                 - CASE
+                                      WHEN s.start_date &lt; p.start_date
+                                      THEN
+                                         p.start_date
+                                      ELSE
+                                         s.start_date
+                                   END)
+                                 slice 
+                         FROM plans fpd
+                              INNER JOIN odf_ssl_cst_dtl_cost s ON fpd.id = s.prj_object_id
+                              INNER JOIN biz_com_periods p ON p.entity_id = (SELECT entity_key FROM dwh_settings)
+                                                          AND p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                                          AND s.start_date &lt; p.end_date
+                                                          AND s.finish_date > p.start_date
+                       UNION ALL
+                       SELECT fpd.id plan_detail_key,
+                              p.id period_key,
+                              p.end_date - 1 period_finish,
+                              5 field,
+                              s.slice 
+                              * (CASE
+                                    WHEN s.finish_date - 1 &lt; p.end_date - 1
+                                    THEN
+                                       s.finish_date
+                                    ELSE
+                                       p.end_date
+                                 END
+                                 - CASE
+                                      WHEN s.start_date &lt; p.start_date
+                                      THEN
+                                         p.start_date
+                                      ELSE
+                                         s.start_date
+                                   END)
+                                 slice 
+                         FROM plans fpd
+                              INNER JOIN odf_ssl_cst_dtl_bcost s ON fpd.id = s.prj_object_id
+                              INNER JOIN biz_com_periods p ON p.entity_id = (SELECT entity_key FROM dwh_settings)
+                                                          AND p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                                          AND s.start_date &lt; p.end_date
+                                                          AND s.finish_date > p.start_date
+                      UNION ALL
+                       SELECT fpd.id plan_detail_key,
+                              p.id period_key,
+                              p.end_date - 1 period_finish,
+                              6 field,
+                              s.slice 
+                              * (CASE
+                                    WHEN s.finish_date - 1 &lt; p.end_date - 1
+                                    THEN
+                                       s.finish_date
+                                    ELSE
+                                       p.end_date
+                                 END
+                                 - CASE
+                                      WHEN s.start_date &lt; p.start_date
+                                      THEN
+                                         p.start_date
+                                      ELSE
+                                         s.start_date
+                                   END)
+                                 slice 
+                         FROM plans fpd
+                              INNER JOIN odf_ssl_cst_dtl_rev s ON fpd.id = s.prj_object_id
+                              INNER JOIN biz_com_periods p ON p.entity_id = (SELECT entity_key FROM dwh_settings)
+                                                          AND p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                                          AND s.start_date &lt; p.end_date
+                                                          AND s.finish_date > p.start_date
+                       UNION ALL
+                       SELECT fpd.id plan_detail_key,
+                              p.id period_key,
+                              p.end_date - 1 period_finish,
+                              8 field,
+                              s.slice 
+                              * (CASE
+                                    WHEN s.finish_date - 1 &lt; p.end_date - 1
+                                    THEN
+                                       s.finish_date
+                                    ELSE
+                                       p.end_date
+                                 END
+                                 - CASE
+                                      WHEN s.start_date &lt; p.start_date
+                                      THEN
+                                         p.start_date
+                                      ELSE
+                                         s.start_date
+                                   END)
+                                 slice 
+                         FROM plans fpd
+                              INNER JOIN odf_ssl_cst_dtl_brev s ON fpd.id = s.prj_object_id
+                              INNER JOIN biz_com_periods p ON p.entity_id = (SELECT entity_key FROM dwh_settings)
+                                                          AND p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                                          AND s.start_date &lt; p.end_date
+                                                          AND s.finish_date > p.start_date) 
+             SELECT plan_detail_key,
+                    period_key,
+                    NVL (plan_units, 0) plan_units,
+                    NVL (plan_cost, 0) plan_cost,
+                    NVL (billing_plan_cost, 0) billing_plan_cost,
+                    NVL (plan_revenue, 0) plan_revenue,
+                    NVL (billing_plan_revenue, 0) billing_plan_revenue
+               FROM (SELECT plan_detail_key,
+                            period_key,
+                            period_finish,
+                            field,
+                            slice
+                       FROM plan_details) PIVOT (SUM (slice)
+                                          FOR field
+                                          IN  (1 AS plan_units,
+                                              3 AS plan_cost,
+                                              5 AS billing_plan_cost,
+                                              6 AS plan_revenue,
+                                              8 AS billing_plan_revenue)) ) s
+           INNER JOIN fin_cost_plan_details d ON s.plan_detail_key = d.id AND d.parent_detail_id is null
+           INNER JOIN fin_plans p ON d.plan_id = p.id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

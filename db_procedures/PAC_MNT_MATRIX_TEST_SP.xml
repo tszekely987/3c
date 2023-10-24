@@ -1,0 +1,1086 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_TEST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_TEST_SP" 
+(
+  matrixKey         NUMBER,
+  testDate          DATE,
+  sortFilter        NUMBER,
+  in_valueData1     VARCHAR2 DEFAULT NULL,
+  in_valueData2     VARCHAR2 DEFAULT NULL,
+  in_valueData3     VARCHAR2 DEFAULT NULL,
+  in_valueData4     VARCHAR2 DEFAULT NULL,
+  in_valueData5     VARCHAR2 DEFAULT NULL,
+  in_valueData6     VARCHAR2 DEFAULT NULL,
+  in_valueData7     VARCHAR2 DEFAULT NULL,
+  in_valueData8     VARCHAR2 DEFAULT NULL,
+  in_valueData9     VARCHAR2 DEFAULT NULL,
+  in_valueData10    VARCHAR2 DEFAULT NULL,
+  in_userName       VARCHAR2,
+  RC1        IN OUT PAC_MNT_MATRIX_TEST_SPPkg.RCT1)
+AS
+  valueData1        GLOBALPKG.STRING;
+  valueData2        GLOBALPKG.STRING;
+  valueData3        GLOBALPKG.STRING;
+  valueData4        GLOBALPKG.STRING;
+  valueData5        GLOBALPKG.STRING;
+  valueData6        GLOBALPKG.STRING;
+  valueData7        GLOBALPKG.STRING;
+  valueData8        GLOBALPKG.STRING;
+  valueData9        GLOBALPKG.STRING;
+  valueData10       GLOBALPKG.STRING;
+
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  cEntity           GLOBALPKG.STRING;
+  return_           NUMBER;
+  cLocationID       GLOBALPKG.STRING;
+  cDepartCode       GLOBALPKG.STRING;
+  cClient           GLOBALPKG.STRING;
+  cProject          GLOBALPKG.STRING;
+  cCharge_Code      GLOBALPKG.STRING;
+  cInput_Type       GLOBALPKG.STRING;
+  cResource_Code    GLOBALPKG.STRING;
+  cClientClass      GLOBALPKG.STRING;
+  cProjClass        GLOBALPKG.STRING;
+  --cCostClass        GLOBALPKG.STRING;
+  cResource_Class   GLOBALPKG.STRING;
+  cWipClass         GLOBALPKG.STRING;
+  cResourceRole     GLOBALPKG.STRING;
+  cTransType        GLOBALPKG.STRING;
+  cUserName         GLOBALPKG.STRING;
+  TEMP_RC           PPA_GETMATRIXMATCHTESTPkg.RCT1;
+  TEMP_Rt           PPA_GETMATRIXMATCHTESTPkg.RT1;
+  P_sortFilter      NUMBER;
+  p_NNUMVAL1        NUMBER;
+  p_NNUMVAL2        NUMBER;
+  p_NNUMVAL3        NUMBER;
+  p_CSTRVAL1        GLOBALPKG.STRING;
+  p_IBESTMATCHROWID NUMBER;
+  M_flag1           GLOBALPKG.STRING := null;
+  flag1             GLOBALPKG.STRING := null;
+  M_flag2           GLOBALPKG.STRING := null;
+  flag2             GLOBALPKG.STRING := null;
+  M_flag3           GLOBALPKG.STRING := null;
+  flag3             GLOBALPKG.STRING := null;
+  M_flag4           GLOBALPKG.STRING := null;
+  flag4             GLOBALPKG.STRING := null;
+  M_flag5           GLOBALPKG.STRING := null;
+  flag5             GLOBALPKG.STRING := null;
+  M_flag6           GLOBALPKG.STRING := null;
+  flag6             GLOBALPKG.STRING := null;
+  M_flag7           GLOBALPKG.STRING := null;
+  flag7             GLOBALPKG.STRING := null;
+  M_flag8           GLOBALPKG.STRING := null;
+  flag8             GLOBALPKG.STRING := null;
+  M_flag9           GLOBALPKG.STRING := null;
+  flag9             GLOBALPKG.STRING := null;
+  M_flag10          GLOBALPKG.STRING := null;
+  flag10            GLOBALPKG.STRING := null;
+  p_MatrixType      GLOBALPKG.STRING;
+  rateMatrixFlag    NUMBER(1,0);
+  cCurrencyCode     VARCHAR2(30);
+  rowNumb           NUMBER;
+BEGIN
+  PAC_MNT_MATRIX_TEST_SP.valueData1 := PAC_MNT_MATRIX_TEST_SP.in_valueData1;
+	PAC_MNT_MATRIX_TEST_SP.valueData2 := PAC_MNT_MATRIX_TEST_SP.in_valueData2;
+	PAC_MNT_MATRIX_TEST_SP.valueData3 := PAC_MNT_MATRIX_TEST_SP.in_valueData3;
+	PAC_MNT_MATRIX_TEST_SP.valueData4 := PAC_MNT_MATRIX_TEST_SP.in_valueData4;
+	PAC_MNT_MATRIX_TEST_SP.valueData5 := PAC_MNT_MATRIX_TEST_SP.in_valueData5;
+	PAC_MNT_MATRIX_TEST_SP.valueData6 := PAC_MNT_MATRIX_TEST_SP.in_valueData6;
+	PAC_MNT_MATRIX_TEST_SP.valueData7 := PAC_MNT_MATRIX_TEST_SP.in_valueData7;
+	PAC_MNT_MATRIX_TEST_SP.valueData8 := PAC_MNT_MATRIX_TEST_SP.in_valueData8;
+	PAC_MNT_MATRIX_TEST_SP.valueData9 := PAC_MNT_MATRIX_TEST_SP.in_valueData9;
+	PAC_MNT_MATRIX_TEST_SP.valueData10 := PAC_MNT_MATRIX_TEST_SP.in_valueData10;
+  PAC_MNT_MATRIX_TEST_SP.cUserName   := PAC_MNT_MATRIX_TEST_SP.in_userName;
+
+  PAC_MNT_MATRIX_TEST_SP.cEntity := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cLocationID := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cDepartCode := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cClient := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cProject := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cCharge_Code := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cInput_Type := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cResource_Code := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cClientClass := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cProjClass := NULL;
+  --PAC_MNT_MATRIX_TEST_SP.cCostClass := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cResource_Class := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cWipClass := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cResourceRole := NULL;
+  PAC_MNT_MATRIX_TEST_SP.cTransType := NULL;
+
+  PAC_MNT_MATRIX_TEST_SP.valueData1  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData1);
+  PAC_MNT_MATRIX_TEST_SP.valueData2  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData2);
+  PAC_MNT_MATRIX_TEST_SP.valueData3  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData3);
+  PAC_MNT_MATRIX_TEST_SP.valueData4  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData4);
+  PAC_MNT_MATRIX_TEST_SP.valueData5  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData5);
+  PAC_MNT_MATRIX_TEST_SP.valueData6  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData6);
+  PAC_MNT_MATRIX_TEST_SP.valueData7  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData7);
+  PAC_MNT_MATRIX_TEST_SP.valueData8  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData8);
+  PAC_MNT_MATRIX_TEST_SP.valueData9  := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData9);
+  PAC_MNT_MATRIX_TEST_SP.valueData10 := TRIM(PAC_MNT_MATRIX_TEST_SP.valueData10);
+
+  IF PAC_MNT_MATRIX_TEST_SP.valueData1 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData1 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData2 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData2 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData3 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData3 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData4 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData4 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData5 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData5 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData6 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData6 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData7 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData7 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData8 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData8 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData9 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData9 := NULL;
+	END IF;
+	IF  PAC_MNT_MATRIX_TEST_SP.valueData10 = '*' THEN
+    PAC_MNT_MATRIX_TEST_SP.valueData10 := NULL;
+	END IF;
+
+	DELETE FROM temp_tempPAC_MNT_MATRIX_TEST_S;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    FOR REC_MC1 IN (SELECT FieldName, ColumnNo, NULL NoVal
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey
+                    ORDER BY ColumnNo)
+      LOOP
+        INSERT INTO temp_tempPAC_MNT_MATRIX_TEST_S
+               (TEMPFIELDNAME,TEMPCOLUMNNO,TEMPDATA)
+        VALUES (REC_MC1.FieldName, REC_MC1.ColumnNo, REC_MC1.NoVal);
+      END LOOP;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+      SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData1
+    WHERE tempColumnNo = 1;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+  UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+     SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData2
+   WHERE tempColumnNo = 2;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData3
+     WHERE tempColumnNo = 3;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData4
+     WHERE tempColumnNo = 4;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData5
+     WHERE tempColumnNo = 5;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData6
+     WHERE tempColumnNo = 6;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData7
+    WHERE tempColumnNo = 7;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData8
+     WHERE tempColumnNo = 8;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData9
+     WHERE tempColumnNo = 9;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempPAC_MNT_MATRIX_TEST_S
+       SET tempData = PAC_MNT_MATRIX_TEST_SP.valueData10
+     WHERE tempColumnNo = 10;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT  tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cEntity
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'entity';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT  tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cLocationID
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'locationid';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cDepartCode
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'departcode';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cClient
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'company_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cProject
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'project_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cCharge_Code
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+      WHERE tempFieldName = 'chargecode';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cInput_Type
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'inputtype';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cResource_Code
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'resource_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cClientClass
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'clntclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cProjClass
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'projclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+/*
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cCostClass
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'costclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+*/
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cResource_Class
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'resource_class';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cWipClass
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+      WHERE tempFieldName = 'wipclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cResourceRole
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'resource_role';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_TEST_SP.cTransType
+      FROM temp_tempPAC_MNT_MATRIX_TEST_S
+     WHERE tempFieldName = 'transclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    SELECT MatrixType
+      INTO PAC_MNT_MATRIX_TEST_SP.p_MatrixType
+      FROM ppa_Matrix
+     WHERE ppa_Matrix.MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN OTHERS THEN
+        NULL;
+  END;
+
+  IF PAC_MNT_MATRIX_TEST_SP.p_MatrixType = 'R' THEN
+    BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+
+      SELECT allow_use_of_costplus
+        INTO PAC_MNT_MATRIX_TEST_SP.rateMatrixFlag
+        FROM nameoptions;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+	ELSE
+    BEGIN
+      SELECT 9
+        INTO PAC_MNT_MATRIX_TEST_SP.rateMatrixFlag
+        FROM dual;
+    END;
+	END IF;
+
+  begin
+    select 1 into M_flag1
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 1);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag1,1,'1','!!::#undef#::!!')
+    INTO FLAG1
+    from dual;
+
+  begin
+    select 1
+      into M_flag2
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 2);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag2,1,'1','!!::#undef#::!!')
+    INTO FLAG2
+    from dual;
+
+  begin
+    select 1
+      into M_flag3
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 3);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag3,1,'1','!!::#undef#::!!') INTO FLAG3 from dual;
+
+  begin
+    select 1
+      into M_flag4
+      from dual
+      where exists (select ColumnNo
+                      from ppa_MatrixColDef
+                     where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 4);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag4,1,'1','!!::#undef#::!!') INTO FLAG4 from dual;
+
+  begin
+    select 1
+      into M_flag5
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 5);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag5,1,'1','!!::#undef#::!!') INTO FLAG5 from dual;
+
+  begin
+    select 1
+      into M_flag6
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 6);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag6,1,'1','!!::#undef#::!!') INTO FLAG6 from dual;
+
+  begin
+    select 1
+      into M_flag7
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 7);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag7,1,'1','!!::#undef#::!!') INTO FLAG7 from dual;
+
+  begin
+    select 1
+      into M_flag8
+      from dual
+     where exists (select ColumnNo
+                     from ppa_MatrixColDef
+                    where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 8);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag8,1,'1','!!::#undef#::!!') INTO FLAG8 from dual;
+
+  begin
+    select 1
+      into M_flag9
+      from dual
+     where exists (select ColumnNo
+                    from ppa_MatrixColDef
+                   where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 9);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag9,1,'1','!!::#undef#::!!') INTO FLAG9 from dual;
+
+  begin
+    select 1
+      into M_flag10
+      from dual
+     where exists (select ColumnNo
+                    from ppa_MatrixColDef
+                   where MatrixKey = PAC_MNT_MATRIX_TEST_SP.matrixKey And ColumnNo = 10);
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag10,1,'1','!!::#undef#::!!') INTO FLAG10 from dual;
+
+  P_sortFilter := sortFilter;
+
+	DELETE FROM temp_tempResultsPAC_MNT_MATRIX;
+
+	BEGIN
+    ppa_GetMatrixMatchTest(
+      iMatrixID=&gt;PAC_MNT_MATRIX_TEST_SP.matrixKey,
+      bSuppressResultSet=&gt;0,
+      bReturnAllMatches=&gt;PAC_MNT_MATRIX_TEST_SP.P_sortFilter,
+      nNumVal1 =&gt; p_nNumVal1,
+      nNumVal2 =&gt; p_nNumVal2,
+      nNumVal3 =&gt; p_nNumVal3,
+      cStrVal1 =&gt; p_cStrVal1,
+      iBestMatchRowID =&gt; p_iBestMatchRowID,
+      cTransDate=&gt;PAC_MNT_MATRIX_TEST_SP.testDate,
+      cEntity=&gt;PAC_MNT_MATRIX_TEST_SP.cEntity,
+      cLocationID=&gt;PAC_MNT_MATRIX_TEST_SP.cLocationID,
+      cDepartCode=&gt;PAC_MNT_MATRIX_TEST_SP.cDepartCode,
+      cClient=&gt;PAC_MNT_MATRIX_TEST_SP.cClient,
+      cProject=&gt;PAC_MNT_MATRIX_TEST_SP.cProject,
+      cCharge_Code=&gt;PAC_MNT_MATRIX_TEST_SP.cCharge_Code,
+      cInput_Type=&gt;PAC_MNT_MATRIX_TEST_SP.cInput_Type,
+      cResource_Code=&gt;PAC_MNT_MATRIX_TEST_SP.cResource_Code,
+      cClientClass=&gt;PAC_MNT_MATRIX_TEST_SP.cClientClass,
+      cProjClass=&gt;PAC_MNT_MATRIX_TEST_SP.cProjClass,
+     -- cCostClass=&gt;PAC_MNT_MATRIX_TEST_SP.cCostClass,
+      cResource_Class=&gt;PAC_MNT_MATRIX_TEST_SP.cResource_Class,
+      cWipClass=&gt;PAC_MNT_MATRIX_TEST_SP.cWipClass,
+      cResourceRole=&gt;PAC_MNT_MATRIX_TEST_SP.cResourceRole,
+      cTransType=&gt;PAC_MNT_MATRIX_TEST_SP.cTransType,
+      --cCurrencyCode=&gt;PAC_MNT_MATRIX_TEST_SP.cCurrencyCode,
+      cUserName=&gt;PAC_MNT_MATRIX_TEST_SP.cUserName,
+      RC1=&gt;TEMP_RC);
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+	BEGIN
+    FETCH TEMP_RC INTO TEMP_RT;
+    rowNumb := 1;
+
+    LOOP
+	    EXIT WHEN TEMP_RC%NOTFOUND;
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO temp_tempResultsPAC_MNT_MATRIX
+        (ROWKEY, FROMDATE, TODATE, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7, DATA8, DATA9,  DATA10,
+         NUMBER1, NUMBER2, NUMBER3, STRDATA1, MATRIX_CURRENCY_CODE, ROWNUMBER)
+         VALUES
+        (TEMP_RT.MatrixRowKey,TEMP_RT.FromDate,TEMP_RT.ToDate,TEMP_RT.Value1,TEMP_RT.Value2,TEMP_RT.Value3,
+        TEMP_RT.Value4,TEMP_RT.Value5,TEMP_RT.Value6,TEMP_RT.Value7,TEMP_RT.Value8,
+        TEMP_RT.Value9,TEMP_RT.Value10,
+        TEMP_RT.NumVal1,TEMP_RT.NumVal2,TEMP_RT.NumVal3,TEMP_RT.StrVal1, TEMP_RT.transactionCurrencyCode,
+        rowNumb);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+          RETURN;
+        END;
+      END IF;
+
+      rowNumb := rowNumb + 1;
+
+	    FETCH TEMP_RC INTO TEMP_RT;
+    END LOOP;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  IF PAC_MNT_MATRIX_TEST_SP.P_sortFilter = 0 THEN
+   OPEN RC1 FOR
+   SELECT temp_tempResultsPAC_MNT_MATRIX.ROWKEY MatrixRowKey,
+          PAC_MNT_MATRIX_TEST_SP.matrixKey MatrixKey,
+          temp_tempResultsPAC_MNT_MATRIX.FROMDATE FromDate,
+          temp_tempResultsPAC_MNT_MATRIX.TODATE ToDate,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA1, '*') Value1,
+          PAC_MNT_MATRIX_TEST_SP.FLAG1 flag1,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA2, '*') Value2,
+          PAC_MNT_MATRIX_TEST_SP.FLAG2 flag2,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA3, '*') Value3,
+          PAC_MNT_MATRIX_TEST_SP.FLAG3 flag3,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA4, '*') Value4,
+          PAC_MNT_MATRIX_TEST_SP.FLAG4 flag4,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA5, '*') Value5,
+          PAC_MNT_MATRIX_TEST_SP.FLAG5 flag5,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA6, '*') Value6,
+          PAC_MNT_MATRIX_TEST_SP.FLAG6 flag6,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA7, '*') Value7,
+          PAC_MNT_MATRIX_TEST_SP.FLAG7 flag7,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA8, '*') Value8,
+          PAC_MNT_MATRIX_TEST_SP.FLAG8 flag8,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA9, '*') Value9,
+          PAC_MNT_MATRIX_TEST_SP.FLAG9 flag9,
+          NVL(temp_tempResultsPAC_MNT_MATRIX.DATA10, '*') Value10,
+          PAC_MNT_MATRIX_TEST_SP.FLAG10 flag10,
+          temp_tempResultsPAC_MNT_MATRIX.NUMBER1 number1,
+          temp_tempResultsPAC_MNT_MATRIX.NUMBER2 number2,
+          temp_tempResultsPAC_MNT_MATRIX.NUMBER3 number3,
+          temp_tempResultsPAC_MNT_MATRIX.STRDATA1 str1,
+          PAC_MNT_MATRIX_TEST_SP.p_MatrixType matrixType,
+          PAC_MNT_MATRIX_TEST_SP.rateMatrixFlag rateMatrixFlag,
+          temp_tempResultsPAC_MNT_MATRIX.matrix_currency_code transactioncurrencycode
+     FROM temp_tempResultsPAC_MNT_MATRIX
+     WHERE ROWNUMBER = (select max(ROWNUMBER) from temp_tempResultsPAC_MNT_MATRIX);
+  ELSIF PAC_MNT_MATRIX_TEST_SP.P_sortFilter = -1 THEN
+    OPEN RC1 FOR
+    SELECT temp_tempResultsPAC_MNT_MATRIX.ROWKEY MatrixRowKey,
+           PAC_MNT_MATRIX_TEST_SP.matrixKey MatrixKey,
+           temp_tempResultsPAC_MNT_MATRIX.FROMDATE FromDate,
+           temp_tempResultsPAC_MNT_MATRIX.TODATE ToDate,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA1, '*') Value1,
+           PAC_MNT_MATRIX_TEST_SP.FLAG1 flag1,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA2, '*') Value2,
+           PAC_MNT_MATRIX_TEST_SP.FLAG2 flag2,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA3, '*') Value3,
+           PAC_MNT_MATRIX_TEST_SP.FLAG3 flag3,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA4, '*') Value4,
+           PAC_MNT_MATRIX_TEST_SP.FLAG4 flag4,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA5, '*') Value5,
+           PAC_MNT_MATRIX_TEST_SP.FLAG5 flag5,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA6, '*') Value6,
+           PAC_MNT_MATRIX_TEST_SP.FLAG6 flag6,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA7, '*') Value7,
+           PAC_MNT_MATRIX_TEST_SP.FLAG7 flag7,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA8, '*') Value8,
+           PAC_MNT_MATRIX_TEST_SP.FLAG8 flag8,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA9, '*') Value9,
+           PAC_MNT_MATRIX_TEST_SP.FLAG9 flag9,
+           NVL(temp_tempResultsPAC_MNT_MATRIX.DATA10, '*') Value10,
+           PAC_MNT_MATRIX_TEST_SP.FLAG10 flag10,
+           temp_tempResultsPAC_MNT_MATRIX.NUMBER1 number1,
+           temp_tempResultsPAC_MNT_MATRIX.NUMBER2 number2,
+           temp_tempResultsPAC_MNT_MATRIX.NUMBER3 number3,
+           temp_tempResultsPAC_MNT_MATRIX.STRDATA1 str1,
+           PAC_MNT_MATRIX_TEST_SP.p_MatrixType matrixType,
+           PAC_MNT_MATRIX_TEST_SP.rateMatrixFlag rateMatrixFlag,
+           temp_tempResultsPAC_MNT_MATRIX.matrix_currency_code transactioncurrencycode
+      FROM temp_tempResultsPAC_MNT_MATRIX
+     ORDER BY ROWNUMBER DESC;
+  END IF;
+END PAC_MNT_MATRIX_TEST_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

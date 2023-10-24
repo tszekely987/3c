@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_HSGENBODYPROJEMPSUMMARY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_HSGENBODYPROJEMPSUMMARY" (
+  iBillRunKey   NUMBER,
+  cUserID       VARCHAR2,
+  cLanguageCode VARCHAR2 DEFAULT 'en'
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+
+  iSeqNo NUMBER;
+  loc_SubTotal GLOBALPKG.STRING;
+  loc_AdminFee GLOBALPKG.STRING;
+  loc_Tax GLOBALPKG.STRING;
+  loc_InvoiceTotal GLOBALPKG.STRING;
+  temp_printline GLOBALPKG.STRING;
+  billing_currency_code VARCHAR2(30);
+  invoice_no VARCHAR2(16);
+  temp_amount GLOBALPKG.STRING;
+
+  UF1_rowid 				ROWID;
+  UF1_oval1 				temp_tempbb_HSGenBodyProjEmpSu.SEQNO%TYPE;
+  CURSOR UF1_cursor IS
+	SELECT T.ROWID, T.SEQNO
+	FROM temp_tempbb_HSGenBodyProjEmpSu T
+	FOR UPDATE OF T.SEQNO;
+
+BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	StoO_selcnt := 0;
+
+  --Update the header Amount to display the currency code as well
+	BEGIN
+		--get the string Amount in the language passed
+		SELECT lv.name
+		INTO temp_amount
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'AMOUNT'
+	 		 AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 		 AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjempsummary.cLanguageCode);
+
+	     --We want to add the billing_currency_code to the header here
+		 DECLARE CURSOR header_cur IS select distinct P.billing_currency_code, IL.InvoiceNo
+     FROM bb_HSInvoiceList IL, ppa_Billings B, pac_mnt_projects P, prchargecode C, pac_mnt_resources E, CMN_LOOKUPS_V lv
+		 WHERE IL.BillingRunKey = bb_HSGenBodyProjempsummary.iBillRunKey
+		 	 AND B.InvoiceNo = IL.InvoiceNo
+		 	 AND B.TransType = 'B'
+			 AND P.COMPANY_CODE = B.COMPANY_CODE
+	   		 AND P.PROJECT_CODE = B.PROJECT_CODE
+       AND C.prexternalid = B.Charge_Code
+	 		 AND E.RESOURCE_CODE = B.RESOURCE_CODE
+	 		 AND B.ApplyToTransType = lv.LOOKUP_CODE
+	 	 	 AND lv.LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE'
+			 AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjempsummary.cLanguageCode);
+		 BEGIN
+			 OPEN header_cur;
+			 LOOP
+			 	 FETCH header_cur INTO billing_currency_code, invoice_no;
+				 EXIT WHEN NOT header_cur%FOUND;
+
+				 SELECT printline into bb_HSGenBodyProjempsummary.temp_printline FROM bb_hsinvoicelayout
+				 WHERE billingrunkey=bb_HSGenBodyProjempsummary.iBillRunKey
+				 	   AND invoiceno=invoice_no
+					   AND sectionno=1
+					   AND lineseqno=1000;
+
+				--append currency code
+				 bb_HSGenBodyProjempsummary.temp_printline := bb_HSGenBodyProjempsummary.temp_printline || '( ' || billing_currency_code || ' )' ;
+
+				 UPDATE bb_hsinvoicelayout SET printline = bb_HSGenBodyProjempsummary.temp_printline
+ 				 WHERE billingrunkey=bb_HSGenBodyProjempsummary.iBillRunKey
+				 	   AND invoiceno=invoice_no
+					   AND sectionno=1
+					   AND lineseqno=1000;
+
+			 END LOOP;
+			 CLOSE header_cur;
+		END;
+	END;
+	BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenBodyProjEmpSummary.loc_SubTotal
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'SUBTOTAL'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjEmpSummary.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenBodyProjEmpSummary.loc_AdminFee
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'ADMINFEE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjEmpSummary.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenBodyProjEmpSummary.loc_Tax
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'TAX'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjEmpSummary.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenBodyProjEmpSummary.loc_InvoiceTotal
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'INVOICETOTAL'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenBodyProjEmpSummary.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	DELETE FROM temp_EmpNamebb_HSGenBodyProjEm;
+
+	DELETE FROM temp_tempbb_HSGenBodyProjEmpSu;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO temp_EmpNamebb_HSGenBodyProjEm (TransNo, EmpName)
+    SELECT  W.TransNo, R.FULL_NAME -- RTRIM(E.lastname) || ', ' || E.firstname
+      FROM bb_HSInvoiceList IL, ppa_Billings W, SRM_RESOURCES R, PAC_MNT_RESOURCES E, SRM_CONTACTS C
+      WHERE IL.BillingRunKey = bb_HSGenBodyProjEmpSummary.iBillRunKey
+      and W.InvoiceNo = IL.InvoiceNo
+      and W.TransType = 'B'
+      and E.RESOURCE_CODE = W.RESOURCE_CODE
+      and E.ID = R.ID
+      and R.ID = C.PRINCIPAL_ID (+)
+      AND C.PRINCIPAL_TYPE (+) = 'RESOURCE';
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    -- get the amount from the values table
+    INSERT INTO temp_tempbb_HSGenBodyProjEmpSu (InvoiceNo, RESOURCE_NAME, Quantity, Amount)
+    SELECT IL.InvoiceNo, EN.EmpName, SUM(W.Quantity), SUM(WV.Amount)
+      FROM bb_HSInvoiceList IL, ppa_Billings W,  ppa_Billing_values WV, temp_EmpNamebb_HSGenBodyProjEm
+        EN
+      WHERE IL.BillingRunKey = bb_HSGenBodyProjEmpSummary.iBillRunKey
+      and W.InvoiceNo = IL.InvoiceNo
+      and W.TransType = 'B'
+      and EN.TransNo = W.TransNo
+      and W.TRANSNO = WV.TRANSNO
+      and WV.CURRENCY_TYPE = 'BILLING'
+      GROUP BY IL.InvoiceNo, EN.EmpName;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		OPEN UF1_cursor;
+		LOOP
+			FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+			EXIT WHEN UF1_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE temp_tempbb_HSGenBodyProjEmpSu
+			SET
+			SEQNO = temp_tempbb_HSGenBodyProjE_SEQ.nextval
+			WHERE ROWID = UF1_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF1_cursor;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(SeqNo) + 1
+		INTO bb_HSGenBodyProjEmpSummary.iSeqNo FROM temp_tempbb_HSGenBodyProjEmpSu;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenBodyProjEmpSummary.iSeqNo :=  NVL(bb_HSGenBodyProjEmpSummary.iSeqNo, 1);
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_tempbb_HSGenBodyProjEmpSu
+    SET FmtQuantity = TO_CHAR(Quantity),
+    FmtAmount = TO_CHAR(Amount);
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_tempbb_HSGenBodyProjEmpSu
+    SET FmtQuantity = SUBSTR(FmtQuantity, 2, 1) || ',' || SUBSTR(FmtQuantity,
+      LENGTH(FmtQuantity) -  6 || 1,  6)
+    WHERE Quantity &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_tempbb_HSGenBodyProjEmpSu
+    SET FmtAmount = SUBSTR(FmtAmount, 2, 9) || ',' || SUBSTR(FmtAmount,
+      LENGTH(FmtAmount) -  6 || 1,  6)
+    WHERE Amount &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_tempbb_HSGenBodyProjEmpSu
+    SET FmtAmount = SUBSTR(FmtAmount, 2, 5) || ',' || SUBSTR(FmtAmount,
+      LENGTH(FmtAmount) -  10 || 1,  10)
+    WHERE Amount &gt; 999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_tempbb_HSGenBodyProjEmpSu
+    SET FmtAmount = SUBSTR(FmtAmount, 2, 1) || ',' || SUBSTR(FmtAmount,
+      LENGTH(FmtAmount) -  14 || 1,  14)
+    WHERE Amount &gt; 999999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, SeqNo, '  ' || SUBSTR(NVL(RTRIM(RESOURCE_NAME), '')
+        || RPAD( ' ', 40 ), 1, 40) || ' ' || FmtQuantity || ' ' || FmtAmount
+      FROM temp_tempbb_HSGenBodyProjEmpSu;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+	DELETE FROM temp_InvTotbb_HSGenBodyProjEmp;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO temp_InvTotbb_HSGenBodyProjEmp (InvoiceNo, SubTotal)SELECT  InvoiceNo, SUM(Amount)
+      FROM temp_tempbb_HSGenBodyProjEmpSu
+      GROUP BY InvoiceNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET Tax = (SELECT NVL(SUM(IDV.Amount),0)  FROM ppa_InvoiceDetails ID, ppa_InvoiceDetails_values IDV
+    WHERE ID.InvoiceNo = temp_InvTotbb_HSGenBodyProjEmp.InvoiceNo
+    and ID.EntryType = 'T' and IDV.EntryType = 'T' and IDV.INVOICENO=ID.INVOICENO and IDV.CURRENCY_TYPE='BILLING');
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET AdminFee = (SELECT NVL(SUM(IDV.Amount),0)  FROM ppa_InvoiceDetails ID, ppa_InvoiceDetails_values IDV
+    WHERE ID.InvoiceNo = temp_InvTotbb_HSGenBodyProjEmp.InvoiceNo
+    and ID.EntryType = 'A' and IDV.EntryType = 'A' and IDV.INVOICENO=ID.INVOICENO and IDV.CURRENCY_TYPE='BILLING');
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET Total = SubTotal + AdminFee + Tax;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtSubTotal = TO_CHAR(SubTotal),
+    FmtAdminFee = TO_CHAR(AdminFee),
+    FmtTax = TO_CHAR(Tax),
+    FmtTotal = TO_CHAR(Total);
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtSubTotal = SUBSTR(FmtSubTotal, 2, 9) || ',' || SUBSTR(FmtSubTotal, LENGTH(FmtSubTotal) -  6 || 1,  6)
+    WHERE SubTotal &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtAdminFee = SUBSTR(FmtAdminFee, 2, 9) || ',' || SUBSTR(FmtAdminFee, LENGTH(FmtAdminFee) -  6 || 1,  6)
+    WHERE AdminFee &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTax = SUBSTR(FmtTax, 2, 9) || ',' || SUBSTR(FmtTax, LENGTH(FmtTax) -  6 || 1,  6)
+    WHERE Tax &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTotal = SUBSTR(FmtTotal, 2, 9) || ',' || SUBSTR(FmtTotal, LENGTH(FmtTotal) -  6 || 1,  6)
+    WHERE Total &gt; 999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtSubTotal = SUBSTR(FmtSubTotal, 2, 5) || ',' || SUBSTR(FmtSubTotal, LENGTH(FmtSubTotal) -  10 || 1,  10)
+    WHERE SubTotal &gt; 999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtAdminFee = SUBSTR(FmtAdminFee, 2, 5) || ',' || SUBSTR(FmtAdminFee, LENGTH(FmtAdminFee) -  10 || 1,  10)
+    WHERE AdminFee &gt; 999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTax = SUBSTR(FmtTax, 2, 5) || ',' || SUBSTR(FmtTax, LENGTH(FmtTax)  -  10 || 1,  10)
+    WHERE Tax &gt; 999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTotal = SUBSTR(FmtTotal, 2, 5) || ',' || SUBSTR(FmtTotal, LENGTH(FmtTotal) -  10 || 1,  10)
+    WHERE Total &gt; 999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtSubTotal = SUBSTR(FmtSubTotal, 2, 1) || ',' || SUBSTR(FmtSubTotal, LENGTH(FmtSubTotal) -  14 || 1,  14)
+    WHERE SubTotal &gt; 999999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtAdminFee = SUBSTR(FmtAdminFee, 2, 1) || ',' || SUBSTR(FmtAdminFee, LENGTH(FmtAdminFee) -  14 || 1,  14)
+    WHERE AdminFee &gt; 999999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTax = SUBSTR(FmtTax, 2, 1) || ',' || SUBSTR(FmtTax, LENGTH(FmtTax) -  14 || 1,  14)
+    WHERE Tax &gt; 999999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE temp_InvTotbb_HSGenBodyProjEmp
+    SET FmtTotal = SUBSTR(FmtTotal, 2, 1) || ',' || SUBSTR(FmtTotal, LENGTH(FmtTotal) -  14 || 1,  14)
+    WHERE Total &gt; 999999999.99;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo, LPAD('___________________________',62,' ')
+    FROM temp_InvTotbb_HSGenBodyProjEmp
+    WHERE ABS(Tax) || ABS(AdminFee) &gt; 0;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo + 1,
+        RPAD( ' ', 48 - LENGTHB(RTRIM(bb_HSGenBodyProjEmpSummary.loc_SubTotal)))
+        || RTRIM(bb_HSGenBodyProjEmpSummary.loc_SubTotal)
+        || '  '
+        || LPAD(FmtSubTotal,12,' ')
+    FROM temp_InvTotbb_HSGenBodyProjEmp
+    WHERE ABS(Tax) || ABS(AdminFee) &gt; 0;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo + 2,
+        RPAD( ' ', 48 - LENGTHB(RTRIM(bb_HSGenBodyProjEmpSummary.loc_AdminFee)))
+        || RTRIM(bb_HSGenBodyProjEmpSummary.loc_AdminFee)
+        || '  '
+        || LPAD(FmtAdminFee,12,' ')
+      FROM temp_InvTotbb_HSGenBodyProjEmp
+      WHERE AdminFee != 0;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo + 3,
+        RPAD( ' ', 48 - LENGTHB(RTRIM(bb_HSGenBodyProjEmpSummary.loc_Tax)))
+        || RTRIM(bb_HSGenBodyProjEmpSummary.loc_Tax)
+        || '  '
+        || LPAD(FmtTax,12,' ')
+      FROM temp_InvTotbb_HSGenBodyProjEmp
+      WHERE Tax != 0;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo + 4, LPAD('___________________________',62,' ')
+      FROM temp_InvTotbb_HSGenBodyProjEmp;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)SELECT  bb_HSGenBodyProjEmpSummary.iBillRunKey, bb_HSGenBodyProjEmpSummary.cUserID,
+        InvoiceNo, 100, bb_HSGenBodyProjEmpSummary.iSeqNo + 5,
+        RPAD( ' ', 48 - LENGTHB(RTRIM(bb_HSGenBodyProjEmpSummary.loc_InvoiceTotal)))
+        || RTRIM(bb_HSGenBodyProjEmpSummary.loc_InvoiceTotal)
+        || '  '
+        || LPAD(FmtTotal,12,' ')
+      FROM temp_InvTotbb_HSGenBodyProjEmp;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+END bb_HSGenBodyProjEmpSummary;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

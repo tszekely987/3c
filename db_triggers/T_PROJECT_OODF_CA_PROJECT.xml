@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>T_PROJECT_OODF_CA_PROJECT</code>
+          <table_name>ODF_CA_PROJECT</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE OR DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>T_PROJECT_OODF_CA_PROJECT  AFTER INSERT OR UPDATE OR DELETE ON odf_ca_project REFERENCING NEW AS NEW OLD AS OLD FOR EACH ROW 
+  </description>
+          <trigger_body>DECLARE V_OBJECT_ID NUMBER; 
+ V_COUNT NUMBER; 
+          V_TRANSACTION_ID VARCHAR2(20); 
+         AUDIT_ID          NUMBER; 
+         ROW_COUNT NUMBER := 0; 
+ BEGIN 
+ SELECT DBMS_TRANSACTION.LOCAL_TRANSACTION_ID INTO V_TRANSACTION_ID FROM DUAL; 
+ IF UPDATING  THEN 
+ V_OBJECT_ID := :NEW.id;
+/* START BLOCK FOR COLUMN: ebh_audit_test*/
+ IF( V_OBJECT_ID IS NOT NULL AND ((:NEW.ebh_audit_test IS NULL AND :OLD.ebh_audit_test IS NOT NULL) OR (:NEW.ebh_audit_test IS NOT NULL AND :OLD.ebh_audit_test IS NULL) OR  	(:NEW.ebh_audit_test != :OLD.ebh_audit_test) )) THEN 
+ INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE , 
+ 	VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID) 
+ 	SELECT CMN_AUDITS_S1.NEXTVAL, 'project', V_OBJECT_ID, 'ebh_audit_test', 'odf_ca_project', 'ebh_audit_test',:OLD.ebh_audit_test, 
+ 	 :NEW.ebh_audit_test, :OLD.ebh_audit_test, :NEW.ebh_audit_test, 'U', :NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY, :NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL ; 
+ END IF;
+/* END BLOCK FOR COLUMN: ebh_audit_test*/
+ END IF; 
+
+ IF INSERTING THEN 
+ V_OBJECT_ID := :NEW.id;
+/* START BLOCK FOR COLUMN: ebh_audit_test*/
+ IF( V_OBJECT_ID IS NOT NULL ) THEN 
+ INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE , 
+ 	VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID) 
+ 	SELECT CMN_AUDITS_S1.NEXTVAL, 'project', V_OBJECT_ID, 'ebh_audit_test', 'odf_ca_project', 'ebh_audit_test',NULL, 
+ 	 :NEW.ebh_audit_test, NULL, :NEW.ebh_audit_test, 'I', :NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY, :NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL ; 
+ END IF;
+/* END BLOCK FOR COLUMN: ebh_audit_test*/
+
+ END IF; 
+
+ IF DELETING THEN 
+ V_OBJECT_ID := :OLD.id;
+/* START BLOCK FOR COLUMN: ebh_audit_test*/
+ IF( V_OBJECT_ID IS NOT NULL ) THEN 
+ INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE , 
+ 	VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID) 
+ 	SELECT CMN_AUDITS_S1.NEXTVAL, 'project', V_OBJECT_ID, 'ebh_audit_test', 'odf_ca_project', 'ebh_audit_test',:OLD.ebh_audit_test, 
+ 	 NULL, :OLD.ebh_audit_test, NULL, 'D', SYSDATE, :OLD.LAST_UPDATED_BY, SYSDATE, :OLD.LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL ; 
+ END IF;
+/* END BLOCK FOR COLUMN: ebh_audit_test*/
+
+ END IF; 
+ END;</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>CMN_PARTITIONS_FLAT_INS_T1</code>
+          <table_name>CMN_PARTITIONS</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>INSERT</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."CMN_PARTITIONS_FLAT_INS_T1" 
+BEFORE INSERT
+ON CMN_PARTITIONS
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+
+BEGIN
+
+  LOCK TABLE CMN_PARTITIONS_FLAT IN EXCLUSIVE MODE;
+
+  /* 1. Insert this partition itself */
+  INSERT
+    INTO CMN_PARTITIONS_FLAT
+  VALUES (
+    CMN_PARTITIONS_FLAT_S1.nextval 
+  , :new.code                      
+  , :new.code                      
+  , :new.created_date
+  , :new.created_by
+  , :new.last_updated_date
+  , :new.last_updated_by
+  );
+
+   --- Do not insert any records for the seeded NIKU.ROOT recrod.
+  -- for this the parent and partition code will be same : NIKU.ROOT
+ IF :new.code != :new.parent_code THEN
+   /* 2. Insert a new record for all its ancestors */
+  INSERT
+    INTO CMN_PARTITIONS_FLAT
+  ( Id
+  , Partition_Code, Child_Partition_Code
+  , Created_Date, Created_By
+  , Last_Updated_Date, Last_Updated_By )
+    SELECT CMN_PARTITIONS_FLAT_S1.nextval
+         , partition_code, :new.code
+         , :new.created_date, :new.created_by
+         , :new.last_updated_date, :new.last_updated_by
+      FROM CMN_PARTITIONS_FLAT
+     WHERE child_partition_code = :new.parent_code; 
+END IF;
+  COMMIT;
+
+EXCEPTION
+  WHEN OTHERS
+  THEN ROLLBACK;
+
+END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

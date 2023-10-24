@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="FIN_PLANBY_DETAIL_CAPTION" displayAttributeName="name" hiddenAttributeName="pk_key" objectCode="" sortAttributeName="code" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Lookup for Financial Plan By Detail Captions" languageCode="en" name="Financial Plan By Detail Captions"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[SELECT  @SELECT:DATA.PK_KEY:PK_KEY@
+              , @SELECT:DATA.ID:ID@
+              , @SELECT:DATA.NAME:NAME@
+              , @SELECT:DATA.CODE:CODE@
+		  FROM (
+
+  		        SELECT 'FIN_TRANSCLASSES:'@+@CAST(ID AS NVARCHAR) PK_KEY
+  		               , ID
+  		               , DESCRIPTION NAME
+  		               , TRANSCLASS CODE
+  		        FROM 	TRANSCLASS
+
+		        UNION
+
+  		        SELECT 'SCH_BROWSE_ROLE:'@+@CAST(SR.ID AS NVARCHAR) PK_KEY
+  		               , SR.ID ID
+  		               , SR.LAST_NAME NAME
+  		               , SR.UNIQUE_NAME CODE
+  		        FROM 	SRM_RESOURCES SR, PRJ_RESOURCES PR
+  		        WHERE sr.id = pr.prid and pr.prisrole = 1
+
+  		        UNION
+
+			SELECT 'SCH_BROWSE_ROLE:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+		        UNION
+
+  		        SELECT 'LOOKUP_CHARGE_CODES:'@+@CAST(CC.PRID AS NVARCHAR) PK_KEY
+  		               , CC.PRID ID
+  		               , CC.PRNAME NAME
+  		               , CC.PREXTERNALID CODE
+  		        FROM 	PRCHARGECODE CC
+
+  		        UNION
+
+
+  		        SELECT 'FIN_BROWSE_USER_LOV2:'@+@CAST(ID AS NVARCHAR) PK_KEY
+  		               , ID
+  		               , NAME
+  		               , LOOKUP_CODE CODE
+  		        FROM 	CMN_LOOKUPS_V
+  		        WHERE LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV2'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV2:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV1:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+  		        UNION
+
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'@+@CAST(ID AS NVARCHAR) PK_KEY
+                           , ID
+                           , NAME
+                           , LOOKUP_CODE CODE
+                     FROM   CMN_LOOKUPS_V
+                     WHERE  LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV1'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+                     AND EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                          AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+                     UNION
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'@+@CAST(ID AS NVARCHAR) PK_KEY
+                            , ID
+                            , LOOKUP_CODE NAME
+                            , LOOKUP_CODE CODE
+                       FROM USER_LOV1_ALL_V
+                       WHERE NOT EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                         AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			 			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+		   ) DATA WHERE @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT  @SELECT:DATA.PK_KEY:PK_KEY@
+              , @SELECT:DATA.ID:ID@
+              , @SELECT:DATA.NAME:NAME@
+              , @SELECT:DATA.CODE:CODE@
+		  FROM (
+
+  		        SELECT 'FIN_TRANSCLASSES:'@+@ID PK_KEY
+  		               , ID
+  		               , DESCRIPTION NAME
+  		               , TRANSCLASS CODE
+  		        FROM 	TRANSCLASS
+
+		        UNION
+
+  		        SELECT 'SCH_BROWSE_ROLE:'@+@SR.ID PK_KEY
+  		               , SR.ID ID
+  		               , SR.LAST_NAME NAME
+  		               , SR.UNIQUE_NAME CODE
+  		        FROM 	SRM_RESOURCES SR, PRJ_RESOURCES PR
+  		        WHERE sr.id = pr.prid and pr.prisrole = 1
+
+  		        UNION
+
+			SELECT 'SCH_BROWSE_ROLE:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+		        UNION
+
+  		        SELECT 'LOOKUP_CHARGE_CODES:'@+@CC.PRID PK_KEY
+  		               , CC.PRID ID
+  		               , CC.PRNAME NAME
+  		               , CC.PREXTERNALID CODE
+  		        FROM 	PRCHARGECODE CC
+
+  		        UNION
+
+
+  		        SELECT 'FIN_BROWSE_USER_LOV2:'@+@ID PK_KEY
+  		               , ID
+  		               , NAME
+  		               , LOOKUP_CODE CODE
+  		        FROM 	CMN_LOOKUPS_V
+  		        WHERE LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV2'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV2:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV1:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+  		        UNION
+
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'@+@ID PK_KEY
+                           , ID
+                           , NAME
+                           , LOOKUP_CODE CODE
+                     FROM   CMN_LOOKUPS_V
+                     WHERE  LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV1'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+                     AND EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                         AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			 			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+                     UNION
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'@+@ID PK_KEY
+                            , ID
+                            , LOOKUP_CODE NAME
+                            , LOOKUP_CODE CODE
+                       FROM USER_LOV1_ALL_V
+                       WHERE NOT EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                         AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			 			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+		   ) DATA WHERE @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT  @SELECT:DATA.PK_KEY:PK_KEY@
+              , @SELECT:DATA.ID:ID@
+              , @SELECT:DATA.NAME:NAME@
+              , @SELECT:DATA.CODE:CODE@
+		  FROM (
+
+  		        SELECT 'FIN_TRANSCLASSES:'||ID PK_KEY
+  		               , ID
+  		               , DESCRIPTION AS NAME
+  		               , TRANSCLASS CODE
+  		        FROM 	TRANSCLASS
+
+		        UNION
+
+  		        SELECT 'SCH_BROWSE_ROLE:'||SR.ID PK_KEY
+  		               , SR.ID ID
+  		               , SR.LAST_NAME AS NAME
+  		               , SR.UNIQUE_NAME CODE
+  		        FROM 	SRM_RESOURCES SR, PRJ_RESOURCES PR
+  		        WHERE sr.id = pr.prid and pr.prisrole = 1
+
+  		        UNION
+
+			SELECT 'SCH_BROWSE_ROLE:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' AS NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+		        UNION
+
+  		        SELECT 'LOOKUP_CHARGE_CODES:'||CC.PRID PK_KEY
+  		               , CC.PRID ID
+  		               , CC.PRNAME AS NAME
+  		               , CC.PREXTERNALID CODE
+  		        FROM 	PRCHARGECODE CC
+
+  		        UNION
+
+
+  		        SELECT 'FIN_BROWSE_USER_LOV2:'||ID PK_KEY
+  		               , ID
+  		               , NAME
+  		               , LOOKUP_CODE CODE
+  		        FROM 	CMN_LOOKUPS_V
+  		        WHERE LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV2'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV2:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' AS NAME
+			  	, 'NOT_SPECIFIED' CODE
+  		        FROM 	DUAL
+
+  		        UNION
+
+			SELECT 'FIN_BROWSE_USER_LOV1:NOT_SPECIFIED' PK_KEY
+			  	, 0 ID
+			  	, 'NOT_SPECIFIED' AS NAME
+			  	, 'NOT_SPECIFIED' CODE        FROM 	DUAL
+
+  		        UNION
+
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'||ID PK_KEY
+                           , ID
+                           , NAME
+                           , LOOKUP_CODE CODE
+                     FROM   CMN_LOOKUPS_V
+                     WHERE  LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV1'
+                     AND    LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                     AND    IS_ACTIVE = 1
+                     AND EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                         AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			 			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+                     UNION
+
+                     SELECT 'FIN_BROWSE_USER_LOV1:'||ID PK_KEY
+                            , ID
+                            , LOOKUP_CODE AS NAME
+                            , LOOKUP_CODE CODE
+                       FROM USER_LOV1_ALL_V
+                       WHERE NOT EXISTS (
+                       SELECT 'A' FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+                         SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'NKT.GEN.LOOKUP_4_USER_VALUE1')
+                         AND USER_ID IS NULL
+                         AND VALUE = 'PRTIMEENTRY_USER_LOV1')
+                         AND NOT EXISTS (SELECT 1 FROM CMN_OPTION_VALUES WHERE OPTION_ID IN (
+			 			       		           SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_ENABLE_ML')
+                           AND VALUE = '1')
+
+		   ) DATA WHERE @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+              <displayedSuggestionAttribute value="code"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+              <searchedSuggestionAttribute value="code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                <nls description="Financial Plan By Detail Captions" languageCode="en" name="Financial Plan By Detail Captions"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                <nls description="Financial Plan By Detail Captions" languageCode="en" name="Financial Plan By Detail Captions"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="pk_key" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: Key" languageCode="en" name="[hidden]: Key"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="id" order="3" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: Id" languageCode="en" name="[hidden]: Id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="code" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="ID" languageCode="en" name="ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_RATE_INCRS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_RATE_INCRS_SP" 
+(
+  matrixKey   NUMBER ,
+  srcDateFrom DATE ,
+  srcDateTo   DATE ,
+  newDateFrom DATE ,
+  newDateTo   DATE ,
+  rate        NUMBER ,
+  stdCost     NUMBER ,
+  actCost     NUMBER ,
+  RC1  IN OUT PAC_MNT_MATRIX_RATE_INCRS_SPkg.RCT1
+)
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+
+  M_flag1          GLOBALPKG.STRING := null;
+  flag1            GLOBALPKG.STRING := null;
+  M_flag2          GLOBALPKG.STRING := null;
+  flag2            GLOBALPKG.STRING := null;
+  M_flag3          GLOBALPKG.STRING := null;
+  flag3            GLOBALPKG.STRING := null;
+  M_flag4          GLOBALPKG.STRING := null;
+  flag4            GLOBALPKG.STRING := null;
+  M_flag5          GLOBALPKG.STRING := null;
+  flag5            GLOBALPKG.STRING := null;
+  M_flag6          GLOBALPKG.STRING := null;
+  flag6            GLOBALPKG.STRING := null;
+  M_flag7          GLOBALPKG.STRING := null;
+  flag7            GLOBALPKG.STRING := null;
+  M_flag8          GLOBALPKG.STRING := null;
+  flag8            GLOBALPKG.STRING := null;
+  M_flag9          GLOBALPKG.STRING := null;
+  flag9            GLOBALPKG.STRING := null;
+  M_flag10         GLOBALPKG.STRING := null;
+  flag10           GLOBALPKG.STRING := null;
+  p_MatrixType     GLOBALPKG.STRING;
+  rateMatrixFlag   NUMBER(1,0);
+BEGIN
+	DELETE FROM temp_tempResultsPAC_MNT_MATRIX;
+
+  begin
+    SELECT MatrixType
+      into PAC_MNT_MATRIX_RATE_INCRS_SP.p_MatrixType
+      FROM ppa_Matrix
+     WHERE ppa_Matrix.MatrixKey = PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey;
+
+    exception
+      when others then
+        null;
+  end;
+
+  IF PAC_MNT_MATRIX_RATE_INCRS_SP.p_MatrixType = 'R' THEN
+    BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+
+      SELECT allow_use_of_costplus
+        INTO PAC_MNT_MATRIX_RATE_INCRS_SP.rateMatrixFlag
+        FROM nameoptions;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+	ELSE
+    BEGIN
+      SELECT 9
+       INTO PAC_MNT_MATRIX_RATE_INCRS_SP.rateMatrixFlag
+       FROM dual;
+    END;
+	END IF;
+
+  begin
+    select 1 into M_flag1 from dual where exists (
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=1 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag1,1,'1','!!::#undef#::!!')
+    INTO FLAG1
+    from dual;
+
+  begin
+    select 1 into M_flag2 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=2 );
+    exception
+      when others then
+      null;
+  end;
+
+  select decode(M_flag2,1,'1','!!::#undef#::!!')
+    INTO FLAG2
+    from dual;
+
+  begin
+    select 1 into M_flag3 from dual where exists (
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=3 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag3,1,'1','!!::#undef#::!!')
+    INTO FLAG3
+    from dual;
+
+  begin
+    select 1 into M_flag4 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=4 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag4,1,'1','!!::#undef#::!!')
+    INTO FLAG4
+    from dual;
+
+  begin
+    select 1 into M_flag5 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=5 );
+
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag5,1,'1','!!::#undef#::!!')
+    INTO FLAG5
+    from dual;
+
+  begin
+    select 1 into M_flag6 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=6 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag6,1,'1','!!::#undef#::!!')
+    INTO FLAG6
+    from dual;
+
+  begin
+    select 1 into M_flag7 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=7 );
+
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag7,1,'1','!!::#undef#::!!')
+    INTO FLAG7
+    from dual;
+
+  begin
+    select 1 into M_flag8 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=8 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag8,1,'1','!!::#undef#::!!')
+    INTO FLAG8
+    from dual;
+
+  begin
+    select 1 into M_flag9 from dual where exists (
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=9 );
+
+    exception
+      when others then
+      null;
+  end;
+
+  select decode(M_flag9,1,'1','!!::#undef#::!!')
+    INTO FLAG9
+    from dual;
+
+  begin
+    select 1 into M_flag10 from dual where exists(
+      select ColumnNo from ppa_MatrixColDef where MatrixKey=PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey And ColumnNo=10 );
+    exception
+      when others then
+        null;
+  end;
+
+  select decode(M_flag10,1,'1','!!::#undef#::!!')
+    INTO FLAG10
+    from dual;
+
+	OPEN RC1 FOR
+	SELECT
+    PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey "MatrixRowKey",
+    PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey "MatrixKey",
+    PAC_MNT_MATRIX_RATE_INCRS_SP.newDateFrom "FromDate",
+    PAC_MNT_MATRIX_RATE_INCRS_SP.newDateTo "ToDate",
+	  NVL(Value1, '*') "Value1",
+	  FLAG1 "flag1",
+	  NVL(Value2, '*') "Value2",
+	  FLAG2 "flag2",
+	  NVL(Value3, '*') "Value3",
+	  FLAG3 "flag3",
+	  NVL(Value4, '*') "Value4",
+	  FLAG4 "flag4",
+	  NVL(Value5, '*') "Value5",
+	  FLAG5 "flag5",
+	  NVL(Value6, '*') "Value6",
+	  FLAG6 "flag6",
+	  NVL(Value7, '*') "Value7",
+	  FLAG7 "flag7",
+	  NVL(Value8, '*') "Value8",
+	  FLAG8 "flag8",
+	  NVL(Value9, '*') "Value9",
+	  FLAG9 "flag9",
+	  NVL(Value10, '*') "Value10",
+	  FLAG10 "flag10",
+	  ( NumVal1 + NumVal1 * PAC_MNT_MATRIX_RATE_INCRS_SP.rate / 100 ) "NumVal1",
+	  ( NumVal2 + NumVal2 * PAC_MNT_MATRIX_RATE_INCRS_SP.stdCost / 100 ) "NumVal2",
+	  ( NumVal3 + NumVal3 * PAC_MNT_MATRIX_RATE_INCRS_SP.actCost / 100 ) "NumVal3",
+	  StrVal1 "StrData",
+	  PAC_MNT_MATRIX_RATE_INCRS_SP.p_MatrixType "MatrixType",
+	  PAC_MNT_MATRIX_RATE_INCRS_SP.rateMatrixFlag "RateMatrixFlag",
+	  MATRIX_CURRENCY_CODE
+  FROM
+    ppa_MatrixValues
+  WHERE
+    MatrixKey = PAC_MNT_MATRIX_RATE_INCRS_SP.matrixKey and
+    FromDate &gt;= PAC_MNT_MATRIX_RATE_INCRS_SP.srcDateFrom and
+    ToDate &lt;= PAC_MNT_MATRIX_RATE_INCRS_SP.srcDateTo;
+END PAC_MNT_MATRIX_RATE_INCRS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

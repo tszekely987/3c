@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PROJECT_FORECAST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PROJECT_FORECAST_SP" (
+   P_CURRENCY_CODE                  VARCHAR2 
+)
+AS
+  
+   V_STMT                           VARCHAR2 (2000);   
+   V_EXCHANGERATETYPE               VARCHAR2 (255);
+BEGIN
+   SELECT MIN ( LOOKUP_CODE )
+     INTO V_EXCHANGERATETYPE
+     FROM CMN_LOOKUPS
+    WHERE LOOKUP_TYPE = 'CMN_EXCHANGE_RATE_TYPE' AND IS_ACTIVE = 1;
+/*	
+	SELECT ID 
+    INTO V_LOOKUP1_ID 
+    FROM CMN_LOOKUPS 
+    WHERE LOOKUP_TYPE  = 'FIN_PLAN_BY_TYPE' AND LOOKUP_CODE = 'FIN_TRANSCLASS';  
+    
+		
+	SELECT ID 
+    INTO V_LOOKUP2_ID 
+    FROM CMN_LOOKUPS 
+    WHERE LOOKUP_TYPE  = 'FIN_PLAN_BY_TYPE' AND LOOKUP_CODE = 'FIN_CHARGE_CODE';
+ */  
+  
+   V_STMT := 'Populating the planning related information for each of the plan type for the given project';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+    MERGE INTO NBI_PROJECT_FORECAST npf
+    USING (
+            SELECT  PLANS.OBJECT_ID PROJECT_ID,        
+			CASE WHEN CL.LOOKUP_CODE= 'BUDGET' THEN 50343 ELSE 50342 END PLAN_TYPE,        
+			PLANS.TOTAL_UNITS BUDGET_LABOR_UNITS,
+			NULL BUDGET_EQUIP_UNITS,
+			NULL BUDGET_EXPENSE_UNITS,
+			NULL BUDGET_MATL_UNITS,
+			CASE WHEN INV.CURRENCY_CODE &lt;&gt; P_CURRENCY_CODE THEN 
+			Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT ( SYSDATE, INV.CURRENCY_CODE,P_CURRENCY_CODE,NVL ( PLANS.TOTAL_COST,0),pmt.LABOR_EXCHANGE_RATE_TYPE) 
+			ELSE NVL (PLANS.TOTAL_COST,0)
+			END REV_BUDGET_LABOR,
+			0 REV_BUDGET_EQUIP,
+			0 REV_BUDGET_EXPENSE,
+			0 REV_BUDGET_MATL,
+			PLANS.TOTAL_COST REV_BUDGET_TOTAL,
+			CASE WHEN INV.CURRENCY_CODE &lt;&gt; P_CURRENCY_CODE THEN 
+			Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT ( SYSDATE, INV.CURRENCY_CODE,P_CURRENCY_CODE,NVL ( PLANS.TOTAL_COST,0),pmt.LABOR_EXCHANGE_RATE_TYPE) 
+			ELSE NVL (PLANS.TOTAL_COST,0)
+			END COST_BUDGET_LABOR,
+			0 COST_BUDGET_EQUIP,
+			0 COST_BUDGET_EXPENSE,
+			0 COST_BUDGET_MATL,
+			PLANS.TOTAL_COST COST_BUDGET_TOTAL,
+			PLANS.REVISION  REVISION,	
+			(SELECT NVL(ID,0)
+				FROM CMN_LOOKUPS 
+				WHERE LOOKUP_TYPE  = 'FIN_PLAN_BY_TYPE' AND LOOKUP_CODE = 'FIN_TRANSCLASS') DETAIL_TYPE,
+			(SELECT NVL(ID,0)        
+				FROM CMN_LOOKUPS 
+				WHERE LOOKUP_TYPE  = 'FIN_PLAN_BY_TYPE' AND LOOKUP_CODE = 'FIN_CHARGE_CODE') PLAN_BY_2	 
+		FROM
+			 INV_INVESTMENTS INV 
+		JOIN FIN_PLANS PLANS ON (INV.ID = PLANS.OBJECT_ID AND PLANS.IS_PLAN_OF_RECORD = 1 )
+		--Jay: Keep this PAC_MNT_PROJECTS join for now to match the before and after records due to re-factoring.
+		--    This join makes sure that the projects are financially enabled 
+		JOIN  PAC_MNT_PROJECTS pmt ON (pmt.ID=INV.ID AND LOCATIONID IS NOT NULL AND DEPARTCODE IS NOT NULL)
+		JOIN CMN_LOOKUPS CL ON (PLANS.PLAN_TYPE_CODE =CL.LOOKUP_CODE AND CL.LOOKUP_TYPE = 'FIN_PLAN_TYPE' )
+		LEFT OUTER JOIN INV_PROJECTS PROJECTS ON INV.ID=PROJECTS.PRID  
+		WHERE NVL(PROJECTS.IS_TEMPLATE,0)=0
+		) tmp ON (npf.PROJECT_ID=tmp.PROJECT_ID AND npf.PLAN_TYPE=tmp.PLAN_TYPE)
+    WHEN MATCHED THEN
+        UPDATE SET 
+                npf.BUDGET_LABOR_UNITS=tmp.BUDGET_LABOR_UNITS , 
+                npf.BUDGET_EQUIP_UNITS=tmp.BUDGET_EQUIP_UNITS , 
+                npf.BUDGET_EXPENSE_UNITS=tmp.BUDGET_EXPENSE_UNITS , 
+                npf.BUDGET_MATL_UNITS=tmp.BUDGET_MATL_UNITS ,
+                npf.REV_BUDGET_LABOR=tmp.REV_BUDGET_LABOR , 
+                npf.REV_BUDGET_EQUIP=tmp.REV_BUDGET_EQUIP ,
+                npf.REV_BUDGET_EXPENSE=tmp.REV_BUDGET_EXPENSE ,
+                npf.REV_BUDGET_MATL=tmp.REV_BUDGET_MATL ,
+                npf.REV_BUDGET_TOTAL=tmp.REV_BUDGET_TOTAL ,
+                npf.COST_BUDGET_LABOR=tmp.COST_BUDGET_LABOR , 
+                npf.COST_BUDGET_EQUIP=tmp.COST_BUDGET_EQUIP , 
+                npf.COST_BUDGET_EXPENSE=tmp.COST_BUDGET_EXPENSE ,
+                npf.COST_BUDGET_MATL=tmp.COST_BUDGET_MATL ,
+                npf.COST_BUDGET_TOTAL=tmp.COST_BUDGET_TOTAL ,
+                npf.BUDGET_REV_NUMBER=tmp.REVISION ,
+                npf.DETAIL_TYPE=tmp.DETAIL_TYPE ,
+                npf.PLAN_BY_2=tmp.PLAN_BY_2
+    WHEN NOT MATCHED THEN
+           INSERT 
+           ( PROJECT_ID, PLAN_TYPE, BUDGET_LABOR_UNITS, BUDGET_EQUIP_UNITS, BUDGET_EXPENSE_UNITS, BUDGET_MATL_UNITS,
+             REV_BUDGET_LABOR, REV_BUDGET_EQUIP,REV_BUDGET_EXPENSE,REV_BUDGET_MATL,REV_BUDGET_TOTAL,COST_BUDGET_LABOR, 
+             COST_BUDGET_EQUIP, COST_BUDGET_EXPENSE,COST_BUDGET_MATL,COST_BUDGET_TOTAL,BUDGET_REV_NUMBER,DETAIL_TYPE,PLAN_BY_2
+           )
+           VALUES ( tmp.PROJECT_ID,
+                    tmp.PLAN_TYPE,
+                    tmp.BUDGET_LABOR_UNITS , 
+                    tmp.BUDGET_EQUIP_UNITS , 
+                    tmp.BUDGET_EXPENSE_UNITS , 
+                    tmp.BUDGET_MATL_UNITS ,
+                    tmp.REV_BUDGET_LABOR , 
+                    tmp.REV_BUDGET_EQUIP ,
+                    tmp.REV_BUDGET_EXPENSE ,
+                    tmp.REV_BUDGET_MATL ,
+                    tmp.REV_BUDGET_TOTAL ,
+                    tmp.COST_BUDGET_LABOR , 
+                    tmp.COST_BUDGET_EQUIP , 
+                    tmp.COST_BUDGET_EXPENSE ,
+                    tmp.COST_BUDGET_MATL ,
+                    tmp.COST_BUDGET_TOTAL ,
+                    tmp.REVISION ,
+                    tmp.DETAIL_TYPE ,
+                    tmp.PLAN_BY_2           
+                   );
+	--COMMIT;
+	V_STMT := 'Done Populating the planning related information for each of the plan type for the given project';
+	DBMS_OUTPUT.PUT_LINE (V_STMT);
+EXCEPTION   
+   WHEN OTHERS THEN RAISE_APPLICATION_ERROR ( -20000,'Error in NBI_PROJECT_FORECAST_SP -'|| V_STMT|| ': '|| SQLERRM);
+END NBI_PROJECT_FORECAST_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="LOOKUP_USER_PARTITIONS" displayAttributeName="partition_name" hiddenAttributeName="partition_code" objectCode="" sortAttributeName="partition_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List of Partitions that user is member of" languageCode="en" name="Partition that user is member of"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT 
+	      @select:up.model_name:model_name@,
+	        @select:up.model_description:model_description@,
+	        @select:up.partition_name:partition_name@,
+	        @select:up.partition_description:partition_description@,
+	        @select:up.partition_code:partition_code@,
+	        @select:up.model_code:model_code@,
+	        @select:up.is_active:is_active@,
+	        @select:up.depth:depth@,@SELECT:up.LAST_UPDATED_DATE:LAST_UPDATED_DATE@,
+ 		@SELECT:up.ID:LANGUAGE_ID@,
+		@SELECT:up.LANGUAGE_CODE:LANGUAGE_CODE@
+	    FROM 
+	    ( SELECT nls2.name model_name, nls2.description model_description, nls1.name partition_name, nls1.description partition_description,
+	        cpv.partition_code partition_code, cpv.model_code model_code, cpv.is_active is_active, cpv.depth depth, nls1.LAST_UPDATED_DATE, l.ID, nls2.LANGUAGE_CODE
+	        FROM
+	      cmn_user_partitions_v cpv,
+	      cmn_captions_nls nls1,
+	      cmn_captions_nls nls2,
+	      cmn_partition_models cpm,CMN_LANGUAGES l
+	    WHERE 
+	      cpv.user_id = @where:param:user_id@ and
+	      cpv.model_code = cpm.code and
+	     ( (@where:param:user_def:string:model_code@  IS NOT NULL 
+	                   AND cpm.code = @where:param:user_def:string:model_code@)
+	               OR (@where:param:user_def:string:model_code@ IS NULL 
+	                    AND  cpm.code=  cpm.code)) and
+	      nls1.table_name = 'CMN_PARTITIONS' and
+	      nls1.pk_id = cpv.partition_id and
+	      nls1.language_code = @where:param:language@ and
+	      nls2.table_name = 'CMN_PARTITION_MODELS' and
+	      nls2.pk_id = cpm.id and
+	      nls2.language_code = @where:param:language@  and
+		  nls2.LANGUAGE_CODE = l.LANGUAGE_CODE and
+	      cpv.is_active = 1
+	      ) up
+	      WHERE @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="partition_name"/>
+              <displayedSuggestionAttribute value="partition_code"/>
+              <displayedSuggestionAttribute value="partition_description"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="partition_name"/>
+              <searchedSuggestionAttribute value="partition_code"/>
+              <searchedSuggestionAttribute value="partition_description"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Partition" languageCode="en" name="Select Partition"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Partitions" languageCode="en" name="Select Partitions"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="partition_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Partition Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="partition_description" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="partition_code" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Partition ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="partition_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Partition Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="partition_description" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Description"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="partition_code" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Partition ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

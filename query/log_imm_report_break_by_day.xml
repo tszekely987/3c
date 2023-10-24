@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_imm_report_break_by_day" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Immediate Reports Breakdown by Day"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[select /*+ index(LOG_DETAILS LOG_DETAILS_N8) */ @SELECT:DIM:USER_DEF:IMPLIED:LOG:RD.JOB_DEFINITION_ID:REPORTID@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:RD.NAME:report_name@, 
+        @SELECT:METRIC:USER_DEF:IMPLIED:COUNT(*):REPORT_COUNT@
+        from LOG_DETAILS Z
+        INNER JOIN LOG_REPORTDEFS RD ON (Z.REPORT_ID = RD.JOB_DEFINITION_ID)
+        WHERE RD.ENVIRONMENT = @WHERE:PARAM:USER_DEF:STRING:environment@
+        AND RD.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+        AND (CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ as DATE) IS NULL OR Z.LOG_DATE = CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ AS DATE))
+        AND Z.ENVIRONMENT = @WHERE:PARAM:USER_DEF:STRING:environment@
+        AND (@WHERE:PARAM:USER_DEF:STRING:host_name@ IS NULL OR Z.HOST_NAME = @WHERE:PARAM:USER_DEF:STRING:host_name@)
+        AND @FILTER@
+        group by RD.name, RD.JOB_DEFINITION_ID]]></nsql>
+            <attribute id="reportid" lookup="LOG_REPORT_DEFS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="reportid"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="report_name" required="false"/>
+            <attribute id="report_count" required="false"/>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_environment" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_environment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_host_name" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_host_name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

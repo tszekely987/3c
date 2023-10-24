@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_ISSYSCURRENABLED_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_ISSYSCURRENABLED_SP" 
+(
+ 	   p_userid IN VARCHAR2 DEFAULT NULL
+)
+AS
+S_MultiCurrencyEnabled	VARCHAR2(255);
+S_SystemCurrencyEnabled	VARCHAR2(255);
+BEGIN
+ BEGIN
+ 	S_MultiCurrencyEnabled := 0;
+    SELECT cov.value
+	INTO   S_MultiCurrencyEnabled
+	FROM   CMN_OPTIONS CO,
+	       CMN_OPTION_VALUES COV
+    WHERE  CO.ID = COV.OPTION_ID and CO.OPTION_CODE='CMN_IS_MULTI_CURRENCY_SYSTEM';
+ END;
+ -- Perform the check only if it is a single currency enabled system
+ -- else just return.
+ IF   S_MultiCurrencyEnabled = 0 THEN
+  BEGIN
+    SELECT 1
+	INTO   S_SystemCurrencyEnabled
+	FROM   CMN_OPTIONS CO,
+	       CMN_OPTION_VALUES COV
+    WHERE  CO.ID = COV.OPTION_ID and CO.OPTION_CODE ='CMN_SYSTEM_CURRENCY' and COV.CREATED_DATE != COV.LAST_UPDATED_DATE;
+    EXCEPTION
+	 WHEN NO_DATA_FOUND THEN
+	 	  RAISE PAC_GLOBAL_ERRORS.SystemCurrencyNotSet;
+  END;
+ END IF; 
+END PAC_MNT_ISSYSCURRENABLED_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

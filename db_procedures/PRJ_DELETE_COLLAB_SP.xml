@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_DELETE_COLLAB_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_DELETE_COLLAB_SP" (
+   P_PROJECT_ID     INTEGER
+)
+AS
+
+temp_id integer := 0;
+
+BEGIN
+
+  -- Delete project group keys entry
+  DELETE
+     FROM clb_project_group_keys
+     WHERE project_id=P_PROJECT_ID;
+
+
+  -- PROJECT MEMBERS GROUP DELETION
+
+  BEGIN
+  
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_code = 'CLB_PROJECT_MEMBERS' || P_PROJECT_ID
+	AND principal_type='CLB_PROJECTS' AND principal_id=P_PROJECT_ID;
+	
+	IF temp_id &gt; 0
+	THEN 
+	
+	 	-- Remove instant right
+	 	CMN_SEC_REMOVE_INST_RIGHT_SP('GROUP', 'CLB_PROJECT_MEMBERS' || P_PROJECT_ID,     'CLB_PART_AUTO_RIGHT', P_PROJECT_ID);
+	
+	END IF;  
+	
+	temp_id := 0;
+  
+	-- Get PROJECT MEMBERS group 
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_type_id = 2844 and principal_id=P_PROJECT_ID;
+	
+    IF temp_id &gt; 0
+    THEN 
+    
+	    -- Remove all permission entries for this group
+	    DELETE
+	    FROM CMN_SEC_ASSGND_OBJ_PERM
+	    WHERE PRINCIPAL_TYPE = 'GROUP' and PRINCIPAL_ID=temp_id;
+	    
+	    -- Remove Users that belong to this group
+	    DELETE 
+	    FROM CMN_SEC_USER_GROUPS
+	    WHERE group_id=temp_id;
+	    
+	    
+	    -- Delete group and its cmn options entries
+	    DELETE
+	       FROM CMN_SEC_GROUPS
+	      WHERE ID = temp_id;
+	      
+	    CMN_CAPTIONS_NLS_DEL_SP('CMN_SEC_GROUPS', temp_id);
+    
+    END IF;
+    
+    temp_id := 0;
+
+
+  	-- PROJECT MANAGERS GROUP DELETION
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_code = 'CLB_PROJECT_MANAGERS' || P_PROJECT_ID
+	AND principal_type='CLB_PROJECTS' AND principal_id=P_PROJECT_ID;
+
+  	IF temp_id &gt; 0
+    THEN
+		-- Remove instant right
+	  	CMN_SEC_REMOVE_INST_RIGHT_SP('GROUP', 'CLB_PROJECT_MANAGERS' || P_PROJECT_ID,   'CLB_MGR_AUTO_RIGHT', P_PROJECT_ID);
+
+	END IF;
+	
+	temp_id := 0;
+
+	-- Get PROJECT MANAGERS group 
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_type_id = 2845 and principal_id=P_PROJECT_ID;
+	
+	IF temp_id &gt; 0
+	THEN 
+	
+		-- Remove all permission entries for this group
+		DELETE
+		FROM CMN_SEC_ASSGND_OBJ_PERM
+		WHERE PRINCIPAL_TYPE = 'GROUP' and PRINCIPAL_ID=temp_id;
+		
+		-- Remove Users that belong to this group
+		DELETE 
+		FROM CMN_SEC_USER_GROUPS
+		WHERE group_id=temp_id;
+		
+		
+		-- Delete group and its cmn options entries
+		DELETE
+		FROM CMN_SEC_GROUPS
+		WHERE ID = temp_id;
+		   
+		CMN_CAPTIONS_NLS_DEL_SP('CMN_SEC_GROUPS', temp_id);
+	
+	END IF;
+	
+	temp_id := 0;
+	
+	
+	-- PROJECT GROUPS GROUP DELETION
+	
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_code = 'CLB_PROJECT_GROUPS' || P_PROJECT_ID
+	AND principal_type='CLB_PROJECTS' AND principal_id=P_PROJECT_ID;
+	
+	IF temp_id &gt; 0
+	THEN
+	
+		-- Remove instant right
+		CMN_SEC_REMOVE_INST_RIGHT_SP('GROUP', 'CLB_PROJECT_GROUPS' || P_PROJECT_ID,   'CLB_GRPS_AUTO_RIGHT', P_PROJECT_ID);
+	
+	END IF;
+	
+	temp_id := 0;
+	
+	-- Get PROJECT GROUPS group 
+	SELECT id into temp_id 
+	FROM cmn_sec_groups
+	WHERE group_type_id = 2846 and principal_id=P_PROJECT_ID;
+	
+	IF temp_id &gt; 0
+	THEN 
+	
+		-- There should be nothing to delete from the users group
+		
+		-- Delete group and its cmn options entries
+		DELETE
+		FROM CMN_SEC_GROUPS
+		WHERE ID = temp_id;
+		  
+		CMN_CAPTIONS_NLS_DEL_SP('CMN_SEC_GROUPS', temp_id);
+	
+	END IF;
+	  
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN NULL;
+  END;
+ 
+
+  temp_id := 0;
+
+
+-- PROJECT FOLDER deletion
+
+  BEGIN
+
+	  -- Get the project folder
+	  SELECT id into temp_id 
+		FROM clb_dms_folders
+		WHERE assoc_obj_type='Projects' and assoc_obj_id=P_PROJECT_ID;
+	
+	  IF temp_id &gt; 0
+	  THEN 
+	  
+		  -- DELETE project folder and its contents recursively
+		  clb_dms_delete_pkg.delete_folder(temp_id);
+		  
+	  END IF;
+	  
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN NULL;
+  END;
+
+-- DISCUSSION deleteion
+
+  -- DELETE PROJECT Category
+  DELETE 
+	FROM ntd_categories
+	WHERE object_type_id = 300 and object_id=P_PROJECT_ID;
+
+  -- No need to delete perms and folders because they were already deleted above.
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in PRJ_DELETE_COLLAB_SP : ' || ': ' || SQLERRM
+      );
+      
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

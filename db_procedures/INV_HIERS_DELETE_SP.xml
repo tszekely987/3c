@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>INV_HIERS_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."INV_HIERS_DELETE_SP" (
+   P_PARENT_ID    NUMBER,
+   P_CHILD_ID   NUMBER,
+   P_HIERARCHY_ID   NUMBER
+)
+AS
+   V_PARENT_ID    NUMBER;
+   V_CHILD_ID   NUMBER;
+   V_HIERARCHY_ID   NUMBER;
+   CURSOR C_FLAT_HIERS (V_CHILD_ID NUMBER, V_PARENT_ID NUMBER)
+   IS
+    SELECT PARENTCHILD.PARENT_ID PARENT_ID,PARENTCHILD.CHILD_ID CHILD_ID,COUNT(1) REF_COUNT FROM
+    (
+      SELECT PARENT.PARENT_ID, CHILD.CHILD_ID FROM
+      ( SELECT PARENT_ID,CHILD_ID FROM INV_HIERARCHIES START WITH PARENT_ID = V_CHILD_ID CONNECT BY PRIOR CHILD_ID = PARENT_ID
+        UNION ALL
+        SELECT V_CHILD_ID,V_CHILD_ID FROM DUAL
+      )CHILD,
+      ( SELECT PARENT_ID, CHILD_ID FROM  (SELECT PARENT_ID, CHILD_ID FROM INV_HIERARCHIES START WITH CHILD_ID = V_PARENT_ID CONNECT BY PRIOR PARENT_ID = CHILD_ID )PARENTS WHERE PARENT_ID IS NOT NULL
+        UNION ALL
+        SELECT V_PARENT_ID PARENT_ID,V_PARENT_ID CHILD_ID  FROM DUAL
+      ) PARENT
+    ) PARENTCHILD GROUP BY PARENTCHILD.PARENT_ID, PARENTCHILD.CHILD_ID;
+
+  BEGIN
+  V_PARENT_ID := P_PARENT_ID;
+  V_CHILD_ID := P_CHILD_ID;
+   IF (V_CHILD_ID IS NULL OR V_PARENT_ID IS NULL) THEN
+          SELECT CHILD_ID,PARENT_ID INTO V_CHILD_ID,V_PARENT_ID FROM   INV_HIERARCHIES WHERE ID =  P_HIERARCHY_ID;
+   END IF;
+
+   FOR C IN C_FLAT_HIERS (V_CHILD_ID, V_PARENT_ID)
+   LOOP
+      UPDATE INV_FLAT_HIERARCHIES SET REF_COUNT = REF_COUNT-C.REF_COUNT WHERE CHILD_ID = C.CHILD_ID AND  PARENT_ID = C.PARENT_ID;
+   END LOOP;
+
+   --delete all non-existing relations
+   DELETE FROM INV_FLAT_HIERARCHIES WHERE REF_COUNT = 0;
+
+   -- delete self referenced investments
+   -- Delete the self referenced investments if that investment is not having any child and its not a a child to any investment
+   DELETE INV_FLAT_HIERARCHIES
+      WHERE  REF_COUNT = 1
+      AND    CHILD_ID = PARENT_ID
+      AND    NOT EXISTS( SELECT CHILD_ID
+                         FROM INV_FLAT_HIERARCHIES IFH
+                         WHERE IFH.CHILD_ID != IFH.PARENT_ID
+                         AND   IFH.CHILD_ID = INV_FLAT_HIERARCHIES.CHILD_ID
+                         )
+      AND    NOT EXISTS( SELECT PARENT_ID
+                         FROM INV_FLAT_HIERARCHIES IFH
+                         WHERE IFH.CHILD_ID != IFH.PARENT_ID
+                         AND   IFH.PARENT_ID != INV_FLAT_HIERARCHIES.PARENT_ID );
+  END;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

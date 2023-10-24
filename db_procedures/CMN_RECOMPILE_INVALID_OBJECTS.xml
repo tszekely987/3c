@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RECOMPILE_INVALID_OBJECTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RECOMPILE_INVALID_OBJECTS" 
+        AS        
+        CURSOR C_INVALID IS
+            SELECT   OBJECT_TYPE,OBJECT_NAME FROM USER_OBJECTS WHERE STATUS = 'INVALID';
+
+        V_TYPE   VARCHAR2 (4000);
+        V_SQL    VARCHAR2 (4000);
+
+        BEGIN
+            FOR C_INVALID_REC IN C_INVALID
+            LOOP
+                BEGIN
+                    IF C_INVALID_REC.OBJECT_TYPE = 'PACKAGE BODY' THEN
+                        V_SQL := 'alter package ' || C_INVALID_REC.OBJECT_NAME || ' compile body';
+                    ELSE
+                        V_SQL := 'alter ' || C_INVALID_REC.OBJECT_TYPE || ' ' || C_INVALID_REC.OBJECT_NAME || ' compile';
+                    END IF;
+
+                    EXECUTE IMMEDIATE V_SQL;
+                EXCEPTION
+                    WHEN OTHERS
+                    THEN
+                    DBMS_OUTPUT.PUT_LINE (V_SQL || ' ==&gt; ' || SQLERRM);
+                END;
+            END LOOP;
+        END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SUBMITPROJECTFORAPPROVAL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SUBMITPROJECTFORAPPROVAL" (
+COMPANY_CODE 	VARCHAR2 ,
+PROJECT_CODE 	VARCHAR2 ,
+user_ 	VARCHAR2 ,
+awaitingapproval 	NUMBER )
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+projrevisionid  NUMBER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/26/2001
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(projrevisionid)
+		INTO SubmitProjectForApproval.projrevisionid FROM projrevision
+		WHERE COMPANY_CODE = SubmitProjectForApproval.COMPANY_CODE
+		 AND PROJECT_CODE = SubmitProjectForApproval.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  SubmitProjectForApproval.projrevisionid = 0 OR   SubmitProjectForApproval.projrevisionid IS NULL THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+    UPDATE pac_mnt_projects
+		SET awaitingapproval = SubmitProjectForApproval.awaitingapproval,
+		AWAITAPPRVL_RESOURCE_CODE = SubmitProjectForApproval.user_,
+		needapprovaldatetime = SYSDATE
+		WHERE COMPANY_CODE = SubmitProjectForApproval.COMPANY_CODE
+		 AND PROJECT_CODE = SubmitProjectForApproval.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	ELSE
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE projrevision
+		SET awaitingapproval = SubmitProjectForApproval.awaitingapproval,
+		needapprovaldatetime = SYSDATE,
+		AWAITAPPRVL_RESOURCE_CODE = SubmitProjectForApproval.user_
+		WHERE COMPANY_CODE = SubmitProjectForApproval.COMPANY_CODE
+		 AND PROJECT_CODE = SubmitProjectForApproval.PROJECT_CODE
+		 And projrevisionid = SubmitProjectForApproval.projrevisionid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+END SubmitProjectForApproval;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

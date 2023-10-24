@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_DB_COMPILE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_DB_COMPILE_SP" 
+IS
+ CURSOR C_INVALID
+   IS
+      SELECT   OBJECT_TYPE,
+               OBJECT_NAME
+      FROM     USER_OBJECTS
+      WHERE    STATUS = 'INVALID'
+       ORDER BY DECODE (
+                   OBJECT_TYPE,
+                   'VIEW', 1,
+                   'PACKAGE', 2,
+                   'PACKAGE BODY', 3,
+                   'FUNCTION', 4,
+                   'PROCEDURE', 5,
+                   'TRIGGER', 6,
+                   7
+                );
+
+   V_TYPE                        VARCHAR2 (100);
+   V_SQL                         VARCHAR2 (1000);
+   V_BEFORE_COMPILE_CNT          INTEGER := 0;
+   V_AFTER_COMPILE_CNT           INTEGER := 1;
+
+
+BEGIN
+   DBMS_OUTPUT.ENABLE(1000000);
+   WHILE V_BEFORE_COMPILE_CNT &lt;&gt; V_AFTER_COMPILE_CNT
+   LOOP
+      SELECT   COUNT (*)
+      INTO     V_BEFORE_COMPILE_CNT
+      FROM     USER_OBJECTS
+      WHERE    STATUS = 'INVALID';
+
+    FOR C_INVALID_REC IN C_INVALID
+      LOOP
+         BEGIN
+            IF C_INVALID_REC.OBJECT_TYPE = 'PACKAGE BODY'
+            THEN
+               V_SQL := 'alter package ' || C_INVALID_REC.OBJECT_NAME || ' compile body';
+            ELSE
+               V_SQL := 'alter ' || C_INVALID_REC.OBJECT_TYPE || ' ' || C_INVALID_REC.OBJECT_NAME || ' compile';
+            END IF;
+
+            EXECUTE IMMEDIATE V_SQL;
+         EXCEPTION
+            WHEN OTHERS
+            THEN
+               DBMS_OUTPUT.PUT_LINE (V_SQL || ' ==&gt; ' || SQLERRM);
+         END;
+      END LOOP;
+
+      SELECT   COUNT (*)
+      INTO     V_AFTER_COMPILE_CNT
+      FROM     USER_OBJECTS
+      WHERE    STATUS = 'INVALID';
+   END LOOP;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

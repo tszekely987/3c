@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_ARMASTER_UPDATE</code>
+          <table_name>ARMASTER</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_ARMASTER_UPDATE" 
+AFTER UPDATE
+ON ARMASTER
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  status_type       NUMBER(5,0);
+  COMPANY_CODE      GLOBALPKG.STRING;
+  minkey            GLOBALPKG.STRING;
+  return_code       NUMBER;
+  error_message     GLOBALPKG.STRING;
+  retcode           NUMBER;
+  UF1_rowid         ROWID;
+  UF1_oval1         clntsupp.COMPANY_NAME%TYPE;
+
+  CURSOR UF1_cursor IS
+    SELECT clntsupp.ROWID, :NEW.address_name
+      FROM clntsupp
+     WHERE clntsupp.COMPANY_CODE = :NEW.COMPANY_CODE
+    FOR UPDATE OF clntsupp.COMPANY_NAME;
+BEGIN
+  IF (:NEW.address_name != :OLD.address_name) THEN
+    BEGIN
+      OPEN UF1_cursor;
+      LOOP
+        FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+        EXIT WHEN UF1_cursor%NOTFOUND;
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE clntsupp
+             SET clntsupp.COMPANY_NAME = UF1_oval1
+           WHERE ROWID = UF1_rowid;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END LOOP;
+      CLOSE UF1_cursor;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF (:NEW.status_type != :OLD.status_type) THEN
+    BEGIN
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT MIN(:new.COMPANY_CODE)
+          INTO minkey FROM DUAL
+        WHERE :new.COMPANY_CODE &gt; '';
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      &lt;&lt;i_loop1&gt;&gt;
+      WHILE minkey IS NOT NULL AND StoO_rowcnt &gt; 0 LOOP
+        BEGIN
+          BEGIN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+
+            SELECT   :NEW.status_type
+            INTO status_type FROM DUAL
+            WHERE :NEW.COMPANY_CODE = minkey;
+            StoO_rowcnt := SQL%ROWCOUNT;
+
+            EXCEPTION
+              WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+
+         BEGIN
+           sp_ppa_update_clntsupp(status_type=&gt;status_type, IN_clntcode=&gt;minkey, COMPANY_NAME=&gt;NULL,
+                                  return_code=&gt;return_code,  error_message=&gt;error_message, RET_CODE=&gt;retcode);
+
+           EXCEPTION
+             WHEN NO_DATA_FOUND THEN
+               NULL;
+             WHEN OTHERS THEN
+               StoO_error := SQLCODE;
+               StoO_errmsg := SQLERRM;
+         END;
+
+         IF retcode = -1 THEN
+           BEGIN
+             raise_application_error(-20447, 'An error occurred in sp_ppa_update_clntsupp');
+             RETURN;
+           END;
+         END IF;
+
+         BEGIN
+           StoO_rowcnt := 0;
+           StoO_selcnt := 0;
+           StoO_error  := 0;
+
+           SELECT   MIN(:NEW.COMPANY_CODE)
+           INTO minkey FROM DUAL
+           WHERE :NEW.COMPANY_CODE &gt; minkey;
+
+           StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+        END;
+      END LOOP;
+    END;
+	END IF;
+END tr_armaster_update;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

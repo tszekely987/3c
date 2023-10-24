@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SCH_JOB_DEF_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SCH_JOB_DEF_DELETE_SP" (P_ID IN NUMERIC)
+IS
+   V_STMT                        VARCHAR2(200);
+BEGIN
+   V_STMT := 'Deleting from CMN_SCH_JOB_DEFINITIONS';
+   DELETE
+     FROM CMN_SCH_JOB_DEFINITIONS
+    WHERE ID = P_ID;
+   V_STMT := 'Calling CMN_CAPTIONS_NLS_DELETE_SP';
+   CMN_CAPTIONS_NLS_DEL_SP (
+      P_TABLE_NAME =&gt; 'CMN_SCH_JOB_DEFINITIONS',
+      P_PK_ID =&gt; P_ID
+   );
+   V_STMT := 'Deleting from CMN_SCH_JOB_NONCONCUR';
+   DELETE
+     FROM CMN_SCH_JOB_NONCONCUR
+    WHERE JOB_DEFINITION_ID = P_ID
+       OR NON_CONCUR_JOB_DEF_ID = P_ID;
+   V_STMT := 'Deleting from CMN_SCH_JOB_RUN_PARAMS';
+   DELETE
+     FROM CMN_SCH_JOB_RUN_PARAMS
+    WHERE EXISTS (SELECT 'EXISTS'
+                    FROM CMN_SCH_JOB_RUNS JOB_RUNS, CMN_SCH_JOBS JOBS
+                   WHERE CMN_SCH_JOB_RUN_PARAMS.JOB_RUN_ID = JOB_RUNS.ID
+                     AND JOB_RUNS.JOB_ID = JOBS.ID
+                     AND JOBS.JOB_DEFINITION_ID = P_ID);
+   V_STMT := 'Deleting from CMN_SCH_JOB_LOGS';
+   DELETE
+     FROM CMN_SCH_JOB_LOGS
+    WHERE EXISTS (SELECT 'EXISTS'
+                    FROM CMN_SCH_JOB_RUNS JOB_RUNS, CMN_SCH_JOBS JOBS
+                   WHERE CMN_SCH_JOB_LOGS.JOB_RUN_ID = JOB_RUNS.ID
+                     AND JOB_RUNS.JOB_ID = JOBS.ID
+                     AND JOBS.JOB_DEFINITION_ID = P_ID);
+   V_STMT := 'Deleting from CMN_SCH_JOB_RUNS';
+   DELETE
+     FROM CMN_SCH_JOB_RUNS
+    WHERE EXISTS (SELECT 'EXISTS'
+                    FROM CMN_SCH_JOBS JOBS
+                   WHERE CMN_SCH_JOB_RUNS.JOB_ID = JOBS.ID
+                     AND JOBS.JOB_DEFINITION_ID = P_ID);
+   V_STMT := 'Deleting from CMN_SCH_JOBS';
+   DELETE
+     FROM CMN_SCH_JOBS
+    WHERE JOB_DEFINITION_ID = P_ID;
+   V_STMT := 'Deleting from CMN_SCH_USER_ASSOC';
+   DELETE
+     FROM CMN_SCH_USER_ASSOC
+    WHERE TABLE_NAME = 'CMN_SCH_JOB_DEFINITIONS'
+      AND PK_ID = P_ID;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in CMN_SCH_JOB_DEF_DELETE_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

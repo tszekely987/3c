@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_LUP_DEPARTMENTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_LUP_DEPARTMENTS" 
+(
+  in_locationid   IN VARCHAR2  DEFAULT NULL,
+  in_departcode   IN VARCHAR2  DEFAULT NULL,
+  in_description  IN VARCHAR2  DEFAULT NULL,
+  RC1         IN OUT REV_LUP_DEPARTMENTSPkg.RCT1
+)
+AS
+  locationid         GLOBALPKG.STRING;
+  departcode         GLOBALPKG.STRING;
+  description        GLOBALPKG.STRING;
+  StoO_selcnt        INTEGER;
+  StoO_error         INTEGER;
+  StoO_rowcnt        INTEGER;
+  StoO_crowcnt       INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg        GLOBALPKG.STRING;
+  StoO_sqlstatus     INTEGER;
+BEGIN
+	rev_lup_departments.locationid := rev_lup_departments.in_locationid;
+	rev_lup_departments.departcode := rev_lup_departments.in_departcode;
+	rev_lup_departments.description := rev_lup_departments.in_description;
+
+  SELECT DECODE(rev_lup_departments.locationid,
+                '', NULL,
+                '::#hdnLoca', NULL,
+                '::#hdnLocation#::', NULL,
+                NULL, NULL,
+                RTRIM(rev_lup_departments.locationid))
+     INTO rev_lup_departments.locationid
+     FROM DUAL;
+
+  SELECT DECODE(rev_lup_departments.departcode,
+                '', '%',
+                NULL, '%',
+                rev_lup_departments.departcode || '%')
+    INTO rev_lup_departments.departcode
+    FROM DUAL;
+
+  SELECT DECODE(rev_lup_departments.description,
+                '', '%',
+                NULL, '%',
+                rev_lup_departments.description || '%')
+    INTO rev_lup_departments.description
+    FROM DUAL;
+
+  OPEN RC1 FOR
+  SELECT departcode, description, NULL "PlaceHoldForBudgets"
+    FROM departments D
+   WHERE EXISTS (SELECT  1
+                   FROM locationdept LD
+                  WHERE LD.locationid = NVL(rev_lup_departments.locationid, LD.locationid)
+                    AND LD.departcode = D.departcode )
+     AND departcode LIKE rev_lup_departments.departcode
+     AND description LIKE rev_lup_departments.description;
+END rev_lup_departments;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

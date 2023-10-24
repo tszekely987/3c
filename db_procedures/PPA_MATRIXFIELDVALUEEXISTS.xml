@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXFIELDVALUEEXISTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_MATRIXFIELDVALUEEXISTS" 
+(
+  cFieldName  VARCHAR2 ,
+  cValue  VARCHAR2 ,
+  bExists   IN OUT NUMBER,
+  bSuppressResultSet  NUMBER  DEFAULT 0,
+  RC1   IN OUT PPA_MATRIXFIELDVALUEEXISTSPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+	BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE  EXISTS (
+      SELECT  1
+      FROM ppa_MatrixValues V, ppa_MatrixColDef C
+      WHERE C.MatrixKey = V.MatrixKey
+      and C.FieldName = ppa_MatrixFieldValueExists.cFieldName
+      and NVL(V.Value1, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(1 - C.ColumnNo), 255), V.Value1), '')
+      and NVL(V.Value2, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(2 - C.ColumnNo), 255), V.Value2), '')
+      and NVL(V.Value3, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(3 - C.ColumnNo), 255), V.Value3), '')
+      and NVL(V.Value4, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(4 - C.ColumnNo), 255), V.Value4), '')
+      and NVL(V.Value5, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(5 - C.ColumnNo), 255), V.Value5), '')
+      and NVL(V.Value6, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(6 - C.ColumnNo), 255), V.Value6), '')
+      and NVL(V.Value7, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(7 - C.ColumnNo), 255), V.Value7), '')
+      and NVL(V.Value8, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(8 - C.ColumnNo), 255), V.Value8), '')
+      and NVL(V.Value9, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(9 - C.ColumnNo), 255), V.Value9), '')
+      and NVL(V.Value10, '') = NVL(NVL(SUBSTR(ppa_MatrixFieldValueExists.cValue, 1 - ABS(10 - C.ColumnNo), 255), V.Value10), '') );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		ppa_MatrixFieldValueExists.bExists :=  1;
+	ELSE
+		ppa_MatrixFieldValueExists.bExists :=  0;
+	END IF;
+
+  IF  ppa_MatrixFieldValueExists.bSuppressResultSet = 0 THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    OPEN   RC1 FOR
+    SELECT ppa_MatrixFieldValueExists.bExists
+      FROM DUAL;
+	END IF;
+END ppa_MatrixFieldValueExists;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

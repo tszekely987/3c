@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_FEATURE_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_FEATURE_UPD_SP" (
+	P_FEATURE_CODE  VARCHAR2,
+	P_FEATURE_NAME  VARCHAR2,
+	P_FEATURE_DESC  VARCHAR2
+	)
+	IS
+	F_ID NUMBER;
+
+	BEGIN
+		-- check feature existence
+		SELECT ID INTO F_ID
+		FROM CMN_FEATURES 
+		WHERE CODE = P_FEATURE_CODE ;
+
+		-- CHECK IF FEATURE EXISTS THEN UPDATE A RECORD INTO CMN_FEATURES TABLE OTHERWISE THROW EXCEPTION
+		IF F_ID IS NOT NULL
+		THEN
+			UPDATE CMN_FEATURES SET NAME=P_FEATURE_NAME, DESCRIPTION = P_FEATURE_DESC WHERE CODE = P_FEATURE_CODE;
+			CMN_CAPTIONS_NLS_UPD_SP( 'CMN_FEATURES', F_ID, P_FEATURE_NAME, P_FEATURE_DESC, 1);
+		END IF;
+    
+		EXCEPTION
+		-- raise error if feature not exist
+		WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR (-20006, 'No Feature exists to update with the Code: ' || P_FEATURE_CODE);
+    
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

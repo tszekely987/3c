@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.projectCostsResLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project Costs By Resource" languageCode="en" name="Project Costs By Resource"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:resource:@DBUSER@.CMN_TO_CHAR_FCT(inv.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(tm.prid):proj_res_int_id@,  /* Project and Team Internal ID */
+       @select:dim_prop:user_def:implied:resource:r.id:resource_int_id@,
+       @select:dim_prop:user_def:implied:resource:r.full_name:resource_name@,  /* Resource/Role Full Name */
+       @select:dim_prop:user_def:implied:resource:@NVL@(tm.requirement_name,r.full_name):requirement_name@,  /* Resource/Role */
+       @select:dim_prop:user_def:implied:resource:rt.name:resource_type@,
+       @select:dim_prop:user_def:implied:resource:et.name:employment_type@,
+       @select:dim_prop:user_def:implied:resource:r2.full_name:project_role@,
+       @select:dim_prop:user_def:implied:resource:inv.id:project_int_id@,
+       @select:dim_prop:user_def:implied:resource:inv.name:project_name@,
+       @select:dim_prop:user_def:implied:resource:@UPPER@(inv.odf_object_code):investment_type_upper@,
+       @select:metric:user_def:implied:SUM(a.baseline_cost):base_cost@,                                                         
+       @select:metric:user_def:implied:SUM(@NVL@(a.actcost_sum,0)):act_cost@,
+       @select:metric:user_def:implied:SUM(@NVL@(a.prestsum,0) * @NVL@(rc.cost_rate,0)):etc_cost@,
+       @select:metric:user_def:implied:SUM(@NVL@(a.actcost_sum,0) + (@NVL@(a.prestsum,0) * @NVL@(rc.cost_rate,0))):eac_cost@,
+       @select:metric:user_def:implied:(SUM(@NVL@(a.prestsum,0) * @NVL@(rc.cost_rate,0)) + SUM(@NVL@(a.actcost_sum,0))) - SUM(a.baseline_cost):cost_variance@,
+       @select:metric:user_def:implied:CASE WHEN SUM(a.baseline_cost) = 0  THEN 0
+                                            ELSE ( ( ( ( SUM(@NVL@(a.prestsum,0) * @NVL@(rc.cost_rate,0)) + SUM(@NVL@(a.actcost_sum,0))
+                                                       ) - SUM(@NVL@(a.baseline_cost,0))
+                                                     ) / SUM(a.baseline_cost)
+                                                   ) * 100             ) END:cv_percent@,
+       @select:metric:user_def:implied:CASE WHEN SUM(a.baseline_cost) = 0  THEN 0
+                                            ELSE ( ( ( ( SUM(@NVL@(a.prestsum,0) * @NVL@(rc.cost_rate,0)) + SUM(@NVL@(a.actcost_sum,0))
+                                                       ) - SUM(@NVL@(a.baseline_cost,0))
+                                                     ) / SUM(a.baseline_cost)
+                                                   ) * 100
+                                                 ) END:cv_percent_sl@,
+    /* Effort Attributes */
+       @select:metric:user_def:implied:SUM(a.baseline_usage):base_qty@,
+       @select:metric:user_def:implied:SUM(@NVL@(a.prestsum,0)):etc_qty@,
+       @select:metric:user_def:implied:SUM(@NVL@(a.practsum,0)):act_qty@,
+       @select:metric:user_def:implied:SUM((@NVL@(a.practsum,0) + @NVL@(a.prestsum,0) )):eac_qty@,
+    /* Projected Effort Variance Amount */
+       @select:metric:user_def:implied:SUM((@NVL@(a.practsum,0) + @NVL@(a.prestsum,0)) - a.baseline_usage):projected_effort_var@, 
+    /* Projected Effort Variance Percent */
+       @select:metric:user_def:implied:SUM(CASE WHEN a.baseline_usage = 0 THEN 0
+                                            ELSE ( ( @NVL@(a.practsum,0) + @NVL@(a.prestsum,0) - @NVL@(a.baseline_usage,0) )  / a.baseline_usage )	* 100  
+                                            END):projected_effort_var_pct_sl@     
+FROM   inv_investments inv
+INNER  JOIN  prteam tm
+       ON    inv.id = tm.prProjectID
+INNER  JOIN  srm_resources r
+       ON    tm.prResourceID = r.id
+LEFT   OUTER JOIN cmn_lookups_v rt
+             ON   r.resource_type = rt.lookup_enum
+             AND  rt.lookup_type = 'RESOURCE_TYPE' 
+             AND  rt.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v et
+             ON   r.person_type = et.id 
+             AND  et.lookup_type = 'SRM_RESOURCE_TYPE' 
+             AND  et.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN srm_resources r2
+             ON   tm.prRoleID = r2.id
+LEFT   OUTER JOIN odf_assignment_v2 a
+             ON   inv.id = a.odf_grand_parent_id  /* Project Internal ID */
+             AND  r.id = a.prResourceID
+LEFT   OUTER JOIN nbi_proj_res_rates_and_costs rc
+             ON   a.odf_grand_parent_id = rc.project_id
+             AND  a.prTaskID = rc.task_id
+             AND  a.prResourceID = rc.resource_id
+             AND  a.prFinish BETWEEN rc.from_date AND rc.to_date
+WHERE  @WHERE:PARAM:USER_DEF:INTEGER:r.person_type:EMPL_TYPE@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:r.resource_type:RES_TYPE@
+AND    (   (@WHERE:PARAM:USER_DEF:STRING:IS_ROLE@ IS NULL)
+        OR (@WHERE:PARAM:USER_DEF:STRING:IS_ROLE@ = 'BOTH')
+        OR (@WHERE:PARAM:USER_DEF:STRING:IS_ROLE@ = 'NO' AND r.person_type <> 0)
+        OR (@WHERE:PARAM:USER_DEF:STRING:IS_ROLE@ = 'YES' AND r.person_type = 0)
+       )
+AND    (inv.id = @WHERE:PARAM:XML:INTEGER:/data/ProjectID/@value@)
+AND    @WHERE:SECURITY:PROJECT:inv.id@
+AND    @FILTER@
+GROUP  BY tm.prid, tm.requirement_name, r.id, r.full_name, r.person_type,
+          rt.name, et.name, r2.full_name, inv.id, inv.name, inv.odf_object_code
+HAVING @HAVING_FILTER@]]></nsql>
+            <attribute id="proj_res_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_int_id" lookup="SCH_BROWSE_RESOURCE" required="false">
+              
+              
+              
+              
+              <nls description="Resource Filter" languageCode="en" name="Resource Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_name" required="false">
+              
+              
+              
+              
+              <nls description="Resource/Role Full Name" languageCode="en" name="Resource/Role Full Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="requirement_name" required="false">
+              
+              
+              
+              
+              <nls description="Resource/Role" languageCode="en" name="Resource/Role"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_type" required="false">
+              
+              
+              
+              
+              <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="employment_type" required="false">
+              
+              
+              
+              
+              <nls description="Employment Type" languageCode="en" name="Employment Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_role" required="false">
+              
+              <nls description="Project Role" languageCode="en" name="Project Role"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="base_cost" required="false">
+              
+              
+              
+              <nls description="BAC Cost" languageCode="en" name="BAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_cost" required="false">
+              
+              
+              
+              
+              <nls description="Actual Cost (ACWP)" languageCode="en" name="Actual Cost (ACWP)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_cost" required="false">
+              
+              
+              
+              
+              <nls description="ETC Cost" languageCode="en" name="ETC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac_cost" required="false">
+              
+              
+              
+              
+              <nls description="EAC Cost" languageCode="en" name="EAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost_variance" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Projected Cost Variance" languageCode="en" name="Projected Cost Variance"/>
+              
+            </attribute>
+            <attribute id="cv_percent" required="false">
+              
+              
+              
+              
+              <nls description="Projected Cost Variance % Value" languageCode="en" name="Projected Cost Variance % Value"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cv_percent_sl" required="false">
+              
+              <nls description="Projected Cost Variance %" languageCode="en" name="Projected Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="base_qty" required="false">
+              
+              
+              
+              
+              <nls description="BAC" languageCode="en" name="BAC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_qty" required="false">
+              
+              
+              
+              
+              <nls description="ETC" languageCode="en" name="ETC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_qty" required="false">
+              
+              
+              
+              
+              <nls description="Actuals" languageCode="en" name="Actuals"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac_qty" required="false">
+              
+              
+              
+              
+              <nls description="EAC" languageCode="en" name="EAC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="projected_effort_var" required="false">
+              
+              
+              
+              
+              <nls description="Projected Effort Variance" languageCode="en" name="Projected Effort Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="projected_effort_var_pct_sl" required="false">
+              <nls description="Projected Effort Variance %" languageCode="en" name="Projected Effort Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_empl_type" lookup="SRM_RESOURCE_TYPE" required="false">
+              
+              
+              
+              <nls description="Employment Type Filter" languageCode="en" name="Employment Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_res_type" lookup="RESOURCE_TYPE" required="false">
+              
+              <nls description="Resource Type Filter" languageCode="en" name="Resource Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_is_role" lookup="COP_PORTLET_IS_ROLE" required="false">
+              
+              
+              
+              
+              <nls description="Is Role Filter" languageCode="en" name="Is Role Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="project.properties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.editResource" code="resourceProperties">
+                
+                
+                
+                
+                <nls description="Resource Properties" languageCode="en" name="Resource Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="/data/id/@value" dataSource="input" paramCode="return_id"/>
+                <linkParam dataRef="resource_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.teamList" code="team.list">
+                
+                
+                
+                
+                <nls description="Team List" languageCode="en" name="Team List"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_INVOICEPROCESS06RETURN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_INVOICEPROCESS06RETURN" 
+(
+  invoiceno   VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  max_key   NUMBER;
+  COMPANY_CODE  GLOBALPKG.STRING;
+  PROJECT_CODE  GLOBALPKG.STRING;
+  changeorder   GLOBALPKG.STRING;
+  cTransType    GLOBALPKG.STRING;
+  prjsep  GLOBALPKG.STRING;
+  transdate   DATE;
+  originvoiceno   GLOBALPKG.STRING;
+  amtrem  NUMBER(32,6);
+  amountremaining   NUMBER(32,6);
+  UF1_rowid   ROWID;
+
+  /* Multicurrency Change
+  * Updated the Cursor definition so as to update the values table along with the parent table.
+  * In this case the parent table is : PPA_BILLINGS and the values table is : PPA_BILLING_VALUES
+  */
+
+  CURSOR UF1_cursor IS
+    SELECT PPA_BILLINGS.ROWID ROWID_BILL, PPA_BILLING_VALUES.ROWID ROWID_VALUES,
+        ( ppa_Billing_values.AMOUNTREMAINING + temp_brbpapplytossp_invoicepro.amountremaining ) AMOUNTREMAINING,
+        PPA_BILLING_VALUES.CURRENCY_TYPE CURRENCY_TYPE
+    FROM TEMP_BRBPAPPLYTOSSP_INVOICEPRO, PPA_BILLINGS, PPA_BILLING_VALUES
+    WHERE PPA_BILLINGS.TransNo = TEMP_BRBPAPPLYTOSSP_INVOICEPRO.applytonumber
+        AND TEMP_BRBPAPPLYTOSSP_INVOICEPRO.CURRENCY_TYPE = PPA_BILLING_VALUES.CURRENCY_TYPE
+        AND TEMP_BRBPAPPLYTOSSP_INVOICEPRO.APPLYTONUMBER = PPA_BILLING_VALUES.TRANSNO
+    FOR UPDATE OF PPA_BILLING_VALUES.AMOUNTREMAINING;
+  UF2_rowid   ROWID;
+  UF2_oval1   ppa_WIP.Status%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT W.ROWID, 0 FROM ppa_WIP W, temp_tempsp_invoiceprocess06re T
+    WHERE T.TransType  IN ('B', 'AU', 'AD')
+    and W.TransNo = T.WTransNo
+    AND
+    NOT EXISTS (
+    SELECT  1
+    FROM ppa_TransBill
+    WHERE ApplyTo = T.WTransNo )
+    FOR UPDATE OF W.Status;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+
+
+    -- get the Transtype If it's a Credit Memo we need to call another procedure and then RETURN ----
+    BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(TransType)
+		  INTO sp_invoiceprocess06return.cTransType
+		  FROM ppa_TransBill
+		  WHERE InvoiceNo = sp_invoiceprocess06return.invoiceno AND
+		        TransType != 'MR' ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	--- Modified to call sp_reverse_billings if the transtype is 'BC'.
+	--- This is fix for bug # 48570 ---
+
+	--- If transtype is Credit Memo then  call sp_return_creditmemo()---
+	IF  sp_invoiceprocess06return.cTransType = 'BC' THEN
+	  BEGIN
+	       PAC_BIL_RETURN_CREDITMEMO_SP(invoiceno);
+		   RETURN;
+	  END;
+	  END IF;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MIN(COMPANY_CODE),  MIN(PROJECT_CODE)
+		INTO sp_invoiceprocess06return.COMPANY_CODE, sp_invoiceprocess06return.PROJECT_CODE FROM ppa_TransBill
+		WHERE InvoiceNo = sp_invoiceprocess06return.invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	DELETE FROM temp_tempsp_invoiceprocess06re;
+	DELETE FROM temp_brbpapplytossp_invoicepro;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO temp_tempsp_invoiceprocess06re
+	(TRANSNO,WTRANSNO,TRANSTYPE,AMOUNT, CURRENCY_TYPE)
+	SELECT  T.TransNo, T.ApplyTo, T.TransType, tval.Amount, tval.CURRENCY_TYPE
+			FROM ppa_TransBill T, ppa_transbill_values tval
+			WHERE T.InvoiceNo = sp_invoiceprocess06return.invoiceno
+				  AND t.TRANSNO = tval.TRANSNO ;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_brbpapplytossp_invoicepro
+	(APPLYTONUMBER,AMOUNTREMAINING, CURRENCY_TYPE )
+	SELECT  WTransNo, SUM(Amount), CURRENCY_TYPE
+		 FROM temp_tempsp_invoiceprocess06re
+		WHERE TransType = 'AY'
+		GROUP BY WTransNo, CURRENCY_TYPE;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+/* update amt remaining for matched entries */
+	END;
+	END IF;
+
+/*  Multicurrency Change
+ * 	Update the values table also with the amount remaining. In this case the values table is PPA_BILLING_VALUES.
+ */
+
+
+	FOR REC IN UF1_CURSOR
+	LOOP
+ 		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		UPDATE PPA_BILLING_VALUES
+		SET
+		PPA_BILLING_VALUES.AMOUNTREMAINING = REC.AMOUNTREMAINING
+		WHERE ROWID = REC.ROWID_VALUES ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+			 NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_TransBill
+		WHERE TransType  IN ('BP', 'BR')
+		 AND InvoiceNo = sp_invoiceprocess06return.invoiceno );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   BillingDate
+			INTO sp_invoiceprocess06return.transdate FROM ppa_TransBill
+			WHERE TransType  IN ('BP', 'BR')
+			 and InvoiceNo = sp_invoiceprocess06return.invoiceno;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE billingschedule
+		SET billed = 0
+		WHERE COMPANY_CODE = sp_invoiceprocess06return.COMPANY_CODE
+		 AND PROJECT_CODE = sp_invoiceprocess06return.PROJECT_CODE
+		 AND billdate = sp_invoiceprocess06return.transdate;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			RETURN ;
+		END;
+		END IF;
+/*  LB  08/29/95   Get the original invoiceno from the original Bill Record
+                          and set the status to 2 to allow another Rebill  */
+	END;
+	END IF;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(WTransNo)
+		INTO sp_invoiceprocess06return.max_key FROM temp_tempsp_invoiceprocess06re;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   InvoiceNo
+		INTO sp_invoiceprocess06return.originvoiceno FROM ppa_TransBill
+		WHERE ApplyTo = sp_invoiceprocess06return.max_key
+		 AND TransType = 'B'
+		 AND SUBSTR(InvoiceNo, 1, 5) != 'MATCH';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt &gt; 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE invoiceheader
+		SET status = '2'
+		WHERE invoiceno = sp_invoiceprocess06return.originvoiceno
+		 AND status = '3';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  bb_BillingRun
+		WHERE ROWID IN
+		(SELECT bb_BillingRun.ROWID FROM bb_BillTracking, bb_BillingRun
+		WHERE bb_BillTracking.InvoiceNo = sp_invoiceprocess06return.invoiceno
+		 AND bb_BillTracking.BillingRunKey = bb_BillingRun.BillingRunKey);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  bb_BillTracking
+		WHERE InvoiceNo = sp_invoiceprocess06return.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	/* checkin - start */
+   	DELETE FROM PPA_TRANSBILL_VALUES
+		WHERE TRANSNO IN ( SELECT TRANSNO FROM PPA_TRANSBILL
+			  		  	   WHERE InvoiceNo = sp_invoiceprocess06return.invoiceno ) ;
+/* checkin - end */
+	DELETE FROM ppa_TransBill
+		WHERE InvoiceNo = sp_invoiceprocess06return.invoiceno;
+
+
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+/* 3/10/99 PTR #11322 Moved down */
+	END;
+	END IF;
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP W
+		SET
+		Status = UF2_oval1
+		WHERE ROWID = UF2_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	COMMIT WORK;
+/*
+Modified By; SN
+colums included in temp_tempsp_invoiceprocess06re and temp_brbpapplytossp_invoicepro
+*/
+END sp_invoiceprocess06return;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

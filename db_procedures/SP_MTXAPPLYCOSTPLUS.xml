@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_MTXAPPLYCOSTPLUS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_MTXAPPLYCOSTPLUS" (
+rule 	VARCHAR2 ,
+units   NUMBER,
+actualcost  NUMBER,
+stdcost   NUMBER,
+rate  NUMBER,
+minutes 	NUMBER ,
+factoramount  IN OUT NUMBER,
+burdenvalue   IN OUT NUMBER,
+overheadvalue   IN OUT NUMBER)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+applyto 	GLOBALPKG.STRING;
+multflatpercent 	GLOBALPKG.STRING;
+burdenflatpercent 	GLOBALPKG.STRING;
+overheadflatpercent 	GLOBALPKG.STRING;
+multamount  NUMBER(32,6);
+burdenamount  NUMBER(32,6);
+overheadamount  NUMBER(32,6);
+multeachunit 	NUMBER(1,0);
+burdeneachunit 	NUMBER(1,0);
+overheadeachunit 	NUMBER(1,0);
+unitsmodified   NUMBER(32,6);
+amounttouse   NUMBER(32,6);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   applytoactualstdcost
+		INTO sp_mtxapplycostplus.applyto FROM costplus
+		WHERE costpluscode = sp_mtxapplycostplus.rule;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  sp_mtxapplycostplus.applyto = 'A' THEN
+		sp_mtxapplycostplus.amounttouse :=  sp_mtxapplycostplus.actualcost;
+	ELSE
+		sp_mtxapplycostplus.amounttouse :=  sp_mtxapplycostplus.stdcost;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   multflatpercent,  burdenflatpercent,  overheadflatpercent,  multamount,
+		  burdenamount,  overheadamount,  multeachunit,  burdeneachunit,  overheadeachunit
+		INTO sp_mtxapplycostplus.multflatpercent, sp_mtxapplycostplus.burdenflatpercent, sp_mtxapplycostplus.overheadflatpercent, sp_mtxapplycostplus.multamount,
+		 sp_mtxapplycostplus.burdenamount, sp_mtxapplycostplus.overheadamount, sp_mtxapplycostplus.multeachunit, sp_mtxapplycostplus.burdeneachunit, sp_mtxapplycostplus.overheadeachunit FROM costplusrules
+		WHERE costpluscode = sp_mtxapplycostplus.rule
+		 AND
+		(sp_mtxapplycostplus.units &gt;= fromrange
+		 AND sp_mtxapplycostplus.units &lt;= torange);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+/* 4/27/99 PTR #11683 */
+	IF  sp_mtxapplycostplus.multflatpercent = 'F' THEN
+	BEGIN
+		IF  sp_mtxapplycostplus.multeachunit = 0 THEN
+			sp_mtxapplycostplus.factoramount :=  sp_mtxapplycostplus.multamount;
+		ELSE
+			sp_mtxapplycostplus.factoramount :=  ROUND(sp_mtxapplycostplus.multamount
+			   * sp_mtxapplycostplus.units, 2);
+		END IF;
+	END;
+	ELSE
+	BEGIN
+		sp_mtxapplycostplus.factoramount :=  ROUND(( sp_mtxapplycostplus.multamount
+		   * sp_mtxapplycostplus.amounttouse * sp_mtxapplycostplus.units
+		   ) / 100, 2);
+	END;
+	END IF;
+	IF  sp_mtxapplycostplus.burdenflatpercent = 'F' THEN
+	BEGIN
+		IF  sp_mtxapplycostplus.burdeneachunit = 0 THEN
+			sp_mtxapplycostplus.burdenvalue :=  sp_mtxapplycostplus.burdenamount;
+		ELSE
+			sp_mtxapplycostplus.burdenvalue :=  ROUND(sp_mtxapplycostplus.burdenamount
+			   * sp_mtxapplycostplus.units, 2);
+		END IF;
+	END;
+	ELSE
+	BEGIN
+		sp_mtxapplycostplus.burdenvalue :=  ROUND(( sp_mtxapplycostplus.burdenamount
+		   * sp_mtxapplycostplus.amounttouse * sp_mtxapplycostplus.units
+		   ) / 100, 2);
+	END;
+	END IF;
+	IF  sp_mtxapplycostplus.overheadflatpercent = 'F' THEN
+	BEGIN
+		IF  sp_mtxapplycostplus.overheadeachunit = 0 THEN
+			sp_mtxapplycostplus.overheadvalue :=  sp_mtxapplycostplus.overheadamount;
+		ELSE
+			sp_mtxapplycostplus.overheadvalue :=  ROUND(sp_mtxapplycostplus.overheadamount
+			   * sp_mtxapplycostplus.units, 2);
+		END IF;
+	END;
+	ELSE
+	BEGIN
+		sp_mtxapplycostplus.overheadvalue :=  ROUND(( sp_mtxapplycostplus.overheadamount
+		   * sp_mtxapplycostplus.amounttouse * sp_mtxapplycostplus.units
+		   ) / 100, 2);
+	END;
+	END IF;
+END sp_mtxapplycostplus;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

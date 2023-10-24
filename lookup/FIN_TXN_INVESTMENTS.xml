@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="FIN_TXN_INVESTMENTS" displayAttributeName="name" hiddenAttributeName="id" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Financially enabled Investments for Transactions" languageCode="en" name="Investments for Transactions"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:MP.ID:ID@
+       ,@SELECT:INV.NAME:NAME@
+       ,@SELECT:MP.PROJECT_CODE:CODE@
+       ,@SELECT:OBJ.CODE:INVESTMENT_TYPE@
+       ,@SELECT:OBJ.NAME:INVESTMENT_TYPE_NAME@
+FROM INV_INVESTMENTS INV
+JOIN PAC_MNT_PROJECTS MP ON INV.ID = MP.ID AND COALESCE(INV.PURGE_FLAG,0) = 0 AND MP.DEPARTCODE IS NOT NULL
+JOIN ( SELECT O.CODE,(SELECT NAME FROM CMN_CAPTIONS_NLS NLS
+                                           WHERE TABLE_NAME = 'ODF_OBJECTS' AND LANGUAGE_CODE =@WHERE:PARAM:LANGUAGE@ AND NLS.PK_ID = O.ID) NAME
+        FROM ODF_OBJECTS O WHERE (O.CODE IN ('idea', 'project') OR (O.TEMPLATE_EXTENSION = 'inv_extension' AND O.IS_CUSTOM = 1))
+     ) OBJ ON OBJ.CODE = INV.ODF_OBJECT_CODE
+WHERE @WHERE:SECURITY:INV:INV.ID@
+  AND @FILTER@
+  @BROWSE-ONLY: AND INV.IS_ACTIVE = 1
+  AND (MP.STATUS = 'O' OR INV.ID IN (SELECT INV.ID
+                                         FROM INV_INVESTMENTS INV
+                                         JOIN PPA_TRANSCONTROL PPP ON PPP.PROJECT_CODE = UPPER(INV.CODE)
+                                       GROUP BY INV.ID
+                                    )
+       )
+  AND MP.DEPARTCODE IN (SELECT D.DEPARTCODE FROM DEPARTMENTS D)
+  AND INV.ID IN (SELECT INV.ID FROM INV_INVESTMENTS INV
+                                 LEFT JOIN INV_PROJECTS PRJ ON INV.ID = PRJ.PRID
+                                 WHERE @NVL@(PRJ.IS_PROGRAM,0) = 0 AND @NVL@(PRJ.IS_TEMPLATE,0) = 0) :BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+              <displayedSuggestionAttribute value="code"/>
+              <displayedSuggestionAttribute value="investment_type_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+              <searchedSuggestionAttribute value="code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Investment" languageCode="en" name="Select Investment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Investments" languageCode="en" name="Select Investments"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="code" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment ID" languageCode="en" name="Investment ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="investment_type" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type ID" languageCode="en" name="Investment Type ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="investment_type_name" defaultValue="" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type Name" languageCode="en" name="Investment Type Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="code" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment ID" languageCode="en" name="Investment ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="investment_type" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type ID" languageCode="en" name="Investment Type ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="investment_type_name" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Type Name" languageCode="en" name="Investment Type Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

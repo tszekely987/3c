@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>FIN_GET_CURRENCY_CODE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."FIN_GET_CURRENCY_CODE_FCT" ( NPIO_ID INTEGER)
+RETURN VARCHAR2
+IS
+    IS_MULTI_CURRENCY_SYSTEM INTEGER;
+    CURRENCY_CODE VARCHAR2(10);
+BEGIN
+  SELECT OV.VALUE INTO IS_MULTI_CURRENCY_SYSTEM 
+  FROM CMN_OPTIONS O, CMN_OPTION_VALUES OV
+  WHERE O.ID = OV.OPTION_ID 
+  AND  O.OPTION_CODE = 'CMN_IS_MULTI_CURRENCY_SYSTEM';
+  IF NVL(IS_MULTI_CURRENCY_SYSTEM, 0) = 1 THEN
+    BEGIN
+      -- if multi currency system
+      --Get from Investment Object 
+	  BEGIN
+        SELECT HOME_CURRENCY_CODE INTO CURRENCY_CODE 
+        FROM ENTITY E, LOCATIONS L, PAC_MNT_PROJECTS F
+        WHERE E.ENTITY =  L.ENTITY
+        AND L.LOCATIONID = F.LOCATIONID
+        AND F.ID = NPIO_ID;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+	  END;		
+      --Resort to Defaults
+	  BEGIN
+        SELECT NVL(CURRENCY_CODE,HOME_CURRENCY_CODE) INTO CURRENCY_CODE 
+        FROM ENTITY 
+        WHERE ENTITY in
+        ( SELECT DEFAULTENTITY FROM NAMEOPTIONS);
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN 
+          NULL;
+      END;
+    END;
+  ELSE
+    BEGIN
+      -- if not multi currency system
+      SELECT VALUE INTO CURRENCY_CODE 
+	  FROM CMN_OPTION_VALUES 
+	  WHERE OPTION_ID IN 
+      ( SELECT ID FROM CMN_OPTIONS where OPTION_CODE = 'CMN_SYSTEM_CURRENCY');
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+    END;
+  END IF;
+RETURN NVL(CURRENCY_CODE,'');
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN '';
+END FIN_GET_CURRENCY_CODE_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

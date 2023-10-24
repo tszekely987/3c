@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_HSGENFOOTERS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_HSGENFOOTERS" 
+(
+  iBillRunKey   NUMBER,
+  cUserID       VARCHAR2,
+  cLanguageCode VARCHAR2 DEFAULT 'en'
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  loc_Page GLOBALPKG.STRING;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	StoO_selcnt := 0;
+	BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenFooters.loc_Page
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'PAGE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenFooters.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+	SELECT  bb_HSGenFooters.iBillRunKey, bb_HSGenFooters.cUserID, InvoiceNo, 50, 2,
+			RPAD( ' ', 36 )
+		   || RTRIM(bb_HSGenFooters.loc_Page) || ' : '
+	FROM bb_HSInvoiceList
+	WHERE BillingRunKey = bb_HSGenFooters.iBillRunKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END bb_HSGenFooters;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

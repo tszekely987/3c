@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_ADD_MEMBER_SUPP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_ADD_MEMBER_SUPP_SP" (
+  P_INV_ID         IN NUMBER,
+  P_SCENARIO_ID    IN NUMBER,
+  P_USERID         IN NUMBER
+    
+  )
+AS
+  V_SQLString   VARCHAR2(500);
+  V_CNT         NUMBER;
+
+BEGIN
+
+  -- This script is intended to add an investment, team members, tasks, assignments
+  -- and blob slices to a tentative state in support of a scenario
+
+  -- Double check that the entries do not already exist.  if the investment was to be replaced then
+  -- it would have been deleted in a previous step.
+  SELECT COUNT(*) INTO V_CNT FROM CAP_SCENARIO_TEAM WHERE SCENARIO_ID = P_SCENARIO_ID AND PRPROJECTID = P_INV_ID;
+  IF V_CNT &gt; 0 THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO CAP_SCENARIO_TEAM
+    ( id, team_id, scenario_id, prprojectid, prresourceid, pravailstart, pravailfinish, prbooking, pralloccurve, hard_curve, prroleid, prallocsum, hard_sum, hard_start, hard_finish , forecast_rate)
+    ( SELECT CAP_SCENARIO_TEAM_S1.NEXTVAL, prid, P_SCENARIO_ID, prprojectid, prresourceid, 
+              pravailstart, pravailfinish, prbooking, pralloccurve, hard_curve, prroleid, prallocsum, hard_sum, hard_start, hard_finish, forecast_rate 
+        FROM PRTEAM
+       WHERE prprojectid = P_INV_ID);
+
+  INSERT INTO CAP_SCENARIO_TASKS
+    ( ID, TASK_ID, SCENARIO_ID, PROJECT_ID, START_DATE, FINISH_DATE, EXTERNAL_ID, IS_TASK, IS_MILESTONE, PRIORITY, DURATION, IS_FIXED, IS_LOCKED, IS_EXTERNAL, 
+      TOTAL_FLOAT, EARLY_START_DATE, EARLY_FINISH_DATE, LATE_START_DATE, LATE_FINISH_DATE, WBS_SORT, 
+      WBS_LEVEL, WBS_SEQUENCE, WBS_PARSEQ, WBS_NNBSEQ, SLICE_STATUS)
+    ( SELECT CAP_SCENARIO_TASKS_S1.NEXTVAL, PRID, P_SCENARIO_ID, PRPROJECTID, PRSTART, PRFINISH, PREXTERNALID, PRISTASK, PRISMILESTONE, PRPRIORITY, PRDURATION, PRISFIXED, PRISLOCKED, 1 PRISEXTERNAL, 
+      PRTOTALFLOAT, PREARLYSTART, PREARLYFINISH, PRLATESTART, PRLATEFINISH, 1 WBS_SORT, 
+      PRWBSLEVEL, PRWBSSEQUENCE, WBS_PARSEQ, WBS_NNBSEQ, 0 SLICE_STATUS
+        FROM PRTASK
+       WHERE PRPROJECTID = P_INV_ID);
+
+  -- Handle the issue with ODF_CA_TASKS not being there until odf bootstrap by hiding the call.
+  V_SQLString :=  'UPDATE CAP_SCENARIO_TASKS TASKS ' ||
+      'SET PARTITION_CODE = (SELECT PARTITION_CODE FROM ODF_CA_TASK WHERE ID = TASKS.TASK_ID) ' ||
+      'WHERE SCENARIO_ID = ' || TO_CHAR(P_SCENARIO_ID) ||
+      ' AND PROJECT_ID = ' || TO_CHAR(P_INV_ID);
+
+  EXECUTE IMMEDIATE V_SQLString;
+
+  INSERT INTO CAP_SCENARIO_ASSIGNMENTS
+    ( ID, ASSIGNMENT_ID, SCENARIO_ID, TASK_ID, RESOURCE_ID, TEAM_ID, START_DATE, FINISH_DATE, ESTIMATE_SUM, ACTUAL_SUM, PRACTTHRU, PREXTENSION, SLICE_STATUS )
+    ( SELECT CAP_SCENARIO_ASSIGNMENTS_S1.NEXTVAL, PRID, P_SCENARIO_ID, PRTASKID, PRRESOURCEID, TEAM_ID, PRSTART, PRFINISH, PRESTSUM, PRACTSUM, PRACTTHRU, PREXTENSION, SLICE_STATUS
+        FROM PRASSIGNMENT
+       WHERE PRTASKID IN (SELECT PRID FROM PRTASK WHERE PRPROJECTID = P_INV_ID));
+  
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_D_CAP_ALC', 'PRJ_BLB_SLICES_D_ALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_W_CAP_ALC', 'PRJ_BLB_SLICES_W_ALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_M_CAP_ALC', 'PRJ_BLB_SLICES_M_ALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_D_CAP_HARDALC', 'PRJ_BLB_SLICES_D_HARDALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_W_CAP_HARDALC', 'PRJ_BLB_SLICES_W_HARDALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_M_CAP_HARDALC', 'PRJ_BLB_SLICES_M_HARDALC', P_INV_ID, P_SCENARIO_ID, 'ALC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_D_CAP_ETC', 'PRJ_BLB_SLICES_D_ETC', P_INV_ID, P_SCENARIO_ID, 'ETC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_W_CAP_ETC', 'PRJ_BLB_SLICES_W_ETC', P_INV_ID, P_SCENARIO_ID, 'ETC');
+  cap_add_member_slices_sp( 'PRJ_BLB_SLICES_M_CAP_ETC', 'PRJ_BLB_SLICES_M_ETC', P_INV_ID, P_SCENARIO_ID, 'ETC');
+
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

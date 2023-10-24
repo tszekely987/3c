@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_WIPBATCHID_DELETE</code>
+          <table_name>WIPPROCESSCONTROL</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_WIPBATCHID_DELETE" 
+AFTER DELETE
+ON WIPPROCESSCONTROL
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER := 1;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  wipbatchid  NUMBER;
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   :OLD.wipbatchid
+		INTO wipbatchid FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE  EXISTS (
+      SELECT  1
+      FROM ppa_WIP w
+      WHERE w.BatchNo = :OLD.wipbatchid );
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_selcnt != 0 THEN
+    BEGIN
+      raise_application_error(-20653, 'wipbatchid in use in wip');
+      RETURN;
+    END;
+	END IF;
+
+/*
+	BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM ppa_WIPHistory
+        WHERE ppa_WIPHistory.BatchNo = :OLD.wipbatchid );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20654, 'wipbatchid in use in wiphistory');
+        RETURN ;
+      END;
+    END IF;
+	END;
+*/
+
+	BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM ppa_TransControl transactioncontrol
+        WHERE transactioncontrol.BatchNo = :OLD.wipbatchid );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20653, 'wipbatchid in use in wip');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+	BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM ppa_TransWIPAdjust transwipadjust
+        WHERE transwipadjust.BatchNo = :OLD.wipbatchid );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20654, 'wipbatchid in use in wiphistory');
+        RETURN;
+      END;
+    END IF;
+	END;
+END tr_wipbatchid_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

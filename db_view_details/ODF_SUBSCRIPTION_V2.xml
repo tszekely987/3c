@@ -1,0 +1,28 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_SUBSCRIPTION_V2">
+    <indexes/>
+    <text_length>3764</text_length>
+    <text>select   'x' pmd_analytical_partition_by, dpt_subscriptions.id odf_pk, dpt_subscriptions.PK_ID as pk_id, department_id.odf_period_end as odf_period_end, department_id.odf_period_type as odf_period_type, departments.brm_id as brm_id, dpt_subscriptions.SLA_VIOLATIONS_THRESHOLD as sla_violations_th, dpt_subscriptions.TABLE_NAME as table_name, (select distinct(currency_code) from cbk_scaled_gl_txns, cbk_invoice, departments parent_dept
+                where to_inv_id = pk_id and cbk_invoice.department_id in (select sub_depts.id from departments sub_depts,prj_obs_units_flat where 
+	  prj_obs_units_flat.branch_unit_id = parent_dept.OBS_UNIT_ID
+	  and sub_depts.obs_unit_id = prj_obs_units_flat.unit_id ) 
+	  and cbk_invoice.status_code = 2
+         and cbk_scaled_gl_txns.invoice_id = cbk_invoice.id
+    	  and parent_dept.id = dpt_subscriptions.department_id) as currency_code, department_id.odf_period_start as odf_period_start, dpt_subscriptions.CUSTOMER_SATISFACTION as cust_satisfaction, ( SELECT CASE CMN_PAGES.PRINCIPAL_TYPE WHEN 'SYSTEM' THEN CMN_PAGES.ID ELSE
+         NVL(CMN_PAGES.ORIGINATING_PAGE_ID,CMN_PAGES.ID) END
+         FROM CMN_INSTANCE_PAGES, CMN_PAGES
+         WHERE CMN_INSTANCE_PAGES.PAGE_FRAME_ID = CMN_PAGES.ID
+         AND CMN_INSTANCE_PAGES.OBJECT_INSTANCE_ID = DPT_SUBSCRIPTIONS.ID
+         AND CMN_INSTANCE_PAGES.OBJECT_TYPE = 'DPT_SUBSCRIPTION' ) as page_layout, dpt_subscriptions.INCIDENTS as incidents, dpt_subscriptions.PAGE_HITS as page_hits, DPT_SUBSCRIPTIONS.LAST_UPDATED_DATE as last_updated_date, dpt_subscriptions.DEPARTMENT_ID as department_id, departments.shortdesc as department_name, CREATED.FULL_NAME as created_by, dpt_subscriptions.CHANGE_ORDERS as change_orders, (select sum(scaled_amount) from cbk_scaled_gl_txns, cbk_invoice, 
+				departments parent_dept   
+				where to_inv_id = pk_id 
+      and cbk_invoice.department_id in (select sub_depts.id from departments sub_depts,prj_obs_units_flat where 
+	  prj_obs_units_flat.branch_unit_id = parent_dept.OBS_UNIT_ID
+	  and sub_depts.obs_unit_id = prj_obs_units_flat.unit_id ) 
+	  and cbk_scaled_gl_txns.invoice_id = cbk_invoice.id 
+	  and cbk_invoice.status_code = 2
+	  and parent_dept.id = dpt_subscriptions.department_id) as charges, dpt_subscriptions.ACTIVE_USERS as active_users, UPDATED.FULL_NAME as updated_by, dpt_subscriptions.SLA_VIOLATIONS as sla_violations, dpt_subscriptions.INCIDENTS_THRESHOLD as incidents_threshold, DPT_SUBSCRIPTIONS.CREATED_DATE as created_date, odf_ca_subscription.partition_code as partition_code, dpt_subscriptions.TOTAL_USERS as total_users, department_id.odf_entity_code as odf_entity_code  from dpt_subscriptions dpt_subscriptions JOIN odf_ca_subscription odf_ca_subscription ON odf_ca_subscription.id=dpt_subscriptions.id JOIN (select   'x' pmd_analytical_partition_by, departments.id odf_pk, odf_ca_financials.odf_period_type as odf_period_type, odf_ca_financials.odf_period_start as odf_period_start, odf_ca_financials.odf_period_end as odf_period_end, odf_ca_financials.odf_entity_code as odf_entity_code from departments departments join odf_object_instance_mapping oim1 on departments.id = oim1.primary_object_instance_id  and oim1.primary_object_instance_code='department' join fin_financials fin_financials on oim1.secondary_object_instance_id = fin_financials.id and oim1.secondary_object_instance_code='financials' JOIN odf_ca_financials odf_ca_financials ON odf_ca_financials.id=FIN_FINANCIALS.id where 1 = 1 )  department_id ON department_id.odf_pk=dpt_subscriptions.DEPARTMENT_ID , srm_resources created, srm_resources updated, departments where DPT_SUBSCRIPTIONS.CREATED_BY = created.USER_ID
+      AND DPT_SUBSCRIPTIONS.LAST_UPDATED_BY = updated.USER_ID
+      AND DPT_SUBSCRIPTIONS.DEPARTMENT_ID = departments.ID</text>
+  </QueryResult>
+</ClarityDBViewQuery>

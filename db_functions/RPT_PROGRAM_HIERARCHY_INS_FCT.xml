@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>RPT_PROGRAM_HIERARCHY_INS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."RPT_PROGRAM_HIERARCHY_INS_FCT" (
+    p_program_id IN NUMBER,
+    p_project_id IN NUMBER,
+    p_is_program IN NUMBER,
+    p_level IN NUMBER
+)
+RETURN INTEGER IS
+    v_count INTEGER;
+BEGIN
+    SELECT COUNT(*)
+    INTO   v_count
+    FROM   rpt_program_hierarchy
+    WHERE  program_id = p_program_id
+    AND    project_id = p_project_id;
+    IF v_count = 0 THEN
+        BEGIN
+        INSERT INTO rpt_program_hierarchy
+            (
+             program_id,
+             project_id,
+             is_program,
+             the_level
+            )
+        VALUES
+            (
+             p_program_id,
+             p_project_id,
+             p_is_program,
+             p_level
+            );
+        EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                ROLLBACK;
+                GOTO Output;
+            END;
+        END;
+        COMMIT;
+    END IF;
+    RETURN 0;
+    &lt;&lt;Output&gt;&gt;
+    RETURN -1;
+END RPT_PROGRAM_HIERARCHY_INS_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

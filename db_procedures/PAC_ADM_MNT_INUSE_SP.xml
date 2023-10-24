@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_ADM_MNT_INUSE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_ADM_MNT_INUSE_SP" (
+costid 	NUMBER ,
+CostPlusOrMultiplier VARCHAR2,
+RC1 	IN OUT PAC_ADM_MNT_INUSE_SPPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+costmult varchar2(255);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+/* This procedure is used by both Cost Rule and Cost Plus usage in folowing way
+	CostRule - If used in Cost Code, TransControl, WIP, WIP Adjust
+	CostPlus - If used in Matrix
+*/
+/* ~Business Rule~ */
+
+/*
+    If CostPlusOrMultiplier = 'M' Then
+	  BEGIN
+	  	BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+          SELECT  1
+          FROM activatecostcode, costrules
+          WHERE activatecostcode.multiplier = costrules.costrulecode and costrules.id = PAC_ADM_MNT_INUSE_SP.costid
+            );
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+        END;
+	    IF StoO_selcnt != 0 THEN
+	      BEGIN
+		    StoO_rowcnt := 0;
+		    StoO_selcnt := 0;
+		    StoO_error  := 0;
+		    OPEN RC1 FOR
+		    SELECT  1 "inuse"
+		    FROM DUAL;
+		    RETURN ;
+	      END;
+	    END IF;
+		END;
+
+		BEGIN
+	    BEGIN
+	      StoO_selcnt := 0;
+	      StoO_error  := 0;
+	      StoO_rowcnt := 0;
+	      SELECT 1 INTO StoO_selcnt
+	        FROM DUAL
+	        WHERE  EXISTS (
+	        SELECT  1
+		     FROM ppa_TransWIPAdjust transwipadjust, costrules
+		    WHERE transwipadjust.CostRuleCode =  costrules.costrulecode and costrules.id = PAC_ADM_MNT_INUSE_SP.costid
+		     );
+	      StoO_rowcnt := SQL%ROWCOUNT;
+	      EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			  StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+		    WHEN OTHERS THEN
+		   	  StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+	    END;
+	    IF StoO_selcnt != 0 THEN
+	      BEGIN
+		    StoO_rowcnt := 0;
+		    StoO_selcnt := 0;
+		    StoO_error  := 0;
+		    OPEN RC1 FOR
+		    SELECT  1 "inuse"
+		    FROM DUAL;
+		    RETURN ;
+	      END;
+	    END IF;
+		END;
+
+	    BEGIN
+	      BEGIN
+	        StoO_selcnt := 0;
+	        StoO_error  := 0;
+	        StoO_rowcnt := 0;
+	        SELECT 1 INTO StoO_selcnt
+	          FROM DUAL
+	          WHERE  EXISTS (
+		      SELECT  1
+		        FROM ppa_TransControl, costrules
+		        WHERE ppa_TransControl.CostRuleCode = costrules.costrulecode and costrules.id = PAC_ADM_MNT_INUSE_SP.costid
+		        );
+	        StoO_rowcnt := SQL%ROWCOUNT;
+   	        EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			  StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+		    WHEN OTHERS THEN
+			  StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+	      END;
+	      IF StoO_selcnt != 0 THEN
+	        BEGIN
+		      StoO_rowcnt := 0;
+		      StoO_selcnt := 0;
+		      StoO_error  := 0;
+		      OPEN RC1 FOR
+		      SELECT  1 "inuse"
+		      FROM DUAL;
+		      RETURN ;
+	        END;
+	      END IF;
+	    END;
+
+	  BEGIN
+	  BEGIN
+	    StoO_selcnt := 0;
+	    StoO_error  := 0;
+	    StoO_rowcnt := 0;
+	    SELECT 1 INTO StoO_selcnt
+	      FROM DUAL
+	      WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_Wip, costrules
+		WHERE ppa_Wip.CostRuleCode = costrules.costrulecode and costrules.id = PAC_ADM_MNT_INUSE_SP.costid);
+	    StoO_rowcnt := SQL%ROWCOUNT;
+	    EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		  WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	  END;
+	  IF StoO_selcnt != 0 THEN
+	    BEGIN
+		  StoO_rowcnt := 0;
+		  StoO_selcnt := 0;
+		  StoO_error  := 0;
+		  OPEN RC1 FOR
+		  SELECT  1 "inuse"
+		  FROM DUAL;
+		  RETURN ;
+	    END;
+	  END IF;
+	  END;
+	  END;
+	END IF;
+*/
+
+	If CostPlusOrMultiplier = 'P' Then
+		BEGIN
+		  BEGIN
+		  StoO_selcnt := 0;
+		  StoO_error  := 0;
+		  StoO_rowcnt := 0;
+		  SELECT 1 INTO StoO_selcnt
+		    FROM DUAL
+		    WHERE  EXISTS (
+		  SELECT  1
+		    FROM ppa_MatrixValues, costplus
+		    WHERE ppa_MatrixValues.strVal1 = costplus.costpluscode and costplus.id = PAC_ADM_MNT_INUSE_SP.costid
+		    );
+		  StoO_rowcnt := SQL%ROWCOUNT;
+ 		  EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		  WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		  END;
+	      IF StoO_selcnt != 0 THEN
+            BEGIN
+		    StoO_rowcnt := 0;
+		    StoO_selcnt := 0;
+		    StoO_error  := 0;
+		    OPEN RC1 FOR
+		    SELECT  1 "inuse"
+		      FROM DUAL;
+		    RETURN ;
+	        END;
+	      END IF;
+		END;
+	    END IF;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  0 "inuse"
+		FROM DUAL;
+		RETURN ;
+/* ~Business Rule~ */
+	END;
+END PAC_ADM_MNT_INUSE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

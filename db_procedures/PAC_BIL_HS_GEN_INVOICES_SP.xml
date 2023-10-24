@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_HS_GEN_INVOICES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_HS_GEN_INVOICES_SP" 
+(
+  iBillRunKey   NUMBER,
+  cUserID       VARCHAR2,
+  iHSDetailMode NUMBER,
+  languageId    VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	BEGIN
+	Bb_Hsgenheaders(Pac_Bil_Hs_Gen_Invoices_Sp.iBillRunKey,
+	 Pac_Bil_Hs_Gen_Invoices_Sp.cUserID,
+	 Pac_Bil_Hs_Gen_Invoices_Sp.iHSDetailMode,
+ 	 Pac_Bil_Hs_Gen_Invoices_Sp.languageId);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  Pac_Bil_Hs_Gen_Invoices_Sp.iHSDetailMode = 0 THEN
+		BEGIN
+		Bb_Hsgenbodyprojsummary(Pac_Bil_Hs_Gen_Invoices_Sp.iBillRunKey,
+		 Pac_Bil_Hs_Gen_Invoices_Sp.cUserID,
+		 Pac_Bil_Hs_Gen_Invoices_Sp.languageId);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	IF  Pac_Bil_Hs_Gen_Invoices_Sp.iHSDetailMode = 2 THEN
+		BEGIN
+		Bb_Hsgenbodyprojempsummary(Pac_Bil_Hs_Gen_Invoices_Sp.iBillRunKey,
+		 Pac_Bil_Hs_Gen_Invoices_Sp.cUserID,
+		 Pac_Bil_Hs_Gen_Invoices_Sp.languageId);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	IF  Pac_Bil_Hs_Gen_Invoices_Sp.iHSDetailMode = 3 THEN
+		BEGIN
+		Bb_Hsgenbodyprojfulldetail(Pac_Bil_Hs_Gen_Invoices_Sp.iBillRunKey,
+		 Pac_Bil_Hs_Gen_Invoices_Sp.cUserID,
+	  	 Pac_Bil_Hs_Gen_Invoices_Sp.languageId);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	BEGIN
+	Bb_HsgenFooters(Pac_Bil_Hs_Gen_Invoices_Sp.iBillRunKey,
+	 Pac_Bil_Hs_Gen_Invoices_Sp.cUserID,
+  	 Pac_Bil_Hs_Gen_Invoices_Sp.languageId);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END Pac_Bil_Hs_Gen_Invoices_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

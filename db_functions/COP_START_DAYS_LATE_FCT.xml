@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_START_DAYS_LATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_START_DAYS_LATE_FCT" (
+    p_start_date IN DATE,         /* If project, project start.
+                                     If task, task start. */
+    p_base_start_date IN DATE,    /* If project, project baseline start.
+                                     If task, task baseline start. */
+    p_progress IN INTEGER         /* If project, project progress.
+                                     If task, task status. */
+) 
+    RETURN INTEGER
+IS
+    cs_date DATE;
+    bs_date DATE;
+    c_date DATE;
+    days INTEGER;
+BEGIN
+    /* ****************************************************************************************************************************
+    * Schedule (stoplight) and Days Late (value):                                                                                 *
+    * If there is a Baseline and Start Date is not equal to Baseline Start Date, then Start Date - Baseline Start Date            *
+    * (This calculates days late positive or negative based on baseline).                                                         *
+    *                                                                                                                             *
+    * If there is a Baseline and Start Date equals Baseline Start Date and Project Progress (or Task Status) is 'Not Started'     *
+    * and the Start Date is before Today's Date, then Today's Date - Start Date  (This calculates days late positive if the       *
+    * project/task isn't late according to the baseline, but it's 'Not Started' and it is has a start date before today's date).  *
+    *                                                                                                                             *
+    * If there is no Baseline and Project Progress (or Task Status) is 'Not Started' and the Start Date is before Today's Date,   *
+    * then Today's Date - Start Date (This calculates days late positive if there is not any baseline and the project/task isn't  *
+    * started and it is has a start date before today's date).                                                                    *
+    ******************************************************************************************************************************/
+    cs_date := TRUNC(p_start_date);
+    bs_date := TRUNC(p_base_start_date);
+    c_date := TRUNC(SYSDATE);
+    IF bs_date IS NULL THEN
+        IF p_progress = 0 AND c_date &gt; cs_date THEN
+            days := c_date - cs_date;
+        ELSE
+            days := 0;
+        END IF;
+    ELSE
+        IF bs_date = cs_date THEN
+            IF p_progress = 0 AND c_date &gt; cs_date THEN
+                days := c_date - cs_date;
+            ELSE
+                days := 0;
+            END IF;
+        ELSE
+            days := cs_date - bs_date;
+        END IF;
+    END IF;
+    RETURN days;
+END COP_START_DAYS_LATE_FCT;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

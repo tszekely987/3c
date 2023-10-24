@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_SEGMENT_SUM_JULIAN_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_SEGMENT_SUM_JULIAN_FCT" (P_SEGMENT IN NK_SEGMENT, P_START IN INTEGER DEFAULT 2, P_FINISH IN INTEGER DEFAULT 65534)
+RETURN NUMBER
+AS
+  V_SUM NUMBER := 0;
+  V_SEGMENT NK_SEGMENT;
+  V_SEGS_START INTEGER := 2; V_SEGS_FINISH INTEGER := 65534;
+  V_START SIMPLE_INTEGER := 2; V_FINISH SIMPLE_INTEGER := 65534; V_DATE INTEGER;
+  V_START2 SIMPLE_INTEGER := 2; V_FINISH2 SIMPLE_INTEGER := 65534;
+  V_DAY_OF_WEEK SMALLINT;
+  V_WEEK_TOTAL INTEGER; V_WEEKS INTEGER; V_WORK_TIME INTEGER;
+  V_IDX INTEGER;
+  V_START_TOD INTEGER; V_FINISH_TOD INTEGER;
+  V_EXCEPTION NK_EXCEPTION;
+  V_SHIFT NK_SHIFT;
+BEGIN
+
+  IF( P_START IS NOT NULL ) THEN
+    V_SEGS_START := P_START;
+  END IF;
+
+  IF( P_FINISH IS NOT NULL ) THEN
+    V_SEGS_FINISH := P_FINISH;
+  END IF;
+
+
+  /*
+    Compute the sum for the segment for the time range
+  */
+  IF( P_SEGMENT IS NOT NULL ) THEN
+
+    V_SEGMENT := P_SEGMENT;
+    IF( V_SEGMENT.SEGMENT_START &lt; V_SEGS_FINISH AND V_SEGMENT.SEGMENT_FINISH &gt;= V_SEGS_START ) THEN
+      V_START := GREATEST( V_SEGS_START, V_SEGMENT.SEGMENT_START);
+      V_FINISH := LEAST( V_SEGS_FINISH, V_SEGMENT.SEGMENT_FINISH);
+      IF( V_SEGMENT.WORK_WEEK_TOTALS IS NOT NULL ) THEN
+        /*
+          Iterate through the work totals ...
+
+        */
+        V_WEEK_TOTAL := 0; V_WORK_TIME := 0;
+        FOR IDX IN 1..7 LOOP
+          V_WEEK_TOTAL := V_WEEK_TOTAL + V_SEGMENT.WORK_WEEK_TOTALS(IDX);
+        END LOOP;
+
+        V_DAY_OF_WEEK := CRV_SQL_CURVE_PKG.JULIAN_TO_DAY_OF_WEEK(V_START);
+        V_IDX := V_START;
+        WHILE(V_IDX &lt; V_FINISH) LOOP
+          IF(V_DAY_OF_WEEK = 1 AND (V_FINISH - V_IDX) &gt; 7) THEN
+            V_WEEKS := trunc((V_FINISH - V_IDX) / 7);
+            V_WORK_TIME := V_WORK_TIME + (V_WEEKS * V_WEEK_TOTAL);
+            -- reposition to the new day and move on
+            V_IDX := V_IDX + (V_WEEKS * 7);
+            V_DAY_OF_WEEK := CRV_SQL_CURVE_PKG.JULIAN_TO_DAY_OF_WEEK(V_IDX);
+            CONTINUE;
+          END IF;
+
+          V_WORK_TIME := V_WORK_TIME + V_SEGMENT.WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+          IF(V_DAY_OF_WEEK = 7) THEN
+            V_DAY_OF_WEEK := 1;
+          ELSE
+            V_DAY_OF_WEEK := V_DAY_OF_WEEK + 1;
+          END IF;
+
+          V_IDX := V_IDX + 1;
+        END LOOP;
+
+        /*
+          Need to check for a 1 day segment with either start tod or finish tod
+        */
+        IF(V_SEGMENT.SEGMENT_START = V_SEGMENT.SEGMENT_FINISH AND (V_SEGMENT.START_TOD &gt; 0 OR V_SEGMENT.FINISH_TOD &gt; 0)) THEN
+          V_DAY_OF_WEEK := MOD((V_START+6),7)+1;
+          --V_DAY_OF_WEEK := MOD((V_SEGMENT.SEGMENT_START+6),7)+1;
+          -- define the tod boundary
+          V_START_TOD := GREATEST(0,V_SEGMENT.START_TOD);
+          V_FINISH_TOD := LEAST(86400,V_SEGMENT.FINISH_TOD);
+          FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+            V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+            IF(V_SHIFT.DAY_OF_WEEK = V_DAY_OF_WEEK AND (V_SHIFT.FINISH_TOD &gt; V_START_TOD AND V_SHIFT.START_TOD &lt;= V_FINISH_TOD)) THEN
+              V_WORK_TIME := V_WORK_TIME + (LEAST(V_SHIFT.FINISH_TOD, V_FINISH_TOD) - GREATEST(V_SHIFT.START_TOD,V_SEGMENT.START_TOD));
+            END IF;
+          END LOOP;
+        ELSE
+
+          /*
+            check for first day stuff here
+          */
+          IF(V_SEGMENT.START_TOD &gt; 0 AND V_START = V_SEGMENT.SEGMENT_START AND V_SEGMENT.SHIFTS IS NOT NULL) THEN
+            V_DAY_OF_WEEK := MOD((V_START+6),7)+1;
+            V_WORK_TIME := V_WORK_TIME - V_SEGMENT.WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+            -- get the sume from the shifts for the day
+            FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+              V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+              IF(V_SHIFT.DAY_OF_WEEK = V_DAY_OF_WEEK AND V_SHIFT.FINISH_TOD &gt; V_SEGMENT.START_TOD) THEN
+                V_WORK_TIME := V_WORK_TIME + (V_SHIFT.FINISH_TOD - GREATEST(V_SHIFT.START_TOD,V_SEGMENT.START_TOD));
+              END IF;
+            END LOOP;
+          END IF;
+
+          /*
+            check for last day stuff here
+          */
+          IF(V_SEGMENT.FINISH_TOD &gt; 0 AND V_FINISH = V_SEGMENT.SEGMENT_FINISH AND V_SEGS_FINISH &gt; V_SEGMENT.SEGMENT_FINISH AND V_SEGMENT.SHIFTS IS NOT NULL) THEN
+            V_DAY_OF_WEEK := MOD((V_FINISH+6),7)+1;
+            -- get the sume from the shifts for the day
+            FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+              V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+              IF(V_SHIFT.DAY_OF_WEEK = V_DAY_OF_WEEK AND V_SHIFT.START_TOD &lt; V_SEGMENT.FINISH_TOD) THEN
+                V_WORK_TIME := V_WORK_TIME + (LEAST(V_SHIFT.FINISH_TOD,V_SEGMENT.FINISH_TOD) - V_SHIFT.START_TOD);
+              END IF;
+            END LOOP;
+          END IF;
+        END IF;
+
+        /*
+           Now iterate through the exceptions and backout the total
+           from the work week and add the exception
+        */
+        IF( V_SEGMENT.EXCEPTIONS IS NOT NULL ) THEN
+          FOR e_idx IN 1 .. V_SEGMENT.EXCEPTIONS.COUNT LOOP
+            V_EXCEPTION := V_SEGMENT.EXCEPTIONS(e_idx);
+            IF(V_EXCEPTION.START_DATE &lt;= V_FINISH AND V_EXCEPTION.FINISH_DATE &gt; V_START) THEN
+              V_START2 := GREATEST( V_EXCEPTION.START_DATE, V_START);
+              V_FINISH2 := V_EXCEPTION.FINISH_DATE - 1; -- stored natively in db as next day;
+
+              V_DAY_OF_WEEK := MOD((V_START2+6),7)+1;
+              FOR V_DATE IN V_START2 .. (V_FINISH2) LOOP
+
+  				-- if date &gt; seg finish quit
+				IF(V_DATE &gt; V_SEGMENT.SEGMENT_FINISH) THEN
+				  EXIT;
+				END IF;
+
+                -- if date = segment finish and doesn't have a tod quit
+			    IF(V_DATE = V_SEGMENT.SEGMENT_FINISH AND V_SEGMENT.FINISH_TOD = 0) THEN
+			      EXIT;
+			    END IF;
+
+                -- if date &gt;= the query finish then exit
+                IF(V_DATE &gt;= V_SEGS_FINISH) THEN
+                  EXIT;
+                END IF;
+
+			    -- 1 day segment equals start and finish and either start_tod &gt; 0 or finish_tod &gt; 0
+			    IF(V_DATE = V_SEGMENT.SEGMENT_START and V_DATE = V_SEGMENT.SEGMENT_FINISH and (V_SEGMENT.START_TOD &gt; 0 or V_SEGMENT.FINISH_TOD &gt; 0) and V_SEGMENT.shifts is not null) then
+		          -- define the tod boundary
+		          V_START_TOD := GREATEST(0,V_SEGMENT.START_TOD);
+		          V_FINISH_TOD := LEAST(86400,V_SEGMENT.FINISH_TOD);
+		          FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+		            V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+		            IF(V_SHIFT.DAY_OF_WEEK = V_DAY_OF_WEEK AND (V_SHIFT.FINISH_TOD &gt; V_START_TOD AND V_SHIFT.START_TOD &lt;= V_FINISH_TOD)) THEN
+		              V_WORK_TIME := V_WORK_TIME - (LEAST(V_SHIFT.FINISH_TOD, V_FINISH_TOD) - GREATEST(V_SHIFT.START_TOD,V_SEGMENT.START_TOD));
+		            END IF;
+		          END LOOP;
+
+		        -- segment start date with a start tod
+			    ELSIF(V_DATE = V_SEGMENT.SEGMENT_START and V_SEGMENT.START_TOD &gt; 0 and V_SEGMENT.shifts is not null) then
+            	  -- get the sum from the shifts for the day
+		          FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+		            V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+                    IF(v_shift.day_of_week = v_day_of_week and v_shift.finish_tod &gt; V_SEGMENT.start_tod ) THEN
+                      V_WORK_TIME := V_WORK_TIME - (v_shift.finish_tod - greatest(v_shift.start_tod,V_SEGMENT.start_tod));
+                    END IF;
+                  END LOOP;
+
+			    -- segment finish date with a finish tod
+			    ELSIF(V_DATE = V_SEGMENT.SEGMENT_FINISH and V_SEGMENT.FINISH_TOD &gt; 0 and V_SEGMENT.shifts is not null) then
+		          FOR ELEM IN 1 .. V_SEGMENT.SHIFTS.COUNT LOOP
+		            V_SHIFT := V_SEGMENT.SHIFTS(ELEM);
+                    IF(v_shift.day_of_week = v_day_of_week and v_shift.start_tod &lt; V_SEGMENT.finish_tod ) THEN
+                      V_WORK_TIME := V_WORK_TIME - (least(v_shift.finish_tod,V_SEGMENT.finish_tod) - v_shift.start_tod);
+                    END IF;
+                 END LOOP;
+
+			    ELSE
+  			      -- backout the original work time
+                  V_WORK_TIME := V_WORK_TIME - V_SEGMENT.WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+			    END IF;
+
+                -- add the worktime from the exceptions
+  			    -- add the exception based time
+                IF(V_EXCEPTION.SHIFTS IS NOT NULL) THEN
+                  -- 1 day segment
+    		      IF(V_DATE = V_SEGMENT.SEGMENT_START and V_DATE = V_SEGMENT.SEGMENT_FINISH and (V_SEGMENT.START_TOD &gt; 0 or V_SEGMENT.FINISH_TOD &gt; 0) and V_EXCEPTION.shifts is NOT NULL) THEN
+
+                    -- loop through the shifts on the exception
+		            V_START_TOD := GREATEST(0,V_SEGMENT.START_TOD);
+		            V_FINISH_TOD := LEAST(86400,V_SEGMENT.FINISH_TOD);
+		            FOR ELEM in 1 .. V_EXCEPTION.SHIFTS.COUNT LOOP
+		              V_SHIFT := V_EXCEPTION.SHIFTS(ELEM);
+		              IF((V_SHIFT.FINISH_TOD &gt; V_START_TOD AND V_SHIFT.START_TOD &lt;= V_FINISH_TOD)) THEN
+		                V_WORK_TIME := V_WORK_TIME + (LEAST(V_SHIFT.FINISH_TOD, V_FINISH_TOD) - GREATEST(V_SHIFT.START_TOD,V_SEGMENT.START_TOD));
+		              END IF;
+		            END LOOP;
+
+                  -- segment start date with a start tod
+  			      ELSIF(V_DATE = V_SEGMENT.SEGMENT_START and V_SEGMENT.START_TOD &gt; 0 and V_EXCEPTION.SHIFTS IS NOT NULL) THEN
+                    -- loop through the shifts on the exception
+                    FOR ELEM IN 1 .. V_EXCEPTION.SHIFTS.COUNT LOOP
+                      V_SHIFT := V_EXCEPTION.shifts(ELEM);
+                      IF(v_shift.finish_tod &gt; V_SEGMENT.start_tod ) then
+                        V_WORK_TIME := V_WORK_TIME + (v_shift.finish_tod - greatest(v_shift.start_tod,V_SEGMENT.start_tod));
+                      END IF;
+                    END LOOP;
+
+                  -- segment finish date with a finish tod
+			      ELSIF(V_DATE = V_SEGMENT.SEGMENT_FINISH and V_SEGMENT.FINISH_TOD &gt; 0 and V_EXCEPTION.shifts is not null) THEN
+			        -- loop through the shifts on the exception
+                    FOR ELEM in 1..V_EXCEPTION.SHIFTS.COUNT loop
+                      V_SHIFT := V_EXCEPTION.SHIFTS(ELEM);
+                      IF(v_shift.start_tod &lt; V_SEGMENT.finish_tod ) THEN
+                        V_WORK_TIME := V_WORK_TIME + (least(v_shift.finish_tod,V_SEGMENT.finish_tod) - v_shift.start_tod);
+                      END IF;
+                    END LOOP;
+
+  			      ELSE
+  			        -- get the total shifts from the exception
+    			    V_WORK_TIME := V_WORK_TIME + V_EXCEPTION.TOTAL;
+
+  			      END IF;
+  			    END IF;  -- e.shifts not null
+
+                -- advance day of week
+                IF(V_DAY_OF_WEEK = 7) THEN
+                  V_DAY_OF_WEEK := 1;
+                ELSE
+                  V_DAY_OF_WEEK := V_DAY_OF_WEEK + 1;
+                END IF;
+              END LOOP; -- days of the exception
+            END IF;
+          END LOOP; -- segments
+        END IF;
+        V_SUM := V_SUM + (V_WORK_TIME * V_SEGMENT.RATE);
+      ELSE
+        -- no calendar so straight computation
+        /*
+         If a 1 day segment with tod
+        */
+        IF(V_SEGMENT.SEGMENT_START = V_SEGMENT.SEGMENT_FINISH AND (V_SEGMENT.START_TOD &gt; 0 OR V_SEGMENT.FINISH_TOD &gt; 0)) THEN
+          IF(V_SEGMENT.START_TOD &gt; 0 AND V_SEGMENT.FINISH_TOD &gt; 0) THEN
+            V_SUM := V_SUM + ((V_SEGMENT.FINISH_TOD - V_SEGMENT.START_TOD) * V_SEGMENT.RATE);
+          ELSIF(V_SEGMENT.FINISH_TOD &gt; 0) THEN
+            V_SUM := V_SUM + (V_SEGMENT.FINISH_TOD * V_SEGMENT.RATE);
+          ELSE
+            V_SUM := V_SUM + ((86400 - V_SEGMENT.START_TOD) * V_SEGMENT.RATE);
+          END IF;
+          RETURN V_SUM;
+        END IF;
+
+        -- multiday sgment
+        V_SUM := V_SUM + ((V_FINISH - V_START) * 86400 * V_SEGMENT.RATE);
+
+        /*
+		  check for the start_tod &gt; 0
+        */
+        IF(V_SEGMENT.START_TOD &gt; 0 and v_start = V_SEGMENT.segment_start) THEN
+          -- subtract the start day
+          V_SUM := V_SUM - (86400 * V_SEGMENT.RATE);
+          -- add the portion
+          V_SUM := V_SUM + ((86400 - V_SEGMENT.START_TOD) * V_SEGMENT.RATE);
+        END IF;
+
+        /*
+          check for the finish_tod &gt; 0
+        */
+        IF(V_SEGMENT.FINISH_TOD &gt; 0 and v_finish = V_SEGMENT.segment_finish and v_segs_finish &gt; v_segment.segment_finish) THEN
+          V_SUM := V_SUM + (V_SEGMENT.FINISH_TOD * V_SEGMENT.RATE);
+	    END IF;
+	  END IF;
+    END IF;
+  END IF;
+
+  RETURN V_SUM;
+
+-- safety check ... if anything goes wrong just return zero
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN 0;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

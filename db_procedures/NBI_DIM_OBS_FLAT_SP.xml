@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_DIM_OBS_FLAT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_DIM_OBS_FLAT_SP" 
+IS
+   CURSOR C_DIM
+   IS
+      SELECT   OBS_TYPE_ID,
+               OBS_UNIT_ID
+      FROM     NBI_DIM_OBS
+      WHERE    IS_LEAF = 1;
+
+   V_SQL                         VARCHAR2 (4000);
+   V_PARENT_ID                   INTEGER;
+   V_CHILD_ID                    INTEGER;
+   V_STMT                        VARCHAR2 (200);
+BEGIN
+   V_STMT := 'Deleting all records in NBI_DIM_OBS_FLAT';
+
+   DELETE
+     FROM NBI_DIM_OBS_FLAT;
+
+   V_STMT := 'Flattening out NBI_DIM_OBS';
+
+   FOR C_REC IN C_DIM
+   LOOP
+      -- Parent loop
+      FOR I IN 0 .. 10
+      LOOP
+         -- Create one entry where parent = child
+         V_SQL :=
+           'select level' || I || '_unit_id parent, level' || I || '_unit_id child ' ||
+              'from nbi_dim_obs' ||
+              CHR (10) ||
+              'where obs_type_id = ' ||
+              C_REC.OBS_TYPE_ID ||
+              ' and obs_unit_id = ' ||
+              C_REC.OBS_UNIT_ID;
+         EXECUTE IMMEDIATE V_SQL
+            INTO V_PARENT_ID, V_CHILD_ID;
+
+         IF     V_PARENT_ID IS NOT NULL
+            AND V_CHILD_ID IS NOT NULL
+         THEN
+            INSERT INTO NBI_DIM_OBS_FLAT
+                        (OBS_TYPE_ID, PARENT_OBS_UNIT_ID, CHILD_OBS_UNIT_ID)
+               SELECT   C_REC.OBS_TYPE_ID,
+                        V_PARENT_ID,
+                        V_CHILD_ID
+               FROM     DUAL
+               WHERE    NOT EXISTS (SELECT   'obs flat entry exists already'
+                                    FROM     NBI_DIM_OBS_FLAT
+                                    WHERE    OBS_TYPE_ID = C_REC.OBS_TYPE_ID
+                                    AND      PARENT_OBS_UNIT_ID = V_PARENT_ID
+                                    AND      CHILD_OBS_UNIT_ID = V_CHILD_ID);
+         END IF;
+
+         -- Child Loop: Create all children of this parent
+         FOR Y IN I + 1 .. 10
+         LOOP
+            V_SQL :=
+              'select level' || I || '_unit_id parent, level' || Y || '_unit_id child ' || CHR (10) ||
+                 'from nbi_dim_obs' ||
+                 CHR (10) ||
+                 'where obs_type_id = ' ||
+                 C_REC.OBS_TYPE_ID ||
+                 ' and obs_unit_id = ' ||
+                 C_REC.OBS_UNIT_ID;
+            EXECUTE IMMEDIATE V_SQL
+               INTO V_PARENT_ID, V_CHILD_ID;
+
+            IF     V_PARENT_ID IS NOT NULL
+               AND V_CHILD_ID IS NOT NULL
+            THEN
+               INSERT INTO NBI_DIM_OBS_FLAT
+                           (OBS_TYPE_ID, PARENT_OBS_UNIT_ID, CHILD_OBS_UNIT_ID)
+                  SELECT   C_REC.OBS_TYPE_ID,
+                           V_PARENT_ID,
+                           V_CHILD_ID
+                  FROM     DUAL
+                  WHERE    NOT EXISTS (SELECT   'obs flat entry exists already'
+                                       FROM     NBI_DIM_OBS_FLAT
+                                       WHERE    OBS_TYPE_ID = C_REC.OBS_TYPE_ID
+                                       AND      PARENT_OBS_UNIT_ID = V_PARENT_ID
+                                       AND      CHILD_OBS_UNIT_ID = V_CHILD_ID);
+            END IF;
+         END LOOP;
+      END LOOP;
+   END LOOP;
+
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_DIM_OBS_FLAT_SP - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

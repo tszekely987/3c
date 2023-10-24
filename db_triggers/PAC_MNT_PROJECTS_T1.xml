@@ -1,0 +1,916 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_PROJECTS_T1</code>
+          <table_name>PAC_MNT_PROJECTS</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."PAC_MNT_PROJECTS_T1" 
+BEFORE INSERT OR UPDATE
+ON pac_mnt_projects
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt               INTEGER;
+  StoO_error                INTEGER;
+  StoO_rowcnt               INTEGER := 1;
+  StoO_crowcnt              INTEGER := 0;
+  StoO_fetchstatus          INTEGER := 0;
+  StoO_errmsg               VARCHAR2(1000);
+  StoO_sqlstatus            INTEGER;
+  old_status                GLOBALPKG.STRING;
+  status                    GLOBALPKG.STRING;
+  PROJECT_NAME              GLOBALPKG.STRING;
+  oldtitle                  GLOBALPKG.STRING;
+  minkey                    GLOBALPKG.STRING;
+  maxkey                    GLOBALPKG.STRING;
+  retcode                   NUMBER;
+  projchgordersep           GLOBALPKG.STRING;
+  usechangeorders           NUMBER(1,0);
+  msg                       GLOBALPKG.STRING;
+  value                     GLOBALPKG.STRING;
+  COMPANY_CODE              GLOBALPKG.STRING;
+  p_count                   NUMBER(3,0);
+  vDescription              GLOBALPKG.STRING;
+  iInsertedCount            NUMBER;
+  iDeletedCount             NUMBER;
+  type_                     GLOBALPKG.STRING;
+  oldtype                   GLOBALPKG.STRING;
+  iAllowExpenses            NUMBER;
+  buffer                    GLOBALPKG.STRING;
+  min_                      GLOBALPKG.STRING;
+  max_                      GLOBALPKG.STRING;
+  COMPANY_CODE              GLOBALPKG.STRING;
+  MASTER_PROJECT_CODE       GLOBALPKG.STRING;
+  label                     GLOBALPKG.STRING;
+  v_ENFORCE_CONTRACT_AMOUNT NUMBER;
+  v_CONTRACT_AMOUNT         NUMBER;
+  AMOUNTBILLED              NUMBER;
+  iRetainPrecision NUMBER; -- retain precision change  
+  odf_object_code         VARCHAR2(30);
+  
+BEGIN
+
+  /* Only process for projects */
+  IF :NEW.ODF_OBJECT_CODE IS NOT NULL AND UPPER(:NEW.ODF_OBJECT_CODE) != 'PROJECT' THEN
+     RETURN;
+  END IF;  
+
+  /* skip processing if not updating any columns of interest */
+  BEGIN
+    iInsertedCount := 1;
+    iDeletedcount :=0;
+
+    IF :OLD.PROJECT_CODE IS NOT NULL THEN
+     iDeletedcount :=1;
+    END IF;
+  END;
+  
+  BEGIN
+    SELECT  ENFORCE_CONTRACT_AMOUNT,
+        CONTRACTAMOUNT
+      INTO v_ENFORCE_CONTRACT_AMOUNT,
+          v_CONTRACT_AMOUNT
+      FROM PROJCNTRTS p
+      WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+      AND p.PROJECT_CODE = :NEW.PROJECT_CODE;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+      NULL;
+  END;
+
+  StoO_selcnt := 0;
+  StoO_error  := 0;
+
+  IF iInsertedCount = 1 AND iDeletedCount = 0 THEN
+    BEGIN
+  /*
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO PROJREVISION (COMPANY_CODE, PROJECT_CODE, MASTER_PROJECT_CODE, changeorder, projrevisionid, budgetrevision, datesrevision, currenttargetedstartdate, currenttargetedcompldate, actualstartdate, actualcompletiondate, inprogress, awaitingapproval, approved, revisiondatetime, RESOURCE_CODE, COSTPLUS, ratematrix)
+        SELECT :NEW.COMPANY_CODE, :NEW.PROJECT_CODE, NVL(:NEW.MASTER_PROJECT_CODE, :NEW.PROJECT_CODE),
+               :NEW.changeorder, 0, :NEW.budget, 1, :NEW.targetedstartdate, :NEW.targetedcompldate,
+               :NEW.startdate, :NEW.completedate, :NEW.inprogress, :NEW.awaitingapproval,
+               :NEW.approved, SYSDATE, :NEW.RESOURCE_CODE, :NEW.COSTPLUS, :NEW.ratematrix
+          FROM DUAL
+         WHERE NOT EXISTS (SELECT 1
+                             FROM PROJREVISION p
+                            WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+                              AND p.PROJECT_CODE = :NEW.PROJECT_CODE
+                              AND p.projrevisionid = 0 );
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+      END;
+  */
+-----SAVE POINT
+    --  BEGIN
+      
+        /*Inserted PROJECT_CODE and not inherited*/
+  /*
+        IF StoO_selcnt = 0 THEN
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO PROJSTAFF (COMPANY_CODE, PROJECT_CODE, RESOURCE_CODE,
+                                   PROJECTACCESS, PROJECTAPPROVAL, BILLINGACCESS,
+                                   BILLINGAPPROVAL, PROJECTTOGO, INDIVIDUALTOGO,
+                                   FORECASTACCESS, FORECASTAPPROVAL )
+            SELECT  DISTINCT C.COMPANY_CODE, :NEW.PROJECT_CODE, C.RESOURCE_CODE,
+                    1, 1, 1, 1, 1, 1, 1, 1
+            FROM  CLNTRESPONS C, PAC_MNT_RESOURCES E
+            WHERE   C.COMPANY_CODE = :NEW.COMPANY_CODE
+            AND   E.RESOURCE_CODE = C.RESOURCE_CODE
+            AND   :NEW.MASTER_PROJECT_CODE = :NEW.PROJECT_CODE
+            AND NOT EXISTS (  SELECT  1
+                FROM  PROJSTAFF S
+                WHERE S.COMPANY_CODE = :NEW.COMPANY_CODE
+                AND S.PROJECT_CODE   = :NEW.PROJECT_CODE
+                AND S.RESOURCE_CODE = C.RESOURCE_CODE);
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+        END IF;
+
+        IF StoO_error != 0 THEN
+          BEGIN
+            RAISE_APPLICATION_ERROR(-20515,'Error inserting into PROJECT_CODE staff.');
+            RETURN;
+          END;
+        END IF;
+  */
+/* give the PROJECT_CODE creator full access rights.. */
+  /*
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          INSERT INTO PROJSTAFF
+            (COMPANY_CODE, PROJECT_CODE, RESOURCE_CODE,
+             projectaccess, projectapproval, billingaccess,
+             billingapproval, projecttogo, individualtogo,
+             FORECASTACCESS, FORECASTAPPROVAL )
+          SELECT
+             :NEW.COMPANY_CODE, :NEW.PROJECT_CODE, :NEW.RESOURCE_CODE, 1, 1, 1, 1, 1, 1, 1, 1
+--            FROM  employees E
+--            WHERE   E.initials = :NEW.RESOURCE_CODE
+                      FROM DUAL WHERE  -- AND
+               NOT EXISTS ( SELECT  1
+                FROM PROJSTAFF P
+                WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+                AND p.PROJECT_CODE = :NEW.PROJECT_CODE
+                AND p.RESOURCE_CODE = :NEW.RESOURCE_CODE );
+--                  AND p.RESOURCE_CODE = E.RESOURCE_CODE );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+        END;
+
+        IF StoO_error != 0 THEN
+          BEGIN
+            RAISE_APPLICATION_ERROR(-20516,'Trigger forces a rollback 2');
+            RETURN;
+          END;
+        END IF;
+      END;
+  */
+-----SAVE POINT
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT 1
+              FROM CLNTSUPP C
+             WHERE C.COMPANY_CODE = :NEW.COMPANY_CODE
+               AND C.status_type IN (2, 4));
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            RAISE_APPLICATION_ERROR(-20050, 'This PROJECT_CODE cannot be created or updated because the COMPANY_CODE is not active.');
+            RETURN;
+          END;
+        END IF;
+      END;
+
+-----SAVE POINT
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT 1
+              FROM CLNTSUPP C
+             WHERE C.COMPANY_CODE = :NEW.COMPANY_CODE
+               AND C.status_type = 3);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            RAISE_APPLICATION_ERROR(-20052, 'This PROJECT_CODE cannot be created because the COMPANY_CODE is not having any new business.');
+            RETURN;
+          END;
+        END IF;
+      END;
+
+-----SAVE POINT
+      BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  EXISTS (
+          SELECT  1
+          FROM DUAL WHERE :NEW.MASTER_PROJECT_CODE != :NEW.PROJECT_CODE
+           AND iDeletedCount = 0);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+      END;
+  /*
+      IF StoO_selcnt != 0 THEN
+        BEGIN
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO PROJSTAFF (COMPANY_CODE, PROJECT_CODE, RESOURCE_CODE,
+                                   projectaccess, projectapproval, billingaccess,
+                                   billingapproval, projecttogo, individualtogo,
+                                   FORECASTACCESS, FORECASTAPPROVAL)
+            SELECT  p.COMPANY_CODE, :NEW.PROJECT_CODE, p.RESOURCE_CODE, p.projectaccess,
+                    p.projectapproval, p.billingaccess, p.billingapproval, p.projecttogo,
+                    p.individualtogo,  p.FORECASTACCESS, p.FORECASTAPPROVAL
+            FROM PROJSTAFF p
+            WHERE :NEW.MASTER_PROJECT_CODE != :NEW.PROJECT_CODE
+            AND :NEW.COMPANY_CODE = p.COMPANY_CODE
+            AND :NEW.MASTER_PROJECT_CODE = p.PROJECT_CODE
+            AND NOT EXISTS (
+               SELECT  1
+               FROM PROJSTAFF p2
+               WHERE p2.COMPANY_CODE = p.COMPANY_CODE
+               AND p2.PROJECT_CODE = :NEW.PROJECT_CODE
+               AND p2.RESOURCE_CODE = p.RESOURCE_CODE );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+          END;
+
+          IF StoO_error != 0 THEN
+            BEGIN
+              RAISE_APPLICATION_ERROR(-20541,'Trigger forces a rollback 4');
+              RETURN;
+            END;
+          END IF;
+
+        END;
+      END IF;
+  */
+----SAVE POINT
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  iDeletedCount = 0 AND   EXISTS (
+            SELECT  1
+            FROM DUAL WHERE :NEW.MASTER_PROJECT_CODE = :NEW.PROJECT_CODE );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+        END;
+
+      END;
+    END;
+  END IF;
+
+-----BEGIN UPDATE
+
+  IF iInsertedCount = 1 AND iDeletedCount = 1 THEN
+    -- Check if a PROJECT_CODE that is reopened has been scheduled for archiving
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM DUAL, PAC_MNT_BCKGRND_PROCESSES
+        WHERE :NEW.STATUS = 'O'
+           AND :OLD.STATUS = 'C'
+           AND PAC_MNT_BCKGRND_PROCESSES.METHOD_NAME = 'archiveProjects'
+           AND PAC_MNT_BCKGRND_PROCESSES.FIELD_VALUES LIKE '%' || :NEW.COMPANY_CODE || CHR(39) || ';1' || '%'
+           AND PAC_MNT_BCKGRND_PROCESSES.FIELD_VALUES LIKE '%' || CHR(39) || :NEW.PROJECT_CODE || CHR(39) ||  '%');
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20053, 'PROJECT_CODE must be restored before REOPENING.');
+        RETURN;
+      END;
+    END IF;
+    -- End of archive check
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+         FROM DUAL
+        WHERE :NEW.COMPANY_CODE = :OLD.COMPANY_CODE
+         AND :NEW.PROJECT_CODE = :OLD.PROJECT_CODE
+         AND :NEW.TEMPLATE_ONLY = 1
+         AND :OLD.TEMPLATE_ONLY = 0
+         AND :NEW.APPROVED = 1
+         AND :NEW.MASTER_PROJECT_CODE = :NEW.PROJECT_CODE);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+    END;
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20054, 'A PROJECT_CODE cannot be changed to a template once it is approved.');
+        RETURN;
+      END;
+    END IF;
+
+
+--------SAVE POINT
+    BEGIN
+      BEGIN
+
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  (:NEW.AWAITINGAPPROVAL != :OLD.AWAITINGAPPROVAL) AND   EXISTS
+             (
+          SELECT  1
+          FROM DUAL WHERE :NEW.AWAITINGAPPROVAL = 1 );
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+      END;
+
+------SAVE POINT
+      IF StoO_selcnt != 0 THEN
+        BEGIN
+          BEGIN
+            BEGIN
+              StoO_selcnt := 0;
+            StoO_error  := 0;
+              StoO_rowcnt := 0;
+
+              SELECT 1 INTO StoO_selcnt
+              FROM DUAL
+              WHERE  EXISTS (
+                SELECT  1
+                 FROM NAMEOPTIONS N,TAX_TYPE T
+                WHERE T.TAX_TYPE = N.TAX_TYPE
+                 AND T.PROJSITEREQUIRED = 1 );
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+            END;
+          END;
+        END;
+      END IF;
+    END;
+
+--------SAVE POINT
+    BEGIN
+      BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  EXISTS (
+          SELECT  1
+          FROM DUAL
+          WHERE :NEW.COMPANY_CODE = :OLD.COMPANY_CODE
+          AND :NEW.PROJECT_CODE = :OLD.PROJECT_CODE
+          AND :OLD.AWAITINGAPPROVAL = 0
+          AND :NEW.AWAITINGAPPROVAL = 1
+          AND :NEW.STATUS  IN ('H', 'C') );
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+      END;
+      IF StoO_selcnt != 0 THEN
+        BEGIN
+          RAISE_APPLICATION_ERROR(-20057, 'This PROJECT_CODE OR CHANGE ORDER cannot be submitted FOR approval once it IS closed OR ON hold.');
+          RETURN;
+        END;
+      END IF;
+    END;
+
+--------SAVE POINT
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+         FROM DUAL
+        WHERE :NEW.COMPANY_CODE = :OLD.COMPANY_CODE
+         AND :NEW.PROJECT_CODE = :OLD.PROJECT_CODE
+         AND :NEW.STATUS = 'C'
+         AND :OLD.STATUS != 'C' );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+       
+       BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  1
+                FROM PPA_TRANSWIPADJUST T
+               WHERE T.COMPANY_CODE = :NEW.COMPANY_CODE
+                 AND T.PROJECT_CODE = :NEW.PROJECT_CODE AND :NEW.STATUS = 'C');
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                 StoO_rowcnt := 0;
+                 StoO_selcnt := 0;
+          END;
+
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              RAISE_APPLICATION_ERROR(-20062, 'Unable TO CLOSE PROJECT_CODE because there are transactions FOR this PROJECT_CODE waiting TO be adjusted.');
+              RETURN;
+            END;
+          END IF;
+        END;
+
+
+      END;
+    END IF;
+
+-------SAVE POINT
+    BEGIN
+      BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  (:NEW.AWAITINGAPPROVAL != :OLD.AWAITINGAPPROVAL) AND   EXISTS
+            (
+          SELECT  1
+          FROM DUAL WHERE :NEW.AWAITINGAPPROVAL = 1 );
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+      END;
+
+      IF StoO_selcnt != 0 THEN
+        BEGIN
+          BEGIN
+            BEGIN
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+              StoO_rowcnt := 0;
+
+              SELECT 1 INTO StoO_selcnt
+              FROM DUAL
+              WHERE  EXISTS (
+                SELECT  1
+                FROM DUAL WHERE TYPE_ = 'P'
+                 AND :NEW.AWAITINGAPPROVAL = 1 );
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+            END;
+
+            IF StoO_selcnt != 0 THEN
+              BEGIN
+                BEGIN
+                  BEGIN
+                    StoO_selcnt := 0;
+                    StoO_error  := 0;
+                    StoO_rowcnt := 0;
+
+                    SELECT 1 INTO StoO_selcnt
+                    FROM DUAL
+                    WHERE  EXISTS (
+                      SELECT  1
+                      FROM DUAL
+                      WHERE :NEW.COMPANY_CODE = :OLD.COMPANY_CODE
+                      AND :NEW.PROJECT_CODE = :OLD.PROJECT_CODE
+                      AND :NEW.TYPE_ = 'P'
+                      AND :NEW.AWAITINGAPPROVAL = 1
+                      AND :OLD.AWAITINGAPPROVAL = 0
+                      AND :NEW.STATUS = 'O'
+                      AND
+                      NOT EXISTS (
+                      SELECT  1
+                      FROM PROJCNTRTS p
+                      WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+                      AND p.PROJECT_CODE = :NEW.PROJECT_CODE ) );
+                    StoO_rowcnt := SQL%ROWCOUNT;
+                    EXCEPTION
+                      WHEN NO_DATA_FOUND THEN
+                        StoO_rowcnt := 0;
+                        StoO_selcnt := 0;
+                  END;
+
+                  IF StoO_selcnt != 0 THEN
+                    BEGIN
+                      RAISE_APPLICATION_ERROR(-20066, 'A contracted PROJECT_CODE cannot be submitted FOR approval without a contract');
+                      RETURN ;
+                    END;
+                  END IF;
+                END;
+              END;
+            END IF;
+          END;
+        END;
+      END IF;
+    END;
+
+    IF (:NEW.MASTER_PROJECT_CODE != :OLD.MASTER_PROJECT_CODE) THEN
+      BEGIN
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  1
+              FROM NAMEOPTIONS O
+              WHERE O.USECHANGEORDERS = 1
+              AND INSTR( :NEW.MASTER_PROJECT_CODE, O.PROJCHGORDERSEP) &gt; 0 );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+            END;
+
+            IF StoO_selcnt != 0 THEN
+              BEGIN
+                RAISE_APPLICATION_ERROR(-20067, 'PROJECT_CODE Code cannot include the CHANGE ORDER separator designated IN Name ');
+                RETURN ;
+              END;
+            END IF;
+          END;
+        END;
+      END IF;
+
+
+
+-------- SAVE POINT
+/*
+      IF (:NEW.currentrevision != :OLD.currentrevision) THEN
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  1
+              FROM DUAL
+              WHERE :NEW.approved = 1
+              AND :NEW.budget = 1
+              AND
+              NOT EXISTS (
+              SELECT  NVL(MAX(p.projrevisionid), 0)
+              FROM PROJREVISION p
+              WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+              AND p.PROJECT_CODE = :NEW.PROJECT_CODE
+              AND p.projrevisionid = :NEW.currentrevision
+              AND p.budgetrevision = 1
+              AND p.approved = 1 ) );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+          END;
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              RAISE_APPLICATION_ERROR(-20070, 'CURRENT Revision must match the highest Revision NUMBER that IS a budget revision FOR this PROJECT_CODE.');
+              RETURN;
+            END;
+          END IF;
+        END;
+      END IF;
+*/
+------SAVE POINT
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  (:NEW.status != :OLD.status) AND   EXISTS (
+            SELECT  1
+            FROM DUAL WHERE status = 'C'
+             AND type_ &lt;&gt; 'I' );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+        END;
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+/*PTR 10251*/
+/* By Michael Ackermann */
+            BEGIN
+              BEGIN
+                StoO_selcnt := 0;
+                StoO_error  := 0;
+                StoO_rowcnt := 0;
+                SELECT 1 INTO StoO_selcnt
+                FROM DUAL
+                WHERE  EXISTS (
+                  SELECT  1
+                  FROM PPA_TRANSCONTROL T
+                  WHERE T.COMPANY_CODE = :NEW.COMPANY_CODE
+                  AND T.PROJECT_CODE = :NEW.PROJECT_CODE AND :NEW.STATUS = 'C' );
+                StoO_rowcnt := SQL%ROWCOUNT;
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    StoO_rowcnt := 0;
+                    StoO_selcnt := 0;
+              END;
+              IF StoO_selcnt != 0 THEN
+                BEGIN
+                  RAISE_APPLICATION_ERROR(-20071, 'A PROJECT_CODE OR CHANGE ORDER cannot be closed WHILE transactions exist IN PPA_TRANSCONTROL.');
+                  RETURN;
+/*Paul Ackermann*/
+                END;
+              END IF;
+            END;
+          END;
+        END IF;
+      END;
+
+      IF (:NEW.status != :OLD.status) THEN
+        BEGIN
+          IF (:NEW.status='C') THEN
+        :NEW.projclosedatetime := SYSDATE;
+      END IF;
+
+          BEGIN
+            BEGIN
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+              StoO_rowcnt := 0;
+
+              SELECT 1 INTO StoO_selcnt
+              FROM DUAL
+              WHERE  EXISTS (
+                SELECT  1
+                FROM DUAL
+                WHERE :NEW.status = 'O'
+                AND :OLD.status = 'C'
+                AND :NEW.COMPANY_CODE = :OLD.COMPANY_CODE
+                AND :NEW.PROJECT_CODE = :OLD.PROJECT_CODE );
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+            END;
+
+            IF StoO_selcnt != 0 THEN
+              BEGIN
+                :NEW.projreopendatetime := SYSDATE;
+
+                IF StoO_error != 0 THEN
+                  BEGIN
+                    RAISE_APPLICATION_ERROR(-20552,'TRIGGER forces a ROLLBACK 11');
+                    RETURN;
+                  END;
+                END IF;
+              END;
+            END IF;
+          END;
+
+--------SAVE POINT
+          BEGIN
+            BEGIN
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+              StoO_rowcnt := 0;
+
+              SELECT 1 INTO StoO_selcnt
+              FROM DUAL
+              WHERE  (:NEW.type_ != :OLD.type_) AND   EXISTS (
+                SELECT  1
+                FROM DUAL WHERE :NEW.awaitingapproval = 1
+                AND type_ = 'P' );
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                  StoO_selcnt := 0;
+            END;
+            IF StoO_selcnt != 0 THEN
+              BEGIN
+                BEGIN
+                  StoO_selcnt := 0;
+                  StoO_error  := 0;
+                  StoO_rowcnt := 0;
+
+                  SELECT 1 INTO StoO_selcnt
+                  FROM DUAL
+                  WHERE  EXISTS (
+                    SELECT  1
+                    FROM DUAL
+                    WHERE :NEW.awaitingapproval = 1
+                    AND :NEW.type_ = 'P'
+                    AND
+                    NOT EXISTS (
+                    SELECT  1
+                    FROM PROJCNTRTS p
+                    WHERE p.COMPANY_CODE = :NEW.COMPANY_CODE
+                    AND p.PROJECT_CODE = :NEW.PROJECT_CODE ) );
+
+                  StoO_rowcnt := SQL%ROWCOUNT;
+                  EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                      StoO_rowcnt := 0;
+                      StoO_selcnt := 0;
+                END;
+
+                IF StoO_selcnt != 0 THEN
+                  BEGIN
+                    RAISE_APPLICATION_ERROR(-20073, 'A PROJECT_CODE submitted FOR approval cannot be a contracted PROJECT_CODE without a contract.');
+                    RETURN;
+                  END;
+                END IF;
+              END;
+            END IF;
+          END;
+        END;
+      END IF;
+    END;
+  END IF;
+END PAC_MNT_PROJECTS_T1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

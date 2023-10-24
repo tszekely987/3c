@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_FOS_RESOURCE_ENTITY_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_FOS_RESOURCE_ENTITY_FCT" 
+ (P_RESOURCE_CODE VARCHAR2)
+  RETURN VARCHAR2
+IS
+  V_SECURITY_LEVEL  INTEGER := 0;
+  V_DEFAULT_ENTITY  VARCHAR2(60);
+  V_RESOURCE_ENTITY VARCHAR2(60);
+  V_RETURN_VALUE    VARCHAR2(60) := ' ';
+  V_COUNT           INTEGER := 0;
+BEGIN
+  SELECT NVL(ENTITY_SECURITY, 0),
+         NVL(DEFAULTENTITY, ' ')
+    INTO V_SECURITY_LEVEL,
+         V_DEFAULT_ENTITY
+    FROM NAMEOPTIONS;
+
+  IF V_SECURITY_LEVEL = 0 THEN
+    V_RETURN_VALUE := NULL;  -- if there is no security, return NULL to give them access to everything
+  ELSE
+    BEGIN
+      BEGIN
+        SELECT COUNT(*),
+               L.ENTITY
+          INTO V_COUNT,
+               V_RESOURCE_ENTITY
+          FROM PAC_MNT_RESOURCES R,
+              LOCATIONS L
+        WHERE R.RESOURCE_CODE = P_RESOURCE_CODE
+          AND R.LOCATIONID = L.LOCATIONID
+        GROUP BY L.ENTITY;
+
+        EXCEPTION
+          WHEN OTHERS THEN
+            RETURN ' '; -- if the resource code is invalid, or an error occurs, they can't see anything
+      END;
+
+      IF V_COUNT &gt; 0 THEN
+        BEGIN
+          IF V_RESOURCE_ENTITY = V_DEFAULT_ENTITY AND V_SECURITY_LEVEL = 2 THEN
+            V_RETURN_VALUE := NULL;
+          ELSE
+            V_RETURN_VALUE := V_RESOURCE_ENTITY;
+          END IF;
+        END;
+      END IF;
+    END;
+  END IF;
+
+  RETURN V_RETURN_VALUE;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_JOB_ANALYZE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_JOB_ANALYZE_SP" (
+   P_JOB_RUN_ID           IN   NUMBER,
+   P_JOB_USER_ID          IN   NUMBER
+)
+IS
+V_COUNT NUMBER;
+BEGIN
+
+  -- dbms_utility.analyze_schema(schema =&gt; user, method =&gt; 'COMPUTE');
+  -- Fix for bug# 70545. Start using dbms_stats instead.
+  --
+  --  Use for all columns to prevent histograms being generated as Oracle 10 and 11 do the generation by default and it 
+  --  really messes up the performance since the optimizer probably has TMI to process on some of our tables and makes
+  --  bad plans as a result
+  --
+  SELECT COUNT(1) INTO V_COUNT FROM NLS_DATABASE_PARAMETERS WHERE PARAMETER = 'NLS_RDBMS_VERSION' AND VALUE LIKE '19%';
+
+  IF V_COUNT = 1 THEN
+    DBMS_STATS.GATHER_SCHEMA_STATS (ownname =&gt; user, degree =&gt; DBMS_STATS.AUTO_DEGREE, estimate_percent =&gt; DBMS_STATS.AUTO_SAMPLE_SIZE, cascade =&gt; true);
+  ELSE
+    DBMS_STATS.GATHER_SCHEMA_STATS (ownname =&gt; user, degree =&gt; DBMS_STATS.AUTO_DEGREE, estimate_percent =&gt; DBMS_STATS.AUTO_SAMPLE_SIZE, cascade =&gt; true, method_opt=&gt; 'FOR ALL COLUMNS SIZE 1');
+  END IF;
+  --
+  --  Certain temp tables should always have &lt; 4000 rows in them, set this up here
+  --
+  DBMS_STATS.SET_TABLE_STATS( ownname =&gt; user, tabname =&gt; 'CAL_TEMP_VIRTUAL_EVENTS', numrows =&gt; 10, numblks =&gt; 2, avgrlen =&gt; 400 );
+  DBMS_STATS.SET_TABLE_STATS( ownname =&gt; user, tabname =&gt; 'TEMP_RSM_RSF_RESOURCES', numrows =&gt; 100, numblks =&gt; 2, avgrlen =&gt; 35 );
+  DBMS_STATS.SET_COLUMN_STATS( ownname =&gt; user, tabname =&gt; 'TEMP_RSM_RSF_RESOURCES', colname =&gt; 'RESOURCE_ID', distcnt =&gt; 100, nullcnt =&gt; 0);
+
+  DBMS_STATS.SET_TABLE_STATS( ownname =&gt; user, tabname =&gt; 'TEMP_RSM_RSF_SKILLS', numrows =&gt; 3, numblks =&gt; 1, avgrlen =&gt; 35 );
+  --DBMS_STATS.SET_TABLE_STATS( ownname =&gt; user, tabname =&gt; 'PRJ_TEMP_CIRC_DEP_CHK', numrows =&gt; 500, numblks =&gt; 3, avgrlen =&gt; 35 );
+
+  /*
+    Conditionally set the stats for PRJ_FISCAL_BLB_SLICES if the table is empty so that oracle will choose better execution plan during time slice job.
+    Once the table has been populated, allow the stats to be set normally.
+  */
+  SELECT count(1) INTO V_COUNT FROM PRJ_FISCAL_BLB_SLICES WHERE  ROWNUM &lt; 2;
+
+  IF v_count = 0 THEN
+    DBMS_STATS.SET_TABLE_STATS( ownname =&gt; user, tabname =&gt; 'PRJ_FISCAL_BLB_SLICES', numrows =&gt; 10000000 );
+    DBMS_STATS.SET_INDEX_STATS( ownname =&gt; user, indname =&gt; 'PRJ_FISCAL_BLB_SLICES_U1', numdist =&gt; 10000000, numrows =&gt; 10000000 );
+  END IF;
+
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

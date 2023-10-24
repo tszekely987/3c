@@ -1,0 +1,44 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_X_RES_AVAIL_PER_FACTS_V">
+    <indexes/>
+    <text_length>2131</text_length>
+    <text>SELECT s.prj_object_id resource_key,
+          CAST(s.slice_date - TO_DATE ('01/01/2000', 'MM/DD/YYYY') + 2000000 AS INTEGER) period_key,
+          NVL(s.slice,0) avail_hours,
+          CASE WHEN r.last_updated_date >= NVL(a.prModTime,TO_DATE('01/01/1910','MM/DD/YYYY')) 
+               THEN r.last_updated_date ELSE a.prModTime END clarity_updated_date
+   FROM   prj_blb_slices s
+          INNER JOIN prj_resources r ON s.prj_object_id = r.prID
+          INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+          LEFT OUTER JOIN prCalendar a ON r.prID = a.prResourceID
+   WHERE  sr.request_name = 'WEEKLYRESOURCEAVAILCURVE'
+   AND   (SELECT weekly_slices FROM dwh_settings) = 1
+   AND    s.slice &lt;&gt; 0
+   UNION ALL
+   SELECT s.prj_object_id resource_key,
+          CAST (s.slice_date - TO_DATE ('01/01/2000', 'MM/DD/YYYY') + 3000000 AS INTEGER) period_key,
+          s.slice avail_hours,
+          CASE WHEN r.last_updated_date >= NVL(a.prModTime,TO_DATE('01/01/1910','MM/DD/YYYY')) 
+               THEN r.last_updated_date ELSE a.prModTime END clarity_updated_date
+   FROM   prj_blb_slices s
+          INNER JOIN prj_resources r ON s.prj_object_id = r.prID
+          INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+          LEFT OUTER JOIN prCalendar a ON r.prID = a.prResourceID
+   WHERE  sr.request_name = 'MONTHLYRESOURCEAVAILCURVE'
+   AND   (SELECT monthly_slices FROM dwh_settings) = 1
+   AND    s.slice &lt;&gt; 0
+   UNION ALL 
+   SELECT s.prj_object_id resource_key,
+          s.period_id period_key,
+          s.slice avail_hours,
+          CASE WHEN r.last_updated_date >= NVL(a.prModTime,TO_DATE('01/01/1910','MM/DD/YYYY')) 
+               THEN r.last_updated_date ELSE a.prModTime END clarity_updated_date
+   FROM   prj_fiscal_blb_slices s
+          INNER JOIN prj_resources r ON s.prj_object_id = r.prID
+          INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+          LEFT OUTER JOIN prCalendar a ON r.prID = a.prResourceID
+   WHERE  sr.request_name = 'resource::pravailcurve::dwh_fiscal'
+   AND   (SELECT fiscal_slices FROM dwh_settings) = 1
+   AND    s.slice &lt;&gt; 0</text>
+  </QueryResult>
+</ClarityDBViewQuery>

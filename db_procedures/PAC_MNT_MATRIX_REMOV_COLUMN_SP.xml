@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_REMOV_COLUMN_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_REMOV_COLUMN_SP" (
+matrixKey 	NUMBER ,
+fieldName 	VARCHAR2,
+userId      NUMBER DEFAULT 1
+)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+columnNo 	NUMBER(3,0);
+temp_RC1 	PPA_MATRIXDELETECOLUMNPkg.RCT1;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   ColumnNo
+		INTO PAC_MNT_MATRIX_REMOV_COLUMN_SP.columnNo FROM ppa_MatrixColDef
+		WHERE MatrixKey = PAC_MNT_MATRIX_REMOV_COLUMN_SP.matrixKey
+		 and FieldName = PAC_MNT_MATRIX_REMOV_COLUMN_SP.fieldName;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	ppa_MatrixDeleteColumn(iMatrixKey=&gt;PAC_MNT_MATRIX_REMOV_COLUMN_SP.matrixKey,
+	 iColumnNo=&gt;PAC_MNT_MATRIX_REMOV_COLUMN_SP.columnNo,
+	 RC1=&gt;temp_RC1,
+	 userId=&gt;PAC_MNT_MATRIX_REMOV_COLUMN_SP.userId);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END PAC_MNT_MATRIX_REMOV_COLUMN_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

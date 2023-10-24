@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ADD_MANDATORY_PORTLETS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ADD_MANDATORY_PORTLETS_SP" (P_PAGE_ID NUMBER)
+AS
+   	type t_pp_id 								is table of cmn_page_portlets.id%type;
+   	type t_page_id 							is table of cmn_pages.id%type;
+   	type t_portlet_id 					is table of cmn_page_portlets.portlet_id%type;
+   	type t_user_id 							is table of cmn_user_pages.user_id%type;
+   	type t_portlet_name		 			is table of cmn_captions_nls.name%type;
+   	type t_portlet_desc		 			is table of cmn_captions_nls.description%type;
+   	type t_portlet_name_lang		is table of cmn_captions_nls.language_code%type;
+   	type t_portlet_column				is table of cmn_page_portlets.portlet_column%type;
+   	type t_portlet_row					is table of cmn_page_portlets.portlet_row%type;
+   	type t_portlet_title_pk			is table of cmn_page_portlets.portlet_title_pk_id%type;
+   	type t_portlet_title_table	is table of cmn_page_portlets.portlet_title_table%type;
+
+		v_next_id							number;
+		v_page_id							t_page_id;
+		v_pp_id								t_pp_id;
+		v_pp_id2							t_pp_id;
+		v_portlet_id 					t_portlet_id;
+		v_user_id							t_user_id;
+		v_portlet_name 				t_portlet_name;
+		v_portlet_column		 	t_portlet_column;
+		v_portlet_row 				t_portlet_row;
+		v_portlet_title_pk 		t_portlet_title_pk;
+		v_portlet_title_table t_portlet_title_table;
+		v_portlet_desc 				t_portlet_desc;
+		v_language_code 			t_portlet_name_lang;
+
+   cursor c_system_portlet_to_add 
+   is	select  pp.portlet_id, pp.portlet_column, pp.portlet_row, pp.portlet_title_pk_id, 
+							pp.portlet_title_table, ntp.id, pp.id page_portlet_id
+			from    cmn_page_portlets pp, cmn_pages ntp
+			where   pp.principal_type = 'SYSTEM'
+			and			pp.is_mandatory = 1
+			and			pp.page_id = p_page_id
+			and			ntp.originating_page_id = pp.page_id
+			and  		not exists	(select  'SYSTEM PAGE PORTLET EXISTS' 
+													 from     cmn_page_portlets ipp 
+													 where    ipp.page_id = ntp.id 
+													 and      ipp.principal_type = 'SYSTEM'
+													 and			ipp.system_page_portlet_id = pp.id);
+   
+   cursor c_user_portlet_to_add
+   is
+      select  pp.id pp_id, pp.portlet_column, pp.portlet_row, pp.portlet_title_pk_id, 
+							pp.portlet_title_table, portlet_id, user_id, p.id page_id
+      from    cmn_page_portlets pp, cmn_user_pages up, cmn_pages p
+      where   not exists 
+							(select  'SYSTEM PAGE PORTLET EXISTS' 
+							 from     cmn_page_portlets ipp 
+							 where    ipp.page_id = pp.page_id 
+							 and      ipp.principal_id = up.user_id 
+							 and      ipp.system_page_portlet_id = pp.id) 
+			and     (p.id = p_page_id or p.originating_page_id = p_page_id)
+			and			pp.page_id = p.id
+      and     up.page_id = pp.page_id 
+      and     is_mandatory = 1 
+      and     pp.principal_type = 'SYSTEM';
+   
+BEGIN
+			
+   open c_system_portlet_to_add;
+
+   loop
+      fetch c_system_portlet_to_add bulk collect into v_portlet_id,
+      																							v_portlet_column,
+      																							v_portlet_row,
+      																							v_portlet_title_pk,
+      																							v_portlet_title_table,
+                                                    v_page_id,
+                                                    v_pp_id;
+      exit when c_system_portlet_to_add%notfound;
+   end loop;
+
+	 close c_system_portlet_to_add;
+	 
+   if v_pp_id.count &lt;&gt; 0
+   then
+   begin
+      forall j in v_pp_id.first .. v_pp_id.last
+				insert into cmn_page_portlets
+						(
+							 id, page_id, portlet_id, system_page_portlet_id,
+							 principal_id, principal_type, portlet_title_table, portlet_title_pk_id, 
+							 portlet_row, portlet_column, is_mandatory, state,
+							 created_date, created_by, last_updated_date, last_updated_by
+						)
+				select cmn_page_portlets_s1.nextval, v_page_id(j), v_portlet_id(j), v_pp_id(j),
+							 0, 'SYSTEM', v_portlet_title_table(j), v_portlet_title_pk(j),
+							 v_portlet_row(j), least(v_portlet_column(j), (l.column_count - 1)), 1, 0,
+							 sysdate, 1, sysdate, 1
+				from 	 cmn_pages p, cmn_page_layouts l
+				where  p.id = v_page_id(j)
+				and    l.id = p.layout_id;
+					
+      forall j in v_pp_id.first .. v_pp_id.last
+				insert into cmn_page_portlet_status
+						(
+							 id, page_portlet_id, state,
+							 principal_id, principal_type,
+							 created_date, created_by, last_updated_date, last_updated_by
+						)
+						select 	cmn_page_portlet_status_s1.nextval, pp.id, 0,
+										0, 'SYSTEM',
+										sysdate, 1, sysdate, 1
+						from 	 	cmn_page_portlets pp
+						where		pp.principal_id = 0
+						and			pp.principal_type = 'SYSTEM'
+						and			system_page_portlet_id = v_pp_id(j)
+						and			pp.page_id = v_page_id(j);
+					
+      commit;
+
+   end;
+   end if;
+
+   open c_user_portlet_to_add;
+
+   loop
+      fetch c_user_portlet_to_add bulk collect into v_pp_id,
+      																							v_portlet_column,
+      																							v_portlet_row,
+      																							v_portlet_title_pk,
+      																							v_portlet_title_table,
+                                                    v_portlet_id,
+                                                    v_user_id,
+                                                    v_page_id;
+      exit when c_user_portlet_to_add%notfound;
+   end loop;
+
+	 close c_user_portlet_to_add;
+	 
+   if v_pp_id.count &lt;&gt; 0
+   then
+   begin
+      forall j in v_pp_id.first .. v_pp_id.last
+					insert into cmn_page_portlets
+							(
+								 id, page_id, portlet_id, system_page_portlet_id,
+								 principal_id, principal_type, portlet_title_table, portlet_title_pk_id, 
+						 		 object_type, object_instance_id,
+								 portlet_row, portlet_column, is_mandatory, state,
+								 created_date, created_by, last_updated_date, last_updated_by
+							)
+					select cmn_page_portlets_s1.nextval, p_page_id, v_portlet_id(j), v_pp_id(j),
+								 v_user_id(j), 'USER', v_portlet_title_table(j), v_portlet_title_pk(j),
+						 		 up.object_type, up.object_instance_id,
+								 pp.portlet_row, least(pp.portlet_column, (l.column_count - 1)), 1, 0,
+								 sysdate, 1, sysdate, 1
+					from 	 cmn_page_portlets pp, cmn_user_pages up, cmn_page_layouts l
+					where  pp.id = v_pp_id(j)
+					and		 up.user_id = v_user_id(j)
+					and		 up.page_id = p_page_id
+					and    l.id = up.layout_id;
+					
+      forall j in v_pp_id.first .. v_pp_id.last
+			insert into cmn_page_portlet_status
+					(
+						 id, page_portlet_id, state,
+						 principal_id, principal_type,
+				 		 object_type, object_instance_id,
+						 created_date, created_by, last_updated_date, last_updated_by
+					)
+					select 	cmn_page_portlet_status_s1.nextval, pp.id, 0,
+								 	v_user_id(j), 'USER',
+								 	up.object_type, up.object_instance_id,
+								 	sysdate, 1, sysdate, 1
+					from 	 	cmn_page_portlets pp, cmn_user_pages up
+					where		principal_id = v_user_id(j)
+					and			principal_type = 'USER'
+					and			system_page_portlet_id = v_pp_id(j)
+					and			pp.page_id = up.page_id
+					and		 	up.user_id = v_user_id(j);
+					
+      commit;
+
+   end;
+   end if;
+
+exception
+   when others
+   then
+      raise_application_error (-20000, 'Error in CMN_ADD_MANDATORY_PORTLETS: ' || sqlerrm);
+end;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

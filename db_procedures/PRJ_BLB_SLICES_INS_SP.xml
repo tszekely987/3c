@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_SLICES_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_SLICES_INS_SP" (
+   P_SLICE_REQUEST_ID   CMN_TYPE_NUMBER_ARRAY,
+   P_PRJ_OBJECT_ID      CMN_TYPE_NUMBER_ARRAY,
+   P_SLICE_DATE         CMN_TYPE_DATE_ARRAY,
+   P_SLICE              CMN_TYPE_NUMBER_ARRAY,
+   P_TABLE_NAME         VARCHAR2 DEFAULT 'PRJ_BLB_SLICES',
+   P_INV_ID             CMN_TYPE_NUMBER_ARRAY,   
+   P_RESOURCE_ID        CMN_TYPE_NUMBER_ARRAY,
+   P_ROLE_ID            CMN_TYPE_NUMBER_ARRAY,
+   P_SCENARIO_ID        CMN_TYPE_NUMBER_ARRAY,
+   P_IS_DENORMALIZED    NUMBER DEFAULT 0,
+   P_IS_SCENARIO        NUMBER DEFAULT 0
+)
+AS
+   I   INTEGER;
+   NUM_VALUES INTEGER;
+   DYNSQL VARCHAR2(512);
+BEGIN
+   NUM_VALUES := P_SLICE_REQUEST_ID.COUNT;
+   IF  NUM_VALUES &lt;&gt; 0
+   THEN
+      IF P_TABLE_NAME = 'PRJ_BLB_SLICES'
+      THEN
+         FORALL I IN 1 .. NUM_VALUES
+           INSERT INTO PRJ_BLB_SLICES (SLICE_REQUEST_ID, PRJ_OBJECT_ID, SLICE_DATE, SLICE, CREATED_DATE)
+           VALUES (P_SLICE_REQUEST_ID(I), P_PRJ_OBJECT_ID(I), P_SLICE_DATE(I), P_SLICE(I), SYSDATE );
+      ELSE
+        DYNSQL := 'INSERT INTO ' || P_TABLE_NAME || 
+        ' (SLICE_REQUEST_ID, PRJ_OBJECT_ID, SLICE_DATE, SLICE, CREATED_DATE';
+
+        IF P_IS_DENORMALIZED &lt;&gt; 0
+        THEN
+          DYNSQL := DYNSQL || ',INVESTMENT_ID, RESOURCE_ID, ROLE_ID';
+        END IF;
+        
+        IF P_IS_SCENARIO &lt;&gt; 0
+        THEN
+          DYNSQL := DYNSQL || ',SCENARIO_ID';
+        END IF;
+        
+        DYNSQL := DYNSQL || ') VALUES (:REQUEST_ID,:OBJECT_ID,:SLICE_DATE,:SLICE,SYSDATE';
+
+        IF P_IS_DENORMALIZED &lt;&gt; 0
+        THEN
+          DYNSQL := DYNSQL || ',:INVESTMENT_ID, :RESOURCE_ID, :ROLE_ID';
+        END IF;
+        
+        IF P_IS_SCENARIO &lt;&gt; 0
+        THEN
+          DYNSQL := DYNSQL || ',:SCENARIO_ID';
+        END IF;
+        
+        DYNSQL := DYNSQL || ')';
+        
+        FOR I IN 1 .. NUM_VALUES
+          LOOP
+
+            IF P_IS_DENORMALIZED = 0 AND P_IS_SCENARIO = 0
+            THEN
+
+              EXECUTE IMMEDIATE DYNSQL 
+                USING P_SLICE_REQUEST_ID(I), P_PRJ_OBJECT_ID(I), P_SLICE_DATE(I), P_SLICE(I);            
+
+            ELSIF P_IS_DENORMALIZED &lt;&gt; 0 AND P_IS_SCENARIO &lt;&gt; 0
+            THEN
+
+              EXECUTE IMMEDIATE DYNSQL 
+                USING P_SLICE_REQUEST_ID(I), P_PRJ_OBJECT_ID(I), P_SLICE_DATE(I), P_SLICE(I),
+                      P_INV_ID(I), P_RESOURCE_ID(I), P_ROLE_ID(I), P_SCENARIO_ID(I);
+
+            ELSIF P_IS_DENORMALIZED &lt;&gt; 0 AND P_IS_SCENARIO = 0
+            THEN
+
+              EXECUTE IMMEDIATE DYNSQL 
+                USING P_SLICE_REQUEST_ID(I), P_PRJ_OBJECT_ID(I), P_SLICE_DATE(I), P_SLICE(I),
+                      P_INV_ID(I), P_RESOURCE_ID(I), P_ROLE_ID(I);
+
+            ELSIF P_IS_DENORMALIZED = 0 AND P_IS_SCENARIO &lt;&gt; 0
+            THEN
+
+              EXECUTE IMMEDIATE DYNSQL 
+                USING P_SLICE_REQUEST_ID(I), P_PRJ_OBJECT_ID(I), P_SLICE_DATE(I), P_SLICE(I),
+                      P_SCENARIO_ID(I);
+
+            END IF;
+
+          END LOOP;                
+
+      END IF;
+   END IF;
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in PRJ_BLB_SLICES_INS_SP: ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

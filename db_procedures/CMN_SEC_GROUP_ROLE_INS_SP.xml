@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_GROUP_ROLE_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_GROUP_ROLE_INS_SP" (
+   P_GROUP_ROLE_CODE          IN   VARCHAR2,
+   P_GROUP_ROLE_TYPE          IN   VARCHAR2,
+   P_GROUP_ROLE_NAME          IN   VARCHAR2,
+   P_GROUP_ROLE_DESCRIPTION   IN   VARCHAR2,
+   P_IS_ACTIVE                IN   NUMBER,
+   P_CREATED_BY               IN   NUMBER DEFAULT 1,
+   P_TYPE                     IN   VARCHAR2 DEFAULT 'INTERNAL',
+   P_RIGHT_TYPE               IN   VARCHAR2 DEFAULT NULL,
+   P_IS_AUTOMATIC             IN   NUMBER DEFAULT 0,
+   P_GLOBAL_RIGHT_TYPE        IN   VARCHAR2 DEFAULT NULL,
+   P_LIC_RIGHT_TYPE           IN   VARCHAR2 DEFAULT NULL
+)
+IS
+   V_ID                          NUMBER;
+   V_CNT                         INTEGER := 0;
+   V_GROUP_ROLE_TYPE             VARCHAR(100);
+   V_GLOBAL_RIGHT_TYPE           VARCHAR(100);
+   
+BEGIN
+
+  --
+  --  Validate licence type
+  --
+    IF ( P_LIC_RIGHT_TYPE IS NOT NULL ) THEN
+      SELECT   COUNT (*)
+      INTO     V_CNT
+      FROM     CMN_LOOKUPS
+      WHERE    LOOKUP_CODE = P_LIC_RIGHT_TYPE
+      AND      lookup_TYPE = 'CMN_LIC_RIGHT_TYPE';
+
+      IF (V_CNT &lt;= 0) THEN
+        RAISE_APPLICATION_ERROR (-20001, 'Licence Right type does not exist');
+      END IF;
+    END IF;
+
+  --
+  --  Ensure absolute uniqueness
+  --
+   SELECT   COUNT (*)
+   INTO     V_CNT
+   FROM     CMN_SEC_GROUPS
+   WHERE    GROUP_CODE = P_GROUP_ROLE_CODE;
+
+   IF (V_CNT &lt;= 0)
+   THEN
+      SELECT   CMN_SEC_GROUPS_S1.NEXTVAL
+      INTO     V_ID
+      FROM     DUAL;
+
+      --
+      --  Access Roles don't exist anymore, they are now groups
+      --
+      IF ( P_RIGHT_TYPE IS NULL ) THEN
+        V_GROUP_ROLE_TYPE := 'GROUP';
+      ELSE
+        V_GROUP_ROLE_TYPE := P_GROUP_ROLE_TYPE;
+        IF ( P_GLOBAL_RIGHT_TYPE IS NULL ) THEN
+          V_GLOBAL_RIGHT_TYPE := P_RIGHT_TYPE;
+        ELSE
+          V_GLOBAL_RIGHT_TYPE := P_GLOBAL_RIGHT_TYPE;
+        END IF;
+      END IF;
+
+
+  --  Validate licence type as not null for group_role as 'ROLE'
+  --
+    IF (V_GROUP_ROLE_TYPE='ROLE' AND P_LIC_RIGHT_TYPE IS NULL ) THEN
+       RAISE_APPLICATION_ERROR (-20001, 'License Right type can not be null');
+    END IF;
+
+      INSERT INTO CMN_SEC_GROUPS
+                  (
+                     ID,
+                     RIGHT_TYPE,
+                     GLOBAL_RIGHT_TYPE,
+                     GROUP_CODE,
+                     GROUP_ROLE_TYPE,
+                     GROUP_TYPE_ID,
+                     IS_ACTIVE,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY,
+                     IS_AUTOMATIC,
+                     LIC_RIGHT_TYPE,
+                     CAPTIONS_PK_ID
+                  )
+         SELECT   V_ID,
+                  P_RIGHT_TYPE,
+                  V_GLOBAL_RIGHT_TYPE,
+                  P_GROUP_ROLE_CODE,
+                  V_GROUP_ROLE_TYPE,
+                  L.ID,
+                  P_IS_ACTIVE,
+                  SYSDATE,
+                  P_CREATED_BY,
+                  SYSDATE,
+                  P_CREATED_BY,
+                  P_IS_AUTOMATIC,
+                  P_LIC_RIGHT_TYPE,
+                  V_ID
+         FROM     CMN_LOOKUPS L
+         WHERE    LOOKUP_TYPE = 'SEC_GROUP_TYPE'
+         AND      LOOKUP_CODE = P_TYPE;
+
+      CMN_CAPTIONS_NLS_INS_SP (
+         'CMN_SEC_GROUPS',
+         V_ID,
+         P_GROUP_ROLE_NAME,
+         P_GROUP_ROLE_DESCRIPTION,
+         P_CREATED_BY,
+         NULL,
+         NULL,
+         NULL,
+         NULL,
+         NULL
+      );
+   ELSE
+      RAISE_APPLICATION_ERROR (-20000, 'RECORD EXISTS');
+   END IF;
+END;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

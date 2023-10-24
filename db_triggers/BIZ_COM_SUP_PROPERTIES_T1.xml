@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>BIZ_COM_SUP_PROPERTIES_T1</code>
+          <table_name>BIZ_COM_SUP_PROPERTIES</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."BIZ_COM_SUP_PROPERTIES_T1" 
+AFTER INSERT OR UPDATE
+ON BIZ_COM_SUP_PROPERTIES
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>begin
+  DECLARE
+	  v_comp_id GLOBALPKG.STRING;
+	  v_exist number;
+BEGIN
+  IF( :NEW.PRIMARY_CONTACT_NAME != :OLD.PRIMARY_CONTACT_NAME ) THEN
+    SELECT count(*) INTO v_exist
+      FROM ARMASTER A,
+          SRM_COMPANIES CM
+    WHERE :new.ID = CM.ID
+      and CM.COMPANY_ID = A.COMPANY_CODE;
+
+    if v_exist=1 then
+      SELECT CM.COMPANY_ID INTO v_comp_id
+        from ARMASTER A,
+            SRM_COMPANIES CM
+      WHERE :new.ID = CM.ID
+        and CM.COMPANY_ID = A.COMPANY_CODE;
+
+      UPDATE ARMASTER
+          set CONTACT_NAME =:new.PRIMARY_CONTACT_NAME,
+              ATTENTION_NAME = :new.PRIMARY_CONTACT_NAME
+        where ARMASTER.COMPANY_CODE = v_comp_id;
+    END IF;
+  END IF;
+END;  
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

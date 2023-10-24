@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="BROWSE_PROJECT_WBS" displayAttributeName="prexternalid" hiddenAttributeName="prid" objectCode="" sortAttributeName="prname" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List tasks for a project that have external IDs" languageCode="en" name="Browse Tasks for a Project"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[
+                  
+
+SELECT @SELECT:task.prid:prid@,
+       @SELECT:task.PRUID:UNIQUE_CODE@,
+       @SELECT:task.prname:prname@,
+       @SELECT:task.prexternalid:prexternalid@,
+       @SELECT:task.last_updated_date:last_updated_date@
+FROM   prtask task, inv_investments inv
+WHERE  @FILTER@
+@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@ :BROWSE-ONLY@
+AND    task.prprojectid = inv.id
+AND    task.prexternalid is not null
+AND    task.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+AND    task.prid not in (select prtask.prid
+                         from  prtask
+                         left outer join
+                                (select t.prid, min(tnc.prwbssequence) as ncseq        from prtask t
+                                       , prtask tnc
+                                  where  t.prprojectid = tnc.prprojectid
+                                  and   tnc.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   t.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   tnc.prwbslevel <= t.prwbslevel
+                                  and   tnc.prwbssequence > t.prwbssequence
+                                  and   t.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@
+                                  and   tnc.prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@
+                                  group by t.prid) NNCS
+                         on prtask.prid = nncs.prid
+                         where prtask.prprojectid = @where:param:xml:integer:/data/projectId/@value@            and   prtask.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@
+                         and ISNULL(NNCS.NCSEQ,32000) > @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.pristask = 0
+                         union
+                         select prtask.prid
+                         from prtask
+                         where prtask.prprojectid= @where:param:xml:integer:/data/projectId/@value@
+                         and prtask.prwbssequence >= @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.prwbssequence < (select ISNULL(min(prwbssequence),32000) from prtask where prprojectid = @where:param:xml:integer:/data/projectId/@value@ and prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@ and prwbssequence > @where:param:xml:integer:/data/curposseq/@value@))
+                ]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT @SELECT:task.prid:prid@,
+       @SELECT:task.PRUID:UNIQUE_CODE@,
+       @SELECT:task.prexternalid:prexternalid@,
+       @SELECT:task.prname:prname@,
+       @SELECT:task.last_updated_date:last_updated_date@
+FROM   prtask task, inv_investments inv
+WHERE  @FILTER@
+@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@ :BROWSE-ONLY@
+AND    task.prprojectid = inv.id
+AND    task.prexternalid is not null
+AND    task.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+AND    task.prid not in (select prtask.prid
+                         from  prtask
+                               , (select t.prid, min(tnc.prwbssequence) as ncseq
+                                  from prtask t
+                                       , prtask tnc
+                                  where  t.prprojectid = tnc.prprojectid
+                                  and   tnc.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   t.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   tnc.prwbslevel <= t.prwbslevel
+                                  and   tnc.prwbssequence > t.prwbssequence
+                                  and   t.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@        and   tnc.prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@
+                                  group by t.prid) NNCS
+                         where prtask.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                         and   prtask.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@
+                         and NVL(NNCS.NCSEQ,32000) > @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.pristask = 0
+                         and  prtask.prid = nncs.prid (+)
+                         union
+                         select prtask.prid
+                         from prtask
+                         where prtask.prprojectid= @where:param:xml:integer:/data/projectId/@value@
+                         and prtask.prwbssequence >= @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.prwbssequence < (select NVL(min(prwbssequence),32000) from prtask where prprojectid = @where:param:xml:integer:/data/projectId/@value@ and prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@ and prwbssequence > @where:param:xml:integer:/data/curposseq/@value@))]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT @SELECT:task.prid:prid@,
+       @SELECT:task.PRUID:UNIQUE_CODE@,
+       @SELECT:task.prname:prname@,
+       @SELECT:task.prexternalid:prexternalid@,
+       @SELECT:task.last_updated_date:last_updated_date@
+FROM   prtask task, inv_investments inv
+WHERE  @FILTER@
+@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@ :BROWSE-ONLY@
+AND    task.prprojectid = inv.id
+AND    task.prexternalid is not null
+AND    task.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+AND    task.prid not in (select prtask.prid
+                         from  prtask
+                         left outer join
+                                (select t.prid, min(tnc.prwbssequence) as ncseq        from prtask t
+                                       , prtask tnc
+                                  where  t.prprojectid = tnc.prprojectid
+                                  and   tnc.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   t.prprojectid = @where:param:xml:integer:/data/projectId/@value@
+                                  and   tnc.prwbslevel <= t.prwbslevel
+                                  and   tnc.prwbssequence > t.prwbssequence
+                                  and   t.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@
+                                  and   tnc.prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@
+                                  group by t.prid) NNCS
+                         on prtask.prid = nncs.prid
+                         where prtask.prprojectid = @where:param:xml:integer:/data/projectId/@value@            and   prtask.prwbssequence <= @where:param:xml:integer:/data/curposseq/@value@
+                         and COALESCE(NNCS.NCSEQ,32000) > @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.pristask = 0
+                         union
+                         select prtask.prid
+                         from prtask
+                         where prtask.prprojectid= @where:param:xml:integer:/data/projectId/@value@
+                         and prtask.prwbssequence >= @where:param:xml:integer:/data/curposseq/@value@
+                         and prtask.prwbssequence < (select COALESCE(min(prwbssequence),32000) from prtask where prprojectid = @where:param:xml:integer:/data/projectId/@value@ and prwbslevel <= @where:param:xml:integer:/data/curposlev/@value@ and prwbssequence > @where:param:xml:integer:/data/curposseq/@value@))
+                ]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="prname"/>
+              <displayedSuggestionAttribute value="prexternalid"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="prname"/>
+              <searchedSuggestionAttribute value="prexternalid"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Tasks" languageCode="en" name="Select Tasks"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Task" languageCode="en" name="Select Task"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="prexternalid" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="External ID" languageCode="en" name="External ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="prname" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="3" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: id" languageCode="en" name="[hidden]: id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prexternalid" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="External ID" languageCode="en" name="External ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prname" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

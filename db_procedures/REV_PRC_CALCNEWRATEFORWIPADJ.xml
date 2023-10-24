@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_CALCNEWRATEFORWIPADJ</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_CALCNEWRATEFORWIPADJ" (
+dtTransDate 	DATE ,
+cTransType 	VARCHAR2 ,
+cClient 	VARCHAR2 ,
+cProject 	VARCHAR2 ,
+cCharge_Code   VARCHAR2 ,
+cInput_Type  VARCHAR2 ,
+cResource_Code  VARCHAR2 ,
+in_nHours 	IN NUMBER ,
+in_nMinutes 	IN NUMBER ,
+in_nQuantity 	IN NUMBER ,
+nBillRate 	NUMBER ,
+bChargeable 	NUMBER ,
+cNotes 	VARCHAR2 ,
+iTransNo 	NUMBER ,
+nActualCost 	NUMBER ,
+cVendorCode 	VARCHAR2 ,
+cPoNo 	VARCHAR2 ,
+bShowRate 	NUMBER ,
+bAllowChargeable 	NUMBER ,
+bCostVariance 	NUMBER ,
+bOverride 	NUMBER ,
+in_bCalcNewRateClicked 	IN NUMBER ,
+bCalcNewRate 	NUMBER ,
+bRateCurrencyCode	   VARCHAR2,
+bCostCurrencyCode	   VARCHAR2,
+vRoleCode              VARCHAR2,
+RC1 	IN OUT REV_PRC_CALCNEWRATEFORWIPADPkg.RCT1)
+AS
+nHours  NUMBER(32,6);
+nMinutes  NUMBER(32,6);
+nQuantity   NUMBER(32,6);
+bCalcNewRateClicked 	NUMBER(1,0);
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+cTransDate 	GLOBALPKG.STRING;
+mAmount   NUMBER(32,6);
+mStdCost  NUMBER(32,6);
+cCostplusRule 	GLOBALPKG.STRING;
+--cMultiplier 	GLOBALPKG.STRING;
+bRateFound 	NUMBER(1,0);
+nMinuteCalc   NUMBER(32,6);
+mFactorAmount   NUMBER(32,6);
+mBurdenAmount   NUMBER(32,6);
+mOverheadAmount   NUMBER(32,6);
+BCOSTOVERRIDE       NUMBER(32,6);
+temp_RC1			PPA_GETRATEPkg.RCT1;
+nCost   NUMBER(32,6);
+mRate   NUMBER(32,6);
+rateCurrencyCode varchar2(30);
+costCurrencyCode varchar2(30);
+
+temp_rate      NUMBER(32,6);
+temp_actCost   NUMBER(32,6);
+temp_stdcost   NUMBER(32,6);
+temp_factoramt   NUMBER(32,6);
+temp_burdenamt   NUMBER(32,6);
+temp_overheadamt NUMBER(32,6);
+
+v_exchangeRate_err NUMBER;
+
+bUseCostPlus NUMBER;
+--nCostRuleCode GLOBALPKG.STRING;
+stdCostCurrencyCode GLOBALPKG.STRING;
+L_EXCHANGE_RATE_TYPE GLOBALPKG.STRING;
+
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :- This procedure calculates new rate for wip adjustment.
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+
+	/* calculate quantity for labor */
+	nHours := in_nHours;
+	nMinutes := in_nMinutes;
+	nQuantity := in_nQuantity;
+	bCalcNewRateClicked := in_bCalcNewRateClicked;
+	mRate := nBillRate;
+	nCost := nActualCost;
+
+
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+
+	v_exchangeRate_err := 0;
+
+	cTransDate :=  RPAD(TO_CHAR(dtTransDate,'mm/dd/yyyy'), 10, ' ');
+	nHours :=  NVL(nHours,  0);
+	nMinutes :=  NVL(nMinutes, 0);
+
+	/* Negative Transaction Processing. Making hours negative implies that minutes are negative and visa versa */
+	IF cTransType = 'L' Then
+      If nHours &lt; 0 AND nMinutes &gt; 0 Then
+        nMinutes := nMinutes * -1;
+      End If;
+
+      If nHours &gt; 0 AND nMinutes &lt; 0 Then
+        nHours := nHours * -1;
+      End If;
+	End If;
+
+	/* Not enforcing for now
+      IF ( nHours &lt; 0 OR nMinutes &lt; 0 ) AND mRate &lt; 0 Then
+        RAISE_APPLICATION_ERROR(-20087, 'Hours/Minutes and Rate cannot both be negative.');
+        RETURN;
+      End If;
+    ELSE
+      BEGIN
+        IF nQuantity &lt; 0  AND mRate &lt; 0 Then
+          RAISE_APPLICATION_ERROR(-20088, 'Quantity and Rate cannot both be negative.');
+          RETURN;
+        End If;
+      END; */
+
+	IF  ( nHours != 0) OR   ( nMinutes != 0) THEN
+	BEGIN
+		nMinuteCalc :=  ROUND(ROUND( TO_NUMBER(( nMinutes ))) / 60, 2);
+
+		nQuantity :=  nHours + nMinuteCalc;
+	END;
+	END IF;
+
+	   /* get the exchange rate type */
+		BEGIN
+				SELECT DECODE(cTransType,'L',LABOR_EXCHANGE_RATE_TYPE,
+		   		  												   'M',MATERIALS_EXCHANGE_RATE_TYPE,
+																   'Q',EQUIPMENT_EXCHANGE_RATE_TYPE,
+																   'X',EXPENSE_EXCHANGE_RATE_TYPE)
+		   		INTO L_EXCHANGE_RATE_TYPE
+		   		FROM PAC_MNT_PROJECTS PROJ
+		   		WHERE PROJ.PROJECT_CODE = cProject;
+
+		EXCEPTION WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	    END ;
+
+
+	IF  bCalcNewRate = 1 THEN
+	BEGIN
+		BEGIN
+		ppa_GetRate_WithRole(cClient=&gt;cClient,
+		 cProject=&gt;cProject,
+     cCharge_Code=&gt;cCharge_Code,
+     cInput_Type=&gt;cInput_Type,
+     cResource_Code=&gt;cResource_Code,
+		 cLocation =&gt; NULL,
+		 cDepartCode =&gt; NULL,
+		 IN_cTransType=&gt;cTransType,
+		 cTransDate=&gt;cTransDate,
+		 nQuantity=&gt;nQuantity,
+		 bAsResultSet=&gt;0,
+		 nAmount=&gt;mAmount,
+		 nRate=&gt;mRate,
+		 nCost=&gt;nCost,
+		 nStdCost=&gt;mStdCost,
+		 nFactorAmt=&gt;mFactorAmount,
+		 nBurdenAmt=&gt;mBurdenAmount,
+		 nOverheadAmt=&gt;mOverheadAmount,
+		 cCostPlusCode=&gt;cCostplusRule,
+		 --cCostRuleCode=&gt;cMultiplier,
+		 bRateFound=&gt;bRateFound,
+		 budgetcall=&gt;0,
+		 BCOSTOVERRIDE=&gt;0,
+		 currencyCodeReturned=&gt;rateCurrencyCode,
+		 costCurrencyCode=&gt;costCurrencyCode,
+         cRoleCode=&gt;vRoleCode,
+		 RC1=&gt;temp_rc1,
+		 cCost_type =&gt; NULL );
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		bCalcNewRateClicked :=  1;
+		stdCostCurrencyCode := costCurrencyCode;
+	END;
+	ELSE
+	BEGIN
+		 ppa_GetRate_WithRole(cClient=&gt;cClient,
+		 cProject=&gt;cProject,
+     cCharge_Code=&gt;cCharge_Code,
+     cInput_Type=&gt;cInput_Type,
+     cResource_Code=&gt;cResource_Code,
+		 cLocation =&gt; NULL,
+		 cDepartCode =&gt; NULL,
+		 IN_cTransType=&gt;cTransType,
+		 cTransDate=&gt;cTransDate,
+		 nQuantity=&gt;nQuantity,
+		 bAsResultSet=&gt;0,
+		 nAmount=&gt;mAmount,
+		 nRate=&gt;temp_rate,
+		 nCost=&gt;temp_actCost,
+		 nStdCost=&gt;temp_stdCost,
+		 nFactorAmt=&gt;temp_factoramt,
+		 nBurdenAmt=&gt;temp_burdenamt,
+		 nOverheadAmt=&gt;temp_overheadamt,
+		 cCostPlusCode=&gt;cCostplusRule,
+		 --cCostRuleCode=&gt;cMultiplier,
+		 bRateFound=&gt;bRateFound,
+		 budgetcall=&gt;0,
+		 BCOSTOVERRIDE=&gt;0,
+		 currencyCodeReturned=&gt;rateCurrencyCode,
+		 costCurrencyCode=&gt;costCurrencyCode,
+         cRoleCode=&gt;vRoleCode,
+		 RC1=&gt;temp_rc1,
+		 cCost_type =&gt; NULL);
+
+		 EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		/* get std. cost currency if present */
+		stdCostCurrencyCode := costCurrencyCode;
+
+		/* get the currency code from UI */
+		rateCurrencyCode :=bRateCurrencyCode;
+		costCurrencyCode :=bCostCurrencyCode;
+
+		/* assign std cost */
+		mStdCost := temp_stdCost;
+		--mAmount :=  ( nQuantity * mRate );
+
+	END IF;
+
+	/* even if we din't click the getNew Rate, then also we compute the ppa_getrate, if he/she have
+	any burden, overhead or not
+	*/
+
+	/* start all the conversion */
+	v_exchangeRate_err := 0;
+
+	IF costCurrencyCode != rateCurrencyCode THEN
+
+	BEGIN
+
+	/* convert the actual cost to rate currency code */
+	temp_actCost := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+			   		    dtTransDate,
+						costCurrencyCode,
+						rateCurrencyCode,
+						nCost,
+						L_EXCHANGE_RATE_TYPE );
+
+
+	EXCEPTION
+
+  	WHEN NO_DATA_FOUND THEN
+		 v_exchangeRate_err := 1;
+  		 raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+
+	WHEN OTHERS THEN
+  		 StoO_error := SQLCODE;
+  		 StoO_errmsg := SQLERRM;
+		 v_exchangeRate_err := 1;
+		 raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+
+	END;
+
+	ELSE
+
+	temp_actCost := nCost;
+
+	END IF;
+
+
+	IF stdCostCurrencyCode IS NOT NULL AND (stdCostCurrencyCode != rateCurrencyCode) THEN
+
+	BEGIN
+	/* convert the std. cost to rate currency code */
+	temp_stdCost := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+			   			dtTransDate,
+						stdCostCurrencyCode,
+						rateCurrencyCode,
+						mStdCost,
+						L_EXCHANGE_RATE_TYPE );
+
+	EXCEPTION
+
+  	WHEN NO_DATA_FOUND THEN
+	v_exchangeRate_err := 1;
+  		raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+
+	WHEN OTHERS THEN
+  		StoO_error := SQLCODE;
+  		StoO_errmsg := SQLERRM;
+		v_exchangeRate_err := 1;
+		raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+
+	END;
+
+	ELSE
+
+	temp_stdCost := mStdCost;
+
+	END IF;
+
+	/* call computeRateFactor to calculate cost, factor, burden */
+	-- check if the cost plus rule is null or not
+	IF cCostplusRule IS NOT NULL THEN
+
+	bUseCostPlus :=1;
+
+	ELSE
+
+	bUseCostPlus := 0;
+
+	END IF;
+	/* compute all the amount and get the flag that it is based on
+	actual cost or std. cost */
+	Ppa_Computemarkup( bUseCostPlus,
+					   cCostplusRule,
+             cCharge_Code,
+             cInput_Type,
+					   cTransType,
+					   temp_actCost,
+					   nQuantity,
+					   temp_stdCost,
+					   mRate,
+					   mAmount,
+					   temp_factoramt,
+					   temp_burdenamt,
+					   temp_overheadamt,
+				          --nCostRuleCode,
+				          rateCurrencyCode,
+				          stdCostCurrencyCode,
+				          dtTransDate,
+				          cProject
+				          );
+
+	/* calculate the amount */
+	mAmount :=  nQuantity * mRate +NVL(temp_factoramt, 0)
+  								  + NVL(temp_burdenamt, 0)
+  								  + NVL(temp_overheadamt, 0);
+
+	OPEN RC1 FOR
+	SELECT  dtTransDate "TransDate",  cTransType "TransType",  cClient "COMPANY_CODE",
+  cProject "PROJECT_CODE", cCharge_Code "Charge_Code",
+  cInput_Type "Input_Type",  cResource_Code "RESOURCE_CODE",  nQuantity "Quantity",
+  mRate "BillRate",  mAmount "Amount",  bChargeable "Chargeable",
+	cNotes "Notes",  iTransNo "TransNo",  0 "status",  nHours "hours",  nMinutes "minutes",
+	nCost "ActualCost",  cVendorCode "VENDOR_CODE",  cPoNo "PoNo",  mAmount "Total",
+	bShowRate "ShowRate",  bAllowChargeable "AllowChargeable",  bCostVariance "CostVariance",
+	bOverride "AllowOverrideRate",  bCalcNewRateClicked "CalcNewRateClicked", rateCurrencyCode "ratecurrencycode",
+	costCurrencyCode "costCurrencyCode", rateCurrencyCode "totalCurrencyCode", vRoleCode "RoleCode"
+	FROM DUAL;
+/* to let the user know if the CalcNewRate was clicked */
+END REV_PRC_CALCNEWRATEFORWIPADJ;
+/*
+  MOoified By :Deva
+  Changes  	  : Following variable defined and passed there default values to ppa_getrate procedure
+            BCOSTOVERRIDE      NUMBER(32,6);
+				emp_RC1	PPA_GETRATEPkg.RCT1;
+        temp_NCOST          NUMBER(32,6);
+        mRate   NUMBER(32,6);
+*/</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

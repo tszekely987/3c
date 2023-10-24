@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_CHANGE_TRANSCLASS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_CHANGE_TRANSCLASS_SP" 
+(
+  FORECAST_ID      NUMBER,
+  DETAIL_ID    NUMBER,
+  DETAIL2_ID    NUMBER,
+  ADD_OR_REMOVE	   NUMBER,
+  RESOURCE_CODE	   GLOBALPKG.STRING,
+  USER	   		   NUMBER,
+  P_VALIDATE	   NUMBER DEFAULT 1
+)
+AS
+
+  v_FORECAST_ID    NUMBER;
+  v_DETAIL_ID  NUMBER;
+  v_DETAIL2_ID  NUMBER;
+  v_PROJECT_ID     NUMBER;
+  v_ADD_OR_REMOVE  NUMBER;
+  v_RESOURCE_CODE  GLOBALPKG.STRING;
+  v_REVISION_NUMBER GLOBALPKG.STRING;
+  v_REVISION_STATUS GLOBALPKG.STRING;
+  v_ERROR_CODE		INTEGER;
+  v_USER			NUMBER;
+  v_FORECAST_TYPE 	NUMBER;
+
+  StoO_error       INTEGER;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  v_STMT		   GLOBALPKG.STRING;
+BEGIN
+
+  v_FORECAST_ID    := FORECAST_ID;
+  v_DETAIL_ID  := DETAIL_ID;
+  v_DETAIL2_ID  := DETAIL2_ID;
+  v_RESOURCE_CODE  := RESOURCE_CODE;
+  v_ADD_OR_REMOVE  := ADD_OR_REMOVE;
+  v_USER		   := USER;
+
+
+  -- get the status of the forecast/budget
+   v_STMT := 'Error retrieving the financial plan properties for this project.';
+   v_ERROR_CODE := -20963;
+
+   SELECT STATUS,
+	     REVISION,
+		 PROJECT_ID,
+		 FORECAST_TYPE
+      INTO v_REVISION_STATUS,
+      	   v_REVISION_NUMBER,
+		   v_PROJECT_ID,
+		   v_FORECAST_TYPE
+      FROM PAC_FRC_FORECAST_PROPERTIES
+     WHERE ID = v_FORECAST_ID ;
+
+   -- If plan revision is approved then raise an error that plan has been approved
+  IF v_REVISION_STATUS = 2 AND P_VALIDATE = 1 THEN
+    RAISE_APPLICATION_ERROR(-20069, 'This plan has been approved.');
+  END IF;
+
+
+  IF v_ADD_OR_REMOVE = 1 Then -- Add
+    v_STMT := 'Error inserting the details for this financial plan.';
+	v_ERROR_CODE := -20968;
+
+    INSERT INTO PAC_FRC_PROJ_ASSOC(ID, FORECAST_ID, DETAIL_ID, DETAIL2_ID, CREATED_DATE, CREATED_BY,
+		   						   LAST_UPDATED_DATE,LAST_UPDATED_BY)
+	SELECT PAC_FRC_PROJ_ASSOC_S1.nextval, V_FORECAST_ID, v_DETAIL_ID, v_DETAIL2_ID, SYSDATE, v_USER, SYSDATE, v_USER FROM DUAL
+	WHERE NOT EXISTS (SELECT 'EXIST' FROM PAC_FRC_PROJ_ASSOC 
+		  	  		  WHERE FORECAST_ID=V_FORECAST_ID AND DETAIL_ID=v_DETAIL_ID 
+					  and (v_DETAIL2_ID IS NULL or DETAIL2_ID = v_DETAIL2_ID) );
+
+  ELSE -- Delete all values pertaining to the detail for this forecast
+    v_STMT := 'Error deleting financial plan values.';
+	v_ERROR_CODE := -20981;
+		   	
+    DELETE FROM PAC_FRC_FORECAST_VALUES
+	    WHERE FORECAST_DETAILS_ID IN (SELECT D.ID
+			  					  	 	FROM PAC_FRC_FORECAST_DETAILS D
+										WHERE V_FORECAST_ID = D.FORECAST_ID AND
+											  D.DETAIL_ID = v_DETAIL_ID AND
+											  (v_DETAIL2_ID IS NULL or DETAIL2_ID = v_DETAIL2_ID)) ;
+
+
+	DELETE FROM PAC_FRC_FORECAST_DETAILS
+		 WHERE V_FORECAST_ID = FORECAST_ID AND
+		 	   DETAIL_ID = v_DETAIL_ID AND
+			   (v_DETAIL2_ID IS NULL or DETAIL2_ID = v_DETAIL2_ID);
+
+
+    DELETE FROM PAC_FRC_PROJ_ASSOC
+	  		WHERE FORECAST_ID = V_FORECAST_ID AND
+				  DETAIL_ID = v_DETAIL_ID AND
+		  		  (v_DETAIL2_ID IS NULL or DETAIL2_ID = v_DETAIL2_ID);
+
+  End If;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+	  If v_ERROR_CODE IS NULL Then
+	    v_ERROR_CODE := SQLCODE ;
+		v_STMT := SQLERRM;
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  Else
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  End If;
+
+END PAC_FRC_CHANGE_TRANSCLASS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

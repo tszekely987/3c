@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_WBSINDEX_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_WBSINDEX_SP" 
+AS
+    o_project_id NUMERIC;
+    v_project_id NUMERIC;
+    v_phase_id NUMERIC;
+    v_activity_id NUMERIC;
+    v_task_id NUMERIC;
+    v_is_task NUMERIC;
+    v_level INTEGER;
+    v_sequence INTEGER;
+    v_milestone INTEGER;
+    v_count INTEGER;
+    v_date DATE;
+
+    BEGIN
+    v_date := SYSDATE;
+    o_project_id := 0;
+
+    DECLARE CURSOR cursor1 IS
+    SELECT i.id, t.prID, t.prWBSLevel, t.prWBSSequence, t.prIsMilestone, t.prIsTask
+    FROM   inv_investments i, prTask t, 
+          (SELECT DISTINCT t1.PrProjectID project_id, 0 wbs_task
+           FROM   prtask t1, rpt_wbs_updated u1
+           WHERE  t1.last_updated_date &gt;= NVL(u1.last_run_date,TO_DATE('01/01/1900','MM/DD/YYYY'))
+           UNION
+           SELECT i1.id project_id, NVL(w1.task_id,0) wbs_task
+           FROM   inv_investments i1, prTask t1, rpt_wbsindex w1 
+           WHERE  i1.id = t1.prProjectID AND
+                  t1.prProjectID = w1.project_id (+) AND
+                  t1.prID = w1.task_id (+)
+           GROUP BY i1.ID, 
+                  NVL(w1.task_id,0)
+           HAVING NVL(w1.task_id,0) = 0) c
+    WHERE  i.id = t.prProjectID AND
+           i.id = c.project_id
+    GROUP BY i.id, t.prID, t.prWBSLevel, t.prWBSSequence, t.prIsMilestone, t.prIsTask
+    ORDER BY i.id, t.prWBSSequence;
+    BEGIN
+    OPEN cursor1;
+    LOOP
+        FETCH cursor1 INTO v_project_id, v_task_id, v_level, v_sequence, v_milestone, v_is_task;
+        EXIT WHEN cursor1%NOTFOUND;
+        IF o_project_id &lt;&gt; v_project_id THEN
+            DELETE FROM rpt_wbsindex WHERE project_id = v_project_id;
+            v_phase_id := 0;
+            v_activity_id := 0;
+        END IF;
+        IF v_level = 1 THEN
+            IF v_milestone = 0 AND v_is_task = 0 THEN
+                v_phase_id := v_task_id;
+                v_activity_id := 0;
+            ELSE
+                v_phase_id := 0;
+                v_activity_id := 0;
+            END IF;
+        END IF;
+        IF v_level = 2 THEN
+            IF v_milestone = 0 AND v_is_task = 0 THEN
+                v_activity_id := v_task_id;
+            ELSE
+                v_activity_id := 0;
+            END IF;
+        END IF;
+        BEGIN
+        INSERT INTO rpt_wbsindex
+            (
+             project_id,
+             phase_id,
+             activity_id,
+             task_id,
+             wbs_level,
+             is_task
+            )
+        VALUES
+            (
+             v_project_id,
+             v_phase_id,
+             v_activity_id,
+             v_task_id,
+             v_level,
+             v_is_task
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                ROLLBACK;
+                GOTO Output;
+            END; 
+        END;
+        COMMIT;
+        o_project_id := v_project_id;
+    END LOOP;
+    CLOSE cursor1;
+    END;
+    SELECT COUNT(*)
+    INTO   v_count
+    FROM   rpt_wbs_updated;
+    IF v_count &lt;&gt; 0 THEN
+        BEGIN
+        UPDATE rpt_wbs_updated SET last_run_date = v_date;
+        EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                ROLLBACK;
+                GOTO Output;
+            END;
+        END;
+    ELSE
+        BEGIN
+        INSERT INTO rpt_wbs_updated(last_run_date) VALUES(v_date);
+        EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                ROLLBACK;
+                GOTO Output;
+            END;
+        END;
+    END IF;
+    COMMIT;
+    &lt;&lt;Output&gt;&gt;
+    RETURN;
+END RPT_WBSINDEX_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="FIN_TXN_RESOURCES" displayAttributeName="name" hiddenAttributeName="id" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Gets the list of resources for the Transaction, based on the Voucher Entry Type." languageCode="en" name="Transaction Resource"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[SELECT 	@SELECT:RES.ID:ID@,
+    @SELECT:RES.RESOURCE_CODE:CODE@,
+    @SELECT:RES.FULL_NAME:NAME@,
+    @SELECT:RES.RESOURCE_TYPE:RESOURCE_TYPE@,
+    @SELECT:RES.TRANSCLASS:TRANSCLASS@,
+    @SELECT:RES.PREXTERNALID:BILLABLE@,
+    @SELECT:RES.IS_CHARGEABLE:IS_CHARGEABLE@
+FROM
+    (
+        SELECT S.ID,
+               E.RESOURCE_CODE,
+               S.FULL_NAME,
+               (SELECT RT.NAME RESOURCE_TYPE
+                        FROM CMN_LOOKUPS_V RT
+                        WHERE RT.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+                        AND RT.LOOKUP_TYPE ='RESOURCE_TYPE'
+                        AND RT.LOOKUP_CODE = S.RESOURCE_TYPE) AS RESOURCE_TYPE,
+               E.TRANSCLASS,
+               TC.PREXTERNALID,
+               (CASE WHEN TC.IS_CHARGEABLE = -1 THEN 1 ELSE 0 END) AS IS_CHARGEABLE
+        FROM SRM_RESOURCES S
+            INNER JOIN PAC_MNT_RESOURCES E ON S.ID = E.ID
+            LEFT OUTER JOIN PRJ_RESOURCES PR ON S.ID = PR.PRID
+            LEFT OUTER JOIN PRTYPECODE TC ON PR.PRTYPECODEID = TC.PRID
+        WHERE 1=1
+        AND (SELECT CASE
+            WHEN EXISTS (SELECT 1 FROM LOCATIONS LOC WHERE LOC.LOCATIONID = @NVL@(E.LOCATIONID, LOC.LOCATIONID)) AND ENTITY_SECURITY = 0 THEN 1
+            ELSE @DBUSER@.PAC_FOS_IS_VALID_LOCATION_FCT ((SELECT UNIQUE_NAME FROM SRM_RESOURCES WHERE @WHERE:PARAM:USER_ID@ = USER_ID AND IS_HIDDEN = 0), E.LOCATIONID)
+            END
+            FROM NAMEOPTIONS) = 1
+        AND E.ACTIVE        = 1
+        AND PR.PRISROLE     = 0 
+		AND S.RESOURCE_TYPE BETWEEN (CASE WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 0)) THEN 3 ELSE 0 END) 
+                                AND (CASE WHEN 4797 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797)) THEN 3
+                                          WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797)) THEN 3
+                                          ELSE 2 END
+									)
+    ) RES WHERE @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT 	@SELECT:E.ID:ID@,
+	@SELECT:E.RESOURCE_CODE:CODE@,
+	@SELECT:S.FULL_NAME:NAME@,
+	@SELECT:RT.NAME:RESOURCE_TYPE@,
+	@SELECT:E.TRANSCLASS:TRANSCLASS@,
+	@SELECT:TC.PREXTERNALID:BILLABLE@,
+	@SELECT:(CASE WHEN TC.IS_CHARGEABLE = -1 THEN 1 ELSE 0 END):IS_CHARGEABLE@
+FROM SRM_RESOURCES S
+	INNER JOIN PAC_MNT_RESOURCES E ON S.ID = E.ID
+	INNER JOIN CMN_LOOKUPS_V RT ON RT.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@ AND RT.LOOKUP_TYPE ='RESOURCE_TYPE' AND RT.LOOKUP_CODE = S.RESOURCE_TYPE
+	LEFT OUTER JOIN PRJ_RESOURCES PR ON S.ID = PR.PRID
+	LEFT OUTER JOIN PRTYPECODE TC ON PR.PRTYPECODEID = TC.PRID
+WHERE @FILTER@
+AND (SELECT CASE
+	WHEN EXISTS (SELECT 1 FROM LOCATIONS LOC WHERE LOC.LOCATIONID = @NVL@(E.LOCATIONID, LOC.LOCATIONID)) AND ENTITY_SECURITY = 0 THEN 1
+	ELSE @DBUSER@.PAC_FOS_IS_VALID_LOCATION_FCT ((SELECT UNIQUE_NAME FROM SRM_RESOURCES WHERE @WHERE:PARAM:USER_ID@ = USER_ID AND IS_HIDDEN = 0), E.LOCATIONID)
+	END
+	FROM NAMEOPTIONS) = 1
+AND E.ACTIVE        = 1
+AND PR.PRISROLE     = 0 
+AND S.RESOURCE_TYPE BETWEEN (CASE WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 0) FROM DUAL) THEN 3 ELSE 0 END) 
+AND (CASE WHEN 4797 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797) FROM DUAL) THEN 3
+ WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797) FROM DUAL) THEN 3
+ ELSE 2 END)]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT 	@SELECT:E.ID:ID@,
+	@SELECT:E.RESOURCE_CODE:CODE@,
+	@SELECT:S.FULL_NAME:NAME@,
+	@SELECT:RT.NAME:RESOURCE_TYPE@,
+	@SELECT:E.TRANSCLASS:TRANSCLASS@,
+	@SELECT:TC.PREXTERNALID:BILLABLE@,
+	@SELECT:(CASE WHEN TC.IS_CHARGEABLE = -1 THEN 1 ELSE 0 END):IS_CHARGEABLE@
+FROM SRM_RESOURCES S
+	INNER JOIN PAC_MNT_RESOURCES E ON S.ID = E.ID
+	INNER JOIN CMN_LOOKUPS_V RT ON RT.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@ AND RT.LOOKUP_TYPE ='RESOURCE_TYPE' AND RT.LOOKUP_CODE = S.RESOURCE_TYPE::TEXT
+	LEFT OUTER JOIN PRJ_RESOURCES PR ON S.ID = PR.PRID
+	LEFT OUTER JOIN PRTYPECODE TC ON PR.PRTYPECODEID = TC.PRID
+WHERE @FILTER@
+AND (SELECT CASE
+	WHEN EXISTS (SELECT 1 FROM LOCATIONS LOC WHERE LOC.LOCATIONID = @NVL@(E.LOCATIONID, LOC.LOCATIONID)) AND ENTITY_SECURITY = 0 THEN 1
+	ELSE @DBUSER@.PAC_FOS_IS_VALID_LOCATION_FCT ((SELECT UNIQUE_NAME FROM SRM_RESOURCES WHERE @WHERE:PARAM:USER_ID@ = USER_ID AND IS_HIDDEN = 0), E.LOCATIONID) 
+	END 
+	FROM NAMEOPTIONS) = 1
+AND E.ACTIVE        = 1
+AND PR.PRISROLE     = 0 
+AND S.RESOURCE_TYPE IN (SELECT RESP_RES_TYP.RES_TYPE 
+                         FROM  ( SELECT (CASE WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 0)) THEN 3 ELSE 0 END) FROM_RESOURCE_TYPE,
+										(CASE WHEN 4797 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797)) THEN 3
+											  WHEN 4798 = (SELECT @NVL@((SELECT DOCUMENT_TYPE FROM PPA_TRANSCONTROLAPINFO WHERE ID = @WHERE:PARAM:USER_DEF:INTEGER:VOUCHER_ID@), 4797)) THEN 3
+											  ELSE 2 
+										 END) TO_RESOURCE_TYPE 
+								 FROM DUAL 
+							   ) FLT_RES_TYPE 
+						 JOIN (SELECT 0 RES_TYPE FROM DUAL UNION ALL 
+							   SELECT 1 RES_TYPE FROM DUAL UNION ALL 
+							   SELECT 2 RES_TYPE FROM DUAL UNION ALL 
+							   SELECT 3 RES_TYPE FROM DUAL
+							  ) RESP_RES_TYP ON RESP_RES_TYP.RES_TYPE BETWEEN FLT_RES_TYPE.FROM_RESOURCE_TYPE AND FLT_RES_TYPE.TO_RESOURCE_TYPE
+					   )]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="name"/>
+              <displayedSuggestionAttribute value="code"/>
+              <displayedSuggestionAttribute value="resource_type"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="name"/>
+              <searchedSuggestionAttribute value="code"/>
+              <searchedSuggestionAttribute value="resource_type"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Resource" languageCode="en" name="Select Resource"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Resources" languageCode="en" name="Select Resources"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="code" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource ID" languageCode="en" name="Resource ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Full Name" languageCode="en" name="Full Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="resource_type" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="transclass" defaultValue="" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class" languageCode="en" name="Transaction Class"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="billable" defaultValue="" order="5" widgetType="text">
+                
+                
+                
+                
+                <nls description="Input Type Code" languageCode="en" name="Input Type Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="is_chargeable" defaultValue="" order="6" widgetType="text">
+                
+                
+                
+                
+                <nls description="Chargeable" languageCode="en" name="Chargeable"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="code" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource ID" languageCode="en" name="Resource ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Full Name" languageCode="en" name="Full Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="resource_type" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="transclass" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Transaction Class" languageCode="en" name="Transaction Class"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="billable" order="5" widgetType="text">
+                
+                
+                
+                
+                <nls description="Input Type Code" languageCode="en" name="Input Type Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="is_chargeable" order="6" widgetType="text">
+                
+                
+                
+                
+                <nls description="Chargeable" languageCode="en" name="Chargeable"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

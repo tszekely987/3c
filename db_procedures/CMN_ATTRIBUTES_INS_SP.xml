@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ATTRIBUTES_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ATTRIBUTES_INS_SP" (
+   p_column_name                 cmn_attributes.column_name%TYPE,
+   p_table_name                  cmn_attributes.table_name%TYPE,
+   p_pk_id                       cmn_attributes.pk_id%TYPE,
+   p_ui_type                     cmn_attributes.ui_type%TYPE,
+   p_data_type                   cmn_attributes.data_type%TYPE,
+   p_default_value               cmn_attributes.default_value%TYPE DEFAULT NULL,
+   p_referenced_object_id        cmn_attributes.referenced_object_id%TYPE,
+   p_referd_object_cardinality   cmn_attributes.referenced_object_cardinality%TYPE,
+   p_is_required						  cmn_attributes.is_required%TYPE,
+   p_is_active                   cmn_attributes.is_active%TYPE,
+   p_is_system                   cmn_attributes.is_system%TYPE,
+   p_attribute_id				 OUT cmn_attributes.id%TYPE 
+)
+IS
+   v_id   NUMBER;
+BEGIN
+   -- Get the primary key for the cmn_attributes table
+   cmn_id_sp (
+      p_table_name      =&gt; 'CMN_ATTRIBUTES',
+      p_next_id         =&gt; v_id,
+      p_sequence_name   =&gt; 'CMN_ATTRIBUTES_S1'
+   );
+
+	-- Set the value for the OUT param.
+	p_attribute_id := v_id;
+	
+   INSERT INTO cmn_attributes
+               (
+                  id,
+                  column_name,
+                  table_name,
+                  pk_id,
+                  ui_type,
+                  data_type,
+                  default_value,
+                  referenced_object_id,
+                  referenced_object_cardinality,
+                  is_required,
+                  is_active,
+                  is_system,
+                  created_date,
+                  created_by,
+                  last_updated_date,
+                  last_updated_by
+               )
+        VALUES (
+           v_id,
+           p_column_name,
+           p_table_name,
+           p_pk_id,
+           p_ui_type,
+           p_data_type,
+           p_default_value,
+           p_referenced_object_id,
+           p_referd_object_cardinality,
+           p_is_required,
+           p_is_active,
+           p_is_system,
+           SYSDATE,
+           1,
+           SYSDATE,
+           1
+        );
+END; -- Procedure cmn_attributes_ins_sp
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

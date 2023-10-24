@@ -1,0 +1,20 @@
+<ClarityDBViewQuery>
+  <QueryResult code="COP_PROGRAM_V">
+    <indexes/>
+    <text_length>584</text_length>
+    <text>SELECT a.prid program_id, a.prid project_id, 1 is_program
+      FROM   inv_projects a
+      WHERE (a.is_program &lt;&gt; 0)
+      UNION
+      SELECT a.prid program_id, c.prRefProjectID project_id, 0 is_program
+      FROM   inv_projects a, prTask b, prSubProject c
+      WHERE  a.is_program &lt;&gt; 0 AND
+             a.prid = b.prProjectID AND 
+             b.prID = c.prTaskID
+      UNION
+      SELECT a.prid program_id, a.prid project_id, 0 is_program
+      FROM   inv_projects a
+      WHERE  a.is_program = 0
+      AND (NOT EXISTS (SELECT 'x' FROM prSubProject WHERE a.prid = prRefProjectID))</text>
+  </QueryResult>
+</ClarityDBViewQuery>

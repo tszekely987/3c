@@ -1,0 +1,86 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_BENEFIT1_PER_FACTS_V">
+    <indexes/>
+    <text_length>5068</text_length>
+    <text>SELECT p.object_id investment_key,
+          p.id benefitplan_key,
+          s.benefitplan_detail_key,
+          s.period_key,
+          s.benefit benefit,
+          s.billing_benefit billing_benefit,
+          s.actual_benefit actual_benefit,
+          s.benefit_actual_var benefit_actual_var,
+          d.last_updated_date clarity_updated_date
+FROM     (WITH dwh_dates
+                   AS (SELECT pp.id parent_period_key,
+                              pp.period_type parent_period_type,
+                              p.id period_key,
+                              pp.start_date parent_period_start,
+                              p.start_date period_start,
+                              p.end_date period_finish
+                        FROM   biz_com_periods pp, biz_com_periods p
+                        WHERE  pp.entity_id = p.entity_id
+                        AND    p.start_date >= pp.start_date
+                        AND    p.end_date &lt;= pp.end_date
+                        AND    p.id IN (SELECT DISTINCT d.period_key
+                                        FROM  (SELECT p.id period_key,
+                                                      p.start_date period_start,
+                                                      r.row_count,
+                                                      ROW_NUMBER () OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                                               FROM   biz_com_periods p,
+                                                      dwh_settings s,
+                                                     (SELECT MIN (from_date) from_date,
+                                                             MAX (num_periods) row_count
+                                                      FROM   prj_blb_slicerequests
+                                                      WHERE  is_dwh_request = 1
+                                                      AND request_name LIKE '%dwh_fiscal') r
+                                               WHERE  p.entity_id = s.entity_key
+                                               AND    p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                               AND    p.start_date >= r.from_date) d
+                                        WHERE  d.row_key &lt;= d.row_count)),
+                              plan_details
+                   AS (SELECT fpd.id benefitplan_detail_key,
+                              d.period_key,
+                              1 field,
+                              s.slice * (d.period_finish - d.period_start) slice
+                       FROM   fin_plans fp
+					          INNER JOIN fin_benefit_plan_details fpd ON fp.id = fpd.plan_id
+                              INNER JOIN odf_ssl_bft_dtl_bft s ON fpd.id = s.prj_object_id
+                              INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fp.period_type_code = d.parent_period_type
+                       UNION ALL
+                       SELECT fpd.id benefitplan_detail_key,
+                              d.period_key,
+                              2 field,
+                              s.slice * (d.period_finish - d.period_start) slice
+                       FROM   fin_plans fp
+					          INNER JOIN fin_benefit_plan_details fpd ON fp.id = fpd.plan_id
+                              INNER JOIN odf_ssl_bft_dtl_bbft s ON fpd.id = s.prj_object_id
+                              INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fp.period_type_code = d.parent_period_type
+                       UNION ALL
+                       SELECT fpd.id benefitplan_detail_key,
+                              d.period_key,
+                              3 field,
+                              s.slice * (d.period_finish - d.period_start) slice
+                       FROM   fin_plans fp
+					          INNER JOIN fin_benefit_plan_details fpd ON fp.id = fpd.plan_id
+                              INNER JOIN odf_ssl_bft_dtl_abft s ON fpd.id = s.prj_object_id
+                              INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fp.period_type_code = d.parent_period_type)
+          SELECT benefitplan_detail_key,
+                 period_key,
+                 NVL (benefit, 0) benefit,
+                 NVL (actual_benefit, 0) actual_benefit,
+                 NVL (billing_benefit, 0) billing_benefit,
+                 NVL (benefit, 0) - NVL (actual_benefit, 0) benefit_actual_var
+          FROM  (SELECT benefitplan_detail_key,
+                        period_key,
+                        field,
+                        slice
+                 FROM   plan_details) PIVOT (SUM (slice)
+                                        FOR field IN (1 AS benefit,
+                                                      2 AS billing_benefit,
+                                                      3 AS actual_benefit))
+          ORDER BY benefitplan_detail_key, period_key) s
+          INNER JOIN fin_benefit_plan_details d ON s.benefitplan_detail_key = d.id
+          INNER JOIN fin_plans p ON d.plan_id = p.id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

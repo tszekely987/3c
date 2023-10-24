@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_GETWIPADJAPPRECDTL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_GETWIPADJAPPRECDTL" (
+adjustgroupno 	NUMBER ,
+reverse_ 	NUMBER  DEFAULT NULL,
+RC1 	IN OUT REV_PRC_GETWIPADJAPPRECDTLPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+showrate 	NUMBER(1,0);
+BEGIN
+
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   showrate
+		INTO REV_PRC_GETWIPADJAPPRECDTL.showrate
+		FROM NAMEOPTIONS;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	IF  NVL(REV_PRC_GETWIPADJAPPRECDTL.reverse_, 1) = 1 THEN
+
+	BEGIN
+		OPEN RC1 FOR
+		SELECT t.transdate,  RTRIM(w.transtype) "transtype",  t.adjustgroupno,  t.COMPANY_CODE,
+    t.PROJECT_CODE, t.charge_code,  t.RESOURCE_CODE, tValues.amount,  t.notes,  t.quantity,
+    tValues.billrate,  t.chargeable,  t.transno,
+		REV_PRC_GETWIPADJAPPRECDTL.showrate "ShowRate", tValues.RATE_CURRENCY_CODE
+		FROM ppa_transwipadjust t, ppa_wip w, ppa_transwipadjust_values tValues
+		WHERE t.adjustgroupno = REV_PRC_GETWIPADJAPPRECDTL.adjustgroupno
+		  AND t.transtype = 'A'
+		  AND t.applyto = w.transno
+		  AND t.TRANSNO = tValues.TRANSNO
+		  AND tValues.CURRENCY_TYPE = 'NATURAL'
+		ORDER BY t.transtype ;
+	END;
+	ELSE
+	BEGIN
+		OPEN RC1 FOR
+		SELECT t.transdate,  RTRIM(t.transtype) "transtype",  t.adjustgroupno,  t.COMPANY_CODE,
+    t.PROJECT_CODE,  t.charge_code,  t.RESOURCE_CODE,  tValues.amount,  t.notes,  t.quantity,
+    tValues.billrate,  t.chargeable,  t.transno,
+		REV_PRC_GETWIPADJAPPRECDTL.showrate "ShowRate", tValues.RATE_CURRENCY_CODE
+		FROM ppa_transwipadjust t, ppa_transwipadjust_values tValues
+		WHERE t.adjustgroupno = REV_PRC_GETWIPADJAPPRECDTL.adjustgroupno
+		 AND t.TransType &lt;&gt; 'A'
+		 AND t.TRANSNO = tValues.TRANSNO
+		 AND tValues.CURRENCY_TYPE = 'NATURAL'
+		ORDER BY t.transtype ;
+	END;
+	END IF;
+END REV_PRC_GETWIPADJAPPRECDTL;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

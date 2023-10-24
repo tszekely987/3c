@@ -1,0 +1,905 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_GETDMNDBILLINGITEM</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_GETDMNDBILLINGITEM" (
+  cUserID     VARCHAR2 ,
+  cCOMPANY_CODE VARCHAR2 ,
+  cProjectList  VARCHAR2 ,
+  cFromDate     VARCHAR2,
+  cCutoffDate     VARCHAR2,
+  iBillingSessionKey_in   NUMBER ,
+  cBillingCurrency_in VARCHAR2,
+  cLanguageCode VARCHAR2 DEFAULT 'en',
+  RC1   IN OUT Rev_Bill_Getdmndbillingitempkg.RCT1,
+  RC2   IN OUT Rev_Bill_Getdmndbillingitempkg.RCT2,
+  RC3   IN OUT Rev_Bill_Getdmndbillingitempkg.RCT3)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg VARCHAR2(255);
+  StoO_sqlstatus  INTEGER;
+  cStandardText   VARCHAR2(255);
+  cContractText   VARCHAR2(255);
+  cRetainerText   VARCHAR2(255);
+  cTransactionSign  Globalpkg.STRING;
+  cUser           VARCHAR2(20);
+  iBillingSessionKeyHold  NUMBER;
+  iBillingSessionKeyUse   NUMBER;
+  nCurrencyDisplayPrecision NUMBER;
+  iActiveBillingSessions  NUMBER := 0;
+  cClientToBill     VARCHAR(30);
+  iProjectAlreadyLocked   NUMBER := 0;
+  cBillingCurrency  VARCHAR2(30);
+  bCanApproveBill   INTEGER;
+  bNewTotals      INTEGER := 0;
+  iLineNo     NUMBER := 0;
+  iTransSign      NUMBER;
+  cClientTemp     PAC_BIL_DETAIL_SUMMARY.COMPANY_CODE%TYPE;
+  cProjectTemp    PAC_BIL_DETAIL_SUMMARY.PROJECT_CODE%TYPE;
+  nBillAmount     NUMBER(32,6);
+  nAdjustAmount   NUMBER(32,6);
+  cTitle        PAC_BIL_DETAIL_SUMMARY.TITLE%TYPE;
+  cTransType      PAC_BIL_DETAIL_SUMMARY.TRANSTYPE%TYPE;
+  iMaxRow       NUMERIC;
+  currencyPrecisionBilling CMN_CURRENCIES.CURRENCY_PRECISION%TYPE;
+  l_autoPopulate  NAMEOPTIONS.ALLOW_AUTOPOPBILL%TYPE ;
+
+  CURSOR UF1_cursor IS
+    SELECT COMPANY_CODE,
+        PROJECT_CODE,
+        TITLE,
+        TRANSTYPE,
+        SIGN(AmountRemaining)
+    FROM PAC_BIL_DETAIL_SUMMARY
+    WHERE BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse
+    ORDER BY COMPANY_CODE, PROJECT_CODE, TITLE, RECORDTYPE, TRANSTYPE
+    FOR UPDATE OF PAC_BIL_DETAIL_SUMMARY.LINE_NO;
+
+  CURSOR UF2_cursor IS
+      SELECT a.COMPANY_CODE,
+        a.PROJECT_CODE,
+        a.TRANSTYPE,
+        a.BILLAMOUNT,
+        a.ADJUSTAMOUNT,
+        a.TRANSACTION_SIGN
+      FROM TEMP_BILL_ALLOCATIONS_SUM a,
+        PAC_BIL_DETAIL_SUMMARY d
+      WHERE d.COMPANY_CODE = a.COMPANY_CODE AND
+            d.PROJECT_CODE = a.PROJECT_CODE AND
+              d.TRANSTYPE = a.TRANSTYPE AND
+        d.BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse AND
+			  NVL( d.BILLAMOUNT, 0) = 0 AND
+			  NVL( d.ADJUSTAMOUNT, 0) = 0
+    FOR UPDATE OF d.BILLAMOUNT,
+              d.ADJUSTAMOUNT;
+
+BEGIN
+
+    Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold := Rev_Bill_Getdmndbillingitem.iBillingSessionKey_in;
+	Rev_Bill_Getdmndbillingitem.cUser := Rev_Bill_Getdmndbillingitem.cUserID;
+
+    currencyPrecisionBilling := 0;
+	
+    IF Rev_Bill_Getdmndbillingitem.cUser IS NULL THEN
+	  RAISE_APPLICATION_ERROR(-20074, 'Resource has not been assigned to the logged-in user id.  Please create a resource with financial properties and assign it to the logged-in user id,  after which a logout and login step must be followed.');
+      RETURN;
+	END IF;
+	
+	IF Rev_Bill_Getdmndbillingitem.cProjectList = '~' THEN
+	  RAISE_APPLICATION_ERROR(-20178, 'Please select atleast one project to bill.');
+      RETURN;
+	END IF;	
+
+	BEGIN
+	IF NVL(Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold,0) = 0 THEN
+	        BEGIN
+		 	BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   BILLING_CURRENCY_CODE
+				INTO Rev_Bill_Getdmndbillingitem.cBillingCurrency
+				FROM PAC_MNT_PROJECTS P
+				WHERE P.COMPANY_CODE = cCOMPANY_CODE
+				AND INSTR( cProjectList, '~' || RTRIM(P.PROJECT_CODE)   || '~') &gt; 0
+			 	GROUP BY BILLING_CURRENCY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF StoO_selcnt &gt; 1 THEN
+			   RAISE_APPLICATION_ERROR(-20907, 'You may not bill projects with different billing currencies.');
+			   RETURN;
+			END IF;
+
+			BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   COUNT(*)
+				INTO Rev_Bill_Getdmndbillingitem.iActiveBillingSessions
+				FROM OLB_BILLINGCHECKOUT o
+				WHERE o.USERID = Rev_Bill_Getdmndbillingitem.cUser;
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF Rev_Bill_Getdmndbillingitem.iActiveBillingSessions &gt; 0 THEN
+			   RAISE_APPLICATION_ERROR(-20909, 'You currently have an active billing session in progress. You must unlock all your records first before billing');
+			   RETURN;
+			END IF;
+
+			BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   COUNT(*)
+				INTO Rev_Bill_Getdmndbillingitem.iProjectAlreadyLocked
+				FROM OLB_BILLINGCHECKOUT o
+				WHERE o.COMPANY_CODE = cCOMPANY_CODE
+				AND INSTR( cProjectList, '~' || RTRIM(o.PROJECT_CODE)   || '~') &gt; 0
+				AND USERID != Rev_Bill_Getdmndbillingitem.cUser;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF Rev_Bill_Getdmndbillingitem.iProjectAlreadyLocked &gt; 0 THEN
+			   RAISE_APPLICATION_ERROR(-20910, 'Another user has locked one of the projects you have selected.');
+			   RETURN;
+			END IF;
+
+			BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT COMPANY_CODE
+				INTO Rev_Bill_Getdmndbillingitem.cClientToBill
+				FROM PAC_MNT_PROJECTS p
+				WHERE INSTR( cProjectList, '~' || RTRIM(p.PROJECT_CODE)   || '~') &gt; 0
+				GROUP BY COMPANY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF StoO_selcnt &gt; 1 THEN
+			   RAISE_APPLICATION_ERROR(-20911, 'You have selected more than one client to bill. Only one client may be billed at a time.');
+			   RETURN;
+			END IF;
+
+			BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT BILL_TO_COMPANY_CODE
+				INTO Rev_Bill_Getdmndbillingitem.cClientToBill
+				FROM PAC_MNT_PROJECTS p
+				WHERE INSTR( cProjectList, '~' || RTRIM(p.PROJECT_CODE)   || '~') &gt; 0
+				GROUP BY BILL_TO_COMPANY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF StoO_selcnt &gt; 1 THEN
+			   RAISE_APPLICATION_ERROR(-20914, 'You cannot bill projects with different Bill Tos.');
+			   RETURN;
+			END IF;
+
+			/* Do not allow billing if more than one project selected has billing subprojects */
+			BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+			SELECT COUNT(*)
+				INTO StoO_selcnt
+				FROM PAC_MNT_PROJECTS p
+				WHERE INSTR( cProjectList, '~' || RTRIM(p.PROJECT_CODE)   || '~') &gt; 0 AND
+					  ID IN (SELECT BILLING_PROJECT_ID
+					  	 	   FROM PAC_MNT_PROJECTS p2
+							   WHERE p.ID != p2.ID AND
+							   		 p2.APPROVED = 1 AND
+									 p2.STATUS IN ('O', 'H') ) ;
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                NULL;
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+			IF StoO_selcnt &gt; 1 THEN
+			   RAISE_APPLICATION_ERROR(-20985, 'You cannot select more than one project with billing subprojects.');
+			   RETURN;
+			END IF;
+
+			/* If one project has billing subprojects make sure any other projects selected are of the same project type*/
+			IF StoO_selcnt = 1 THEN
+			  BEGIN
+			  StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+			  StoO_error  := 0;
+
+			  SELECT COUNT(*)
+				INTO StoO_selcnt
+				FROM PAC_MNT_PROJECTS p
+				WHERE INSTR( cProjectList, '~' || RTRIM(p.PROJECT_CODE)   || '~') &gt; 0
+				GROUP BY TYPE_ ;
+
+			  StoO_rowcnt := SQL%ROWCOUNT;
+			  EXCEPTION
+			  WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2 ;
+			  WHEN NO_DATA_FOUND THEN
+				NULL;
+			  WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			  END;
+
+			  IF StoO_rowcnt &gt; 1 THEN
+			    RAISE_APPLICATION_ERROR(-20986, 'You cannot bill projects with different project types when one project has billing subprojects.');
+			    RETURN;
+			  END IF;
+			END IF;
+
+            bNewTotals := 1;
+
+			BEGIN
+            Rev_Bill_Createbillsession(Rev_Bill_Getdmndbillingitem.cUserID,
+	 							Rev_Bill_Getdmndbillingitem.cCOMPANY_CODE,
+	 							Rev_Bill_Getdmndbillingitem.cProjectList,
+	 							Rev_Bill_Getdmndbillingitem.cFromDate,
+	 							Rev_Bill_Getdmndbillingitem.cCutoffDate,
+	 							Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+								Rev_Bill_Getdmndbillingitem.cBillingCurrency,
+	 							Rev_Bill_Getdmndbillingitem.bCanApproveBill);
+
+			EXCEPTION
+			WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+              RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+              RETURN;
+			END;
+			END;
+
+	ELSE
+		 Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse := Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold;
+    END IF;
+	END;
+
+    BEGIN
+	StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+	SELECT Billing_Currency_Code
+	  INTO cBillingCurrency
+	  FROM PC_BILLINGSESSION
+	  WHERE BillingSessionKey = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+    
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+ 	WHEN NO_DATA_FOUND THEN
+        NULL;
+	  WHEN OTHERS THEN
+	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_rowcnt = 0 THEN
+      RAISE_APPLICATION_ERROR(-20295, 'Your billing session is no longer active. Please go to the Demand Billing query page and try again.');
+      RETURN;
+    END IF;
+
+
+	currencyPrecisionBilling := Cmn_Exchangerate_Pkg.CMN_GET_CURRENCY_PRECISION_FCT( cBillingCurrency );
+
+	BEGIN
+      SELECT CURRENCY_PRECISION
+	    INTO nCurrencyDisplayPrecision
+	    FROM CMN_CURRENCIES c,
+	         PC_BILLINGSESSION b
+	    WHERE c.CURRENCY_CODE = b.BILLING_CURRENCY_CODE AND
+	          b.BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+	END;
+
+	-- SELECT PAC_BIL_ITEM_SUMMARY_S1.nextval into iLineNo FROM DUAL;
+
+	IF bNewTotals = 1 THEN
+	    /* Populate PAC_BIL_DETAIL_SUMMARY once for positive transactions, and once for negatives */
+ 		BEGIN
+		DELETE FROM PAC_BIL_DETAIL_SUMMARY WHERE BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+		BEGIN
+		StoO_error   := 0;
+        StoO_rowcnt  := 0;
+		INSERT INTO PAC_BIL_DETAIL_SUMMARY
+		    (  ROW1,
+			   BILLINGSESSIONKEY,
+			   CANAPPROVEBILL,
+			   COMPANY_CODE,
+			   PROJECT_CODE,
+			   TITLE,
+			   TRANSTYPE,
+			   TOTALAMOUNT,
+			   AMOUNTREMAINING,
+               BILLAMOUNT,
+			   ADJUSTAMOUNT,
+			   HASDETAILS,
+			   LASTROW,
+			   RECORDTYPE,
+			   BILLFLAGS,
+			   USERID )
+		SELECT 1,
+		   	   Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+		   	   1,
+		   	   B.COMPANY_CODE,
+		   	   W.PROJECT_CODE,
+		   	   '',
+		       RTRIM(W.TransType),
+        	   ROUND( SUM(WV.TotalAmount), currencyPrecisionBilling),
+		       ROUND( SUM(WV.AmountRemaining), currencyPrecisionBilling),
+			   NULL,
+			   0,
+			   0,
+			   0,
+			   0,
+			   'N',
+			   Rev_Bill_Getdmndbillingitem.cUser
+	   FROM PPA_WIP W,
+	     PPA_WIP_VALUES WV,
+		 PC_BILLINGSESSION B,
+		 OLB_BILLINGCHECKOUT C,
+     PAC_MNT_PROJECTS P
+	   WHERE WV.TRANSNO = W.TRANSNO
+	     AND WV.CURRENCY_TYPE = 'BILLING'
+	     AND B.BillingSessionKey = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse
+	     AND C.UserID = B.UserID
+	   	 AND C.ActionID = RPAD(Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+	   	 	 10, ' ')
+	 	 AND W.COMPANY_CODE = C.COMPANY_CODE
+		 AND W.PROJECT_CODE = C.PROJECT_CODE
+	 	 AND W.Status = 0
+	 	 AND WV.AmountRemaining &gt; 0
+	 	 AND W.Chargeable = 1
+	 	 AND W.TransDate BETWEEN NVL( B.FROMDATE, W.TransDate) AND
+		 	 			 		 NVL( B.CUTOFFDATE, W.TransDate)
+	 	 AND P.COMPANY_CODE = W.COMPANY_CODE
+	 	 AND P.PROJECT_CODE = W.PROJECT_CODE
+		 GROUP BY B.COMPANY_CODE,
+		  	 W.PROJECT_CODE,
+			 W.TransType;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+        StoO_rowcnt  := 0;
+		INSERT INTO PAC_BIL_DETAIL_SUMMARY
+		    (  ROW1,
+			   BILLINGSESSIONKEY,
+			   CANAPPROVEBILL,
+			   COMPANY_CODE,
+			   PROJECT_CODE,
+			   TITLE,
+			   TRANSTYPE,
+			   TOTALAMOUNT,
+			   AMOUNTREMAINING,
+               BILLAMOUNT,
+			   ADJUSTAMOUNT,
+			   HASDETAILS,
+			   LASTROW,
+			   RECORDTYPE,
+			   BILLFLAGS,
+			   USERID )
+		SELECT 1,
+		   	   Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+		   	   1,
+		   	   B.COMPANY_CODE,
+		   	   W.PROJECT_CODE,
+		   	   '',
+		       RTRIM(W.TransType),
+        	   ROUND( SUM(WV.TotalAmount), currencyPrecisionBilling),
+		       ROUND( SUM(WV.AmountRemaining), currencyPrecisionBilling),
+			   NULL,
+			   0,
+			   0,
+			   0,
+			   1,
+			   'N',
+			   Rev_Bill_Getdmndbillingitem.cUser
+	   FROM PPA_WIP W,
+	     PPA_WIP_VALUES WV,
+		 PC_BILLINGSESSION B,
+		 OLB_BILLINGCHECKOUT C,
+     PAC_MNT_PROJECTS P
+	   WHERE WV.TRANSNO = W.TRANSNO
+	     AND WV.CURRENCY_TYPE = 'BILLING'
+	     AND B.BillingSessionKey = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse
+	     AND C.UserID = B.UserID
+	   	 AND C.ActionID = RPAD(Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+	   	 	 10, ' ')
+	 	 AND W.COMPANY_CODE = C.COMPANY_CODE
+		 AND W.PROJECT_CODE = C.PROJECT_CODE
+	 	 AND W.Status = 0
+	 	 AND WV.AmountRemaining &lt; 0
+	 	 AND W.Chargeable = 1
+	 	 AND W.TransDate BETWEEN NVL( B.FROMDATE, W.TransDate) AND
+		 	 			 		 NVL( B.CUTOFFDATE, W.TransDate)
+	 	 AND P.COMPANY_CODE = W.COMPANY_CODE
+	 	 AND P.PROJECT_CODE = W.PROJECT_CODE
+		 GROUP BY B.COMPANY_CODE,
+		  	 W.PROJECT_CODE,
+			 W.TransType;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		END;
+
+		END;
+        END IF;
+
+	/* 	REV_BILL_GETDMNDBILLINGITEM.iBillingSessionKeyHold &gt; 0 indicates that we're returning from the billing details screen */
+	IF Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold &gt; 0 THEN
+	    DELETE TEMP_BILL_ALLOCATIONS_SUM;
+
+		BEGIN
+		StoO_error   := 0;
+        StoO_rowcnt  := 0;
+	    INSERT INTO TEMP_BILL_ALLOCATIONS_SUM
+		     ( 	COMPANY_CODE,
+			    PROJECT_CODE,
+				TRANSTYPE,
+				BILLAMOUNT,
+				ADJUSTAMOUNT,
+				TRANSACTION_SIGN )
+	    SELECT p.COMPANY_CODE,
+			   p.PROJECT_CODE,
+			   p.TRANSTYPE,
+			   SUM(p.BILLAMOUNT),
+		   	   SUM(p.ADJUSTAMOUNT),
+			   'P'
+			FROM PC_BILLINGDETAILALLOCATIONS p
+			WHERE p.BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold AND
+				  p.AmountRemaining &gt; 0 AND
+			 	 (p.BILLAMOUNT &gt;= 0 OR
+				  p.ADJUSTAMOUNT &lt; 0)
+			GROUP BY p.COMPANY_CODE,
+				     p.PROJECT_CODE,
+           p.TRANSTYPE
+      HAVING SUM( ABS( p.BILLAMOUNT )) + SUM( ABS( p.ADJUSTAMOUNT )) &gt; 0 ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+        StoO_rowcnt  := 0;
+	    INSERT INTO TEMP_BILL_ALLOCATIONS_SUM
+		     ( 	COMPANY_CODE,
+			    PROJECT_CODE,
+				TRANSTYPE,
+				BILLAMOUNT,
+				ADJUSTAMOUNT,
+				TRANSACTION_SIGN )
+	    SELECT p.COMPANY_CODE,
+			   p.PROJECT_CODE,
+			   p.TRANSTYPE,
+			   SUM(p.BILLAMOUNT),
+		   	   SUM(p.ADJUSTAMOUNT),
+			   'N'
+			FROM PC_BILLINGDETAILALLOCATIONS p
+			WHERE p.BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyHold AND
+				  p.AmountRemaining &lt; 0 AND
+			 	 (p.BILLAMOUNT &lt;= 0 OR
+				  p.ADJUSTAMOUNT &gt; 0)
+			GROUP BY p.COMPANY_CODE,
+				     p.PROJECT_CODE,
+           p.TRANSTYPE
+      HAVING SUM( ABS( p.BILLAMOUNT )) + SUM( ABS( p.ADJUSTAMOUNT )) &gt; 0 ;
+
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		END;
+
+		OPEN UF2_cursor;
+		LOOP
+			FETCH UF2_cursor INTO cClientTemp,
+				  			 	  cProjectTemp,
+								  cTranstype,
+								  nBillAmount,
+								  nAdjustAmount,
+								  cTransactionSign ;
+			EXIT WHEN UF2_cursor%NOTFOUND;
+
+			IF cTransactionSign = 'P' THEN
+			  BEGIN
+			  StoO_error   := 0;
+			  StoO_rowcnt  := 0;
+			  UPDATE PAC_BIL_DETAIL_SUMMARY
+				SET	BILLAMOUNT = nBillAmount,
+          			ADJUSTAMOUNT = nAdjustAmount
+				WHERE COMPANY_CODE = cClientTemp AND
+					  PROJECT_CODE = cProjectTemp AND
+					  TRANSTYPE = cTransType AND
+					  BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse AND
+					  cTransactionSign = 'P' AND
+					  AmountRemaining &gt; 0 ;
+
+	  		  StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+			  WHEN NO_DATA_FOUND THEN
+				NULL;
+			  WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			  END;
+			END IF;
+
+			IF cTransactionSign = 'N' THEN
+			  BEGIN
+			  StoO_error   := 0;
+			  StoO_rowcnt  := 0;
+			  UPDATE PAC_BIL_DETAIL_SUMMARY
+				SET	BILLAMOUNT = nBillAmount,
+          ADJUSTAMOUNT = nAdjustAmount
+				WHERE COMPANY_CODE = cClientTemp AND
+					  PROJECT_CODE = cProjectTemp AND
+					  TRANSTYPE = cTransType AND
+					  BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse AND
+					  cTransactionSign = 'N' AND
+					  AmountRemaining &lt; 0 ;
+
+	  		  StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+			  WHEN NO_DATA_FOUND THEN
+				NULL;
+			  WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			  END;
+			  END IF;
+		END LOOP;
+		CLOSE UF2_cursor;
+
+    BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+		  UPDATE PAC_BIL_DETAIL_SUMMARY
+		    SET	HASDETAILS	 = 1
+		    WHERE EXISTS ( SELECT 1
+		  			       FROM PC_BILLINGDETAILALLOCATIONS p
+						   WHERE p.COMPANY_CODE = PAC_BIL_DETAIL_SUMMARY.COMPANY_CODE AND
+			   			   		 p.PROJECT_CODE = PAC_BIL_DETAIL_SUMMARY.PROJECT_CODE AND
+			   					 p.TRANSTYPE = PAC_BIL_DETAIL_SUMMARY.TRANSTYPE AND
+								 SIGN( p.AmountRemaining ) = SIGN( PAC_BIL_DETAIL_SUMMARY.AMOUNTREMAINING ) AND
+								 ABS( NVL( p.BILLAMOUNT, 0 )) + ABS( NVL( p.ADJUSTAMOUNT, 0)) != 0 AND
+								 p.BillingSessionKey = PAC_BIL_DETAIL_SUMMARY.BILLINGSESSIONKEY AND
+								 p.BillingSessionKey = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse ) ;
+
+	  	  StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			  NULL;
+		    WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE PAC_BIL_DETAIL_SUMMARY
+		  SET	HASDETAILS	 = 0
+		  WHERE BILLAMOUNT + ADJUSTAMOUNT = 0 ;
+
+	  	StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+			NULL;
+		  WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+		END;
+
+		DELETE TEMP_BILL_ALLOCATIONS_SUM;
+
+	END IF;
+
+	BEGIN
+		StoO_error   := 0;
+        StoO_rowcnt  := 0;
+		UPDATE PAC_BIL_DETAIL_SUMMARY
+		   SET TITLE = (SELECT LV.NAME
+		   	   		   	   FROM CMN_LOOKUPS_V lv
+						   WHERE lv.LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE' AND
+						   		 lv.LANGUAGE_CODE = RTRIM(Rev_Bill_Getdmndbillingitem.cLanguageCode) AND
+								 lv.LOOKUP_CODE = PAC_BIL_DETAIL_SUMMARY.TRANSTYPE)
+		WHERE BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	UPDATE PAC_BIL_DETAIL_SUMMARY
+			   SET CANAPPROVEBILL = 0
+			   WHERE NOT EXISTS (SELECT 1
+					FROM PAC_MNT_PROJECTS P
+					WHERE P.COMPANY_CODE = PAC_BIL_DETAIL_SUMMARY.COMPANY_CODE
+					  AND P.PROJECT_CODE = PAC_BIL_DETAIL_SUMMARY.PROJECT_CODE
+					  and (   EXISTS (
+							SELECT object_id
+							  FROM cmn_sec_chk_user_r_v0
+							 WHERE object_id = 51560
+							   AND user_id = (select user_id from srm_resources where unique_name = Rev_Bill_Getdmndbillingitem.cUserID)
+							   AND permission_code = 'APPROVE')
+						  OR EXISTS (
+							SELECT object_id
+							  FROM cmn_sec_chk_user_inst_v0
+							 WHERE object_id = 51560
+							   AND user_id = (select user_id from srm_resources where unique_name = Rev_Bill_Getdmndbillingitem.cUserID)
+							   AND permission_code = 'APPROVE'
+							   AND object_instance_id = P.ID)
+					    )
+                                       ) AND
+					BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+	DELETE FROM PAC_BIL_DETAIL_SUMMARY WHERE RECORDTYPE = 2 AND BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+	INSERT INTO PAC_BIL_DETAIL_SUMMARY
+		    (  ROW1,
+			   BILLINGSESSIONKEY,
+			   CANAPPROVEBILL,
+			   COMPANY_CODE,
+			   PROJECT_CODE,
+			   TITLE,
+			   TRANSTYPE,
+			   TOTALAMOUNT,
+			   AMOUNTREMAINING,
+               BILLAMOUNT,
+			   ADJUSTAMOUNT,
+			   HASDETAILS,
+			   LASTROW,
+			   RECORDTYPE,
+			   BILLFLAGS,
+			   USERID )
+		SELECT 1,
+		   	   Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse,
+		   	   1,
+		   	   COMPANY_CODE,
+			   PROJECT_CODE,
+		   	   'zzzzzzzzzzzzzzzzzzzz',
+		       ' ',
+        	   ROUND( SUM(TOTALAMOUNT), currencyPrecisionBilling),
+			   ROUND( SUM(AMOUNTREMAINING), currencyPrecisionBilling),
+               ROUND( SUM(BILLAMOUNT), currencyPrecisionBilling),
+			   ROUND( SUM(ADJUSTAMOUNT), currencyPrecisionBilling),
+			   0,
+			   0,
+			   2,
+			   'N',
+			   Rev_Bill_Getdmndbillingitem.cUser
+		FROM PAC_BIL_DETAIL_SUMMARY
+		WHERE BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse
+		GROUP BY COMPANY_CODE,
+		         PROJECT_CODE;
+
+	--SELECT PAC_BIL_ITEM_SUMMARY_S1.NEXTVAL INTO iLineNo FROM DUAL;
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO cClientTemp, cProjectTemp, cTitle, cTranstype, iTransSign;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		UPDATE PAC_BIL_DETAIL_SUMMARY
+		SET
+    LINE_NO = iLineNo
+		WHERE COMPANY_CODE = cClientTemp AND
+			  PROJECT_CODE = cProjectTemp AND
+			  TITLE = cTitle AND
+			  TRANSTYPE = cTranstype AND
+			  BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse AND
+			  SIGN(AmountRemaining) = iTransSign ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		iLineNo := iLineNo + 1 ;
+
+	END LOOP;
+	CLOSE UF1_cursor;
+
+
+	BEGIN
+  SELECT MAX(LINE_NO) INTO iMaxRow FROM PAC_BIL_DETAIL_SUMMARY WHERE RECORDTYPE IN ( 0, 1 ) AND BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+	END;
+
+	UPDATE PAC_BIL_DETAIL_SUMMARY
+		   SET LASTROW = 1
+       WHERE LINE_NO = iMaxRow AND
+		         BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+	SELECT NVL(ALLOW_AUTOPOPBILL,0) INTO l_autoPopulate FROM NAMEOPTIONS ;
+
+
+	OPEN RC1 FOR
+	SELECT t.ROW1,
+		   t.BILLINGSESSIONKEY,
+		   t.CANAPPROVEBILL,
+		   t.COMPANY_CODE,
+		   t.PROJECT_CODE,
+		   t.TITLE,
+		   t.TRANSTYPE,
+		   t.TOTALAMOUNT,
+		   t.AMOUNTREMAINING,
+	         t.LINE_NO,
+		   DECODE( l_autoPopulate, 0, t.BILLAMOUNT, (DECODE ( t.BILLAMOUNT, NULL, t.AMOUNTREMAINING, t.BILLAMOUNT ) ) ) BILLAMOUNT,		   
+		   t.ADJUSTAMOUNT,
+		   t.HASDETAILS,
+		   t.LASTROW,
+		   t.RECORDTYPE,
+		   p.TITLE,
+		   t.BILLFLAGS,
+		   nCurrencyDisplayPrecision,
+		   p.Type_
+    FROM PAC_BIL_DETAIL_SUMMARY t,
+     PAC_MNT_PROJECTS p
+	WHERE p.PROJECT_CODE = t.PROJECT_CODE AND
+		  p.COMPANY_CODE = t.COMPANY_CODE AND
+		  BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse
+	ORDER BY 4, 5, 6, 15 ;
+
+	OPEN RC2 FOR
+	SELECT ROUND( SUM(TOTALAMOUNT), currencyPrecisionBilling),
+		   ROUND( SUM(AMOUNTREMAINING), currencyPrecisionBilling),
+		   DECODE( l_autoPopulate, -- IF l_autoPopulate = 0 THEN
+		   		   0, 
+				   ROUND( SUM(BILLAMOUNT), currencyPrecisionBilling), 
+		   		   (DECODE ( ROUND( SUM(BILLAMOUNT), currencyPrecisionBilling), --ELSE IF SUM(BILLAMOUNT) = 0 THEN 
+				   		   	 NULL, 
+							 ROUND( SUM(AMOUNTREMAINING), currencyPrecisionBilling), 
+				   		   	 ROUND( SUM(BILLAMOUNT), currencyPrecisionBilling) ) ) ), --ELSE
+		   ROUND( SUM(ADJUSTAMOUNT), currencyPrecisionBilling)
+	FROM PAC_BIL_DETAIL_SUMMARY
+	WHERE RECORDTYPE IN ( 0, 1 ) AND
+	      BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse ;
+
+	OPEN RC3 FOR
+	SELECT COMPANY_ID,
+		   COMPANY_NAME,
+		   BILLING_CURRENCY_CODE
+	FROM SRM_COMPANIES s,
+	     PC_BILLINGSESSION p
+	WHERE s.COMPANY_ID = p.COMPANY_CODE AND
+		  p.BILLINGSESSIONKEY = Rev_Bill_Getdmndbillingitem.iBillingSessionKeyUse;
+
+END Rev_Bill_Getdmndbillingitem;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

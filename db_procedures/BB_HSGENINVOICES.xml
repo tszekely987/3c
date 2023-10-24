@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_HSGENINVOICES</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_HSGENINVOICES" 
+(
+  iBillRunKey   NUMBER,
+  cUserID       VARCHAR2,
+  iHSDetailMode NUMBER,
+  RC1    IN OUT BB_HSGENINVOICESPkg.RCT1)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+	bb_HSGenHeaders(bb_HSGenInvoices.iBillRunKey,
+	 bb_HSGenInvoices.cUserID,
+	 bb_HSGenInvoices.iHSDetailMode);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  bb_HSGenInvoices.iHSDetailMode = 0 THEN
+		BEGIN
+		bb_HSGenBodyProjSummary(bb_HSGenInvoices.iBillRunKey,
+		 bb_HSGenInvoices.cUserID);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	IF  bb_HSGenInvoices.iHSDetailMode = 2 THEN
+		BEGIN
+		bb_HSGenBodyProjEmpSummary(bb_HSGenInvoices.iBillRunKey,
+		 bb_HSGenInvoices.cUserID);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	IF  bb_HSGenInvoices.iHSDetailMode = 3 THEN
+		BEGIN
+		bb_HSGenBodyProjFullDetail(bb_HSGenInvoices.iBillRunKey,
+		 bb_HSGenInvoices.cUserID);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	BEGIN
+	bb_HSGenFooters(bb_HSGenInvoices.iBillRunKey,
+	 bb_HSGenInvoices.cUserID);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	OPEN RC1 FOR
+	SELECT InvoiceNo,  SectionNo,  LineSeqNo,  PrintLine FROM bb_HSInvoiceLayout
+	WHERE BillingRunKey = bb_HSGenInvoices.iBillRunKey
+	 and UserID = bb_HSGenInvoices.cUserID
+	ORDER BY 1 , 2 , 3 ;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM bb_HSInvoiceLayout
+		WHERE BillingRunKey = bb_HSGenInvoices.iBillRunKey
+		 and UserID = bb_HSGenInvoices.cUserID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END bb_HSGenInvoices;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

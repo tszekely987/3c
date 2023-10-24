@@ -1,0 +1,812 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="cps_restLinks" createdBy="admin" endStep="Finish" source="customer" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Restores the Project Links to be server specific. Updates Links with the local Clarity server name. Restore is for a Presales Demo Dataset after it moves to a new server or to a local VM." languageCode="en" name="Link Restore on Presales Demo Data"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="false" name="thisXmlDocument" objectType="xml_document" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="cps_resetLinks" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls description="Reset Links" languageCode="en" name="Reset Links"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:file="jelly:com.niku.union.gel.FileTagLibrary" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:u="jelly:util" xmlns:xog="http://www.niku.com/xog" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <!-- Copyright 2020 CA Technologies. All Rights Reserved.  -->
+                          <!-- Links Restore for 15.8 demo dataset GCP and VMs
+
+      Restores the high level domain (host) in the prlink table for relative links (no host name).
+      These show up within the Modern UX in the Project Links, Menu Links, Custom Investment Links, etc.
+
+      05/14/2020 - Matt Schulze - Fixed Blueprints
+      03/09/2020 - Matt Schulze - Syntax change to 1 = 1
+      01/17/2020 - Matt Schulze - Changed PRLINK SQL from inclusive to exclusive to widen the search... from = 'INV_INVESTMENTS' to NOT IN ('CMN_SEC_USERS','PRSite') 
+      01/16/2020 - Matt Schulze - Added back in Blueprint Name, on join from odf_abstract_blueprints.
+      01/13/2020 - Matt Schulze - Removed Blueprint Name from SQL and msgs, since it has been removed from the base tables.
+      01/15/2019 - Matt Schulze - Added processing of links in Blueprint Channels. Will not add a host if none is present for Blueprint Channel Links.
+      04/02/2018 - Matt Schulze - Fixes for 15.4, including handing of the weird URL syntax in the Template Links from Alex
+      09/28/2017 - Matt Schulze - Initial coding
+
+      NOTE: We need to use the encode="false" and the escapeText="false" to not convert Ampersands in the URL values.
+            see: http://commons.apache.org/proper/commons-jelly/tags.html#core:set
+            and: http://commons.apache.org/proper/commons-jelly/libs/sql/tags.html#sql:update
+
+    -->
+                          <!-- Debug Flags, which get disabled when running in a PPM process -->
+                          <core:set value="true" var="bDebug"/>
+                          <core:set value="Xtrue" var="bDebugTimings"/>
+                          <core:set value="true" var="bDebugVerbose"/>
+                          <core:if test="${gel_processId != null}">
+                            <core:set value="Xtrue" var="bDebug"/>
+                            <core:set value="Xtrue" var="bDebugTimings"/>
+                            <core:set value="Xtrue" var="bDebugVerbose"/>
+                          </core:if>
+                          <!-- skip workspace processing -->
+                          <core:set value="Xtrue" var="bSkipLinkUpdates"/>
+                          <!-- skip sql:update calls on Project Links, for debugging what will get changed -->
+                          <core:set value="Xtrue" var="bSkipChannelUpdates"/>
+                          <!-- skip sql:update calls on Blueprint Channel Links, We need to change these now. -->
+                          <!-- Script timing variables -->
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milStart"/>
+                          <core:new className="java.util.Date" var="dteElapse"/>
+                          <core:new className="java.text.SimpleDateFormat" var="sdFmtElapse">
+                            <core:arg type="java.lang.String" value="HH:mm:ss.hhh"/>
+                          </core:new>
+                          <core:new className="java.text.DecimalFormat" var="sdFmtElapseNum">
+                            <core:arg type="java.lang.String" value="0.000"/>
+                          </core:new>
+                          <core:invokeStatic className="java.lang.Runtime" method="getRuntime" var="myRuntime"/>
+                          <core:invokeStatic className="java.util.TimeZone" method="getTimeZone" var="tzGMT">
+                            <core:arg type="java.lang.String" value="GMT"/>
+                          </core:invokeStatic>
+                          <core:set value="${sdFmtElapse.setTimeZone(tzGMT)}" var="dummy"/>
+                          <!-- we need to set GMT, otherwise timings add the GMT hr offset of 18 hrs -->
+                          <gel:formatDate format="yyyy-MM-dd HH:MM:S" stringVar="today"/>
+                          <!-- Use this code snipet for timings within the GEL
+  <core:invokeStatic className="java.lang.System"   method="currentTimeMillis" var="milStart_00"/>
+
+  <core:invokeStatic className="java.lang.System"   method="currentTimeMillis" var="milEnd_00"/>
+  <core:set var="elapsedTime"   value="${(milEnd_00 - milStart_00)}"/>
+  <core:if test="${bDebugTimings}"><gel:out>Script Elapse #00: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out></core:if>
+    -->
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd"/>
+                          <core:set value="${(milEnd - milStart)}" var="elapsedTime"/>
+                          <core:if test="${bDebugTimings}">
+                            <gel:out>Script Elapse #11: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out>
+                          </core:if>
+                          <!-- There has to be an eaiser way, but this is the only way I have found so far to generate an ampersand in a string without typing the actual character in the GEL -->
+                          <core:set value="xyz" var="strTemp"/>
+                          <!-- start with a java String class -->
+                          <core:set value="${strTemp.charAt(0)}" var="chTemp"/>
+                          <!-- generate a java Character primitive, the only way I know. -->
+                          <core:set value="${chTemp.toChars(38)}" var="chTemp"/>
+                          <!-- use the int to Character converstion  -->
+                          <core:set value="${chTemp[0].toString()}" var="myAmpr"/>
+                          <!-- Finally, get a Sting variable that contains just the ampersand -->
+                          <core:if test="${bDebug}">
+                            <gel:out>myAmpr[${myAmpr}]</gel:out>
+                          </core:if>
+                          <!-- same thing with the % 20 characters for the space -->
+                          <core:set value="%" var="myBlnk"/>
+                          <core:set value="${myBlnk}20" var="myBlnk"/>
+                          <!-- Basic PPM Variables -->
+                          <!-- PPM DB instance, used for debugging and running from a command line.
+  <gel:parameter var="v_nikuDB"       default="Niku"/>
+    -->
+                          <!-- CA PPM XOG URL Settings -->
+                          <core:invokeStatic className="com.niku.union.config.ConfigurationManager" method="getInstance" var="config"/>
+                          <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getId()}" var="WebServerid"/>
+                          <core:if test="${WebServerid == 'app'}">
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getEntryUrl()}" var="EntryURL"/>
+                          </core:if>
+                          <core:if test="${XOGURL == null || XOGURL.length() == 0}">
+                            <core:set value="${EntryURL}" var="XOGURL"/>
+                          </core:if>
+                          <core:if test="${bDebug}">
+                            <gel:out>EntryURL : ${EntryURL}</gel:out>
+                            <gel:out>XOGURL   : ${XOGURL}</gel:out>
+                          </core:if>
+                          <!-- Specific PPM Project Values -->
+                          <!-- Project Internal Id, default for debugging. Commented out since we do not really need to set it blank as default.
+  <gel:parameter var="v_PPMProjIntId" default="" />       
+    -->
+                          <core:new className="java.text.SimpleDateFormat" var="sdFmtDteTme">
+                            <core:arg type="java.lang.String" value="yyyy-MM-dd'T'HH:mm:ss"/>
+                          </core:new>
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd"/>
+                          <core:set value="${(milEnd - milStart)}" var="elapsedTime"/>
+                          <core:if test="${bDebugTimings}">
+                            <gel:out>Script Elapse #12: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out>
+                          </core:if>
+                          <!-- ___ PPM Project Int ID from the associated Object Id or use the default for debugging  ___ -->
+                          <core:choose>
+                            <core:when test="${gel_objectInstanceId == null}">
+                              <!-- Only add the specific Project Id if one was given. 
+         We can set this for debugging on the command line by setting the java variable when running GEL (ie -v_PPMProjIntId "5002008") -->
+                              <core:if test="${(v_PPMProjIntId != null)}">
+                                <!-- AND -->
+                                <core:if test="${(v_PPMProjIntId.length() &gt; 0)}">
+                                  <core:set value="${v_PPMProjIntId}" var="v_PrjProjId"/>
+                                  <core:set value="Setting PPM Project Int Id to ${v_PrjProjId}..." var="logMessage"/>
+                                  <core:choose>
+                                    <core:when test="${gel_processId == null}">
+                                      <gel:out>${logMessage}</gel:out>
+                                    </core:when>
+                                    <core:otherwise>
+                                      <gel:log level="INFO">${logMessage}</gel:log>
+                                    </core:otherwise>
+                                  </core:choose>
+                                </core:if>
+                              </core:if>
+                            </core:when>
+                            <core:otherwise>
+                              <!-- Skip picking up the Project ID from the process. We want to sync all Projects, even though we are running from a specific Project.
+    <core:set var="v_PrjProjId" value="${gel_objectInstanceId}" />
+    -->
+                            </core:otherwise>
+                          </core:choose>
+                          <core:invokeStatic className="com.niku.union.config.ConfigurationManager" method="getInstance" var="config"/>
+                          <core:set value="${config.getVersionNumber()}" var="ppm_version"/>
+                          <core:set value="${ppm_version.substring(0,4)}" var="ppm_ver_major"/>
+                          <core:set value="${ppm_ver_major+0}" var="ppm_ver"/>
+                          <!-- convert to a numeric data type (Double) -->
+                          <core:if test="${bDebug || bDebugSec}">
+                            <core:set value="PPM Version: ${ppm_version} major[${ppm_ver_major}]" var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log>${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milStart_04"/>
+                          <!-- DB Debug Settings -->
+                          <core:choose>
+                            <core:when test="${gel_processId == null}">
+                              <core:set value="Setting datasource to ${v_nikuDB}..." var="logMessage"/>
+                              <core:choose>
+                                <core:when test="${gel_processId == null}">
+                                  <gel:out>${logMessage}</gel:out>
+                                  <gel:out/>
+                                </core:when>
+                                <core:otherwise>
+                                  <gel:log level="INFO">${logMessage}</gel:log>
+                                </core:otherwise>
+                              </core:choose>
+                              <gel:setDataSource dbId="${v_nikuDB}"/>
+                            </core:when>
+                            <core:otherwise>
+                              <!-- default to niku for out demos -->
+                              <gel:setDataSource dbId="niku"/>
+                              <!-- override default if we were given a specific value -->
+                              <core:if test="${(v_nikuDB != null)}">
+                                <!-- AND -->
+                                <core:if test="${(v_nikuDB.length() &gt; 0)}">
+                                  <gel:setDataSource dbId="${v_nikuDB}"/>
+                                </core:if>
+                              </core:if>
+                            </core:otherwise>
+                          </core:choose>
+                          <!-- ________________ -->
+                          <!-- ___ Get the PPM host  ___ -->
+                          <core:set var="v_PPMURL"><![CDATA[${XOGURL}]]></core:set>
+                          <core:if test="${bDebug}">
+                            <gel:out>PPMURL  : ${v_PPMURL}</gel:out>
+                          </core:if>
+                          <core:new className="java.net.URL" var="aPPMURL">
+                            <core:arg type="java.lang.String" value="${v_PPMURL}"/>
+                          </core:new>
+                          <core:set var="v_PPMHost"><![CDATA[${aPPMURL.getHost()}]]></core:set>
+                          <core:if test="${bDebug}">
+                            <gel:out>Host    : ${v_PPMHost}</gel:out>
+                          </core:if>
+                          <core:if test="${bDebugVerbose}">
+                            <gel:out>protocol  = ${aPPMURL.getProtocol()}</gel:out>
+                            <gel:out>authority = ${aPPMURL.getAuthority()}</gel:out>
+                            <gel:out>host      = ${aPPMURL.getHost()}</gel:out>
+                            <gel:out>port      = ${aPPMURL.getPort()}</gel:out>
+                            <gel:out>path      = ${aPPMURL.getPath()}</gel:out>
+                            <gel:out>query     = ${aPPMURL.getQuery()}</gel:out>
+                            <gel:out>filename  = ${aPPMURL.getFile()}</gel:out>
+                            <gel:out>ref       = ${aPPMURL.getRef()}</gel:out>
+                          </core:if>
+                          <core:set encode="false" var="v_TempPPM"><![CDATA[${aPPMURL.getProtocol()}://${aPPMURL.getHost()}]]></core:set>
+                          <core:if test="${bDebug}">
+                            <gel:out>v_TempPPM: ${v_TempPPM}</gel:out>
+                          </core:if>
+                          <core:set encode="false" var="v_TempPPMnoHost"><![CDATA[${aPPMURL.getProtocol()}:]]></core:set>
+                          <core:if test="${bDebug}">
+                            <gel:out>v_TempPPMnoHost: ${v_TempPPMnoHost}</gel:out>
+                          </core:if>
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd_04"/>
+                          <core:set value="${(milEnd_04 - milStart_04)}" var="elapsedTime"/>
+                          <core:if test="${bDebugTimings}">
+                            <gel:out>Elapse DataSource Connect: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out>
+                          </core:if>
+                          <core:catch var="exvar2">
+                            <!-- ________________ -->
+                            <!-- 
+        Some Manual Cleanup...
+
+        SELECT i.code proj_id, i.name project
+             , l.prid task_id
+             , l.prname task_name
+             , l.prurl 
+             , l.prrecordid inv_id
+             , l.prtablename
+             , l.*
+          FROM prlink l
+           LEFT OUTER JOIN inv_investments i ON i.id = prrecordid
+        WHERE prtablename = 'INV_INVESTMENTS'
+          AND (prurl like '%changeList%' OR prurl like '%issueList%' OR prurl like '%riskList%')
+         ORDER BY l.prurl, i.name, l.prname, i.code
+
+        UPDATE prlink
+           SET prname  = 'Changes'
+        WHERE prurl like '%changeList%' 
+        
+        UPDATE prlink
+           SET prname  = 'Issues'
+        WHERE prurl like '%issueList%' 
+        
+        UPDATE prlink
+           SET prname  = 'Risks'
+        WHERE prurl like '%riskList%' 
+
+ -->
+                            <!-- ________________ -->
+                            <!-- ___ Get Links from Projects  ___ -->
+                            <sql:query trim="true" var="v_invRecord">
+
+        SELECT l.prid
+             , l.prname link_name
+             , l.prtablename link_type
+             , l.prrecordid proj_intid
+             , inv.name proj_name
+             , inv.code proj_id
+             , l.prurl 
+          FROM prlink l
+          LEFT OUTER JOIN inv_investments inv ON l.prrecordid = inv.id
+         WHERE prtablename NOT IN ('CMN_SEC_USERS','PRSite') 
+           AND 1 = 1 
+
+        <core:if test="${v_PrjProjId != null}">
+                                <core:if test="${v_PrjProjId.length() &gt; 0}">
+          AND l.prrecordid = '${v_PrjProjId}'
+          </core:if>
+                              </core:if>
+
+         ORDER BY l.prrecordid
+
+      </sql:query>
+                            <!-- <core:if test="${bDebug}"><gel:out trim="false">Got DB Connection.</gel:out></core:if> -->
+                            <core:if test="${bDebug}">
+                              <gel:out/>
+                              <gel:out>_______________________________________________</gel:out>
+                            </core:if>
+                            <core:set value="${v_invRecord.rows.size()}" var="len_arrProjs"/>
+                            <core:if test="${bDebug}">
+                              <gel:out>Number of Links found for query: ${len_arrProjs}</gel:out>
+                              <gel:out/>
+                            </core:if>
+                            <core:forEach indexVar="i" items="${v_invRecord.rows}" var="thisrow">
+                              <core:set var="v_LinkId"><![CDATA[${v_invRecord.rows[i].prid}]]></core:set>
+                              <core:set var="v_LinkName"><![CDATA[${v_invRecord.rows[i].link_name}]]></core:set>
+                              <core:set var="v_LinkType"><![CDATA[${v_invRecord.rows[i].link_type}]]></core:set>
+                              <core:set var="v_ProjIntId"><![CDATA[${v_invRecord.rows[i].proj_intid}]]></core:set>
+                              <core:set var="v_ProjName"><![CDATA[${v_invRecord.rows[i].proj_name}]]></core:set>
+                              <core:set var="v_ProjId"><![CDATA[${v_invRecord.rows[i].proj_id}]]></core:set>
+                              <core:set encode="false" var="v_LinkURL"><![CDATA[${v_invRecord.rows[i].prurl}]]></core:set>
+                              <core:if test="${bDebug}">
+                                <gel:out>LinkURL: ${v_LinkURL}</gel:out>
+                              </core:if>
+                              <core:if test="${bDebugVerbose}">
+                                <core:set encode="false" value="Checking Link (${v_LinkId}): ${v_LinkName} Type(${v_LinkType}) ProjId(${v_ProjIntId}.${v_ProjId}):${v_ProjName}  URL:${v_LinkURL}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="INFO">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:set value="${v_LinkURL}xxxxxxxxxxxx" var="v_tmpURL"/>
+                              <core:set value="${v_tmpURL.substring(0,8)}" var="v_tmpURL"/>
+                              <core:if test="${v_tmpURL.equals('@SERVER@')}">
+                                <core:if test="${bDebug}">
+                                  <gel:out>Found @SERVER@, skipping LinkURL changes.</gel:out>
+                                </core:if>
+                              </core:if>
+                              <!-- v_tmpURL.equals('@SERVER@') -->
+                              <core:set value="true" var="bSkipURL"/>
+                              <core:if test="${!(v_tmpURL.equals('@SERVER@'))}">
+                                <core:catch var="exvarURL">
+                                  <core:new className="java.net.URL" var="aURL">
+                                    <core:arg type="java.lang.String" value="${v_LinkURL}"/>
+                                  </core:new>
+                                  <core:set value="false" var="bSkipURL"/>
+                                  <core:if test="${bDebug}">
+                                    <gel:out>Parsed URL.</gel:out>
+                                  </core:if>
+                                </core:catch>
+                                <core:if test="${not empty exvarURL}">
+                                  <core:set value="1 EXCEPTION: ${exvarURL.getMessage()}" var="logMessage"/>
+                                  <core:choose>
+                                    <core:when test="${gel_processId == null}">
+                                      <gel:out>${logMessage}</gel:out>
+                                    </core:when>
+                                    <core:otherwise>
+                                      <gel:log level="INFO">${logMessage}</gel:log>
+                                    </core:otherwise>
+                                  </core:choose>
+                                  <core:if test="${bDebug}">
+                                    <gel:out>ERROR - Exception: ${exvarURL}</gel:out>
+                                    <gel:out/>
+                                  </core:if>
+                                  <core:new className="org.apache.commons.jelly.JellyTagException" var="exTagURL">
+                                    <core:arg type="java.lang.Throwable" value="${exvarURL}"/>
+                                  </core:new>
+                                  <gel:log level="INFO" message="ERROR - TAG Exception: ${exTagURL}"/>
+                                  <gel:out>ERROR - TAG Exception: ${exTagURL}</gel:out>
+                                  <gel:out/>
+                                </core:if>
+                              </core:if>
+                              <!-- !v_tmpURL.equals('@SERVER@') -->
+                              <core:if test="${(aURL != null) &amp;&amp; (!bSkipURL)}">
+                                <core:set var="v_LinkHost"><![CDATA[${aURL.getHost()}]]></core:set>
+                                <core:if test="${bDebug}">
+                                  <gel:out>Host   : ${v_LinkHost}</gel:out>
+                                </core:if>
+                                <core:if test="${bDebugVerbose}">
+                                  <gel:out>protocol  = ${aURL.getProtocol()}</gel:out>
+                                  <gel:out>authority = ${aURL.getAuthority()}</gel:out>
+                                  <gel:out>host      = ${aURL.getHost()}</gel:out>
+                                  <gel:out>port      = ${aURL.getPort()}</gel:out>
+                                  <gel:out>path      = ${aURL.getPath()}</gel:out>
+                                  <gel:out>query     = ${aURL.getQuery()}</gel:out>
+                                  <gel:out>filename  = ${aURL.getFile()}</gel:out>
+                                  <gel:out>ref       = ${aURL.getRef()}</gel:out>
+                                </core:if>
+                                <core:if test="${(aURL.getAuthority() == null)}">
+                                  <core:set encode="false" var="v_TempLink"><![CDATA[${v_TempPPM}${aURL.getFile()}]]></core:set>
+                                  <core:if test="${(aURL.getRef() != null)}">
+                                    <core:set encode="false" var="v_TempLink"><![CDATA[${v_TempLink}#${aURL.getRef()}]]></core:set>
+                                  </core:if>
+                                  <!-- cleanup bad edits
+            <core:set var="v_TempLink"  encode="false"  ><![CDATA[${v_TempLink.toString().replace('&amp;','&')}]]></core:set>
+            <core:set var="v_TempLink"  encode="false"  ><![CDATA[${v_TempLink.toString().replace('?','#')}]]></core:set>
+              -->
+                                  <core:if test="${bDebug}">
+                                    <gel:out>Old Link: ${v_LinkURL}</gel:out>
+                                    <gel:out>New Link: ${v_TempLink}</gel:out>
+                                  </core:if>
+                                  <core:set encode="false" value="Update ${v_LinkType}(${v_ProjIntId}.${v_ProjId}):${v_ProjName} Link:${v_LinkName}  NewURL: ${v_TempLink}" var="logMessage"/>
+                                  <core:choose>
+                                    <core:when test="${gel_processId == null}">
+                                      <gel:out>${logMessage}</gel:out>
+                                    </core:when>
+                                    <core:otherwise>
+                                      <gel:log level="INFO">${logMessage}</gel:log>
+                                    </core:otherwise>
+                                  </core:choose>
+                                  <core:if test="${(bSkipLinkUpdates)}">
+                                    <gel:out>Skipping Updates: SkipLinkUpdates for direct Links</gel:out>
+                                    <core:set encode="false" value="Skipping Updates: SkipLinkUpdates for direct Links" var="logMessage"/>
+                                    <core:choose>
+                                      <core:when test="${gel_processId == null}">
+                                        <gel:out>${logMessage}</gel:out>
+                                      </core:when>
+                                      <core:otherwise>
+                                        <gel:log level="INFO">${logMessage}</gel:log>
+                                      </core:otherwise>
+                                    </core:choose>
+                                  </core:if>
+                                  <!-- (bSkipLinkUpdates) -->
+                                  <core:if test="${!(bSkipLinkUpdates)}">
+                                    <sql:update escapeText="false" var="v_invLink"><![CDATA[
+                UPDATE prlink
+                   SET prurl = '${v_TempLink}'
+                WHERE prid = '${v_LinkId}'
+              ]]></sql:update>
+                                  </core:if>
+                                  <!-- !(bSkipLinkUpdates) -->
+                                </core:if>
+                                <!-- (aURL.getAuthority() == null) -->
+                              </core:if>
+                              <!-- (aURL != null) -->
+                              <core:if test="${bDebug}">
+                                <!--
+          <core:set var="logMessage"  value="" /><core:choose><core:when test="${gel_processId == null}"><gel:out>${logMessage}</gel:out></core:when><core:otherwise><gel:log level="INFO">${logMessage}</gel:log></core:otherwise></core:choose>
+            -->
+                              </core:if>
+                            </core:forEach>
+                            <!-- Project Link -->
+                            <core:if test="${bDebug}">
+                              <gel:out/>
+                              <gel:out>Finished Project Links </gel:out>
+                            </core:if>
+                            <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd"/>
+                            <core:set value="${(milEnd - milStart)}" var="elapsedTime"/>
+                            <core:if test="${bDebugTimings}">
+                              <gel:out>Script Elapse #82: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out>
+                            </core:if>
+                            <!-- <core:set var="logMessage"  value="Script Elapse: ${sdFmtElapse.format(dteElapse)}" /><core:choose><core:when test="${gel_processId == null}"><gel:out>${logMessage}</gel:out></core:when><core:otherwise><gel:log level="INFO">${logMessage}</gel:log></core:otherwise></core:choose>  -->
+                            <!-- ________________ -->
+                            <!-- ___ Get Blueprint Channel Links  ___ -->
+                            <sql:query trim="true" var="v_invRecord">
+
+         SELECT blp.id blp_id
+          , ablp.name blp_name
+          , bex.id chnl_id
+          , bex.name chnl_name
+          , bex.base_url chnl_url
+          , bex.blueprint_visual_id chnl_mod_id
+          , bv.name chnl_mod_name
+        FROM blp_external_app bex
+        LEFT OUTER JOIN BLP_AVAILABLE_VISUALS bv ON bv.id = bex.blueprint_visual_id
+        LEFT OUTER JOIN ODF_BLUEPRINTS blp ON blp.id = bex.blueprint_id
+        LEFT OUTER JOIN ODF_ABSTRACT_BLUEPRINTS ablp ON ablp.id = bex.blueprint_id
+        WHERE base_url LIKE '%/niku/%'
+        ORDER BY blueprint_visual_id
+
+      </sql:query>
+                            <!-- <core:if test="${bDebug}"><gel:out trim="false">Got DB Connection.</gel:out></core:if> -->
+                            <core:if test="${bDebug}">
+                              <gel:out/>
+                              <gel:out>_______________________________________________</gel:out>
+                            </core:if>
+                            <core:set value="${v_invRecord.rows.size()}" var="len_arrProjs"/>
+                            <core:if test="${bDebug}">
+                              <gel:out>Number of Blueprint Channel Links found for query: ${len_arrProjs}</gel:out>
+                              <gel:out/>
+                            </core:if>
+                            <core:forEach indexVar="i" items="${v_invRecord.rows}" var="thisrow">
+                              <core:set var="v_blp_id"><![CDATA[${v_invRecord.rows[i].blp_id}]]></core:set>
+                              <core:set var="v_blp_name"><![CDATA[${v_invRecord.rows[i].blp_name}]]></core:set>
+                              <core:set var="v_LinkId"><![CDATA[${v_invRecord.rows[i].chnl_id}]]></core:set>
+                              <core:set var="v_chnl_name"><![CDATA[${v_invRecord.rows[i].chnl_name}]]></core:set>
+                              <core:set encode="false" var="v_LinkURL"><![CDATA[${v_invRecord.rows[i].chnl_url}]]></core:set>
+                              <core:set var="v_chnl_mod_id"><![CDATA[${v_invRecord.rows[i].chnl_mod_id}]]></core:set>
+                              <core:set var="v_chnl_mod_name"><![CDATA[${v_invRecord.rows[i].chnl_mod_name}]]></core:set>
+                              <core:if test="${bDebug}">
+                                <gel:out>Channel URL: ${v_LinkURL}</gel:out>
+                              </core:if>
+                              <core:if test="${bDebugVerbose}">
+                                <core:set encode="false" value="Checking Channel(${v_LinkId}:${v_chnl_name}) Blueprint(${v_blp_id}.${v_blp_name}) Module(${v_chnl_mod_id}:${v_chnl_mod_name}) URL:${v_LinkURL}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="INFO">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:set value="${v_LinkURL}xxxxxxxxxxxx" var="v_tmpURL"/>
+                              <core:set value="${v_tmpURL.substring(0,8)}" var="v_tmpURL"/>
+                              <core:if test="${v_tmpURL.equals('@SERVER@')}">
+                                <core:if test="${bDebug}">
+                                  <gel:out>Found @SERVER@, skipping LinkURL changes.</gel:out>
+                                </core:if>
+                              </core:if>
+                              <!-- v_tmpURL.equals('@SERVER@') -->
+                              <core:set value="true" var="bSkipURL"/>
+                              <core:if test="${!(v_tmpURL.equals('@SERVER@'))}">
+                                <core:catch var="exvarURL">
+                                  <core:new className="java.net.URL" var="aURL">
+                                    <core:arg type="java.lang.String" value="${v_LinkURL}"/>
+                                  </core:new>
+                                  <core:set value="false" var="bSkipURL"/>
+                                  <core:if test="${bDebug}">
+                                    <gel:out>Parsed URL.</gel:out>
+                                  </core:if>
+                                </core:catch>
+                                <core:if test="${not empty exvarURL}">
+                                  <core:set value="1 EXCEPTION: ${exvarURL.getMessage()}" var="logMessage"/>
+                                  <core:choose>
+                                    <core:when test="${gel_processId == null}">
+                                      <gel:out>${logMessage}</gel:out>
+                                    </core:when>
+                                    <core:otherwise>
+                                      <gel:log level="INFO">${logMessage}</gel:log>
+                                    </core:otherwise>
+                                  </core:choose>
+                                  <core:if test="${bDebug}">
+                                    <gel:out>ERROR - Exception: ${exvarURL}</gel:out>
+                                    <gel:out/>
+                                  </core:if>
+                                  <core:new className="org.apache.commons.jelly.JellyTagException" var="exTagURL">
+                                    <core:arg type="java.lang.Throwable" value="${exvarURL}"/>
+                                  </core:new>
+                                  <gel:log level="INFO" message="ERROR - TAG Exception: ${exTagURL}"/>
+                                  <gel:out>ERROR - TAG Exception: ${exTagURL}</gel:out>
+                                  <gel:out/>
+                                </core:if>
+                              </core:if>
+                              <!-- !v_tmpURL.equals('@SERVER@') -->
+                              <core:if test="${(aURL != null) &amp;&amp; (!bSkipURL)}">
+                                <core:set var="v_LinkHost"><![CDATA[${aURL.getHost()}]]></core:set>
+                                <core:if test="${bDebug}">
+                                  <gel:out>Host   : ${v_LinkHost}</gel:out>
+                                </core:if>
+                                <core:if test="${bDebugVerbose}">
+                                  <gel:out>protocol  = ${aURL.getProtocol()}</gel:out>
+                                  <gel:out>authority = ${aURL.getAuthority()}</gel:out>
+                                  <gel:out>host      = ${aURL.getHost()}</gel:out>
+                                  <gel:out>port      = ${aURL.getPort()}</gel:out>
+                                  <gel:out>path      = ${aURL.getPath()}</gel:out>
+                                  <gel:out>query     = ${aURL.getQuery()}</gel:out>
+                                  <gel:out>filename  = ${aURL.getFile()}</gel:out>
+                                  <gel:out>ref       = ${aURL.getRef()}</gel:out>
+                                </core:if>
+                                <core:if test="${(aURL.getAuthority() == null)}">
+                                  <core:set encode="false" var="v_TempLink"><![CDATA[${v_TempPPM}${aURL.getFile()}]]></core:set>
+                                  <!--
+            <core:if test="${v_LinkHost == null || v_LinkHost.length() == 0}">
+              <core:set var="v_TempLink"  encode="false"  ><![CDATA[${v_TempPPMnoHost}${aURL.getFile()}]]></core:set>
+            </core:if>
+              -->
+                                  <core:if test="${(aURL.getRef() != null)}">
+                                    <core:set encode="false" var="v_TempLink"><![CDATA[${v_TempLink}#${aURL.getRef()}]]></core:set>
+                                  </core:if>
+                                  <!-- cleanup bad edits
+            <core:set var="v_TempLink"  encode="false"  ><![CDATA[${v_TempLink.toString().replace('&amp;','&')}]]></core:set>
+            <core:set var="v_TempLink"  encode="false"  ><![CDATA[${v_TempLink.toString().replace('?','#')}]]></core:set>
+              -->
+                                  <core:if test="${bDebug}">
+                                    <gel:out>Old Link: ${v_LinkURL}</gel:out>
+                                    <gel:out>New Link: ${v_TempLink}</gel:out>
+                                  </core:if>
+                                  <core:if test="${(bSkipChannelUpdates)}">
+                                    <core:if test="${bDebug}">
+                                      <gel:out>SkipChannelUpdates for Blueprint Channel Links</gel:out>
+                                    </core:if>
+                                  </core:if>
+                                  <!-- (bSkipChannelUpdates) -->
+                                  <core:if test="${!(bSkipChannelUpdates)}">
+                                    <core:set encode="false" value="Updating Channel(${v_LinkId}:${v_chnl_name}) Blueprint(${v_blp_id}) Module(${v_chnl_mod_id}:${v_chnl_mod_name}) New URL: ${v_TempLink}" var="logMessage"/>
+                                    <core:choose>
+                                      <core:when test="${gel_processId == null}">
+                                        <gel:out>${logMessage}</gel:out>
+                                      </core:when>
+                                      <core:otherwise>
+                                        <gel:log level="INFO">${logMessage}</gel:log>
+                                      </core:otherwise>
+                                    </core:choose>
+                                    <sql:update escapeText="false" var="v_invLink"><![CDATA[
+                UPDATE blp_external_app 
+                   SET base_url  = '${v_TempLink}'
+                WHERE id = '${v_LinkId}'
+              ]]></sql:update>
+                                  </core:if>
+                                  <!-- !(bSkipChannelUpdates) -->
+                                </core:if>
+                                <!-- (aURL.getAuthority() == null) -->
+                              </core:if>
+                              <!-- (aURL != null) -->
+                              <core:if test="${bDebug}">
+                                <!--
+          <core:set var="logMessage"  value="" /><core:choose><core:when test="${gel_processId == null}"><gel:out>${logMessage}</gel:out></core:when><core:otherwise><gel:log level="INFO">${logMessage}</gel:log></core:otherwise></core:choose>
+            -->
+                              </core:if>
+                            </core:forEach>
+                            <!-- Project Link -->
+                            <core:if test="${bDebug}">
+                              <gel:out/>
+                              <gel:out>Finished Blueprint Channel Links </gel:out>
+                            </core:if>
+                            <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd"/>
+                            <core:set value="${(milEnd - milStart)}" var="elapsedTime"/>
+                            <core:if test="${bDebugTimings}">
+                              <gel:out>Script Elapse #82: sec[${sdFmtElapseNum.format(elapsedTime/1000)}]</gel:out>
+                            </core:if>
+                            <!-- <core:set var="logMessage"  value="Script Elapse: ${sdFmtElapse.format(dteElapse)}" /><core:choose><core:when test="${gel_processId == null}"><gel:out>${logMessage}</gel:out></core:when><core:otherwise><gel:log level="INFO">${logMessage}</gel:log></core:otherwise></core:choose>  -->
+                          </core:catch>
+                          <core:if test="${not empty exvar2}">
+                            <gel:out/>
+                            <gel:out>__________________________________________________________________</gel:out>
+                            <core:set value="1 EXCEPTION: ${exvar2.getMessage()}" var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                            <core:if test="${bDebug}">
+                              <gel:out>ERROR - Exception: ${exvar2}</gel:out>
+                              <gel:out/>
+                            </core:if>
+                            <gel:out/>
+                            <gel:out>__________________________________________________________________</gel:out>
+                            <gel:out>__________________________________________________________________</gel:out>
+                            <!--
+        -->
+                            <core:new className="org.apache.commons.jelly.JellyTagException" var="exTag">
+                              <core:arg type="java.lang.Throwable" value="${exvar2}"/>
+                            </core:new>
+                            <gel:log level="INFO" message="ERROR - TAG Exception: ${exTag}"/>
+                            <gel:out>ERROR - TAG Exception: ${exTag}</gel:out>
+                            <gel:out/>
+                            <gel:out>__________________________________________________________________</gel:out>
+                            <gel:out>__________________________________________________________________</gel:out>
+                          </core:if>
+                          <core:invokeStatic className="java.lang.System" method="currentTimeMillis" var="milEnd"/>
+                          <core:set value="${(milEnd - milStart)}" var="elapsedTime"/>
+                          <core:new className="java.util.Date" var="dteElapse">
+                            <core:arg type="java.lang.Long" value="${elapsedTime}"/>
+                          </core:new>
+                          <core:if test="${bDebugTimings}">
+                            <gel:out/>
+                          </core:if>
+                          <core:set value="Script Elapse: ${sdFmtElapse.format(dteElapse)} sec[${sdFmtElapseNum.format(elapsedTime/1000)}]" var="logMessage"/>
+                          <core:choose>
+                            <core:when test="${gel_processId == null}">
+                              <gel:out>${logMessage}</gel:out>
+                            </core:when>
+                            <core:otherwise>
+                              <gel:log level="INFO">${logMessage}</gel:log>
+                            </core:otherwise>
+                          </core:choose>
+                          <core:if test="${bDebug}">
+                            <gel:out/>
+                            <gel:out>The End</gel:out>
+                            <gel:out/>
+                            <gel:out/>
+                            <gel:out/>
+                          </core:if>
+                        </gel:script>
+                      </scriptText>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

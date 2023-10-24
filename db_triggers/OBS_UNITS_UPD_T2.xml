@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>OBS_UNITS_UPD_T2</code>
+          <table_name>PRJ_OBS_UNITS</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."OBS_UNITS_UPD_T2" 
+BEFORE update
+  of id, parent_id
+ON PRJ_OBS_UNITS
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+
+  lock table obs_units_flat_by_mode in exclusive mode;
+
+  if ( nvl(:new.parent_id,-1) != nvl(:old.parent_id, -1) ) then
+    --
+    --  Remove all the parent references to nodes above me for my children
+    --
+    --
+    --  Unit is not one of my children, linked unit is a child
+    --
+    delete  obs_units_flat_by_mode
+    where   linked_unit_id in ( select  linked_unit_id
+                                from    obs_units_flat_by_mode
+                                where   unit_id = :old.id
+                                and     unit_mode = 'OBS_UNIT_AND_CHILDREN')
+    and     (unit_mode = 'OBS_UNIT_AND_CHILDREN'
+             or
+             unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS')
+    and     unit_id not in (select  linked_unit_id
+                            from    obs_units_flat_by_mode
+                            where   unit_id = :old.id
+                            and     unit_mode = 'OBS_UNIT_AND_CHILDREN');
+                                
+    --
+    --  Unit is one of my children, linked unit is an ancestor and not a child
+    --
+    delete  obs_units_flat_by_mode
+    where   unit_id in ( select linked_unit_id
+                         from   obs_units_flat_by_mode
+                         where  unit_id = :old.id
+                         and    unit_mode = 'OBS_UNIT_AND_CHILDREN')
+    and     (unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+             or
+             unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS')
+    and     linked_unit_id not in ( select  linked_unit_id
+                                    from    obs_units_flat_by_mode
+                                    where   unit_id = :old.id
+                                    and     unit_mode = 'OBS_UNIT_AND_CHILDREN');
+    
+    --
+    --  Remove all the child references for my parents
+    --
+    --
+    --  Linked unit is a parent, unit is a child
+    --
+    delete  obs_units_flat_by_mode
+    where   linked_unit_id in ( select  linked_unit_id
+                                from    obs_units_flat_by_mode
+                                where   unit_id = :old.id
+                                and     unit_mode = 'OBS_UNIT_AND_ANCESTORS')
+    and     unit_id in ( select   linked_unit_id
+                                from    obs_units_flat_by_mode
+                                where   unit_id = :old.id
+                                and     unit_mode = 'OBS_UNIT_AND_CHILDREN')
+    and     (unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+             or
+             unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS')
+    and     not ( unit_id = :old.id and linked_unit_id = :old.id);
+    
+    --
+    --  Linked unit is a child, unit is a parent
+    --
+    delete  obs_units_flat_by_mode
+    where   linked_unit_id in ( select  linked_unit_id
+                                from    obs_units_flat_by_mode
+                                where   unit_id = :old.id
+                                and     unit_mode = 'OBS_UNIT_AND_CHILDREN')
+    and     unit_id in ( select   linked_unit_id
+                                from    obs_units_flat_by_mode
+                                where   unit_id = :old.id
+                                and     unit_mode = 'OBS_UNIT_AND_ANCESTORS')
+    and     (unit_mode = 'OBS_UNIT_AND_CHILDREN'
+             or
+             unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS')
+    and     not ( unit_id = :old.id);
+
+    delete from obs_units_flat_by_mode
+    where   (unit_id = :old.id
+             or     
+              linked_unit_id = :old.id)
+    and     not (unit_id = linked_unit_id)
+    and     unit_mode != 'OBS_UNIT_AND_CHILDREN';             
+    --
+    --  Add this as a child for the parents
+    --
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  linked_unit_id,'OBS_UNIT_AND_CHILDREN', :old.id
+      from    obs_units_flat_by_mode
+      where   unit_id = :new.parent_id
+      and     unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  :old.id,'OBS_UNIT_AND_ANCESTORS', linked_unit_id
+      from    obs_units_flat_by_mode
+      where   unit_id = :new.parent_id
+      and     unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  linked_unit_id,'OBS_UNIT_CHILD_AND_ANCESTORS', :old.id
+      from    obs_units_flat_by_mode
+      where   unit_id = :new.parent_id
+      and     unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  :old.id,'OBS_UNIT_CHILD_AND_ANCESTORS', linked_unit_id
+      from    obs_units_flat_by_mode
+      where   unit_id = :new.parent_id
+      and     unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+    --
+    --  At this point the updated node is back in the tree
+    --
+    --
+    --  Now handle the children
+    --
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  p.linked_unit_id,'OBS_UNIT_AND_CHILDREN', c.linked_unit_id
+      from    obs_units_flat_by_mode c, obs_units_flat_by_mode p
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     p.unit_id = :new.parent_id
+      and     p.unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = c.linked_unit_id
+                           and    i.unit_id = p.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_AND_CHILDREN');
+    
+    --  Now the ancestor links
+    
+    --  All my children have all my ancestors as ancestors
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  c.linked_unit_id,'OBS_UNIT_AND_ANCESTORS', p.linked_unit_id
+      from    obs_units_flat_by_mode c, obs_units_flat_by_mode p
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     p.unit_id = :new.parent_id
+      and     p.unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = p.linked_unit_id
+                           and    i.unit_id = c.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_AND_ANCESTORS');
+    --  All my children have me as an ancestor
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  c.linked_unit_id,'OBS_UNIT_AND_ANCESTORS', :old.id
+      from    obs_units_flat_by_mode c
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = :old.id
+                           and    i.unit_id = c.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_AND_ANCESTORS');
+    --  All my children have themselves as an ancestor
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  c.linked_unit_id,'OBS_UNIT_AND_ANCESTORS', c.linked_unit_id
+      from    obs_units_flat_by_mode c
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = c.linked_unit_id
+                           and    i.unit_id = c.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_AND_ANCESTORS');
+
+    --
+    --  Now the combination of child and ancestor
+    --
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  c.linked_unit_id,'OBS_UNIT_CHILD_AND_ANCESTORS', p.linked_unit_id
+      from    obs_units_flat_by_mode c, obs_units_flat_by_mode p
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     p.unit_id = :old.id
+      and     p.unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = p.linked_unit_id
+                           and    i.unit_id = c.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS');
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  p.linked_unit_id,'OBS_UNIT_CHILD_AND_ANCESTORS', c.linked_unit_id
+      from    obs_units_flat_by_mode c, obs_units_flat_by_mode p
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     p.unit_id = :old.id
+      and     p.unit_mode = 'OBS_UNIT_AND_ANCESTORS'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = c.linked_unit_id
+                           and    i.unit_id = p.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS');
+    insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+      select  c.linked_unit_id,'OBS_UNIT_CHILD_AND_ANCESTORS', c.linked_unit_id
+      from    obs_units_flat_by_mode c
+      where   c.unit_id = :old.id
+      and     c.unit_mode = 'OBS_UNIT_AND_CHILDREN'
+      and     not exists ( select unit_id
+                           from   obs_units_flat_by_mode i
+                           where  i.linked_unit_id = c.linked_unit_id
+                           and    i.unit_id = c.linked_unit_id
+                           and    i.unit_mode = 'OBS_UNIT_CHILD_AND_ANCESTORS');
+
+    
+  end if;
+  
+  commit;
+  
+exception
+   when others
+   then
+      rollback;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

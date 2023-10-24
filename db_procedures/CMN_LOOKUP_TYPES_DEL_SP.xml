@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUP_TYPES_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUP_TYPES_DEL_SP" (P_LOOKUP_TYPE IN VARCHAR2)
+IS
+   V_ID                                     NUMBER;
+   V_CHILD_LOOKUP_TYPE    VARCHAR2( 255 );
+BEGIN
+   /* Delete lookup values first */
+   CMN_LOOKUPS_DEL_SP (NLS_UPPER(P_LOOKUP_TYPE), NULL);
+   /* Delete lookup type captions */
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_ID
+   FROM     CMN_LOOKUP_TYPES
+   WHERE    NLS_UPPER(LOOKUP_TYPE) = NLS_UPPER(P_LOOKUP_TYPE);
+   IF (V_ID != -9)
+   THEN
+      /* Delete Lookup Type captions */
+      CMN_CAPTIONS_NLS_DEL_SP ('CMN_LOOKUP_TYPES', V_ID);
+            
+      /* Delete Dependent Lookup Types, if any exists */
+      BEGIN
+        SELECT B.LOOKUP_TYPE_CODE INTO V_CHILD_LOOKUP_TYPE 
+          FROM CMN_LIST_OF_VALUES A, CMN_LIST_OF_VALUES B
+          WHERE UPPER( A.LOOKUP_TYPE_CODE ) = UPPER( P_LOOKUP_TYPE )
+          AND B.PARENT_ID = A.ID;
+        
+          EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            V_CHILD_LOOKUP_TYPE := NULL;
+     END;
+
+      
+      IF V_CHILD_LOOKUP_TYPE IS NOT NULL THEN
+        CMN_LOOKUP_TYPES_DEL_SP( V_CHILD_LOOKUP_TYPE );
+      END IF;
+
+      /* Delete from the lookup type hierarchy */
+      DELETE 
+        FROM CMN_LOV_FLAT_HIERS
+        WHERE NLS_UPPER(LOV_TYPE) = NLS_UPPER(P_LOOKUP_TYPE);
+        
+      /* Delete lookup type */
+      DELETE
+        FROM CMN_LOOKUP_TYPES
+       WHERE ID = V_ID;
+   END IF;
+
+	-- Now delete the ODF Lookup data too.
+	CMN_ODF_LOOKUP_DEL_SP (p_lookup_type); 
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

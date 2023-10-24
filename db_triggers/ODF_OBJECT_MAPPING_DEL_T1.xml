@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>ODF_OBJECT_MAPPING_DEL_T1</code>
+          <table_name>ODF_OBJECT_MAPPING</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."ODF_OBJECT_MAPPING_DEL_T1" 
+after delete
+on ODF_OBJECT_MAPPING
+referencing new as new old as old
+for each row
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+
+	lock table ODF_OBJECT_MAPPING_FLAT in exclusive mode;
+	--
+	--	remove all reference to this 
+	--
+      delete
+      from odf_object_mapping_flat
+      where obj_mapping_code = :old.mapping_code
+      or ancestor_obj_mapping_code = :old.mapping_code;
+	commit;
+	
+exception
+   when others
+   then
+      rollback;
+
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

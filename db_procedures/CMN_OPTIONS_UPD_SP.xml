@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_OPTIONS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_OPTIONS_UPD_SP" (
+   P_OPTION_CODE          IN   VARCHAR2,
+   P_OPTION_NAME          IN   VARCHAR2,
+   P_OPTION_DESCRIPTION   IN   VARCHAR2,
+   P_IS_SYSTEM            IN   NUMBER,
+   P_IS_ACTIVE            IN   NUMBER,
+   P_DATA_TYPE            IN   VARCHAR2,
+   P_API_ENABLED 		  IN   NUMBER,
+   P_MULTI 				  IN   NUMBER,
+   P_LAST_UPDATED_BY      IN   NUMBER DEFAULT 1
+   
+)
+IS
+   V_COUNT                       NUMBER;
+   V_ID                          NUMBER;
+BEGIN
+     SELECT   NVL (MAX (ID), -9)
+   INTO     V_ID
+   FROM     CMN_OPTIONS
+   WHERE    OPTION_CODE = P_OPTION_CODE;
+   IF (V_ID != -9)
+   THEN
+      UPDATE CMN_OPTIONS
+         SET IS_SYSTEM = P_IS_SYSTEM,
+             IS_ACTIVE = P_IS_ACTIVE,
+             LAST_UPDATED_DATE = SYSDATE,
+             LAST_UPDATED_BY = P_LAST_UPDATED_BY,
+             API_ENABLED = P_API_ENABLED,
+             MULTI_VALUED = P_MULTI,
+             DATA_TYPE = P_DATA_TYPE
+       WHERE ID = V_ID;
+      /* Find out if this lookup type was already translated */
+      SELECT   COUNT (DISTINCT (NAME || DESCRIPTION))
+      INTO     V_COUNT
+      FROM     CMN_CAPTIONS_NLS
+      WHERE    TABLE_NAME = 'CMN_OPTIONS'
+      AND      PK_ID = V_ID;
+      IF (V_COUNT &lt;= 1)/* Not translated yet */
+      THEN
+         CMN_CAPTIONS_NLS_UPD_SP (
+            'CMN_OPTIONS',
+            V_ID,
+            P_OPTION_NAME,
+            P_OPTION_DESCRIPTION,
+            P_LAST_UPDATED_BY
+         );
+      END IF;
+   END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

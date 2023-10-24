@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CRV_SEGMENT_SLICES_ROW_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CRV_SEGMENT_SLICES_ROW_FCT" ( p_id NUMBER, p_field_id NUMBER, p_scenario_id NUMBER )
+ RETURN CRV_SLICES PIPELINED
+  IS
+  BEGIN
+    FOR ao_rec IN (
+      select * from table( crv_sql_curve_pkg.segment_slices_row( p_id, p_field_id, p_scenario_id ) )
+    )
+    LOOP
+      pipe row( CRV_SLICE( ao_rec.id, ao_rec.field, ao_rec.scenario, ao_rec.period, ao_rec.start_date, ao_rec.finish_date, ao_rec.slice, ao_rec.calendar_key, ao_rec.period_name, ao_rec.group_by ) );
+    END LOOP;
+    RETURN;
+  END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

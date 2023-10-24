@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_SLICES_REORG_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_SLICES_REORG_SP" AS
+v_table_ts_name     VARCHAR2(255);
+v_n1_index_ts_name  VARCHAR2(255);
+v_n2_index_ts_name  VARCHAR2(255);
+v_u2_index_ts_name  VARCHAR2(255);
+
+v_default_ts_name   VARCHAR2(255);
+v_mv_log_exist      NUMBER;
+
+
+v_n1_index_exists      NUMBER;
+v_n2_index_exists      NUMBER;
+v_u1_index_exists      NUMBER;
+v_u2_index_exists      NUMBER;
+
+v_slice_table_exists   NUMBER;
+v_temp_table_exists    NUMBER;
+
+BEGIN
+
+    -- Check if MV exist for the table. This has been seen in some databases.
+    SELECT  COUNT(1)  into v_mv_log_exist  
+    FROM USER_MVIEW_LOGS
+    WHERE MASTER = 'PRJ_BLB_SLICES';
+    
+     -- get slice table exists
+    SELECT  COUNT(1)  into v_slice_table_exists  
+      FROM   user_tables   
+      WHERE table_name = 'PRJ_BLB_SLICES';
+      
+    -- get slice  temp table exists
+    SELECT  COUNT(1)  into v_temp_table_exists  
+      FROM   user_tables   
+      WHERE table_name = 'PRJ_BLB_SLICES_TEMP';      
+      
+    -- get slice table tablespace  
+    IF v_slice_table_exists &gt; 0 THEN      
+      SELECT tablespace_name into v_table_ts_name FROM   user_tables   WHERE  table_name = 'PRJ_BLB_SLICES';
+    END IF;
+    
+    -- get temp slice table tablespace  
+    IF v_temp_table_exists &gt; 0 THEN      
+      SELECT tablespace_name into v_table_ts_name FROM   user_tables   WHERE  table_name = 'PRJ_BLB_SLICES_TEMP';
+    END IF;    
+    
+    IF (v_temp_table_exists = 0 AND  v_slice_table_exists = 0) THEN
+      RAISE_APPLICATION_ERROR (-20000,'Cannot continue. Irrecoverable state. PRJ_BLB_SLICES table is gone');
+    END IF;
+
+    -- Handle the indexes
+    SELECT  COUNT(1)  into v_n1_index_exists  
+      FROM   user_indexes   
+      WHERE table_name = 'PRJ_BLB_SLICES'
+      AND index_name='PRJ_BLB_SLICES_N1';
+    
+    IF v_n1_index_exists &gt; 0 THEN    
+      SELECT tablespace_name  into v_n1_index_ts_name FROM   user_indexes   
+        WHERE      table_name = 'PRJ_BLB_SLICES' AND index_name='PRJ_BLB_SLICES_N1';
+        
+      CMN_DROP_INDEX_SP('PRJ_BLB_SLICES_N1');
+    END IF;
+    
+    SELECT  COUNT(1)  into v_n2_index_exists  
+      FROM   user_indexes   
+      WHERE table_name = 'PRJ_BLB_SLICES'
+      AND index_name='PRJ_BLB_SLICES_N2';
+    
+    IF v_n2_index_exists &gt; 0 THEN        
+      SELECT tablespace_name into v_n2_index_ts_name FROM   user_indexes   
+        WHERE      table_name = 'PRJ_BLB_SLICES' AND index_name='PRJ_BLB_SLICES_N2';
+        
+      CMN_DROP_INDEX_SP('PRJ_BLB_SLICES_N2'); 
+    END IF;
+    
+    SELECT  COUNT(1)  into v_u2_index_exists  
+      FROM   user_indexes   
+      WHERE table_name = 'PRJ_BLB_SLICES'
+      AND index_name='PRJ_BLB_SLICES_U2';
+    
+    IF v_u2_index_exists &gt; 0 THEN     
+      SELECT tablespace_name  into v_u2_index_ts_name FROM   user_indexes   
+        WHERE      table_name = 'PRJ_BLB_SLICES' AND index_name='PRJ_BLB_SLICES_U2';
+        
+      CMN_DROP_INDEX_SP('PRJ_BLB_SLICES_U2');
+    END IF;
+    
+    SELECT  COUNT(1)  into v_u1_index_exists  
+      FROM   user_indexes   
+      WHERE table_name = 'PRJ_BLB_SLICES'
+      AND index_name='PRJ_BLB_SLICES_U1';
+    
+    IF v_u1_index_exists &gt; 0 THEN  
+      CMN_DROP_INDEX_SP('PRJ_BLB_SLICES_U1');
+    END IF;    
+    
+    --Begin table reorganization
+    
+    IF v_mv_log_exist &gt; 0 THEN   
+		  DBMS_MVIEW.BEGIN_TABLE_REORGANIZATION(USER,'PRJ_BLB_SLICES');
+	  END IF;
+
+	  BEGIN
+      EXECUTE IMMEDIATE 'RENAME PRJ_BLB_SLICES  TO PRJ_BLB_SLICES_TEMP';
+      EXCEPTION   
+        WHEN OTHERS  THEN   
+        IF (SQLCODE != -955 AND SQLCODE != -4043) THEN 
+           IF v_mv_log_exist &gt; 0 THEN
+            DBMS_MVIEW.END_TABLE_REORGANIZATION(USER,'PRJ_BLB_SLICES');
+           END IF;
+           RAISE_APPLICATION_ERROR (-20000,'Error operating on PRJ_BLB_SLICES. Cannot create temp table. Refer to the Change Impact Guide for information : ' || SQLERRM);
+        END IF;      
+    END;    
+    
+    BEGIN  
+      EXECUTE IMMEDIATE 'CREATE TABLE PRJ_BLB_SLICES TABLESPACE ' || v_table_ts_name || ' NOLOGGING PARALLEL 4 AS SELECT SLICE_REQUEST_ID,PRJ_OBJECT_ID,SLICE_DATE,SLICE,CREATED_DATE FROM PRJ_BLB_SLICES_TEMP';
+      EXCEPTION
+       WHEN OTHERS  THEN 
+          EXECUTE IMMEDIATE 'RENAME PRJ_BLB_SLICES_TEMP TO PRJ_BLB_SLICES';
+          IF v_mv_log_exist &gt; 0 THEN
+              DBMS_MVIEW.END_TABLE_REORGANIZATION(USER,'PRJ_BLB_SLICES');
+          END IF;       
+          RAISE_APPLICATION_ERROR (-20000,'Error recreating PRJ_BLB_SLICES table. Refer to the Change Impact Guide for information : ' || SQLERRM);     
+    END;
+    
+    --End table reorganization after creating the table with required columns.
+    
+    IF v_mv_log_exist &gt; 0 THEN
+        DBMS_MVIEW.END_TABLE_REORGANIZATION(USER,'PRJ_BLB_SLICES');
+    END IF;
+    
+    -- Drop the temp table
+    CMN_DROP_TABLE_SP('PRJ_BLB_SLICES_TEMP');
+        
+    -- Recreate the indices
+    IF v_n1_index_exists &gt; 0 THEN
+      CMN_CREATE_INDEX_SP('PRJ_BLB_SLICES','PRJ_BLB_SLICES_N1','','PRJ_OBJECT_ID, SLICE_DATE, SLICE, SLICE_REQUEST_ID', v_n1_index_ts_name);
+    END IF;
+    IF v_n2_index_exists &gt; 0 THEN
+      CMN_CREATE_INDEX_SP('PRJ_BLB_SLICES','PRJ_BLB_SLICES_N2','','SLICE_REQUEST_ID, SLICE_DATE', v_n2_index_ts_name);
+    END IF; 
+    IF v_u2_index_exists &gt; 0 THEN
+      CMN_CREATE_INDEX_SP('PRJ_BLB_SLICES','PRJ_BLB_SLICES_U2','UNIQUE','SLICE_REQUEST_ID, PRJ_OBJECT_ID, SLICE_DATE',v_u2_index_ts_name);
+    END IF;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

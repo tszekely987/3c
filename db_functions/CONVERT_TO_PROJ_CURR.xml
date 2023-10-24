@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CONVERT_TO_PROJ_CURR</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CONVERT_TO_PROJ_CURR" (V_TRANS_NO IN PPA_WIP.TRANSNO%TYPE, V_TABLE_NAME IN VARCHAR2)
+    RETURN PAC_IMP_ACTUALS_EXPORT.TOT_COST_PRJ_CURR%TYPE
+IS
+
+   /*
+    This function takes transaction no and tablename(in UPPERCASE) as input and returns totalcost in 'Project currency'.
+    The transno should be available in the tablename that you specify in the second argument.
+    NOTE: This transno should be from one of these tables only PPA_WIP, PPA_TRANSWIPADJUST, PPA_TRANSCONTROL tables only.
+    Function CONVERT_TO_PROJ_CURR may return null, it is the function caller responsibility to handle the situation. 
+    It returns null in two possible cases
+                   a.	When the input given is wrong.
+                   b.	When there is no proper exchange rate defined.
+    */
+
+    /*
+    Local variables
+    */
+    V_EXCHANGE_RATE_REC  CMN_EXCHANGE_RATES%ROWTYPE;
+    V_TOT_COST_PROJ_CURR PAC_IMP_ACTUALS_EXPORT.TOT_COST_PRJ_CURR%TYPE;
+
+    V_PROJ_CURRENCY    INV_INVESTMENTS.CURRENCY_CODE%TYPE;
+    V_EXG_TYPE         PAC_MNT_PROJECTS.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+    V_HOME_CURRENCY    INV_INVESTMENTS.CURRENCY_CODE%TYPE;
+    V_TOT_COST_IN_HOME PPA_TRANSWIPADJUST_VALUES.TOTALCOST%TYPE;
+    V_TRANS_DATE        PPA_TRANSWIPADJUST.TRANSDATE%TYPE;
+    V_TRANSNO          PPA_TRANSWIPADJUST.TRANSNO%TYPE;
+    V_TRANS_TYPE        PPA_TRANSWIPADJUST.TRANSTYPE%TYPE;
+
+    BEGIN
+
+        /*
+        Function call with 'PPA_TRANSWIPADJUST' when adjusted transactions are approved.  
+        */
+
+        IF  V_TABLE_NAME = 'PPA_TRANSWIPADJUST' THEN
+        BEGIN
+
+        /*
+         If the transaction is adjusted then there will be two entries in the PPA_TRANSWIPADJUST.
+         One row with PPA_TRANSWIPADJUST.TRANSTYPE set to 'A' and other with 'L/Q/M/X' (resource type).
+         If PPA_TRANSWIPADJUST.TRANSTYPE = 'A' then, PPA_TRANSWIPADJUST.APPLYTO has a numeric = PPA_WIP.TRANSNO. Using this join we are fetching EXCHANGE_RATE_TYPE.
+         else when PPA_TRANSWIPADJUST.TRANSTYPE = 'L/Q/M/X' we will directly pick the EXCHANGE_RATE_TYPE from PPA_TRANSWIPADJUST table itself.
+         */
+            SELECT TRANSTYPE INTO V_TRANS_TYPE FROM PPA_TRANSWIPADJUST WHERE TRANSNO = V_TRANS_NO;
+
+            IF V_TRANS_TYPE NOT IN ('A', 'R') THEN
+            BEGIN
+                SELECT INV.CURRENCY_CODE,
+                    CASE A.TRANSTYPE
+                    WHEN 'L' THEN PAC_PRJ.LABOR_EXCHANGE_RATE_TYPE
+                    WHEN 'X' THEN PAC_PRJ.EXPENSE_EXCHANGE_RATE_TYPE
+                    WHEN 'M' THEN PAC_PRJ.MATERIALS_EXCHANGE_RATE_TYPE
+                    WHEN 'Q' THEN PAC_PRJ.EQUIPMENT_EXCHANGE_RATE_TYPE
+                    END,
+                    AV.CURRENCY_CODE, AV.TOTALCOST, A.TRANSDATE, A.TRANSNO INTO V_PROJ_CURRENCY, V_EXG_TYPE, V_HOME_CURRENCY, V_TOT_COST_IN_HOME, V_TRANS_DATE, V_TRANSNO
+                FROM PAC_MNT_PROJECTS PAC_PRJ, INV_INVESTMENTS INV, PPA_TRANSWIPADJUST A ,PPA_TRANSWIPADJUST_VALUES AV
+                WHERE A.PROJECT_CODE = UPPER(INV.CODE) AND PAC_PRJ.ID = INV.ID
+                    AND UPPER(AV.CURRENCY_TYPE) = 'HOME' AND A.TRANSNO = AV.TRANSNO
+                    AND A.PROJECT_CODE = PAC_PRJ.PROJECT_CODE
+                    AND AV.TRANSNO = V_TRANS_NO;
+                END;
+            ELSE
+            BEGIN
+            /* When V_TRANS_TYPE is 'L'/'Q'/'M'/'X' */
+                SELECT INV.CURRENCY_CODE,
+                    CASE W.TRANSTYPE
+                    WHEN 'L' THEN PAC_PRJ.LABOR_EXCHANGE_RATE_TYPE
+                    WHEN 'X' THEN PAC_PRJ.EXPENSE_EXCHANGE_RATE_TYPE
+                    WHEN 'M' THEN PAC_PRJ.MATERIALS_EXCHANGE_RATE_TYPE
+                    WHEN 'Q' THEN PAC_PRJ.EQUIPMENT_EXCHANGE_RATE_TYPE
+                    END,
+                    AV.CURRENCY_CODE, AV.TOTALCOST, A.TRANSDATE, A.TRANSNO INTO V_PROJ_CURRENCY, V_EXG_TYPE, V_HOME_CURRENCY, V_TOT_COST_IN_HOME, V_TRANS_DATE, V_TRANSNO
+                FROM PAC_MNT_PROJECTS PAC_PRJ, INV_INVESTMENTS INV, PPA_TRANSWIPADJUST A ,PPA_TRANSWIPADJUST_VALUES AV, PPA_WIP W
+                WHERE A.PROJECT_CODE = UPPER(INV.CODE) AND PAC_PRJ.ID = INV.ID
+                    AND UPPER(AV.CURRENCY_TYPE) = 'HOME' AND A.TRANSNO = AV.TRANSNO
+                    AND A.EXTERNALTRANSNO = W.EXTERNALTRANSNO
+                    AND A.PROJECT_CODE = PAC_PRJ.PROJECT_CODE
+                    AND A.BATCHNO = W.BATCHNO
+                    AND A.APPLYTO = W.TRANSNO
+                    AND AV.TRANSNO = V_TRANS_NO;
+            END;
+            END IF;
+        END;
+        /*
+        Function call with parameter 'PPA_WIP' is used in upgrade scenario.
+        */
+        ELSIF V_TABLE_NAME = 'PPA_WIP' THEN
+        BEGIN
+            SELECT INV.CURRENCY_CODE,
+                CASE W.TRANSTYPE
+                WHEN 'L' THEN PAC_PRJ.LABOR_EXCHANGE_RATE_TYPE
+                WHEN 'X' THEN PAC_PRJ.EXPENSE_EXCHANGE_RATE_TYPE
+                WHEN 'M' THEN PAC_PRJ.MATERIALS_EXCHANGE_RATE_TYPE
+                WHEN 'Q' THEN PAC_PRJ.EQUIPMENT_EXCHANGE_RATE_TYPE
+                END,
+                WV.CURRENCY_CODE, WV.TOTALCOST, W.TRANSDATE, W.TRANSNO INTO V_PROJ_CURRENCY, V_EXG_TYPE, V_HOME_CURRENCY, V_TOT_COST_IN_HOME, V_TRANS_DATE, V_TRANSNO
+            FROM PAC_MNT_PROJECTS PAC_PRJ, INV_INVESTMENTS INV, PPA_WIP W ,PPA_WIP_VALUES WV
+            WHERE W.PROJECT_CODE = UPPER(INV.CODE) AND PAC_PRJ.ID = INV.ID
+                AND UPPER(WV.CURRENCY_TYPE) = 'HOME' AND W.TRANSNO = WV.TRANSNO
+                AND W.PROJECT_CODE = PAC_PRJ.PROJECT_CODE
+                AND WV.TRANSNO = V_TRANS_NO;
+        END;
+        /*
+        Function call with parameter 'PPA_TRANSCONTROL' is used when transactions are posted to wip.
+        */
+        ELSIF V_TABLE_NAME = 'PPA_TRANSCONTROL' THEN
+        BEGIN
+            SELECT INV.CURRENCY_CODE,
+                CASE T.TRANSTYPE
+                WHEN 'L' THEN PAC_PRJ.LABOR_EXCHANGE_RATE_TYPE
+                WHEN 'X' THEN PAC_PRJ.EXPENSE_EXCHANGE_RATE_TYPE
+                WHEN 'M' THEN PAC_PRJ.MATERIALS_EXCHANGE_RATE_TYPE
+                WHEN 'Q' THEN PAC_PRJ.EQUIPMENT_EXCHANGE_RATE_TYPE
+                END,
+                TV.CURRENCY_CODE, TV.TOTALCOST, T.TRANSDATE, T.TRANSNO INTO V_PROJ_CURRENCY, V_EXG_TYPE, V_HOME_CURRENCY, V_TOT_COST_IN_HOME, V_TRANS_DATE, V_TRANSNO
+            FROM PAC_MNT_PROJECTS PAC_PRJ, INV_INVESTMENTS INV, PPA_TRANSCONTROL T ,PPA_TRANSCONTROL_VALUES TV
+            WHERE T.PROJECT_CODE = UPPER(INV.CODE) AND PAC_PRJ.ID = INV.ID
+                AND UPPER(TV.CURRENCY_TYPE) = 'HOME' AND T.TRANSNO = TV.TRANSNO
+                AND T.PROJECT_CODE = PAC_PRJ.PROJECT_CODE
+                AND TV.TRANSNO = V_TRANS_NO;
+        END;
+        END IF;
+
+        --DBMS_OUTPUT.PUT_LINE(  'From home currency "' || V_HOME_CURRENCY || '" to project currency "' || V_PROJ_CURRENCY || '" using exchange ' || V_EXG_TYPE || ' on total cost ' || V_TOT_COST_IN_HOME || ' on date ' || V_TRANS_DATE || ' with transno ' || V_TRANSNO || ' in table ' || V_TABLE_NAME || '.');
+
+        /*
+         Function CMN_EXCH_NONTRIANGULATION_FCT will take 'effectivedate, fromcurrency, tocurrency, 'Average'' as input parameters and return the  CALCULATION_METHOD and MULTIPLE_FACTOR.
+        */
+        IF NOT (V_TRANS_DATE IS NULL AND V_HOME_CURRENCY IS NULL AND V_PROJ_CURRENCY IS NULL AND V_EXG_TYPE IS NULL AND V_TOT_COST_IN_HOME IS NULL) THEN
+          V_EXCHANGE_RATE_REC := CMN_EXCHANGERATE_PKG.CMN_EXCH_NONTRIANGULATION_FCT ( V_TRANS_DATE, V_HOME_CURRENCY, V_PROJ_CURRENCY, V_EXG_TYPE );
+
+          /*
+          Using the CALCULATION_METHOD and MULTIPLEFACTOR, we calculate total cost of project currency.
+          */
+          IF V_EXCHANGE_RATE_REC.CALCULATION_METHOD = 'MULTIPLY' THEN
+              V_TOT_COST_PROJ_CURR := V_TOT_COST_IN_HOME * V_EXCHANGE_RATE_REC.RATE;
+          ELSIF V_EXCHANGE_RATE_REC.CALCULATION_METHOD = 'DIVIDE' THEN
+              V_TOT_COST_PROJ_CURR := V_TOT_COST_IN_HOME / V_EXCHANGE_RATE_REC.RATE;
+          END IF;
+        END IF;
+        
+        RETURN V_TOT_COST_PROJ_CURR;
+    END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

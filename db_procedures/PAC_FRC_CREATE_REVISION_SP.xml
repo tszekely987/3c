@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_CREATE_REVISION_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_CREATE_REVISION_SP" 
+(
+  PROJECT_ID       NUMBER,
+  USER_ID          NUMBER,
+  FORECAST_TYPE	   NUMBER,
+  FORECAST_ID OUT  NUMBER
+)
+AS
+  REVISION_STATUS  NUMBER;
+  REVISION_NUMBER  NUMBER;
+  SYSTEM_DATE      DATE;
+  FROM_PROJECT     NUMBER := 0;
+  FROM_REVISION    NUMBER := 0;
+  FROM_FORECAST    NUMBER;
+  NEW_FORECAST_ID  NUMBER;
+
+  -- variables for system defaults
+  V_PERIOD_TYPE VARCHAR2(30);
+  V_START_PERIOD NUMBER;
+  V_END_PERIOD NUMBER;
+  V_UNIT_OF_MEASURE VARCHAR2(30);
+  V_BUSINESS_UNIT_NUMBER NUMBER;
+  V_USE_DETAIL_TYPE NUMBER;
+  V_DEFAULT_VIEW VARCHAR2(30);
+  V_SHOW_UNITS NUMBER;
+  V_SHOW_COST NUMBER;
+  V_SHOW_REVENUE NUMBER;
+  V_EDIT_UNITS NUMBER;
+  V_EDIT_COST NUMBER;
+  V_EDIT_REVENUE NUMBER;
+  V_PERIODS_PER_SCREEN NUMBER;
+  V_CURRENCY_TYPE VARCHAR2(30);
+  
+  V_CREATED_DATE DATE;
+  V_LAST_UPDATED_DATE DATE;
+
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+BEGIN
+
+  -- Get the current plan revision
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    SELECT MAX(REVISION)
+      INTO PAC_FRC_CREATE_REVISION_SP.REVISION_NUMBER
+      FROM PAC_FRC_FORECAST_PROPERTIES
+     WHERE PROJECT_ID = PAC_FRC_CREATE_REVISION_SP.PROJECT_ID
+	 AND FORECAST_TYPE = PAC_FRC_CREATE_REVISION_SP.FORECAST_TYPE;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(-20963, 'Error retrieving the financial plan properties for this project.');
+      RETURN;
+  END;
+
+
+  PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE := SYSDATE ;
+
+  -- if there isnt a revision out there, create a new one.
+  IF PAC_FRC_CREATE_REVISION_SP.REVISION_NUMBER IS NULL THEN
+    BEGIN
+	  RAISE_APPLICATION_ERROR(-20963, 'Error retrieving the financial plan properties for this project.');
+    END;
+  ELSE
+    BEGIN
+      -- get the forecast id and status
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        SELECT ID,
+               STATUS,
+			   CREATED_DATE,
+			   LAST_UPDATED_DATE
+          INTO PAC_FRC_CREATE_REVISION_SP.FROM_FORECAST,
+               PAC_FRC_CREATE_REVISION_SP.REVISION_STATUS,
+			   PAC_FRC_CREATE_REVISION_SP.V_CREATED_DATE,
+			   PAC_FRC_CREATE_REVISION_SP.V_LAST_UPDATED_DATE
+          FROM PAC_FRC_FORECAST_PROPERTIES
+         WHERE PROJECT_ID = PAC_FRC_CREATE_REVISION_SP.PROJECT_ID
+           AND REVISION = PAC_FRC_CREATE_REVISION_SP.REVISION_NUMBER
+		   AND FORECAST_TYPE = PAC_FRC_CREATE_REVISION_SP.FORECAST_TYPE;
+      EXCEPTION
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          RAISE_APPLICATION_ERROR(-20964, 'Error retrieving the financial plan status for this project.');
+          RETURN;
+      END;
+
+	  -- if plan revision is not approved then raise an error
+      IF REVISION_STATUS &lt;= 1 THEN
+            RAISE_APPLICATION_ERROR(-20965, 'There is already a new financial plan revision that has not been approved.');          
+      ELSE
+        BEGIN
+          FROM_PROJECT := PROJECT_ID;
+          FROM_REVISION := REVISION_NUMBER;
+          REVISION_NUMBER := REVISION_NUMBER + 1;
+        END;
+      END IF;
+    END;
+  END IF;  
+
+  -- get the ID for the forecast properties table
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    SELECT PAC_FRC_FORECAST_PROPERTIES_S1.NEXTVAL
+      INTO NEW_FORECAST_ID
+      FROM DUAL;
+    EXCEPTION
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+        RAISE_APPLICATION_ERROR(-20966, 'Error retrieving the financial plan id for this project.');
+        RETURN;
+  END;
+ 
+    -- copy from the last revision
+   BEGIN
+     StoO_error   := 0;
+     StoO_rowcnt  := 0;
+
+     INSERT INTO PAC_FRC_FORECAST_PROPERTIES
+     (
+       ID,
+       PROJECT_ID,
+       REVISION,
+       REVISION_DESCRIPTION,
+       STATUS,
+       PERIOD_TYPE,
+       START_PERIOD,
+       END_PERIOD,
+       UNIT_OF_MEASURE,
+       BUSINESS_UNIT_NUMBER,
+       USE_DETAIL_TYPE,
+       DEFAULT_VIEW,
+       SHOW_UNITS,
+       SHOW_COST,
+       SHOW_REVENUE,
+       EDIT_UNITS,
+       EDIT_COST,
+       EDIT_REVENUE,
+       PERIODS_PER_SCREEN,
+       CURRENCY_TYPE,
+ 	   FORECAST_TYPE,
+       CREATED_DATE,
+       CREATED_BY,
+       LAST_UPDATED_DATE,
+       LAST_UPDATED_BY
+     )
+     SELECT
+       PAC_FRC_CREATE_REVISION_SP.NEW_FORECAST_ID,
+       PAC_FRC_CREATE_REVISION_SP.PROJECT_ID,
+       PAC_FRC_CREATE_REVISION_SP.REVISION_NUMBER,
+       NULL,  -- REVISION_DESCRIPTION
+       0,
+       PERIOD_TYPE,
+       START_PERIOD,
+       END_PERIOD,
+       UNIT_OF_MEASURE,
+       BUSINESS_UNIT_NUMBER,
+       USE_DETAIL_TYPE,
+       DEFAULT_VIEW,
+       SHOW_UNITS,
+       SHOW_COST,
+       SHOW_REVENUE,
+       EDIT_UNITS,
+       EDIT_COST,
+       EDIT_REVENUE,
+       PERIODS_PER_SCREEN,
+       CURRENCY_TYPE,
+ 	   PAC_FRC_CREATE_REVISION_SP.FORECAST_TYPE,
+       PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+       PAC_FRC_CREATE_REVISION_SP.USER_ID,
+       PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+       PAC_FRC_CREATE_REVISION_SP.USER_ID
+     FROM PAC_FRC_FORECAST_PROPERTIES
+   	 WHERE PROJECT_ID = PAC_FRC_CREATE_REVISION_SP.FROM_PROJECT
+     AND REVISION = PAC_FRC_CREATE_REVISION_SP.FROM_REVISION
+	 AND FORECAST_TYPE = PAC_FRC_CREATE_REVISION_SP.FORECAST_TYPE;
+   
+   EXCEPTION
+--      WHEN NO_DATA_FOUND THEN
+--        NULL;
+     WHEN OTHERS THEN
+       StoO_error := SQLCODE;
+       StoO_errmsg := SQLERRM;
+       RAISE_APPLICATION_ERROR(-20969, 'Error copying the financial plan properties.');
+       RETURN;
+   END;
+
+   BEGIN
+     -- copy the default transaction classes
+     INSERT INTO PAC_FRC_PROJ_ASSOC
+     (
+       ID,
+       FORECAST_ID,
+       DETAIL_ID,
+ 	   DETAIL2_ID,
+ 	   SORT_ORDER,
+ 	   CREATED_DATE,
+       CREATED_BY,
+       LAST_UPDATED_DATE,
+       LAST_UPDATED_BY
+     )
+     SELECT PAC_FRC_PROJ_ASSOC_S1.NEXTVAL,
+            PAC_FRC_CREATE_REVISION_SP.NEW_FORECAST_ID,
+            DETAIL_ID,
+   			DETAIL2_ID,
+   			SORT_ORDER,
+            PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+            PAC_FRC_CREATE_REVISION_SP.USER_ID,
+            PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+            PAC_FRC_CREATE_REVISION_SP.USER_ID
+       FROM PAC_FRC_PROJ_ASSOC
+      WHERE FORECAST_ID = PAC_FRC_CREATE_REVISION_SP.FROM_FORECAST;
+      EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+         NULL;
+       WHEN OTHERS THEN
+         StoO_error := SQLCODE;
+         StoO_errmsg := SQLERRM;
+         RAISE_APPLICATION_ERROR(-20970, 'Error copying the details for this plan');
+         RETURN;
+   END;
+  
+  -- if this wasn't a new revision, copy the old values too
+  IF REVISION_NUMBER &lt;&gt; 0 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        INSERT INTO PAC_FRC_FORECAST_DETAILS
+        (
+          ID,
+          FORECAST_ID,
+          PERIOD_ID,
+          DETAIL_ID,
+		  DETAIL2_ID,
+          UNITS,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        SELECT PAC_FRC_FORECAST_DETAILS_S1.NEXTVAL,
+              PAC_FRC_CREATE_REVISION_SP.NEW_FORECAST_ID,
+              PERIOD_ID,
+              DETAIL_ID,
+			  DETAIL2_ID,
+              UNITS,
+              PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+              PAC_FRC_CREATE_REVISION_SP.USER_ID,
+              PAC_FRC_CREATE_REVISION_SP.SYSTEM_DATE,
+              PAC_FRC_CREATE_REVISION_SP.USER_ID
+          FROM PAC_FRC_FORECAST_DETAILS
+        WHERE FORECAST_ID = FROM_FORECAST
+        ;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            RAISE_APPLICATION_ERROR(-20973, 'Error copying the financial plan details.');
+            RETURN;
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        INSERT INTO PAC_FRC_FORECAST_VALUES
+        (
+          ID,
+          FORECAST_DETAILS_ID,
+          CURRENCY_TYPE,
+          CURRENCY_CODE,
+          COST,
+          REVENUE,
+          ACTUAL_BENEFITS
+        )
+        SELECT PAC_FRC_FORECAST_VALUES_S1.NEXTVAL,
+              DN.ID,
+              V.CURRENCY_TYPE,
+              V.CURRENCY_CODE,
+              V.COST,
+              V.REVENUE,
+              V.ACTUAL_BENEFITS
+          FROM PAC_FRC_FORECAST_DETAILS D,
+	  	   PAC_FRC_FORECAST_DETAILS DN, --New Forecast to get proper ID
+               PAC_FRC_FORECAST_VALUES V
+		WHERE D.FORECAST_ID = FROM_FORECAST
+	      AND V.FORECAST_DETAILS_ID = D.ID
+		  AND DN.FORECAST_ID = PAC_FRC_CREATE_REVISION_SP.NEW_FORECAST_ID
+		  AND DN.PERIOD_ID = D.PERIOD_ID
+		  AND DN.DETAIL_ID = D.DETAIL_ID 
+		  AND (D.DETAIL2_ID IS NULL or D.DETAIL2_ID=DN.DETAIL2_ID);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            RAISE_APPLICATION_ERROR(-20974, 'Error copying the financial plan values.');
+            RETURN;
+      END;
+    END;
+  END IF;
+  FORECAST_ID := NEW_FORECAST_ID;
+END PAC_FRC_CREATE_REVISION_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

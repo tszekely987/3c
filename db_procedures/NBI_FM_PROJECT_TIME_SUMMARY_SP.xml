@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_FM_PROJECT_TIME_SUMMARY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_FM_PROJECT_TIME_SUMMARY_SP" (P_PERIODS_TO_ROLL_UP INTEGER)
+    AS
+       -- Dimension Variables
+       V_TIME_TYPE_IDX               INTEGER;
+       V_TIME_TYPE                   VARCHAR2 (20);
+       V_ROLLUP_FROM_TIME_TYPE       VARCHAR2 (20);
+       V_SQL                         VARCHAR2 (32000);
+       V_IDX                         INTEGER;
+       V_NUM_RECORDS                 INTEGER;
+       V_FISCAL_TIME_KEY             VARCHAR2 (20);
+       V_TIME_SQL                    VARCHAR2 (32000);
+       V_START_TIME                  DATE;
+       V_END_TIME                    DATE;
+       V_ROWID                       VARCHAR2 (100);
+       V_COMMIT_CNT                  INTEGER := 1000;
+       V_STMT                        VARCHAR2 (200);
+       V_PROCESS_FROM_DATE           DATE;
+       V_CNT                         INTEGER;
+       T_TIME_TAB                    NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE;
+
+       TYPE T_ROLLUP_CURSOR IS REF CURSOR;-- define weak REF CURSOR type
+
+       TYPE T_DELETE_CURSOR IS REF CURSOR;-- define weak REF CURSOR type
+
+       C_ROLLUP_CURSOR               T_ROLLUP_CURSOR;-- declare cursor variable
+       C_ROLLUP_REC                  NBI_FM_PROJECT_TIME_SUMMARY%ROWTYPE;
+       C_DELETE_CURSOR               T_DELETE_CURSOR;
+
+       CURSOR C_PERIODS
+       IS
+          SELECT   PERIOD_KEY
+          FROM     NBI_DIM_FISCAL_TIME
+          WHERE    HIERARCHY_LEVEL = 'PERIOD'
+           ORDER BY YEAR DESC,
+                    PERIOD DESC;
+
+       CURSOR C_ROLLUP_SQL
+       IS
+          SELECT   SQL_STATEMENT
+          FROM     NBI_ROLLUP_SQL
+          WHERE    TABLE_NAME = 'NBI_FM_PROJECT_TIME_SUMMARY'
+           ORDER BY DECODE (TIME_TYPE, 'PERIOD', 1, 'QUARTER', 2, 'YEAR', 3, 4);
+
+       /* CURSOR C_UPDATE_EOP_MEASURES
+       IS
+          SELECT   HIERARCHY_LEVEL,
+                   YEAR_KEY PERIOD,
+                   QUARTER_KEY LAST_CHILD_PERIOD
+          FROM     NBI_DIM_FISCAL_TIME T
+          WHERE    HIERARCHY_LEVEL = 'QUARTER'
+          AND      QUARTER =
+                    (SELECT   MAX (QUARTER)
+                     FROM     NBI_DIM_FISCAL_TIME T1
+                     WHERE    T1.HIERARCHY_LEVEL = 'QUARTER'
+                     AND      T1.YEAR = T.YEAR
+                     AND      T1.TIME_KEY IN (SELECT DISTINCT   FISCAL_TIME_KEY
+                                              FROM     NBI_FM_PROJECT_TIME_SUMMARY))
+          UNION
+          SELECT   HIERARCHY_LEVEL,
+                   QUARTER_KEY PERIOD,
+                   PERIOD_KEY LAST_CHILD_PERIOD
+          FROM     NBI_DIM_FISCAL_TIME T
+          WHERE    HIERARCHY_LEVEL = 'PERIOD'
+          AND      PERIOD =
+                    (SELECT   MAX (PERIOD)
+                     FROM     NBI_DIM_FISCAL_TIME T1
+                     WHERE    T1.HIERARCHY_LEVEL = 'PERIOD'
+                     AND      T1.QUARTER = T.QUARTER
+                     AND      T1.YEAR = T.YEAR
+                     AND      T1.TIME_KEY IN (SELECT DISTINCT   FISCAL_TIME_KEY
+                                              FROM     NBI_FM_PROJECT_TIME_SUMMARY))
+           ORDER BY 1;*/
+
+       CURSOR C_DELETE_SUMMARY
+       IS
+          SELECT   TIME_KEY
+          FROM     NBI_DIM_CALENDAR_TIME
+          WHERE    HIERARCHY_LEVEL IN ('QUARTER', 'YEAR');
+
+       TYPE T_INDEX_DEF_TAB IS TABLE OF VARCHAR2 (32000) INDEX BY BINARY_INTEGER;
+       V_INDEX_DEF T_INDEX_DEF_TAB;
+
+    BEGIN
+       /* Clean out rollup SQL table */
+       V_STMT := 'Deleting nbi_rollup_sql';
+
+       DELETE
+         FROM NBI_ROLLUP_SQL
+        WHERE TABLE_NAME = 'NBI_FM_PROJECT_TIME_SUMMARY';
+
+       COMMIT;
+       SELECT   COUNT (*)
+       INTO     V_CNT
+       FROM     NBI_FM_PT_FACTS;
+
+       IF V_CNT &lt;&gt; 0
+       THEN
+          /* Clean out quarter and year information before we roll it up again */
+          V_STMT := 'Cleaning out quarter and year information before rolling up';
+
+          FOR C_DELETE_REC IN C_DELETE_SUMMARY
+          LOOP
+             DELETE
+               FROM NBI_FM_PROJECT_TIME_SUMMARY
+              WHERE FISCAL_TIME_KEY = C_DELETE_REC.TIME_KEY;
+
+             COMMIT;
+          END LOOP;
+
+          /* Build rollup SQL */
+          V_STMT := 'Building rollup SQL';
+
+          FOR V_TIME_TYPE_IDX IN 0 .. 3
+          LOOP
+             SELECT   DECODE (V_TIME_TYPE_IDX, 0, 'PERIOD', 1, 'QUARTER', 2, 'YEAR', 'NA')
+             INTO     V_TIME_TYPE
+             FROM     DUAL;
+             SELECT   DECODE (V_TIME_TYPE, 'PERIOD', 'PERIOD', 'QUARTER', 'PERIOD', 'YEAR', 'QUARTER', 'PERIOD')
+             INTO     V_ROLLUP_FROM_TIME_TYPE
+             FROM     DUAL;
+             /* To roll up periods, we only select the last X periods. Need to prepare dynamic SQL string for those last x periods */
+             /* Quarter and Years are rolled up from periods and quarters respectively */
+
+             V_TIME_SQL := NULL;
+             V_STMT := 'Building string of periods that need to be rolled up again';
+
+             IF V_TIME_TYPE = 'PERIOD'
+             THEN
+                NBI_GET_ROLLUP_TIME_INFO_SP (
+                   'NBI_FM_PROJECT_TIME_SUMMARY',
+                   P_PERIODS_TO_ROLL_UP,
+                   'PERIOD',
+                   V_TIME_SQL,
+                   V_PROCESS_FROM_DATE,
+                   T_TIME_TAB
+                );
+                /* Clean out PERIOD records for the PERIOD series so we can insert them back in later */
+
+                V_STMT := 'Deleting periods that need to be rolled up again';
+
+                FOR V_IDX IN T_TIME_TAB.FIRST .. T_TIME_TAB.LAST
+                LOOP
+                   DELETE
+                     FROM NBI_FM_PROJECT_TIME_SUMMARY
+                    WHERE FISCAL_TIME_KEY = T_TIME_TAB (V_IDX);
+
+                   COMMIT;
+                END LOOP;
+             END IF;
+
+             /* If rolling periods, we're going to roll up from NBI_FM_PROJECT_TIME_FACTS. Quarters and years
+                are rolled up from NBI_FM_PROJECT_TIME_FACTS instead so they will be outside of this inner loop - they're
+                being processed in the time_type loop */
+             V_STMT := 'Building actual rollup SQL for periods';
+
+             IF V_TIME_TYPE = 'PERIOD'
+             THEN
+                FOR V_IDX IN 0 .. T_TIME_TAB.LAST
+                LOOP
+                   V_SQL :=
+                     'SELECT t.' || V_TIME_TYPE || '_key FISCAL_TIME_KEY, ' || 'OBS1.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS2.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS3.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS4.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS5.PARENT_OBS_UNIT_ID, ' ||
+                        'SUM(BUDGET_HOURS) BUDGET_HOURS, ' ||
+                        'SUM(ACTUAL_HOURS) ACTUAL_HOURS, ' ||
+                        'SUM(REV_BUDGET_LABOR) REV_BUDGET_LABOR, ' ||
+                        'SUM(REV_BUDGET_EQUIP) REV_BUDGET_EQUIP, ' ||
+                        'SUM(REV_BUDGET_EXPENSE) REV_BUDGET_EXPENSE, ' ||
+                        CHR (10) ||
+                        'SUM(REV_BUDGET_MATL) REV_BUDGET_MATL, ' ||
+                        'SUM(REV_BUDGET_TOTAL) REV_BUDGET_TOTAL, ' ||
+                        'SUM(COST_BUDGET_LABOR) COST_BUDGET_LABOR, ' ||
+                        'SUM(COST_BUDGET_EQUIP) COST_BUDGET_EQUIP, ' ||
+                        'SUM(COST_BUDGET_EXPENSE) COST_BUDGET_EXPENSE, ' ||
+                        CHR (10) ||
+                        'SUM(COST_BUDGET_MATL) COST_BUDGET_MATL, ' ||
+                        'SUM(COST_BUDGET_TOTAL) COST_BUDGET_TOTAL, ' ||
+                        'SUM(ACT_BILLING) ACT_BILLING, ' ||
+                        'SUM(REV_ACT_LABOR) REV_ACT_LABOR, ' ||
+                        'SUM(REV_ACT_EQUIP) REV_ACT_EQUIP, ' ||
+                        CHR (10) ||
+                        'SUM(REV_ACT_EXPENSE) REV_ACT_EXPENSE, ' ||
+                        'SUM(REV_ACT_MATL) REV_ACT_MATL, ' ||
+                        'SUM(REV_ACT_TOTAL) REV_ACT_TOTAL, ' ||
+                        'SUM(COST_ACT_LABOR) COST_ACT_LABOR, ' ||
+                        'SUM(COST_ACT_EQUIP) COST_ACT_EQUIP, ' ||
+                        CHR (10) ||
+                        'SUM(COST_ACT_EXPENSE) COST_ACT_EXPENSE, ' ||
+                        'SUM(COST_ACT_MATL) COST_ACT_MATL, ' ||
+                        'SUM(COST_ACT_TOTAL) COST_ACT_TOTAL, ' ||
+                        'SUM(COST_TO_COMPLETE) COST_TO_COMPLETE, ' ||
+                        'AVG(PCT_BUDGET_EXPENDED) AVERAGE_PCT_BUDGET_EXPENDED, ' ||
+                        CHR (10) ||
+                        'AVG(BUDGET_MARGIN) AVERAGE_BUDGET_MARGIN, ' ||
+                        'MAX(CURRENCY_CODE) CURRENCY_CODE ' ||
+                        CHR (10) ||
+                        'FROM NBI_DIM_FISCAL_TIME t, nbi_FM_project_time_facts f, nbi_dim_obs_flat obs1, nbi_dim_obs_flat obs2, ' ||
+                        CHR (10) ||
+                        '     nbi_dim_obs_flat obs3, nbi_dim_obs_flat obs4, nbi_dim_obs_flat obs5 ' ||
+                        CHR (10) ||
+                        'WHERE f.obs1_unit_id = obs1.child_obs_unit_id(+) ' ||
+                        CHR (10) ||
+                        'AND f.obs2_unit_id = obs2.child_obs_unit_id(+) ' ||
+                        CHR (10) ||
+                        'AND f.obs3_unit_id = obs3.child_obs_unit_id(+) ' ||
+                        CHR (10) ||
+                        'AND f.obs4_unit_id = obs4.child_obs_unit_id(+) ' ||
+                        CHR (10) ||
+                        'AND f.obs5_unit_id = obs5.child_obs_unit_id(+) ' ||
+                        CHR (10) ||
+                        'and t.time_key = f.FISCAL_TIME_KEY ' ||
+                        'and t.hierarchy_level = ''' ||
+                        V_ROLLUP_FROM_TIME_TYPE ||
+                        '''' ||
+                        'and f.FISCAL_TIME_KEY = ''' ||
+                        T_TIME_TAB (V_IDX) ||
+                        '''' ||
+                        CHR (10) ||
+                        ' GROUP BY t.' ||
+                        V_TIME_TYPE ||
+                        '_key, ' ||
+                        'OBS1.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS2.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS3.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS4.PARENT_OBS_UNIT_ID, ' ||
+                        'OBS5.PARENT_OBS_UNIT_ID ' ||
+                        CHR (10) ||
+                        ' having sum(actual_hours) is not null';
+
+                   INSERT INTO NBI_ROLLUP_SQL
+                               (TABLE_NAME, TIME_TYPE, SQL_STATEMENT, TIME_IN_SECS)
+                        VALUES ('NBI_FM_PROJECT_TIME_SUMMARY', V_TIME_TYPE, V_SQL, NULL);
+                END LOOP;
+
+                COMMIT;
+             END IF;
+
+             V_STMT := 'Building actual rollup SQL for quarters and years';
+
+             IF V_TIME_TYPE IN ('QUARTER', 'YEAR')
+             THEN
+                V_SQL :=
+                  'SELECT t.' || V_TIME_TYPE || '_key FISCAL_TIME_KEY, ' ||
+                     'f.obs1_unit_id, f.obs2_unit_id, f.obs3_unit_id, f.obs4_unit_id, f.obs5_unit_id, ' ||
+                     'SUM(BUDGET_HOURS) BUDGET_HOURS, ' ||
+                     'SUM(ACTUAL_HOURS) ACTUAL_HOURS, ' ||
+                     'SUM(REV_BUDGET_LABOR) REV_BUDGET_LABOR, ' ||
+                     'SUM(REV_BUDGET_EQUIP) REV_BUDGET_EQUIP, ' ||
+                     'SUM(REV_BUDGET_EXPENSE) REV_BUDGET_EXPENSE, ' ||
+                     CHR (10) ||
+                     'SUM(REV_BUDGET_MATL) REV_BUDGET_MATL, ' ||
+                     'SUM(REV_BUDGET_TOTAL) REV_BUDGET_TOTAL, ' ||
+                     'SUM(COST_BUDGET_LABOR) COST_BUDGET_LABOR, ' ||
+                     'SUM(COST_BUDGET_EQUIP) COST_BUDGET_EQUIP, ' ||
+                     'SUM(COST_BUDGET_EXPENSE) COST_BUDGET_EXPENSE, ' ||
+                     CHR (10) ||
+                     'SUM(COST_BUDGET_MATL) COST_BUDGET_MATL, ' ||
+                     'SUM(COST_BUDGET_TOTAL) COST_BUDGET_TOTAL, ' ||
+                     'SUM(ACT_BILLING) ACT_BILLING, ' ||
+                     'SUM(REV_ACT_LABOR) REV_ACT_LABOR, ' ||
+                     'SUM(REV_ACT_EQUIP) REV_ACT_EQUIP, ' ||
+                     CHR (10) ||
+                     'SUM(REV_ACT_EXPENSE) REV_ACT_EXPENSE, ' ||
+                     'SUM(REV_ACT_MATL) REV_ACT_MATL, ' ||
+                     'SUM(REV_ACT_TOTAL) REV_ACT_TOTAL, ' ||
+                     'SUM(COST_ACT_LABOR) COST_ACT_LABOR, ' ||
+                     'SUM(COST_ACT_EQUIP) COST_ACT_EQUIP, ' ||
+                     CHR (10) ||
+                     'SUM(COST_ACT_EXPENSE) COST_ACT_EXPENSE, ' ||
+                     'SUM(COST_ACT_MATL) COST_ACT_MATL, ' ||
+                     'SUM(COST_ACT_TOTAL) COST_ACT_TOTAL, ' ||
+                     'SUM(COST_TO_COMPLETE) COST_TO_COMPLETE, ' ||
+                     'AVG(AVERAGE_PCT_BUDGET_EXPENDED) AVERAGE_PCT_BUDGET_EXPENDED, ' ||
+                     CHR (10) ||
+                     'AVG(AVERAGE_BUDGET_MARGIN) AVERAGE_BUDGET_MARGIN, ' ||
+                     'MAX(CURRENCY_CODE) CURRENCY_CODE ' ||
+                     CHR (10) ||
+                     'FROM NBI_DIM_FISCAL_TIME t, NBI_FM_PROJECT_TIME_SUMMARY f' ||
+                     CHR (10) ||
+                     'WHERE t.time_key = f.FISCAL_TIME_KEY ' ||
+                     'and t.hierarchy_level = ''' ||
+                     V_ROLLUP_FROM_TIME_TYPE ||
+                     '''' ||
+                     CHR (10) ||
+                     ' GROUP BY t.' ||
+                     V_TIME_TYPE ||
+                     '_key, f.obs1_unit_id, f.obs2_unit_id, f.obs3_unit_id, f.obs4_unit_id, f.obs5_unit_id';
+
+                INSERT INTO NBI_ROLLUP_SQL
+                            (TABLE_NAME, TIME_TYPE, SQL_STATEMENT, TIME_IN_SECS)
+                     VALUES ('NBI_FM_PROJECT_TIME_SUMMARY', V_TIME_TYPE, V_SQL, NULL);
+             END IF;
+
+             COMMIT;
+          END LOOP;
+
+          /* Process Rollup SQL and insert into summary table */
+
+          V_STMT := 'Processing Rollup SQL and insert into summary table';
+
+          /* Drop the Indices */
+          V_STMT:= 'Dropping the indices on NBI_FM_PROJECT_TIME_SUMMARY table';
+
+          /* Store the Non-Unique Index Definitions */
+          V_IDX := 0;
+          FOR C_INDEX IN
+            (SELECT
+                    ui.table_name,
+                    ui.index_name,
+                    ui.uniqueness,
+                    listagg(aic.column_name, ', ') WITHIN GROUP (
+                    ORDER BY aic.column_position) AS index_columns
+                FROM
+                    user_indexes ui
+                INNER JOIN all_ind_columns aic ON
+                    aic.index_name = ui.index_name
+                LEFT OUTER JOIN user_constraints uc ON
+                    uc.index_name = ui.index_name
+                    AND uc.constraint_type = 'P'
+                WHERE ui.table_name='NBI_FM_PROJECT_TIME_SUMMARY'
+                AND ui.uniqueness = 'NONUNIQUE'
+                GROUP BY
+                    ui.table_name,
+                    ui.index_name,
+                    ui.uniqueness)
+          LOOP
+            V_INDEX_DEF(V_IDX) := 'CREATE INDEX '|| C_INDEX.INDEX_NAME ||' ON '||C_INDEX.TABLE_NAME||' ('||C_INDEX.INDEX_COLUMNS||')';
+            EXECUTE IMMEDIATE 'DROP INDEX '||C_INDEX.INDEX_NAME;
+            V_IDX := V_IDX + 1;
+          END LOOP;
+
+          FOR C_ROLLUP_SQL_REC IN C_ROLLUP_SQL
+          LOOP
+             V_START_TIME := SYSDATE;
+             V_NUM_RECORDS := 0;
+             V_SQL := C_ROLLUP_SQL_REC.SQL_STATEMENT;
+
+             EXECUTE IMMEDIATE 'INSERT INTO NBI_FM_PROJECT_TIME_SUMMARY
+                        (
+                           FISCAL_TIME_KEY,
+                           OBS1_UNIT_ID,
+                           OBS2_UNIT_ID,
+                           OBS3_UNIT_ID,
+                           OBS4_UNIT_ID,
+                           OBS5_UNIT_ID,
+                           BUDGET_HOURS,
+                           ACTUAL_HOURS,
+                           REV_BUDGET_LABOR,
+                           REV_BUDGET_EQUIP,
+                           REV_BUDGET_EXPENSE,
+                           REV_BUDGET_MATL,
+                           REV_BUDGET_TOTAL,
+                           COST_BUDGET_LABOR,
+                           COST_BUDGET_EQUIP,
+                           COST_BUDGET_EXPENSE,
+                           COST_BUDGET_MATL,
+                           COST_BUDGET_TOTAL,
+                           ACT_BILLING,
+                           REV_ACT_LABOR,
+                           REV_ACT_EQUIP,
+                           REV_ACT_EXPENSE,
+                           REV_ACT_MATL,
+                           REV_ACT_TOTAL,
+                           COST_ACT_LABOR,
+                           COST_ACT_EQUIP,
+                           COST_ACT_EXPENSE,
+                           COST_ACT_MATL,
+                           COST_ACT_TOTAL,
+                           COST_TO_COMPLETE,
+                           AVERAGE_PCT_BUDGET_EXPENDED,
+                           AVERAGE_BUDGET_MARGIN,
+                           CURRENCY_CODE
+                        ) '||V_SQL;
+
+
+             V_NUM_RECORDS := SQL%ROWCOUNT;
+
+             V_END_TIME := SYSDATE;
+
+             UPDATE NBI_ROLLUP_SQL
+                SET NUM_RECORDS = V_NUM_RECORDS,
+                    TIME_IN_SECS = (V_END_TIME - V_START_TIME) * 24 * 60 * 60
+              WHERE SQL_STATEMENT = V_SQL
+              AND TABLE_NAME = 'NBI_FM_PROJECT_TIME_SUMMARY';
+
+             COMMIT;
+          END LOOP;
+
+          /* Add back the Indices */
+          V_STMT := 'Adding Indices back on the NBI_FM_PROJECT_TIME_SUMMARY table';
+          FOR V_IDX IN V_INDEX_DEF.FIRST .. V_INDEX_DEF.LAST
+          LOOP
+                EXECUTE IMMEDIATE V_INDEX_DEF(V_IDX);
+          END LOOP;
+
+          /* Update EOP measures for year and quarter with the last child period. For example,
+             Baseline hours for quarter 2002-Q3 needs to be updated with baseline hours from
+             PERIOD 2002-9.
+
+          V_STMT := 'Updating EOP measures';
+
+          FOR C_EOP_REC IN C_UPDATE_EOP_MEASURES
+          LOOP
+             V_SQL :=
+               'update NBI_FM_PROJECT_TIME_SUMMARY p' || CHR (10) ||
+                  'set (budget_hours, rev_budget_labor, rev_budget_equip, rev_budget_expense, ' ||
+                  CHR (10) ||
+                  '     rev_budget_matl, rev_budget_total, cost_budget_labor, cost_budget_equip, ' ||
+                  CHR (10) ||
+                  '     cost_budget_expense, cost_budget_matl, cost_budget_total, cost_to_complete) = ' ||
+                  CHR (10) ||
+                  CHR (10) ||
+                  '    (select budget_hours, rev_budget_labor, rev_budget_equip, rev_budget_expense, ' ||
+                  CHR (10) ||
+                  '     rev_budget_matl, rev_budget_total, cost_budget_labor, cost_budget_equip, ' ||
+                  CHR (10) ||
+                  '     cost_budget_expense, cost_budget_matl, cost_budget_total, cost_to_complete ' ||
+                  CHR (10) ||
+                  '     from NBI_FM_PROJECT_TIME_SUMMARY c' ||
+                  CHR (10) ||
+                  '     where FISCAL_TIME_KEY = ''' ||
+                  C_EOP_REC.LAST_CHILD_PERIOD ||
+                  '''' ||
+                  CHR (10) ||
+                  '     and (c.obs1_unit_id = p.obs1_unit_id or c.obs1_unit_id is null)' ||
+                  CHR (10) ||
+                  '     and (c.obs2_unit_id = p.obs2_unit_id or c.obs2_unit_id is null) ' ||
+                  CHR (10) ||
+                  '     and (c.obs3_unit_id = p.obs3_unit_id or c.obs3_unit_id is null) ' ||
+                  CHR (10) ||
+                  '     and (c.obs4_unit_id = p.obs4_unit_id or c.obs4_unit_id is null) ' ||
+                  CHR (10) ||
+                  '     and (c.obs5_unit_id = p.obs5_unit_id or c.obs5_unit_id is null) ' ||
+                  CHR (10) ||
+                  '     and rownum = 1) ' ||
+                  CHR (10) ||
+                  'where p.FISCAL_TIME_KEY = ''' ||
+                  C_EOP_REC.PERIOD ||
+                  '''';
+             EXECUTE IMMEDIATE V_SQL;
+             COMMIT;
+          END LOOP; */
+
+          /* Identify rowids of dupplicate records. Projects that have non-leaf OBS units assigned will cause
+             duplicate rows in the summary table. They need to be removed */
+
+          /* 06 OCT 2004.  Its been established that there can be no duplicate rows
+             so the code for merging them has been removed */
+
+          /* Merge duplicate rows */
+
+       END IF;-- if count(*) from NBI_fM_PROJECT_TIME_FACTS &lt;&gt; 0
+    EXCEPTION
+       WHEN OTHERS
+       THEN
+          RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_FM_PROJECT_TIME_SUMMARY - ' || V_STMT || ': ' || SQLERRM);
+    END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

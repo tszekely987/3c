@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_CREDIT_MEMO_GEN_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_CREDIT_MEMO_GEN_SP" 
+(
+  RESOURCE_CODE VARCHAR2,
+  SUCCESS  IN OUT NUMBER
+)
+AS
+  /* This procedure takes transactions from the TEMP_BIL_REVERSE_TRANSACTIONS table and generates credit memos
+    for each and every one of the TransNos. TEMP_BIL_REVERSE_TRANSACTIONS.TRANSNO relates to PPA_WIP.TRANSNO.
+  */
+
+  StoO_selcnt     INTEGER;
+  StoO_error      INTEGER;
+  StoO_rowcnt     INTEGER;
+  StoO_crowcnt    INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg     GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  cNewInvoiceNo   VARCHAR2(16);
+  cCurrentInvoiceNo VARCHAR2(16);
+  cRESOURCE_CODE    VARCHAR2(30);
+
+  CURSOR reverseBillingsCursor IS
+    SELECT  ORIGINAL_INVOICENO
+      FROM TEMP_BIL_CREDIT_MEMO_BATCH
+      GROUP BY ORIGINAL_INVOICENO;
+BEGIN
+
+PAC_BIL_CREDIT_MEMO_GEN_SP.cRESOURCE_CODE := PAC_BIL_CREDIT_MEMO_GEN_SP.RESOURCE_CODE;
+PAC_BIL_CREDIT_MEMO_GEN_SP.Success := 1;
+
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+
+    DELETE FROM TEMP_BIL_CREDIT_MEMO_BATCH;
+
+	INSERT INTO TEMP_BIL_CREDIT_MEMO_BATCH (
+            APPLYTO, TRANSTYPE, COMPANY_CODE,  PROJECT_CODE, CHARGE_CODE, RESOURCE_CODE,
+            BILLINGDATE, INPUT_TYPE,  ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+      	    LASTUPDATEDATE, ORIGINAL_INVOICENO, NOTES, QUANTITY, WORKINT, WORKBUF, APPLYTOTRANSTYPE )
+  SELECT  b.TransNo, SUBSTR('BCADAUMR', INSTR( 'B AUADAY', TransType), 2), COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE,
+      BillingDate, INPUT_TYPE, cRESOURCE_CODE, SYSDATE, cRESOURCE_CODE,
+	   		SYSDATE, InvoiceNo, Notes, Quantity, WorkInt, WorkBuf, TransType
+		FROM ppa_Billings b,
+			 TEMP_BIL_REVERSE_TRANSACTIONS t
+		WHERE b.ApplyTo = t.TRANSNO AND
+			  b.TransType  IN ('B', 'AU', 'AD', 'AY') AND
+			  b.Status = 0 ;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+			PAC_BIL_CREDIT_MEMO_GEN_SP.Success := 0;
+			RETURN;
+	END;
+
+	OPEN reverseBillingsCursor;
+	LOOP
+
+	  FETCH reverseBillingsCursor INTO cCurrentInvoiceNo;
+	  EXIT WHEN reverseBillingsCursor%NOTFOUND;
+	  BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+
+	  DELETE FROM TEMP_BIL_CREDIT_MEMO_GENERATE ;
+
+	  SELECT to_char(REVMGR_TEMP_INVOICENO_S1.NEXTVAL) INTO PAC_BIL_CREDIT_MEMO_GEN_SP.cNewInvoiceNo FROM DUAL;
+
+	  INSERT INTO TEMP_BIL_CREDIT_MEMO_GENERATE
+         ( APPLYTO, TRANSTYPE, COMPANY_CODE,PROJECT_CODE, CHARGE_CODE, RESOURCE_CODE,
+         BILLINGDATE, INPUT_TYPE,ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+   			   LASTUPDATEDATE, INVOICENO,NOTES, QUANTITY, WORKINT, WORKBUF, APPLYTOTRANSTYPE)
+      SELECT APPLYTO, TRANSTYPE, COMPANY_CODE,PROJECT_CODE, CHARGE_CODE, RESOURCE_CODE,
+         BILLINGDATE, INPUT_TYPE,ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+   			   LASTUPDATEDATE, cNewInvoiceNo, NOTES, QUANTITY, WORKINT, WORKBUF, APPLYTOTRANSTYPE
+		FROM TEMP_BIL_CREDIT_MEMO_BATCH
+		WHERE ORIGINAL_INVOICENO = cCurrentInvoiceNo;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+		PAC_BIL_CREDIT_MEMO_GEN_SP.Success := 0;
+	    ROLLBACK WORK;
+		RETURN;
+	  WHEN OTHERS THEN
+		PAC_BIL_CREDIT_MEMO_GEN_SP.Success := 0;
+	    ROLLBACK WORK;
+		RETURN;
+	  END;
+
+	  SP_CREDITMEMO( cCurrentInvoiceNo, PAC_BIL_CREDIT_MEMO_GEN_SP.cNewInvoiceNo, RESOURCE_CODE);
+
+	  SP_REVERSE_BILLINGS ( PAC_BIL_CREDIT_MEMO_GEN_SP.cNewInvoiceNo, RESOURCE_CODE);
+
+	END LOOP;
+	CLOSE reverseBillingsCursor;
+
+
+/*	IF  StoO_error != 0 THEN
+		COMMIT WORK;
+	END IF; */
+
+END PAC_BIL_CREDIT_MEMO_GEN_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

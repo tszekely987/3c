@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>FIN_GET_POSTED_AMOUNT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."FIN_GET_POSTED_AMOUNT_FCT" (
+      NPIO_ID             NUMBER
+	  )
+RETURN NUMBER
+IS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+
+  cCurrencyCode VARCHAR2(30);
+  nTotalCost NUMBER;
+  nConvertedAmount NUMBER;
+  nConvertedAmountTot NUMBER;
+  dTransactionDate DATE;	  
+  DISPLAY_CURRENCY_CODE VARCHAR2(10);
+	  	  
+BEGIN
+DECLARE
+  CURSOR POSTED_DATA_CUR IS
+    SELECT FV.CURRENCY_CODE, SUM(FV.TOTAL_COST), F.TRANSACTION_DATE 
+    FROM FIN_POSTED_TXN_VALUES FV, FIN_POSTED_TXNS F
+    WHERE F.ID = FV.POSTED_TXN_ID 
+    AND FV.CURRENCY_TYPE = 'HOME'
+    AND FV.CURRENCY_CODE &lt;&gt; DISPLAY_CURRENCY_CODE
+    AND F.INV_OBJECT_ID = NPIO_ID
+    GROUP BY F.TRANSACTION_DATE, FV.CURRENCY_CODE;
+
+  BEGIN
+    nconvertedAmountTot := 0;
+    DISPLAY_CURRENCY_CODE := nvl(FIN_GET_CURRENCY_CODE_FCT(NPIO_ID),'');
+    IF NVL(DISPLAY_CURRENCY_CODE, '') = '' THEN
+	  RETURN NULL;
+	END IF;
+    BEGIN
+      SELECT SUM(FV.TOTAL_COST) INTO nConvertedAmountTot
+        FROM FIN_POSTED_TXN_VALUES FV, FIN_POSTED_TXNS F
+        WHERE F.ID = FV.POSTED_TXN_ID 
+    	AND FV.CURRENCY_TYPE = 'HOME'
+	    AND FV.CURRENCY_CODE = DISPLAY_CURRENCY_CODE
+        AND F.INV_OBJECT_ID = NPIO_ID;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        nConvertedAmountTot := 0;             
+    END;
+    OPEN POSTED_DATA_CUR;
+    LOOP
+      FETCH POSTED_DATA_CUR INTO cCurrencyCode, nTotalCost, dTransactionDate;
+      EXIT WHEN NOT POSTED_DATA_CUR%FOUND;
+      BEGIN
+        nConvertedAmount := 0;
+        nConvertedAmount := FIN_CONVERT_CURRENCY_FCT(
+                     nTotalCost,
+                     'AVERAGE',
+                     dTransactionDate,
+                     cCurrencyCode,
+                     DISPLAY_CURRENCY_CODE);
+        nConvertedAmountTot := nvl(nConvertedAmountTot,0) + nvl(nConvertedAmount,0);
+      EXCEPTION
+        WHEN OTHERS THEN
+          NULL;
+      END;
+    END LOOP;
+    CLOSE POSTED_DATA_CUR;
+  END;
+  RETURN nConvertedAmountTot;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NULL;
+END FIN_GET_POSTED_AMOUNT_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

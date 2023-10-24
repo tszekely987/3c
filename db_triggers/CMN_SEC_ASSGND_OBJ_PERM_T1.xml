@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_ASSGND_OBJ_PERM_T1</code>
+          <table_name>CMN_SEC_ASSGND_OBJ_PERM</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>INSERT</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."CMN_SEC_ASSGND_OBJ_PERM_T1" 
+before insert
+on cmn_sec_assgnd_obj_perm
+referencing new as new old as old
+for each row
+</description>
+          <trigger_body>begin
+
+  if ( :new.is_right_definition = 1 ) then
+    insert into cmn_sec_right
+                ( object_id, permission_id, right_id, right_type, right_obs_type, permission_code,
+                  permission_value, is_active )
+      select :new.object_id, :new.permission_id, :new.principal_id, r.right_type,
+             nvl(o.obs_code, r.right_type), permission_code, permission_value, r.is_active
+      from   cmn_sec_perm_elements pe, 
+             cmn_sec_groups r left outer join odf_objects o on r.right_type = o.right_code
+      where  pe.permission_id = :new.permission_id
+      and    r.id = :new.principal_id
+      and    :new.principal_type = 'GROUP'
+      and    not exists(
+               select 'exists'
+               from   cmn_sec_right csr
+               where  csr.object_id = :new.object_id
+               and    csr.permission_id = :new.permission_id
+               and    csr.right_id = :new.principal_id
+               and    csr.right_type = r.right_type
+               and    csr.permission_code = pe.permission_code
+               and    csr.permission_value = pe.permission_value );
+  end if;
+  
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

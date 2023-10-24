@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUDITS_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUDITS_DELETE_SP" 
+	(
+		P_OBJECT_NAME			VARCHAR2,
+    P_PURGE_AGE       VARCHAR2
+	)
+	AS
+	V_SQL                       VARCHAR2 (1000);
+	BEGIN
+                 
+	V_SQL := 'delete from cmn_audits where object_code= ''' || P_OBJECT_NAME || ''' and created_date &lt;= sysdate - ' || P_PURGE_AGE; 
+        V_SQL := V_SQL || ' AND ROWNUM &lt;= 10000';
+
+        LOOP
+            EXECUTE IMMEDIATE V_SQL;
+            EXIT WHEN SQL%ROWCOUNT = 0;
+            COMMIT;
+        END LOOP;
+        
+	V_SQL := 'delete from cmn_audits_tsv where object_code= ''' || P_OBJECT_NAME || ''' and created_date &lt;= sysdate - ' || P_PURGE_AGE; 
+        V_SQL := V_SQL || ' AND ROWNUM &lt;= 10000';
+
+        LOOP
+            EXECUTE IMMEDIATE V_SQL;
+            EXIT WHEN SQL%ROWCOUNT = 0;
+            COMMIT;
+        END LOOP;
+        
+	V_SQL := 'DELETE FROM ODF_AUD_MULTI_VAL_LOVS WHERE ID NOT IN (SELECT MAX(ID) MAX_ID FROM ODF_AUD_MULTI_VAL_LOVS GROUP BY OBJECT_INSTANCE_ID, ATTRIBUTE_CODE) AND object_code= ''' || P_OBJECT_NAME || ''' and created_date &lt;= sysdate - ' || P_PURGE_AGE;
+
+        V_SQL := V_SQL || ' AND ROWNUM &lt;= 10000';
+
+        LOOP
+            EXECUTE IMMEDIATE V_SQL;
+            EXIT WHEN SQL%ROWCOUNT = 0;
+            COMMIT;
+        END LOOP;                 
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

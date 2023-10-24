@@ -1,0 +1,1150 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_CEL_VALIDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_CEL_VALIDATE_SP" (
+   iMatrixKey                 NUMBER,
+   iColumnNo                  NUMBER,
+   cEntity                    VARCHAR2,
+   cLocationID                VARCHAR2 DEFAULT NULL,
+   cDepartCode                VARCHAR2 DEFAULT NULL,
+   cClient                    VARCHAR2 DEFAULT NULL,
+   cProject                   VARCHAR2 DEFAULT NULL,
+   cCharge_Code               VARCHAR2 DEFAULT NULL,
+   cInput_Type                VARCHAR2 DEFAULT NULL,
+   cResource_Code             VARCHAR2 DEFAULT NULL,
+   cClntClass                 VARCHAR2 DEFAULT NULL,
+   cProjClass                 VARCHAR2 DEFAULT NULL,
+   --cCostClass       VARCHAR2  DEFAULT NULL,
+   cResource_Class            VARCHAR2 DEFAULT NULL,
+   cWIPClass                  VARCHAR2 DEFAULT NULL,
+   cRole                      VARCHAR2 DEFAULT NULL,
+   cTransType                 VARCHAR2 DEFAULT NULL,
+   cCostType                  VARCHAR2 DEFAULT NULL,
+   bValid            IN OUT   NUMBER,
+   RC1               IN OUT   PAC_MNT_MATRIX_CEL_VALIDATEPkg.RCT1,
+   cUserName                  VARCHAR2
+)
+AS
+   StoO_selcnt         INTEGER;
+   StoO_error          INTEGER;
+   StoO_rowcnt         INTEGER;
+   StoO_crowcnt        INTEGER          := 0;
+   StoO_fetchstatus    INTEGER          := 0;
+   StoO_errmsg         GLOBALPKG.STRING;
+   StoO_sqlstatus      INTEGER;
+   bAllTransTypes      NUMBER ( 5, 0 );
+   matrixFiled         GLOBALPKG.STRING;
+   isValid             NUMBER;
+   V_SECURITY_LEVEL    INTEGER          := 0;
+   V_DEFAULT_ENTITY    VARCHAR2 ( 60 );
+   V_RESOURCE_ENTITY   VARCHAR2 ( 60 );
+BEGIN
+   PAC_MNT_MATRIX_CEL_VALIDATE_SP.bAllTransTypes := 0;
+   PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT FieldName
+        INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled
+        FROM ppa_MatrixColDef
+       WHERE MatrixKey = PAC_MNT_MATRIX_CEL_VALIDATE_SP.iMatrixKey
+         AND ColumnNo = PAC_MNT_MATRIX_CEL_VALIDATE_SP.iColumnNo;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'entity'
+   THEN
+      BEGIN
+         BEGIN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := 0;
+
+            SELECT COUNT ( * )
+              INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+              FROM entity
+             WHERE entity = PAC_MNT_MATRIX_CEL_VALIDATE_SP.cEntity;
+
+            StoO_rowcnt                := SQL%ROWCOUNT;
+         EXCEPTION
+            WHEN TOO_MANY_ROWS
+            THEN
+               StoO_rowcnt                := 2;
+            WHEN NO_DATA_FOUND
+            THEN
+               StoO_rowcnt                := 0;
+               StoO_selcnt                := 0;
+            WHEN OTHERS
+            THEN
+               StoO_rowcnt                := 0;
+               StoO_selcnt                := 0;
+               StoO_error                 := SQLCODE;
+               StoO_errmsg                := SQLERRM;
+         END;
+
+         IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+         THEN
+            StoO_error                 := -20180;
+            StoO_errmsg                := 'Entity is not valid';
+            raise_application_error ( StoO_error, StoO_errmsg );
+            RETURN;
+         END IF;
+
+         -- check entity based-security
+         IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid &lt;&gt; 0
+         THEN
+            BEGIN
+               BEGIN
+                  SELECT NVL ( ENTITY_SECURITY, 0 ),
+                         NVL ( DEFAULTENTITY, ' ' )
+                    INTO V_SECURITY_LEVEL,
+                         V_DEFAULT_ENTITY
+                    FROM NAMEOPTIONS;
+               EXCEPTION
+                  WHEN OTHERS
+                  THEN
+                     PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+               END;
+
+               IF V_SECURITY_LEVEL &gt; 0
+               THEN
+                  BEGIN
+                     BEGIN
+                        SELECT L.ENTITY
+                          INTO V_RESOURCE_ENTITY
+                          FROM PAC_MNT_RESOURCES R, LOCATIONS L
+                         WHERE R.RESOURCE_CODE = cUserName
+                           AND R.LOCATIONID = L.LOCATIONID;
+                     EXCEPTION
+                        WHEN OTHERS
+                        THEN
+                           PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0; -- if the resource code is invalid, or an error occurs, they can't see anything
+                     END;
+
+                     IF V_RESOURCE_ENTITY &lt;&gt;
+                                        PAC_MNT_MATRIX_CEL_VALIDATE_SP.cEntity
+                     THEN
+                        BEGIN
+                           IF V_SECURITY_LEVEL = 1
+                           THEN
+                              PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                           ELSE
+                              BEGIN
+                                 IF V_RESOURCE_ENTITY &lt;&gt; V_DEFAULT_ENTITY
+                                 THEN -- if resource belongs to parent entity, give them access
+                                    PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid :=
+                                                                            0;
+                                 END IF;
+                              END;
+                           END IF;
+                        END;
+                     END IF;
+                  END;
+               END IF;
+            END;
+         END IF;
+      END;
+   ELSE
+      IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'locationid'
+      THEN
+         BEGIN
+                  BEGIN
+                     PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := 0;
+
+                     SELECT COUNT ( * )
+                       INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                       FROM locations
+                      WHERE locationid =
+                                    PAC_MNT_MATRIX_CEL_VALIDATE_SP.cLocationID
+                        AND PAC_FOS_IS_VALID_LOCATION_FCT ( cUserName,
+                                                            locationid
+                                                          ) = 1;
+
+                     StoO_rowcnt                := SQL%ROWCOUNT;
+                  EXCEPTION
+                     WHEN TOO_MANY_ROWS
+                     THEN
+                        StoO_rowcnt                := 2;
+                     WHEN NO_DATA_FOUND
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                     WHEN OTHERS
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                        StoO_error                 := SQLCODE;
+                        StoO_errmsg                := SQLERRM;
+                  END;
+
+                  IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                  THEN
+                     StoO_error                 := -20181;
+                     StoO_errmsg                := 'Location is not valid';
+                     raise_application_error ( StoO_error, StoO_errmsg );
+                     RETURN;
+                  END IF;
+
+
+         END;
+      ELSE
+         IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'departcode'
+         THEN
+            BEGIN
+                  BEGIN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                        StoO_error                 := 0;
+
+                        SELECT COUNT ( * )
+                          INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                          FROM departments
+                         WHERE departcode =
+                                    PAC_MNT_MATRIX_CEL_VALIDATE_SP.cDepartCode;
+
+                        StoO_rowcnt                := SQL%ROWCOUNT;
+                     EXCEPTION
+                        WHEN TOO_MANY_ROWS
+                        THEN
+                           StoO_rowcnt                := 2;
+                        WHEN NO_DATA_FOUND
+                        THEN
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                        WHEN OTHERS
+                        THEN
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                           StoO_error                 := SQLCODE;
+                           StoO_errmsg                := SQLERRM;
+                  END;
+
+                     IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                     THEN
+                        StoO_error                 := -20182;
+                        StoO_errmsg                :=
+                                                    'Department is not valid';
+                        raise_application_error ( StoO_error, StoO_errmsg );
+                        RETURN;
+                     END IF;
+
+            END;
+         ELSE
+            IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'company_code'
+            THEN
+               BEGIN
+                  BEGIN
+                     BEGIN
+                        StoO_selcnt                := 0;
+                        StoO_error                 := 0;
+                        StoO_rowcnt                := 0;
+
+                        SELECT 1
+                          INTO StoO_selcnt
+                          FROM DUAL
+                         WHERE EXISTS (
+                                  SELECT 1
+                                    FROM ppa_MatrixColDef
+                                   WHERE MatrixKey =
+                                            PAC_MNT_MATRIX_CEL_VALIDATE_SP.iMatrixKey
+                                     AND FieldName = 'project_code'
+                                     AND CompareOp = 0 )
+                           AND NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProject
+                                           ),
+                                     ''
+                                   ) IS NOT NULL;
+
+                        StoO_rowcnt                := SQL%ROWCOUNT;
+                     EXCEPTION
+                        WHEN NO_DATA_FOUND
+                        THEN
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                        WHEN OTHERS
+                        THEN
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                           StoO_error                 := SQLCODE;
+                           StoO_errmsg                := SQLERRM;
+                     END;
+
+                     IF StoO_selcnt != 0
+                     THEN
+                        BEGIN
+                           PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                           StoO_error                 := 0;
+
+                           SELECT COUNT ( * )
+                             INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                             FROM clntsupp C, pac_mnt_projects P
+                            WHERE C.clntclass =
+                                     NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClntClass
+                                                 ),
+                                           C.clntclass
+                                         )
+                              AND P.COMPANY_CODE = C.COMPANY_CODE
+                              AND P.PROJECT_CODE =
+                                       PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProject
+                              AND C.COMPANY_CODE =
+                                        PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClient;
+
+                           StoO_rowcnt                := SQL%ROWCOUNT;
+
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                           THEN
+                              StoO_error                 := -20183;
+                              StoO_errmsg                :=
+                                                       'Company is not valid';
+                              raise_application_error ( StoO_error,
+                                                        StoO_errmsg
+                                                      );
+                              RETURN;
+                           END IF;
+                        EXCEPTION
+                           WHEN TOO_MANY_ROWS
+                           THEN
+                              StoO_rowcnt                := 2;
+                           WHEN NO_DATA_FOUND
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                           WHEN OTHERS
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := SQLCODE;
+                              StoO_errmsg                := SQLERRM;
+                        END;
+                     ELSE
+                        BEGIN
+                           PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                           StoO_error                 := 0;
+
+                           SELECT COUNT ( * )
+                             INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                             FROM clntsupp C
+                            WHERE C.clntclass =
+                                     NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClntClass
+                                                 ),
+                                           C.clntclass
+                                         )
+                              AND C.COMPANY_CODE =
+                                        PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClient;
+
+                           StoO_rowcnt                := SQL%ROWCOUNT;
+                        EXCEPTION
+                           WHEN TOO_MANY_ROWS
+                           THEN
+                              StoO_rowcnt                := 2;
+                           WHEN NO_DATA_FOUND
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                           WHEN OTHERS
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := SQLCODE;
+                              StoO_errmsg                := SQLERRM;
+                        END;
+
+                        IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                        THEN
+                           StoO_error                 := -20183;
+                           StoO_errmsg                :=
+                                                       'Company is not valid';
+                           raise_application_error ( StoO_error, StoO_errmsg );
+                           RETURN;
+                        END IF;
+                     END IF;
+                  END;
+               END;
+            ELSE
+               IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'project_code'
+               THEN
+                  BEGIN
+                     BEGIN
+                        BEGIN
+                           StoO_selcnt                := 0;
+                           StoO_error                 := 0;
+                           StoO_rowcnt                := 0;
+
+                           SELECT 1
+                             INTO StoO_selcnt
+                             FROM DUAL
+                            WHERE EXISTS (
+                                     SELECT 1
+                                       FROM ppa_MatrixColDef
+                                      WHERE MatrixKey =
+                                               PAC_MNT_MATRIX_CEL_VALIDATE_SP.iMatrixKey
+                                        AND FieldName = 'company_code'
+                                        AND CompareOp = 0 )
+                              AND NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClient
+                                              ),
+                                        ''
+                                      ) IS NOT NULL;
+
+                           StoO_rowcnt                := SQL%ROWCOUNT;
+                        EXCEPTION
+                           WHEN NO_DATA_FOUND
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                           WHEN OTHERS
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := SQLCODE;
+                              StoO_errmsg                := SQLERRM;
+                        END;
+
+                        IF StoO_selcnt != 0
+                        THEN
+                           BEGIN
+                              PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := 0;
+
+                              SELECT COUNT ( * )
+                                INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                FROM pac_mnt_projects P
+                               WHERE P.CLASS =
+                                        NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProjClass
+                                                    ),
+                                              P.CLASS
+                                            )
+                                 AND P.COMPANY_CODE =
+                                        PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClient
+                                 AND P.PROJECT_CODE =
+                                       PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProject;
+
+                              StoO_rowcnt                := SQL%ROWCOUNT;
+                           EXCEPTION
+                              WHEN TOO_MANY_ROWS
+                              THEN
+                                 StoO_rowcnt                := 2;
+                              WHEN NO_DATA_FOUND
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                              WHEN OTHERS
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                                 StoO_error                 := SQLCODE;
+                                 StoO_errmsg                := SQLERRM;
+                           END;
+
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                           THEN
+                              StoO_error                 := -20184;
+                              StoO_errmsg                :=
+                                                       'Project is not valid';
+                              raise_application_error ( StoO_error,
+                                                        StoO_errmsg
+                                                      );
+                              RETURN;
+                           END IF;
+                        ELSE
+                           BEGIN
+                              PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := 0;
+
+                              SELECT COUNT ( * )
+                                INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                FROM pac_mnt_projects P
+                               WHERE /*P.CLASS =
+                                        NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProjClass
+                                                    ),
+                                              P.CLASS
+                                            )
+                                 AND*/ P.PROJECT_CODE =
+                                       PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProject;
+
+                              StoO_rowcnt                := SQL%ROWCOUNT;
+                           EXCEPTION
+                              WHEN TOO_MANY_ROWS
+                              THEN
+                                 StoO_rowcnt                := 2;
+                              WHEN NO_DATA_FOUND
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                              WHEN OTHERS
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                                 StoO_error                 := SQLCODE;
+                                 StoO_errmsg                := SQLERRM;
+                           END;
+
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                           THEN
+                              StoO_error                 := -20184;
+                              StoO_errmsg                :=
+                                                       'Project is not valid';
+                              raise_application_error ( StoO_error,
+                                                        StoO_errmsg
+                                                      );
+                              RETURN;
+                           END IF;
+                        END IF;
+                     END;
+                  END;
+               ELSE
+                  IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                 'chargecode'
+                  THEN
+                     BEGIN
+                        BEGIN
+                           PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                           StoO_rowcnt                := 0;
+                           StoO_selcnt                := 0;
+                           StoO_error                 := 0;
+
+                           SELECT COUNT ( * )
+                             INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                             FROM prchargecode
+                            WHERE PREXTERNALID =
+                                     PAC_MNT_MATRIX_CEL_VALIDATE_SP.cCharge_Code
+                              AND PRISOPEN &lt;&gt; 0;
+
+                           StoO_rowcnt                := SQL%ROWCOUNT;
+                        EXCEPTION
+                           WHEN TOO_MANY_ROWS
+                           THEN
+                              StoO_rowcnt                := 2;
+                           WHEN NO_DATA_FOUND
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                           WHEN OTHERS
+                           THEN
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := SQLCODE;
+                              StoO_errmsg                := SQLERRM;
+                        END;
+
+                        IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                        THEN
+                           StoO_error                 := -20185;
+                           StoO_errmsg                :=
+                                                    'Chargecode is not valid';
+                           raise_application_error ( StoO_error, StoO_errmsg );
+                           RETURN;
+                        END IF;
+                     END;
+                  ELSE
+                     IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                  'inputtype'
+                     THEN
+                        BEGIN
+                           BEGIN
+                              PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid := 0;
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := 0;
+
+                              SELECT COUNT ( * )
+                                INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                FROM PRTYPECODE
+                               WHERE PREXTERNALID =
+                                        PAC_MNT_MATRIX_CEL_VALIDATE_SP.cInput_Type
+                                 AND PRISOPEN &lt;&gt; 0;
+
+                              StoO_rowcnt                := SQL%ROWCOUNT;
+                           EXCEPTION
+                              WHEN TOO_MANY_ROWS
+                              THEN
+                                 StoO_rowcnt                := 2;
+                              WHEN NO_DATA_FOUND
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                              WHEN OTHERS
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                                 StoO_error                 := SQLCODE;
+                                 StoO_errmsg                := SQLERRM;
+                           END;
+
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                           THEN
+                              StoO_error                 := -20186;
+                              StoO_errmsg                :=
+                                                     'Inputtype is not valid';
+                              raise_application_error ( StoO_error,
+                                                        StoO_errmsg
+                                                      );
+                              RETURN;
+                           END IF;
+                        END;
+                     ELSE
+                        IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                              'resource_code'
+                        THEN
+                           BEGIN
+                              isValid                    := 0;
+                              StoO_rowcnt                := 0;
+                              StoO_selcnt                := 0;
+                              StoO_error                 := 0;
+
+                              SELECT COUNT ( * )
+                                INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                FROM pac_mnt_resources
+                               WHERE resource_class =
+                                        NVL ( RTRIM ( PAC_MNT_MATRIX_CEL_VALIDATE_SP.cResource_Class
+                                                    ),
+                                              resource_class
+                                            )
+                                 AND RESOURCE_CODE =
+                                       PAC_MNT_MATRIX_CEL_VALIDATE_SP.cResource_Code
+                                 AND active = 1;
+
+                              StoO_rowcnt                := SQL%ROWCOUNT;
+                           EXCEPTION
+                              WHEN TOO_MANY_ROWS
+                              THEN
+                                 StoO_rowcnt                := 2;
+                              WHEN NO_DATA_FOUND
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                              WHEN OTHERS
+                              THEN
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                                 StoO_error                 := SQLCODE;
+                                 StoO_errmsg                := SQLERRM;
+                           END;
+
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                           THEN
+                              StoO_error                 := -20187;
+                              StoO_errmsg                :=
+                                                 'Resource Code is not valid';
+                              raise_application_error ( StoO_error,
+                                                        StoO_errmsg
+                                                      );
+                              RETURN;
+                           END IF;
+						   			    BEGIN
+                                                 BEGIN
+                                                      isvalid := 0;
+                                                      stoo_rowcnt := 0;
+                                                      stoo_selcnt := 0;
+                                                      stoo_error := 0;
+                                                            SELECT COUNT(* )
+                                                            INTO   pac_mnt_matrix_cel_validate_sp.isvalid
+                                                            FROM   srm_resources sr, prj_resources pr
+                                                            WHERE  sr.id = pr.prid
+                                                                   and pr.prisrole = 1
+                                                                   AND sr.unique_name = pac_mnt_matrix_cel_validate_sp.cResource_Code;
+
+                                                      stoo_rowcnt := SQL%ROWCOUNT;
+                                                    EXCEPTION
+                                                      WHEN too_many_rows THEN
+                                                        stoo_rowcnt := 2;
+                                                      WHEN no_data_found THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                      WHEN OTHERS THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                        stoo_error := SQLCODE;
+                                                        stoo_errmsg := SQLERRM;
+                                                 END;
+                                                    IF pac_mnt_matrix_cel_validate_sp.isvalid = 1 THEN
+                                                      stoo_error := -20299;
+                                                      stoo_errmsg := 'Role in Resource code';
+                                                      raise_application_error(stoo_error,stoo_errmsg);
+                                                      RETURN;
+                                                    ELSE
+                                                        pac_mnt_matrix_cel_validate_sp.isvalid := 1;
+                                                    END IF;
+                                        END;
+                        ELSE
+                           IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                  'clntclass'
+                           THEN
+                              BEGIN
+                                 isValid                    := 0;
+                                 StoO_rowcnt                := 0;
+                                 StoO_selcnt                := 0;
+                                 StoO_error                 := 0;
+
+                                 SELECT COUNT ( * )
+                                   INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                   FROM clntclass
+                                  WHERE clntclass =
+                                           PAC_MNT_MATRIX_CEL_VALIDATE_SP.cClntClass;
+
+                                 StoO_rowcnt                := SQL%ROWCOUNT;
+                              EXCEPTION
+                                 WHEN TOO_MANY_ROWS
+                                 THEN
+                                    StoO_rowcnt                := 2;
+                                 WHEN NO_DATA_FOUND
+                                 THEN
+                                    StoO_rowcnt                := 0;
+                                    StoO_selcnt                := 0;
+                                 WHEN OTHERS
+                                 THEN
+                                    StoO_rowcnt                := 0;
+                                    StoO_selcnt                := 0;
+                                    StoO_error                 := SQLCODE;
+                                    StoO_errmsg                := SQLERRM;
+                              END;
+
+                              IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                              THEN
+                                 StoO_error                 := -20146;
+                                 StoO_errmsg                :=
+                                                  'Client Class is not valid';
+                                 raise_application_error ( StoO_error,
+                                                           StoO_errmsg
+                                                         );
+                                 RETURN;
+                              END IF;
+                           ELSE
+                              IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                  'projclass'
+                              THEN
+                                 BEGIN
+                                    isValid                    := 0;
+                                    StoO_rowcnt                := 0;
+                                    StoO_selcnt                := 0;
+                                    StoO_error                 := 0;
+
+                                    SELECT COUNT ( * )
+                                      INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                      FROM projclass
+                                     WHERE projclass =
+                                              PAC_MNT_MATRIX_CEL_VALIDATE_SP.cProjClass;
+
+                                    StoO_rowcnt                :=
+                                                                SQL%ROWCOUNT;
+                                 EXCEPTION
+                                    WHEN TOO_MANY_ROWS
+                                    THEN
+                                       StoO_rowcnt                := 2;
+                                    WHEN NO_DATA_FOUND
+                                    THEN
+                                       StoO_rowcnt                := 0;
+                                       StoO_selcnt                := 0;
+                                    WHEN OTHERS
+                                    THEN
+                                       StoO_rowcnt                := 0;
+                                       StoO_selcnt                := 0;
+                                       StoO_error                 := SQLCODE;
+                                       StoO_errmsg                := SQLERRM;
+                                 END;
+
+                                 IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+                                 THEN
+                                    StoO_error                 := -20158;
+                                    StoO_errmsg                :=
+                                                 'Investment Class is not valid';
+                                    raise_application_error ( StoO_error,
+                                                              StoO_errmsg
+                                                            );
+                                    RETURN;
+                                 END IF;
+                              ELSE
+/*
+                                 IF  PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled = 'costclass' THEN
+                                    BEGIN
+                                       isValid := 0 ;
+                                       StoO_rowcnt := 0;
+                                       StoO_selcnt := 0;
+                                       StoO_error  := 0;
+                          SELECT   0
+                          INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                          FROM DUAL;
+                                       StoO_rowcnt := SQL%ROWCOUNT;
+
+                                       EXCEPTION
+                                          WHEN TOO_MANY_ROWS THEN
+                                             StoO_rowcnt := 2;
+                                          WHEN NO_DATA_FOUND THEN
+                                             StoO_rowcnt := 0;
+                                             StoO_selcnt := 0;
+                                          WHEN OTHERS THEN
+                                             StoO_rowcnt := 0;
+                                             StoO_selcnt := 0;
+                                             StoO_error := SQLCODE;
+                                             StoO_errmsg := SQLERRM;
+                                    END;
+                                 ELSE
+*/
+                                 IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                             'resource_class'
+                                 THEN
+                                    BEGIN
+                                       isValid                    := 0;
+                                       StoO_rowcnt                := 0;
+                                       StoO_selcnt                := 0;
+                                       StoO_error                 := 0;
+
+                                       SELECT COUNT ( * )
+                                         INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                         FROM PAC_FOS_RESOURCE_CLASS
+                                        WHERE resource_class =
+                                                 PAC_MNT_MATRIX_CEL_VALIDATE_SP.cResource_Class
+                                          AND active &lt;&gt; 0;
+
+                                       StoO_rowcnt                :=
+                                                                SQL%ROWCOUNT;
+                                    EXCEPTION
+                                       WHEN TOO_MANY_ROWS
+                                       THEN
+                                          StoO_rowcnt                := 2;
+                                       WHEN NO_DATA_FOUND
+                                       THEN
+                                          StoO_rowcnt                := 0;
+                                          StoO_selcnt                := 0;
+                                       WHEN OTHERS
+                                       THEN
+                                          StoO_rowcnt                := 0;
+                                          StoO_selcnt                := 0;
+                                          StoO_error                 :=
+                                                                      SQLCODE;
+                                          StoO_errmsg                :=
+                                                                      SQLERRM;
+                                    END;
+
+                                    IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid =
+                                                                             0
+                                    THEN
+                                       StoO_error                 := -20159;
+                                       StoO_errmsg                :=
+                                                'Resource Class is not valid';
+                                       raise_application_error ( StoO_error,
+                                                                 StoO_errmsg
+                                                               );
+                                       RETURN;
+                                    END IF;
+                                 ELSE
+                                    IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                   'wipclass'
+                                    THEN
+                                       BEGIN
+                                          isValid                    := 0;
+                                          StoO_rowcnt                := 0;
+                                          StoO_selcnt                := 0;
+                                          StoO_error                 := 0;
+
+                                          SELECT COUNT ( * )
+                                            INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                            FROM wipclass
+                                           WHERE wipclass =
+                                                    PAC_MNT_MATRIX_CEL_VALIDATE_SP.cWIPClass;
+
+                                          StoO_rowcnt                :=
+                                                                SQL%ROWCOUNT;
+                                       EXCEPTION
+                                          WHEN TOO_MANY_ROWS
+                                          THEN
+                                             StoO_rowcnt                := 2;
+                                          WHEN NO_DATA_FOUND
+                                          THEN
+                                             StoO_rowcnt                := 0;
+                                             StoO_selcnt                := 0;
+                                          WHEN OTHERS
+                                          THEN
+                                             StoO_rowcnt                := 0;
+                                             StoO_selcnt                := 0;
+                                             StoO_error                 :=
+                                                                      SQLCODE;
+                                             StoO_errmsg                :=
+                                                                      SQLERRM;
+                                       END;
+
+                                       IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid =
+                                                                             0
+                                       THEN
+                                          StoO_error                 :=
+                                                                       -20167;
+                                          StoO_errmsg                :=
+                                                     'Wip Class is not valid';
+                                          raise_application_error ( StoO_error,
+                                                                    StoO_errmsg
+                                                                  );
+                                          RETURN;
+                                       END IF;
+                                       ELSE
+                                          IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                  'transtype'
+                                          THEN
+                                             BEGIN
+                                                IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.bAllTransTypes =
+                                                                            0
+                                                THEN
+                                                   PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid :=
+                                                                            1;
+                                                ELSE
+                                                   BEGIN
+                                                      StoO_rowcnt                :=
+                                                                            0;
+                                                      StoO_selcnt                :=
+                                                                            0;
+                                                      StoO_error                 :=
+                                                                            0;
+
+                                                      SELECT 1
+                                                        INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                                        FROM DUAL
+                                                       WHERE PAC_MNT_MATRIX_CEL_VALIDATE_SP.cTransType IN (
+                                                                SELECT LOOKUP_CODE
+                                                                  FROM cmn_lookups
+                                                                 WHERE LOOKUP_TYPE =
+                                                                          'PAC_MATRIX_TRANSACTION_CLASS' );
+
+                                                      StoO_rowcnt                :=
+                                                                SQL%ROWCOUNT;
+                                                   EXCEPTION
+                                                      WHEN TOO_MANY_ROWS
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            2;
+                                                      WHEN NO_DATA_FOUND
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            0;
+                                                         StoO_selcnt                :=
+                                                                            0;
+                                                      WHEN OTHERS
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            0;
+                                                         StoO_selcnt                :=
+                                                                            0;
+                                                         StoO_error                 :=
+                                                                      SQLCODE;
+                                                         StoO_errmsg                :=
+                                                                      SQLERRM;
+                                                   END;
+
+                                                   IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid =
+                                                                             0
+                                                   THEN
+                                                      StoO_error                 :=
+                                                                       -20196;
+                                                      StoO_errmsg                :=
+                                                         'Transaction Type is not valid';
+                                                      raise_application_error ( StoO_error,
+                                                                                StoO_errmsg
+                                                                              );
+                                                      RETURN;
+                                                   END IF;
+                                                END IF;
+                                             END;
+                                          ELSE
+                                             IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.matrixFiled =
+                                                                 'transclass'
+                                             THEN
+                                                BEGIN
+                                                   BEGIN
+                                                      isValid                    :=
+                                                                            0;
+                                                      StoO_rowcnt                :=
+                                                                            0;
+                                                      StoO_selcnt                :=
+                                                                            0;
+                                                      StoO_error                 :=
+                                                                            0;
+
+                                                      SELECT COUNT ( * )
+                                                        INTO PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid
+                                                        FROM transclass
+                                                       WHERE transclass =
+                                                                PAC_MNT_MATRIX_CEL_VALIDATE_SP.cTransType;
+
+                                                      StoO_rowcnt                :=
+                                                                SQL%ROWCOUNT;
+                                                   EXCEPTION
+                                                      WHEN TOO_MANY_ROWS
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            2;
+                                                      WHEN NO_DATA_FOUND
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            0;
+                                                         StoO_selcnt                :=
+                                                                            0;
+                                                      WHEN OTHERS
+                                                      THEN
+                                                         StoO_rowcnt                :=
+                                                                            0;
+                                                         StoO_selcnt                :=
+                                                                            0;
+                                                         StoO_error                 :=
+                                                                      SQLCODE;
+                                                         StoO_errmsg                :=
+                                                                      SQLERRM;
+                                                   END;
+
+                                                   IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid =
+                                                                             0
+                                                   THEN
+                                                      StoO_error                 :=
+                                                                       -20197;
+                                                      StoO_errmsg                :=
+                                                         'Trans Class is not valid';
+                                                      raise_application_error ( StoO_error,
+                                                                                StoO_errmsg
+                                                                              );
+                                                      RETURN;
+                                                   END IF;
+                                                END;
+                                             ELSE
+                                              IF pac_mnt_matrix_cel_validate_sp.matrixfiled = 'resource_role' THEN
+                                                  BEGIN
+                                                    BEGIN
+                                                      isvalid := 0;
+                                                      stoo_rowcnt := 0;
+                                                      stoo_selcnt := 0;
+                                                      stoo_error := 0;
+                                                            SELECT COUNT(* )
+                                                            INTO   pac_mnt_matrix_cel_validate_sp.isvalid
+                                                            FROM   srm_resources sr, prj_resources pr
+                                                            WHERE  sr.id = pr.prid
+                                                                   and pr.prisrole = 1
+                                                                   AND sr.unique_name = pac_mnt_matrix_cel_validate_sp.crole;
+
+                                                      stoo_rowcnt := SQL%ROWCOUNT;
+                                                    EXCEPTION
+                                                      WHEN too_many_rows THEN
+                                                        stoo_rowcnt := 2;
+                                                      WHEN no_data_found THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                      WHEN OTHERS THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                        stoo_error := SQLCODE;
+                                                        stoo_errmsg := SQLERRM;
+                                                    END;
+                                                    IF pac_mnt_matrix_cel_validate_sp.isvalid = 0 THEN
+                                                      stoo_error := -20198;
+                                                      stoo_errmsg := 'Resource role is not valid';
+                                                      raise_application_error(stoo_error,stoo_errmsg);
+                                                      RETURN;
+                                                    ELSE
+                                                        pac_mnt_matrix_cel_validate_sp.isvalid := 1;
+                                                    END IF;
+                                                  END;
+
+                                                  ELSE
+
+                                                    IF pac_mnt_matrix_cel_validate_sp.matrixfiled = 'cost_type' THEN
+                                                    BEGIN
+                                                      BEGIN
+                                                        isvalid := 0;
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                        stoo_error := 0;
+                                                        SELECT COUNT(1)
+                                                        INTO   pac_mnt_matrix_cel_validate_sp.isvalid
+                                                        FROM   cmn_lookups
+                                                        WHERE  LOOKUP_TYPE = 'LOOKUP_FIN_COSTTYPECODE'
+                                                        AND LOOKUP_CODE = UPPER(pac_mnt_matrix_cel_validate_sp.cCostType);
+
+                                                        stoo_rowcnt := SQL%ROWCOUNT;
+                                                        EXCEPTION
+                                                        WHEN too_many_rows THEN
+                                                        stoo_rowcnt := 2;
+                                                        WHEN no_data_found THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                        WHEN OTHERS THEN
+                                                        stoo_rowcnt := 0;
+                                                        stoo_selcnt := 0;
+                                                        stoo_error := SQLCODE;
+                                                        stoo_errmsg := SQLERRM;
+                                                      END;
+                                                      IF pac_mnt_matrix_cel_validate_sp.isvalid = 0 THEN
+                                                        stoo_error := -20752;
+                                                        stoo_errmsg := 'Cost Type is not valid';
+                                                        raise_application_error(stoo_error,stoo_errmsg);
+                                                        RETURN;
+                                                      ELSE
+                                                        pac_mnt_matrix_cel_validate_sp.isvalid := 1;
+                                                      END IF;
+                                                    END;
+                                                    END IF;
+
+                                                END IF;
+                                             END IF;
+                                          END IF;
+                                       END IF;
+                                    --                            END IF;
+                                    END IF;
+                                 END IF;
+                              END IF;
+                           END IF;
+                        END IF;
+                     END IF;
+                  END IF;
+               END IF;
+            END IF;
+         END IF;
+      END IF;
+
+   IF PAC_MNT_MATRIX_CEL_VALIDATE_SP.isValid = 0
+   THEN
+      PAC_MNT_MATRIX_CEL_VALIDATE_SP.bValid := 0;
+   ELSE
+      PAC_MNT_MATRIX_CEL_VALIDATE_SP.bValid := 1;
+   END IF;
+
+   StoO_rowcnt                := 0;
+   StoO_selcnt                := 0;
+   StoO_error                 := 0;
+   OPEN RC1 FOR
+      SELECT PAC_MNT_MATRIX_CEL_VALIDATE_SP.bValid "IsValid"
+        FROM DUAL;
+END PAC_MNT_MATRIX_CEL_VALIDATE_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

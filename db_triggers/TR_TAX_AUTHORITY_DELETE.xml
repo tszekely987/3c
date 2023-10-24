@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_TAX_AUTHORITY_DELETE</code>
+          <table_name>TAX_AUTHORITY</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_TAX_AUTHORITY_DELETE" 
+AFTER DELETE
+ON TAX_AUTHORITY
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER := 1;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+	BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE  EXISTS (
+      SELECT  1
+      FROM tax_method
+      WHERE tax_method.tax_authority_code = :OLD.code
+      AND tax_method.code IS NOT NULL);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_selcnt != 0 THEN
+    BEGIN
+      raise_application_error(-20643, 'Unable to delete tax delete tax authority because it is being used in tax method ');
+      RETURN;
+    END;
+	END IF;
+END tr_tax_authority_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

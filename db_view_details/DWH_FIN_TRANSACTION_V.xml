@@ -1,0 +1,98 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_TRANSACTION_V">
+    <indexes/>
+    <text_length>6174</text_length>
+    <text>SELECT /*+ index(wap ppa_wipapinfo_u1) index(w ppa_wip_transdate) */
+       CAST (w.transno AS INTEGER) transaction_key,
+       w.transno clarity_transaction_key,
+       CAST (NVL (i.id, 0) AS INTEGER) investment_key,
+       i.code investment_id,
+       i.name investment_name,
+       CAST (NVL (t.prID, 0) AS INTEGER) task_key,
+       t.prExternalID task_id,
+       t.prName task_name,
+       CAST (NVL (r.id, 0) AS INTEGER) resource_key,
+       NVL (r.unique_name, 'X') resource_id,
+       r.full_name resource_name,
+       tc.transtype transaction_type_key,
+       NVL((SELECT CAST (id AS INTEGER) FROM entity WHERE  entity = w.entity),0) entity_key,
+      (SELECT shortdesc FROM entity WHERE entity = w.entity) entity,
+      (SELECT CAST (id AS INTEGER) FROM wipclass WHERE wipclass = w.wipclass) wip_class_key,
+      (SELECT shortdesc FROM wipclass WHERE wipclass = w.wipclass) wip_class,
+      (SELECT CAST (id AS INTEGER) FROM projclass WHERE projclass = w.projectclass) investment_class_key,
+      (SELECT shortdesc FROM projclass WHERE projclass = w.projectclass) investment_class,
+       NVL((SELECT CAST (id AS INTEGER) FROM srm_companies WHERE company_id = w.company_code),0) company_key,
+      (SELECT company_name FROM srm_companies WHERE company_id = w.company_code) company_name,
+       NVL((SELECT CAST (prID AS INTEGER) FROM prChargeCode WHERE prExternalID = w.charge_code),0) charge_code_key,
+      (SELECT prName FROM prChargeCode WHERE prExternalID = w.charge_code) charge_code,
+       NVL(w.cost_type,'0') cost_type_key,
+       NVL((SELECT prID FROM prTypeCode WHERE prExternalID = w.input_type),0) input_type_code_key,
+      (SELECT prName FROM prTypeCode WHERE prExternalID = w.input_type) input_type_code,
+       NVL(w.user_lov1,'0') user_value1_key,
+       NVL(w.user_lov2,'0') user_value2_key,
+       NVL((SELECT CAST (id AS INTEGER) FROM pac_fos_resource_class WHERE resource_class = w.resource_class),0) resource_class_key,
+       NVL((SELECT description FROM pac_fos_resource_class WHERE resource_class = w.resource_class),'X') resource_class,
+       NVL (rr.id, 0) role_key,
+       rr.full_name role_name,
+       CAST(tc.id AS INTEGER) transaction_class_key,
+       NVL(tc.shortdesc,'X') transaction_class,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = w.emplyhomelocation),0) resource_location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = w.emplyhomelocation) resource_location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = w.emplyhomedepart),0) resource_department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = w.emplyhomedepart) resource_department,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = w.project_location),0) investment_location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = w.project_location) investment_location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = w.project_department),0) investment_department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = w.project_department) investment_department,
+       NVL(w.batchno, 0) batch_number,
+       w.status transaction_status_flag,
+       w.invoiceno invoice_number,
+       w.notes,
+       w.externalbatchid external_batch_id,
+       NVL (w.externaltransno, 0) external_transaction_id,
+       wap.voucherno voucher_number,
+       wap.pono po_number,
+       CAST (NVL (v.id, 0) AS INTEGER) vendor_key,
+       v.vendor_code vendor_id,
+       v.address_name vendor_name,
+       NVL((SELECT CAST (id AS INTEGER) FROM srm_resources WHERE unique_name = wap.incurred_by),0) incurred_by_key,
+      (SELECT full_name FROM srm_resources WHERE unique_name = wap.incurred_by) incurred_by,
+       NVL (wap.document_type, 0) document_type_key,
+       w.workint_source,
+       NVL (w.xog_exported, 0) xog_exported,
+       w.xog_exported_date xog_exported_date,
+       w.entrydate clarity_created_date,
+       w.lastupdatedate last_updated_date,
+       l.language_code_key,
+       l.language_code,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = tc.transtype AND lookup_type = 'RPT_TRANSACTION_TYPE'
+                   AND language_code = l.language_code) transaction_type,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = w.cost_type AND lookup_type = 'LOOKUP_FIN_COSTTYPECODE'
+                   AND language_code = l.language_code) cost_type,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = w.user_lov1 AND lookup_type = 'PRTIMEENTRY_USER_LOV1'
+                   AND language_code = l.language_code) user_value1,
+      (SELECT name FROM cmn_lookups_v WHERE lookup_code = w.user_lov2 AND lookup_type = 'PRTIMEENTRY_USER_LOV2'
+                   AND language_code = l.language_code) user_value2,
+      (SELECT name FROM cmn_lookups_v WHERE id = wap.document_type AND lookup_type = 'PAC_DOCUMENT_TYPE'
+                   AND language_code = l.language_code) document_type,
+       NVL(w.chargeable,0) chargeable,
+	   w.transdate transaction_date,
+	   w.quantity,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = w.locationid),0) location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = w.locationid) location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = w.departcode),0) department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = w.departcode) department
+FROM   rpt_calendar c
+       INNER JOIN ppa_wip w ON (c.period_type = 'DAILY' AND w.transdate = c.start_date)
+       INNER JOIN (SELECT DISTINCT l.id language_code_key, l.language_code
+                     FROM cmn_languages l
+                    WHERE l.is_dw_enabled = 1) l ON 1 = 1
+       INNER JOIN transclass tc ON w.transclass = tc.transclass
+       LEFT OUTER JOIN ppa_wipapinfo wap ON wap.id = w.ppa_wipapinfo_id
+       INNER JOIN srm_resources r ON w.resource_id = r.id
+       LEFT OUTER JOIN srm_resources rr ON w.role_code = rr.unique_name
+       INNER JOIN inv_investments i ON w.investment_id = i.id
+       LEFT OUTER JOIN prTask t ON w.task_id = t.prID
+       LEFT OUTER JOIN apmaster v ON wap.vendor_code = v.vendor_code</text>
+  </QueryResult>
+</ClarityDBViewQuery>

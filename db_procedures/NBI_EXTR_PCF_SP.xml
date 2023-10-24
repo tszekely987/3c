@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXTR_PCF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXTR_PCF_SP" (
+   P_CURRENCY_CODE        VARCHAR2
+)
+AS
+   V_STMT                        VARCHAR2(200);
+   V_START_TIME                  DATE;
+   V_DURATION                    NUMBER;
+  /*  V_XDM_GOALS_EXIST             VARCHAR2(1);
+   V_XDM_BENEFITS_EXIST          VARCHAR2(1); */
+
+BEGIN
+   /* Check if XDM sample tables have been installed */
+/*    SELECT NVL (MAX ('Y'), 'N')
+     INTO V_XDM_BENEFITS_EXIST
+     FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'XDM_ACT_EST_BENEFITS'
+      AND COLUMN_NAME = 'XDM_EST_ROI_DT';
+	  
+   SELECT NVL (MAX ('Y'), 'N')
+     INTO V_XDM_GOALS_EXIST
+     FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'XDM_ACT_CORPORATE_GOALS'
+      AND COLUMN_NAME = 'XDM_GOAL_01'; */
+	  
+	V_STMT := 'executing NBI_PROJECT_CURRENT_FACTS_SP';
+	V_START_TIME := SYSDATE;
+	--NBI_PROJECT_CURRENT_FACTS_SP ( P_CURRENCY_CODE,V_XDM_BENEFITS_EXIST, V_XDM_GOALS_EXIST);
+	--Removed the procedure NBI_PCF_SP as part of the optimization.
+    NBI_PROJECT_CURRENT_FACTS_SP (P_CURRENCY_CODE);
+	V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+    DBMS_OUTPUT.PUT_LINE ('Time for NBI_PROJECT_CURRENT_FACTS_SP: ' || V_DURATION);
+
+   -- Call to stoplight queries stored procedure.
+   -- This procedure updates all configured stoplights
+   V_STMT := 'executing NBI_EXECUTE_STOPLIGHTS_SP';
+   V_START_TIME := SYSDATE;
+   NBI_EXECUTE_STOPLIGHTS_SP ('NBI_PROJECT_CURRENT_FACTS');
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time NBI_EXECUTE_STOPLIGHTS_SP: ' || V_DURATION);
+EXCEPTION
+   WHEN OTHERS THEN RAISE_APPLICATION_ERROR (-20000,'Error in NBI_EXTR_PCF_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

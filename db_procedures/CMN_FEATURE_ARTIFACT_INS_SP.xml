@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_FEATURE_ARTIFACT_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_FEATURE_ARTIFACT_INS_SP" (
+         P_FEATURE_CODE  VARCHAR2, 
+         P_FEATURE_ARTIFACT_TYPE  VARCHAR2,
+         P_FEATURE_ARTIFACT_CODE  VARCHAR2
+         )
+         IS
+         F_ID NUMBER;
+         A_ID NUMBER;
+         A_CODE VARCHAR2(90);
+         
+         BEGIN
+               SELECT ID INTO F_ID
+               FROM CMN_FEATURES 
+               WHERE CODE = P_FEATURE_CODE ;
+               
+               SELECT LOOKUP_CODE INTO A_CODE FROM CMN_LOOKUPS WHERE LOOKUP_TYPE = 'FEATURE_ARTIFACT_TYPE' AND LOOKUP_CODE = P_FEATURE_ARTIFACT_TYPE;
+               
+               -- validate Artifact code with FEATURE_ARTIFACT_TYPE Look up code.
+               IF A_CODE IS NULL
+               THEN
+                               RAISE_APPLICATION_ERROR (-20006, 'No Look Up value exists with the code: ' || P_FEATURE_ARTIFACT_TYPE || ' of LOOKUP_TYPE [FEATURE_ARTIFACT_TYPE]');
+              
+               -- check if feature exists then try to insert a record into cmn_feature_artifacts table.
+               ELSIF F_ID IS NOT NULL AND A_CODE IS NOT NULL
+               THEN
+                     -- Get ID column value from sequence into A_ID
+                     SELECT CMN_FEATURE_ARTIFACTS_S1.NEXTVAL
+                     INTO A_ID
+                     FROM DUAL;
+                     
+                     SELECT ID INTO F_ID FROM CMN_FEATURES WHERE CODE = P_FEATURE_CODE;
+                     
+                     INSERT INTO CMN_FEATURE_ARTIFACTS(ID,FEATURE_ID, CODE, TYPE) 
+                     VALUES (A_ID, F_ID, P_FEATURE_ARTIFACT_CODE, P_FEATURE_ARTIFACT_TYPE);
+                               
+               END IF;
+               
+               EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+               -- feature not exist raise error
+               IF F_ID IS NULL
+               THEN
+                               RAISE_APPLICATION_ERROR (-20006, 'Artifact can not be added as no feature exists to with the code: ' || P_FEATURE_CODE);
+               END IF;
+         END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

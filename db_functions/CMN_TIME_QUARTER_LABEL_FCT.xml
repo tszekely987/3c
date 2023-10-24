@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_TIME_QUARTER_LABEL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_TIME_QUARTER_LABEL_FCT" (
+   P_LANGUAGE_CODE VARCHAR2,
+   P_TIME_TYPE VARCHAR2,
+   P_PERIOD_KEY VARCHAR2,
+   P_QUARTER INTEGER,
+   P_YEAR INTEGER
+)
+   RETURN VARCHAR2
+IS
+   V_LABEL                       VARCHAR2 (100) := NULL;
+BEGIN
+
+   -- Get Label
+  IF P_TIME_TYPE = 'PERIOD'
+  THEN
+    V_LABEL := P_PERIOD_KEY;
+  ELSIF P_TIME_TYPE = 'YEAR'
+  THEN
+    V_LABEL := P_YEAR;
+  ELSIF P_TIME_TYPE = 'QUARTER'
+  THEN
+      SELECT   NAME
+      INTO     V_LABEL
+      FROM     CMN_LOOKUPS_V
+      WHERE    LOOKUP_TYPE = 'CMN_TIME_TYPES'
+      AND      LOOKUP_CODE = 'QUARTER'
+      AND      LANGUAGE_CODE = P_LANGUAGE_CODE;
+  END IF;      
+
+   -- Concatenate label according to language/locale
+
+   IF P_LANGUAGE_CODE IN ('de', 'en', 'fr', 'es', 'ja')
+   THEN
+     IF P_TIME_TYPE = 'QUARTER'
+     THEN
+         V_LABEL := V_LABEL || ' ' || P_QUARTER || ', ' || P_YEAR;
+     END IF;         
+   END IF;
+
+   RETURN (V_LABEL);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

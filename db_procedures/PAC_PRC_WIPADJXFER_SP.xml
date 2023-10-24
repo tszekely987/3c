@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_WIPADJXFER_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_WIPADJXFER_SP" 
+(
+  in_cTransNoList   IN VARCHAR2,
+  cProjId              VARCHAR2,
+  cCharge_Code         VARCHAR2,
+  cResource_Code       VARCHAR2,
+  cTransClass          VARCHAR2,
+  cInput_Type          VARCHAR2,
+  in_TaskID         IN NUMBER DEFAULT NULL,
+  dXferDate            DATE,
+  bCalcNewRate         NUMBER,
+  cUserId              VARCHAR2,
+  cLanguageCode        VARCHAR2  DEFAULT 'en',
+  RC1           IN OUT Pac_Prc_Wipadjxfer_Sppkg.RCT1
+)
+AS
+  cTransNoList         VARCHAR2(4000);
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          Globalpkg.STRING;
+  StoO_sqlstatus       INTEGER;
+  iLength              NUMBER;
+  iSubVal              NUMBER;
+  cSubStr              VARCHAR2(4000);
+  iTransNo             NUMBER;
+  iAdjustNumber        NUMBER;
+  iTransferStatus      NUMBER;
+  iAdjustXactionNo     NUMBER;
+  cErrorMessage        Globalpkg.STRING;
+  cWIPClntCode         Globalpkg.STRING;
+  cWIPProjId           Globalpkg.STRING;
+  cWIPCharge_Code      Globalpkg.STRING;
+  cWIPResource_Code    Globalpkg.STRING;
+  dWIPTransDate        DATE;
+  cWIPInputType        Globalpkg.STRING;
+  cWIPTransactionClass Globalpkg.STRING;
+  cTransTypeDesc       Globalpkg.STRING;
+BEGIN
+	DELETE FROM TEMP_TEMP_TRANSFERPAC_PRC_WIPA;
+
+	Pac_Prc_Wipadjxfer_Sp.cTransNoList := Pac_Prc_Wipadjxfer_Sp.in_cTransNoList;
+  Pac_Prc_Wipadjxfer_Sp.cTransNoList := RTRIM(Pac_Prc_Wipadjxfer_Sp.cTransNoList);
+  Pac_Prc_Wipadjxfer_Sp.iLength := LENGTH(Pac_Prc_Wipadjxfer_Sp.cTransNoList);
+
+	/*Get rid of the first and last ~ */
+  Pac_Prc_Wipadjxfer_Sp.cTransNoList := SUBSTR(RTRIM(Pac_Prc_Wipadjxfer_Sp.cTransNoList), 2, Pac_Prc_Wipadjxfer_Sp.iLength - 2);
+  Pac_Prc_Wipadjxfer_Sp.iSubVal := INSTR( Pac_Prc_Wipadjxfer_Sp.cTransNoList, '~');
+
+	/* If only one PROJECT_CODE transaction was selected */
+  IF Pac_Prc_Wipadjxfer_Sp.iSubVal = 0 THEN
+    BEGIN
+      Pac_Prc_Wipadjxfer_Sp.cSubStr := SUBSTR(Pac_Prc_Wipadjxfer_Sp.cTransNoList, 1, Pac_Prc_Wipadjxfer_Sp.iLength);
+
+      Pac_Prc_Wipadjxfer_Sp.cTransNoList := SUBSTR(Pac_Prc_Wipadjxfer_Sp.cTransNoList, Pac_Prc_Wipadjxfer_Sp.iSubVal + 1, Pac_Prc_Wipadjxfer_Sp.iLength);
+
+      Pac_Prc_Wipadjxfer_Sp.iTransNo := ROUND( TO_NUMBER(Pac_Prc_Wipadjxfer_Sp.cSubStr),0);
+
+      BEGIN
+        Rev_Prc_Adjwipmodxferxaction(
+          iTransaction=&gt;Pac_Prc_Wipadjxfer_Sp.iTransNo,
+          IN_cProjId=&gt;Pac_Prc_Wipadjxfer_Sp.cProjId,
+          IN_cCharge_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cCharge_Code,
+          IN_cResource_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cResource_Code,
+          IN_cCostKeyLevel6 =&gt; NULL,
+          IN_cCostKeyLevel7 =&gt; NULL,
+          IN_cInput_Type=&gt;Pac_Prc_Wipadjxfer_Sp.cInput_Type,
+          bOverrideDate=&gt;0,
+          dXferDate=&gt;Pac_Prc_Wipadjxfer_Sp.dXferDate,
+          in_cTransClass=&gt;cTransClass,
+          cAdjType=&gt;'T',
+          IN_bCalcNewRate=&gt;Pac_Prc_Wipadjxfer_Sp.bCalcNewRate,
+          cUserId=&gt;Pac_Prc_Wipadjxfer_Sp.cUserId,
+          dWIPTransDate=&gt;Pac_Prc_Wipadjxfer_Sp.dWIPTransDate,
+          cWIPClntCode=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPClntCode,
+          cWIPProjId=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPProjId,
+          cWIPCharge_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPCharge_Code,
+          cWIPResource_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPResource_Code,
+          cWIPInputType=&gt; Pac_Prc_Wipadjxfer_Sp.cWIPInputType,
+          cWIPTransactionClass=&gt; Pac_Prc_Wipadjxfer_Sp.cWIPTransactionClass,
+          iTransferStatus=&gt;Pac_Prc_Wipadjxfer_Sp.iTransferStatus,
+          iAdjustXactionNo=&gt;Pac_Prc_Wipadjxfer_Sp.iAdjustXactionNo,
+          iAdjustNumber=&gt;Pac_Prc_Wipadjxfer_Sp.iAdjustNumber,
+          cErrorMessage=&gt;Pac_Prc_Wipadjxfer_Sp.cErrorMessage,
+          cLanguageCode=&gt;Pac_Prc_Wipadjxfer_Sp.cLanguageCode,
+          in_TaskID =&gt; in_TaskID );
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;            
+            RAISE_APPLICATION_ERROR( SQLCODE, SQLERRM );
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO TEMP_TEMP_TRANSFERPAC_PRC_WIPA
+        (TANSNO,TRANSDATE,COMPANY_CODE,PROJECT_CODE,CHARGE_CODE,RESOURCE_CODE,XFERSTATUS,INPUT_TYPE,TRANSCLASS,ADJXACTIONNO,ADJNUMBER,ERRORMESG)
+        SELECT Pac_Prc_Wipadjxfer_Sp.iTransNo, Pac_Prc_Wipadjxfer_Sp.dWIPTransDate,
+               Pac_Prc_Wipadjxfer_Sp.cWIPClntCode, Pac_Prc_Wipadjxfer_Sp.cWIPProjId,
+               Pac_Prc_Wipadjxfer_Sp.cWIPCharge_Code, Pac_Prc_Wipadjxfer_Sp.cWIPResource_Code,
+               Pac_Prc_Wipadjxfer_Sp.iTransferStatus,Pac_Prc_Wipadjxfer_Sp.cWIPInputType,
+               Pac_Prc_Wipadjxfer_Sp.cWIPTransactionClass,
+               Pac_Prc_Wipadjxfer_Sp.iAdjustXactionNo, Pac_Prc_Wipadjxfer_Sp.iAdjustNumber,
+               lv.DESCRIPTION
+          FROM CMN_LOOKUPS_V lv
+         WHERE lv.LOOKUP_CODE = Pac_Prc_Wipadjxfer_Sp.cErrorMessage
+           AND lv.LOOKUP_TYPE = 'PAC_POSTING_ERRORS'
+           AND lv.LANGUAGE_CODE = RTRIM(Pac_Prc_Wipadjxfer_Sp.cLanguageCode);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END;
+	ELSE
+    BEGIN
+      &lt;&lt;i_loop1&gt;&gt;
+      WHILE Pac_Prc_Wipadjxfer_Sp.iSubVal &gt; 0 LOOP
+        BEGIN
+          Pac_Prc_Wipadjxfer_Sp.iLength := LENGTH(Pac_Prc_Wipadjxfer_Sp.cTransNoList);
+          Pac_Prc_Wipadjxfer_Sp.iSubVal := INSTR( Pac_Prc_Wipadjxfer_Sp.cTransNoList,'~');
+          IF Pac_Prc_Wipadjxfer_Sp.iSubVal &gt; 0 THEN
+            Pac_Prc_Wipadjxfer_Sp.cSubStr := SUBSTR(Pac_Prc_Wipadjxfer_Sp.cTransNoList, 1, Pac_Prc_Wipadjxfer_Sp.iSubVal - 1);
+          ELSE
+            Pac_Prc_Wipadjxfer_Sp.cSubStr := SUBSTR(Pac_Prc_Wipadjxfer_Sp.cTransNoList, 1, Pac_Prc_Wipadjxfer_Sp.iLength);
+          END IF;
+
+          Pac_Prc_Wipadjxfer_Sp.cTransNoList := SUBSTR(Pac_Prc_Wipadjxfer_Sp.cTransNoList, Pac_Prc_Wipadjxfer_Sp.iSubVal + 1, Pac_Prc_Wipadjxfer_Sp.iLength);
+          Pac_Prc_Wipadjxfer_Sp.iTransNo := ROUND(TO_NUMBER(Pac_Prc_Wipadjxfer_Sp.cSubStr),0);
+
+          BEGIN
+            Rev_Prc_Adjwipmodxferxaction(
+              iTransaction=&gt;Pac_Prc_Wipadjxfer_Sp.iTransNo,
+              IN_cProjId=&gt;Pac_Prc_Wipadjxfer_Sp.cProjId,
+              IN_cCharge_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cCharge_Code,
+              IN_cResource_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cResource_Code,
+              IN_cCostKeyLevel6 =&gt; NULL,
+              IN_cCostKeyLevel7 =&gt; NULL,
+              IN_cInput_Type=&gt;Pac_Prc_Wipadjxfer_Sp.cInput_Type,
+              bOverrideDate=&gt;0,
+              dXferDate=&gt;Pac_Prc_Wipadjxfer_Sp.dXferDate,
+              in_cTransClass=&gt;cTransClass,
+              cAdjType=&gt;'T',
+              IN_bCalcNewRate=&gt;Pac_Prc_Wipadjxfer_Sp.bCalcNewRate,
+              cUserId=&gt;Pac_Prc_Wipadjxfer_Sp.cUserId,
+              dWIPTransDate=&gt;Pac_Prc_Wipadjxfer_Sp.dWIPTransDate,
+              cWIPClntCode=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPClntCode,
+              cWIPProjId=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPProjId,
+              cWIPCharge_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPCharge_Code,
+              cWIPResource_Code=&gt;Pac_Prc_Wipadjxfer_Sp.cWIPResource_Code,
+              cWIPInputType=&gt; Pac_Prc_Wipadjxfer_Sp.cWIPInputType,
+              cWIPTransactionClass=&gt; Pac_Prc_Wipadjxfer_Sp.cWIPTransactionClass,
+              iTransferStatus=&gt;Pac_Prc_Wipadjxfer_Sp.iTransferStatus,
+              iAdjustXactionNo=&gt;Pac_Prc_Wipadjxfer_Sp.iAdjustXactionNo,
+              iAdjustNumber=&gt;Pac_Prc_Wipadjxfer_Sp.iAdjustNumber,
+              cErrorMessage=&gt;Pac_Prc_Wipadjxfer_Sp.cErrorMessage,
+              cLanguageCode=&gt;Pac_Prc_Wipadjxfer_Sp.cLanguageCode,
+              in_TaskID =&gt; in_TaskID);
+
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+                RAISE_APPLICATION_ERROR( SQLCODE, SQLERRM );
+          END;
+
+
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO TEMP_TEMP_TRANSFERPAC_PRC_WIPA
+            (TANSNO,TRANSDATE,COMPANY_CODE,PROJECT_CODE,CHARGE_CODE,RESOURCE_CODE,XFERSTATUS,INPUT_TYPE,TRANSCLASS,ADJXACTIONNO,ADJNUMBER,ERRORMESG)
+            SELECT Pac_Prc_Wipadjxfer_Sp.iTransNo, Pac_Prc_Wipadjxfer_Sp.dWIPTransDate,
+                   Pac_Prc_Wipadjxfer_Sp.cWIPClntCode, Pac_Prc_Wipadjxfer_Sp.cWIPProjId,
+                   Pac_Prc_Wipadjxfer_Sp.cWIPCharge_Code, Pac_Prc_Wipadjxfer_Sp.cWIPResource_Code,
+                   Pac_Prc_Wipadjxfer_Sp.iTransferStatus,Pac_Prc_Wipadjxfer_Sp.cWIPInputType,
+                   Pac_Prc_Wipadjxfer_Sp.cWIPTransactionClass,
+                   Pac_Prc_Wipadjxfer_Sp.iAdjustXactionNo, Pac_Prc_Wipadjxfer_Sp.iAdjustNumber,
+                   lv.DESCRIPTION
+              FROM CMN_LOOKUPS_V lv
+             WHERE lv.LOOKUP_CODE = Pac_Prc_Wipadjxfer_Sp.cErrorMessage
+               AND lv.LOOKUP_TYPE = 'PAC_POSTING_ERRORS'
+               AND lv.LANGUAGE_CODE = RTRIM(Pac_Prc_Wipadjxfer_Sp.cLanguageCode);
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+        END;
+      END LOOP;
+    END;
+  END IF;
+
+  OPEN RC1 FOR
+  SELECT TANSNO,TRANSDATE,PROJECT_CODE,CHARGE_CODE,RESOURCE_CODE,TRANSCLASS,INPUT_TYPE,XFERSTATUS,ERRORMESG
+    FROM TEMP_TEMP_TRANSFERPAC_PRC_WIPA;
+
+	DELETE FROM TEMP_TEMP_TRANSFERPAC_PRC_WIPA;
+END Pac_Prc_Wipadjxfer_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

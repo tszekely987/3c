@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_NDE_PORTLET_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_NDE_PORTLET_INS_SP" (
+   P_PORTLET_CODE		   IN   VARCHAR2,
+   P_VIEW_SOURCE		   IN   VARCHAR2,
+   P_SERVICE_TYPE      IN   VARCHAR2,
+   P_SERVICE_UDDI   	 IN   VARCHAR2,
+   P_COMPONENT_CODE    IN   VARCHAR2,
+   P_NAME   					 IN   VARCHAR2,
+   P_DESCRIPTION       IN   VARCHAR2,
+   P_CREATED_BY        IN   NUMBER DEFAULT 1,
+   P_INSTANCE_TYPE     IN   VARCHAR2 DEFAULT 'SYSTEM'
+)
+IS
+   V_PORTLET_ID            	              NUMBER;
+   V_POLICY_ID            	              NUMBER;
+   V_SERVICE_ID		         	              NUMBER;
+   V_PORTLET_SERVICE_ID		 	              NUMBER;
+   V_CREATE_DATE                 					DATE := SYSDATE;
+   V_CNT1		               								NUMBER;
+BEGIN
+
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_PORTLETS
+		WHERE    PORTLET_CODE 		= P_PORTLET_CODE;
+
+   	IF    V_CNT1 &gt; 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20006, 'PORTLET EXISTS');
+   	END IF;
+		
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_LOOKUPS
+		WHERE    LOOKUP_CODE = P_INSTANCE_TYPE
+		AND			 LOOKUP_TYPE = 'CMN_PAGE_INSTANCE_TYPE'
+		AND			 IS_ACTIVE = 1;
+
+   	IF    V_CNT1 = 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20007, 'INVALID INSTANCE TYPE');
+   	END IF;
+		
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_SERVICES
+		WHERE    SERVICE_CODE 		= P_PORTLET_CODE;
+
+   	IF    V_CNT1 &gt; 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20006, 'SERVICE EXISTS');
+   	END IF;
+		
+		BEGIN
+			SELECT   CMN_PORTLETS_S1.NEXTVAL
+			INTO     V_PORTLET_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+		INSERT INTO CMN_PORTLETS
+				( ID, PORTLET_CODE, STATUS_CODE, IS_WIDE, INSTANCE_TYPE,
+					MIME_TYPE_CODE, VIEW_SOURCE, COMPONENT_CODE, CATEGORY_ID, 
+					PORTLET_VIEW_TYPE_CODE, PORTLET_TYPE_CODE, IS_SYSTEM, IS_ACTIVE,
+					CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+		VALUES (
+					V_PORTLET_ID, P_PORTLET_CODE, 'NORMAL', 1, P_INSTANCE_TYPE,
+					'vxsl', P_VIEW_SOURCE, P_COMPONENT_CODE, 50210, 
+					'body', 'SYSTEM', 1, 1,
+					V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY);
+
+		CMN_CAPTIONS_NLS_INS_SP( 'CMN_PORTLETS', V_PORTLET_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY);
+
+		BEGIN
+			SELECT   CMN_SERVICES_S1.NEXTVAL
+			INTO     V_SERVICE_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+		INSERT INTO CMN_SERVICES
+			( ID, SERVICE_TYPE_CODE, SERVICE_CODE, COMPONENT_CODE,
+				UDDI_DESCRIPTION,
+				CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+		VALUES(
+				V_SERVICE_ID, P_SERVICE_TYPE, P_PORTLET_CODE, P_COMPONENT_CODE, 
+				P_SERVICE_UDDI,
+				V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY);
+
+		CMN_CAPTIONS_NLS_INS_SP( 'CMN_SERVICES', V_SERVICE_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY );
+
+		BEGIN
+			SELECT   CMN_PORTLET_SERVICES_S1.NEXTVAL
+			INTO     V_PORTLET_SERVICE_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+		INSERT INTO CMN_PORTLET_SERVICES
+			( ID, PORTLET_ID, SERVICE_ID, 
+				CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+		VALUES(
+			  V_PORTLET_SERVICE_ID, V_PORTLET_ID, V_SERVICE_ID, 
+				V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY);
+
+		CMN_CAPTIONS_NLS_INS_SP( 'CMN_PORTLET_SERVICES', V_PORTLET_SERVICE_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY );
+
+		BEGIN
+			SELECT   CMN_SEC_POLICIES_S1.NEXTVAL
+			INTO     V_POLICY_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+		insert into cmn_sec_policies
+		(id, policy_code, object_code, object_type_code, permission_code, component_code, feature_code, object_instance_id, 
+		created_date, created_by, last_updated_date, last_updated_by)
+		values
+		( V_POLICY_ID, 'permView' || P_PORTLET_CODE, 'PORTLET', 'PORTLET', 'VIEW', 'CMN', 'base', V_PORTLET_ID,
+			V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY);
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

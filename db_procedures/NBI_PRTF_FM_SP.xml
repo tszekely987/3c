@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PRTF_FM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PRTF_FM_SP" (
+   P_CURRENCY_CODE                  VARCHAR2  
+)
+AS  
+   V_STMT                           VARCHAR2 (2000);  
+BEGIN
+
+INSERT /*+ APPEND */ INTO NBI_PRTF_FM 
+SELECT      --Getting exchange rate types for the project
+			PMP.ID PROJECT_ID,
+            PMP.BILLING_CURRENCY_CODE,
+            PMP.LABOR_EXCHANGE_RATE_TYPE,
+            PMP.EQUIPMENT_EXCHANGE_RATE_TYPE,
+            PMP.EXPENSE_EXCHANGE_RATE_TYPE,
+            PMP.MATERIALS_EXCHANGE_RATE_TYPE,
+			--Getting company name
+			comp.ID CUSTOMER_ID,
+			comp.COMPANY_NAME COMPANY_NAME,
+			comp.COMPANY_ID CUSTOMER_CODE,
+            --'Getting Billing project id';
+		    NBI_GET_BILLING_PROJECT_FCT (PMP.ID) BILLING_PROJECT_ID,
+            --'Getting entity for projects: '
+            E.ENTITY,
+            E.DESCRIPTION ENTITY_NAME,
+            L.LOCATIONID LOCATION,
+            L.LOCATIONDESCRIPTION LOCATION_NAME,
+            D.DEPARTCODE DEPARTMENT,
+            D.DESCRIPTION DEPARTMENT_NAME,
+            PMP.CLASS PROJECT_CLASS,
+            PMP.WIPCLASS WIP_CLASS,
+            PMP.TYPE_ PROJECT_TYPE,
+            PMP.STATUS FM_STATUS,
+            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+            SYSDATE,
+            PMP.BILLING_CURRENCY_CODE,
+            P_CURRENCY_CODE,
+            C.CONTRACTAMOUNT,
+            PMP.LABOR_EXCHANGE_RATE_TYPE
+            ) CONTRACTAMOUNT,
+            C.CONTRACTNBR CONTRACTNBR,
+            C.CONTRACTDATE CONTRACTDATE,
+            H.CLNTCLASS CUSTOMER_CLASS,
+            H.DESCRIPTION CUSTOMER_CLASS_NAME,
+			--Getting current revision
+            revision.BUDGET_REV_NUMBER,
+            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 PMP.BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL(act_billing.ACT_BILLING, 0), PMP.LABOR_EXCHANGE_RATE_TYPE
+              ) ACT_BILLING,
+              --'Getting labor/expense/matl/equip rev/cost/wip'
+			  --LEME ==&gt;LaborExpenseMaterialEquipment
+			  --Applying the exchange rate on totalamount/cost/amountremaining
+			  --Need the conversion only if the currency codes are different
+              LEME_REV_COST_WIP.ACTUAL_WIP_HOURS,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.REV_ACT_LABOR,0),
+                                                                                 PMP.LABOR_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.REV_ACT_LABOR,0)   
+              END REV_ACT_LABOR,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.REV_ACT_EQUIP,0),
+                                                                                 PMP.EQUIPMENT_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.REV_ACT_EQUIP,0)                                                               
+              END REV_ACT_EQUIP,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.REV_ACT_EXPENSE,0),
+                                                                                 PMP.EXPENSE_EXCHANGE_RATE_TYPE
+                                                                                 )
+              ELSE NVL(LEME_REV_COST_WIP.REV_ACT_EXPENSE,0)    
+              END REV_ACT_EXPENSE,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.REV_ACT_MATL,0),
+                                                                                 PMP.MATERIALS_EXCHANGE_RATE_TYPE
+                                                                              )
+            
+              ELSE NVL(LEME_REV_COST_WIP.REV_ACT_MATL,0)
+              END REV_ACT_MATL,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.COST_ACT_LABOR,0),
+                                                                                 PMP.LABOR_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.COST_ACT_LABOR,0)
+              END COST_ACT_LABOR,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.COST_ACT_EQUIP,0),
+                                                                                 PMP.EQUIPMENT_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.COST_ACT_EQUIP,0) 
+              END COST_ACT_EQUIP,
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.COST_ACT_EXPENSE,0),
+                                                                                 PMP.EXPENSE_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.COST_ACT_EXPENSE,0)
+              END COST_ACT_EXPENSE,     
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.COST_ACT_MATL,0),
+                                                                                 PMP.MATERIALS_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.COST_ACT_MATL,0) 
+              END COST_ACT_MATL,   
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.WIP_REMAINING_LABOR,0),
+                                                                                 PMP.LABOR_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.WIP_REMAINING_LABOR,0)
+              END WIP_REMAINING_LABOR,   
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.WIP_REMAINING_EQUIP,0),
+                                                                                 PMP.EQUIPMENT_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.WIP_REMAINING_EQUIP,0)
+              END WIP_REMAINING_EQUIP, 
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.WIP_REMAINING_EXPENSE,0),
+                                                                                 PMP.EXPENSE_EXCHANGE_RATE_TYPE
+                                                                              )
+              ELSE NVL(LEME_REV_COST_WIP.WIP_REMAINING_EXPENSE,0)
+              END WIP_REMAINING_EXPENSE, 
+              CASE WHEN P_CURRENCY_CODE &lt;&gt; PMP.BILLING_CURRENCY_CODE THEN
+                            CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                                                                                 SYSDATE,
+                                                                                 PMP.BILLING_CURRENCY_CODE,
+                                                                                 P_CURRENCY_CODE,
+                                                                                 NVL(LEME_REV_COST_WIP.WIP_REMAINING_MATL,0),
+                                                                                 PMP.MATERIALS_EXCHANGE_RATE_TYPE
+                                                                              )
+               ELSE NVL(LEME_REV_COST_WIP.WIP_REMAINING_MATL,0)                                                                                  
+               END WIP_REMAINING_MATL, 
+			  NVL(LEME_REV_COST_WIP.COST_ACT_LABOR, 0) + NVL(LEME_REV_COST_WIP.COST_ACT_EQUIP, 0) + NVL(LEME_REV_COST_WIP.COST_ACT_EXPENSE, 0) + NVL(LEME_REV_COST_WIP.COST_ACT_MATL,0) COST_ACT_TOTAL,
+			  NVL(LEME_REV_COST_WIP.REV_ACT_LABOR, 0) + NVL(LEME_REV_COST_WIP.REV_ACT_EQUIP, 0) + NVL(LEME_REV_COST_WIP.REV_ACT_EXPENSE, 0) + NVL (LEME_REV_COST_WIP.REV_ACT_MATL,0) REV_ACT_TOTAL,
+            --'Getting labor/equip/matl/expense cost/rev';
+			--LEMECR=&gt; LaborExpenseMaterialEquipmentCostRevenue
+            NVL(LEMECR.COST_ETC_LABOR,0) COST_ETC_LABOR,
+            NVL(LEMECR.COST_BASE_LABOR,0) COST_BASE_LABOR,
+            NVL(LEMECR.REV_ETC_LABOR,0) REV_ETC_LABOR,
+            NVL(LEMECR.REV_BASE_LABOR,0) REV_BASE_LABOR,
+            NVL(LEMECR.COST_ETC_EQUIP,0) COST_ETC_EQUIP,
+            NVL(LEMECR.COST_BASE_EQUIP,0) COST_BASE_EQUIP,
+            NVL(LEMECR.REV_ETC_EQUIP,0) REV_ETC_EQUIP,
+            NVL(LEMECR.REV_BASE_EQUIP,0) REV_BASE_EQUIP,
+            NVL(LEMECR.COST_ETC_MATL,0) COST_ETC_MATL,
+            NVL(LEMECR.COST_BASE_MATL,0) COST_BASE_MATL,
+            NVL(LEMECR.REV_ETC_MATL,0) REV_ETC_MATL,
+            NVL(LEMECR.REV_BASE_MATL,0) REV_BASE_MATL,
+            NVL(LEMECR.COST_ETC_EXPENSE,0) COST_ETC_EXPENSE,
+            NVL(LEMECR.COST_BASE_EXPENSE,0) COST_BASE_EXPENSE,
+            NVL(LEMECR.REV_ETC_EXPENSE,0) REV_ETC_EXPENSE,
+            NVL(LEMECR.REV_BASE_EXPENSE,0) REV_BASE_EXPENSE,
+			NVL(LEMECR.REV_BASE_LABOR, 0) + NVL(LEMECR.REV_BASE_EQUIP, 0) + NVL(LEMECR.REV_BASE_EXPENSE, 0) + NVL(LEMECR.REV_BASE_MATL,0) REV_BASE_TOTAL,
+			NVL(LEMECR.COST_BASE_LABOR, 0) + NVL(LEMECR.COST_BASE_EQUIP, 0) + NVL(LEMECR.COST_BASE_EXPENSE, 0) + NVL(LEMECR.COST_BASE_MATL,0) COST_BASE_TOTAL,
+			NVL(LEMECR.COST_ETC_LABOR, 0) + NVL(LEMECR.COST_ETC_EQUIP, 0) + NVL(LEMECR.COST_ETC_EXPENSE, 0) + NVL(LEMECR.COST_ETC_MATL,0) COST_ETC_TOTAL,			
+			NVL (LEMECR.REV_ETC_LABOR, 0) + NVL (LEMECR.REV_ETC_EQUIP, 0) + NVL (LEMECR.REV_ETC_EXPENSE, 0) + NVL (LEMECR.REV_ETC_MATL,0) REV_ETC_TOTAL,
+            NVL (LEME_REV_COST_WIP.WIP_REMAINING_LABOR, 0) + NVL (LEME_REV_COST_WIP.WIP_REMAINING_EQUIP, 0) + NVL (LEME_REV_COST_WIP.WIP_REMAINING_EXPENSE, 0) + NVL (LEME_REV_COST_WIP.WIP_REMAINING_MATL,0) ACT_WIP_QTY
+FROM    PAC_MNT_PROJECTS PMP
+--Getting current revision
+LEFT OUTER JOIN (SELECT   MAX (A.PROJREVISIONID) BUDGET_REV_NUMBER,P.ID
+FROM  PAC_MNT_PROJECTS P
+        JOIN  PROJREVISION A ON (P.PROJECT_CODE = A.PROJECT_CODE AND  A.APPROVED =1)
+     GROUP BY P.ID
+      ) revision ON revision.ID=PMP.ID 
+--Getting labor/expense/matl/equip rev/cost/wip
+JOIN (
+         SELECT  A.INVESTMENT_ID,                 
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'L' THEN NVL(A.QUANTITY, 0) END),0) ACTUAL_WIP_HOURS,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'L' THEN NVL(V.AMOUNT, 0) END),0) REV_ACT_LABOR,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'Q' THEN NVL(V.AMOUNT, 0) END),0) REV_ACT_EQUIP,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'X' THEN NVL(V.AMOUNT, 0) END),0) REV_ACT_EXPENSE,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'M' THEN NVL(V.AMOUNT, 0) END),0) REV_ACT_MATL,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'L' THEN NVL(V.TOTALCOST, 0) END),0) COST_ACT_LABOR,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'Q' THEN NVL(V.TOTALCOST, 0) END),0) COST_ACT_EQUIP,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'X' THEN NVL(V.TOTALCOST, 0) END),0) COST_ACT_EXPENSE,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'M' THEN NVL(V.TOTALCOST, 0) END),0) COST_ACT_MATL,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'L' THEN NVL(V.AMOUNTREMAINING, 0) END),0) WIP_REMAINING_LABOR,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'Q' THEN NVL(V.AMOUNTREMAINING, 0) END),0) WIP_REMAINING_EQUIP,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'X' THEN NVL(V.AMOUNTREMAINING, 0) END),0) WIP_REMAINING_EXPENSE,
+                 NVL(SUM(CASE WHEN A.TRANSTYPE = 'M' THEN NVL(V.AMOUNTREMAINING, 0) END),0) WIP_REMAINING_MATL                
+        FROM     PPA_WIP A  
+        JOIN     PPA_WIP_VALUES V ON(A.TRANSNO = V.TRANSNO
+                                  AND      V.CURRENCY_TYPE = 'BILLING')  
+		WHERE ( A.TRANSTYPE IN ('L', 'Q', 'X', 'M') AND  A.STATUS &lt;&gt; 2)
+         --WHERE    P.ID = 5001308         
+         GROUP BY A.INVESTMENT_ID
+     ) LEME_REV_COST_WIP ON LEME_REV_COST_WIP.INVESTMENT_ID=PMP.ID
+JOIN    LOCATIONS L ON PMP.LOCATIONID = L.LOCATIONID
+JOIN    ENTITY E ON L.ENTITY = E.ENTITY
+JOIN    DEPARTMENTS D ON PMP.DEPARTCODE = D.DEPARTCODE
+LEFT OUTER JOIN PROJCNTRTS C ON PMP.PROJECT_CODE = C.PROJECT_CODE
+LEFT OUTER JOIN SRM_COMPANIES comp ON PMP.COMPANY_CODE = comp.COMPANY_ID
+LEFT OUTER JOIN CLNTSUPP G ON comp.COMPANY_ID = G.COMPANY_CODE
+LEFT OUTER JOIN CLNTCLASS H ON G.CLNTCLASS = H.CLNTCLASS
+--Getting act_billing
+LEFT OUTER JOIN (SELECT   SUM (NVL(V.AMOUNT, 0) * DECODE (A.TRANSTYPE, 'BC', -1, 1)) ACT_BILLING,I.ID
+        FROM     PPA_BILLINGS A
+        JOIN     PPA_BILLING_VALUES V ON (A.TRANSNO = V.TRANSNO AND V.CURRENCY_TYPE = 'BILLING' AND SUBSTR (A.TRANSTYPE, 1, 1) = 'B')
+        JOIN     INV_INVESTMENTS I ON NLS_UPPER (I.CODE) = A.PROJECT_CODE
+        GROUP BY I.ID
+       -- WHERE    I.ID = 5001308    
+      ) act_billing ON act_billing.ID=PMP.ID
+	 -- 'Getting labor/equip/matl/expense cost/rev';
+LEFT OUTER JOIN (
+                 SELECT  A.PROJECT_ID,            
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 0 THEN NVL((A.ETC_QTY * RC.COST_RATE) ,0) END),0) 	COST_ETC_LABOR,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 0 THEN NVL((A.BASE_QTY * RC.COST_RATE) ,0) END),0) 	COST_BASE_LABOR,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 0 THEN NVL((A.ETC_QTY * RC.BILL_RATE) ,0) END),0) 	REV_ETC_LABOR,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 0 THEN NVL((A.BASE_QTY * RC.BILL_RATE) ,0) END),0) 	REV_BASE_LABOR,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 1 THEN NVL((A.ETC_QTY * RC.COST_RATE) ,0) END),0) 	COST_ETC_EQUIP,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 1 THEN NVL((A.BASE_QTY * RC.COST_RATE) ,0) END),0) 	COST_BASE_EQUIP,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 1 THEN NVL((A.ETC_QTY * RC.BILL_RATE) ,0) END),0) 	REV_ETC_EQUIP,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 1 THEN NVL((A.BASE_QTY * RC.BILL_RATE) ,0) END),0) 	REV_BASE_EQUIP,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 2 THEN NVL((A.ETC_QTY * RC.COST_RATE) ,0) END),0) 	COST_ETC_MATL,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 2 THEN NVL((A.BASE_QTY * RC.COST_RATE) ,0) END),0) 	COST_BASE_MATL,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 2 THEN NVL((A.ETC_QTY * RC.BILL_RATE) ,0) END),0) 	REV_ETC_MATL,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 2 THEN NVL((A.BASE_QTY * RC.BILL_RATE) ,0) END),0) 	REV_BASE_MATL,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 3 THEN NVL((A.ETC_QTY * RC.COST_RATE) ,0) END),0) 	COST_ETC_EXPENSE,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 3 THEN NVL((A.BASE_QTY * RC.COST_RATE) ,0) END),0) 	COST_BASE_EXPENSE,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 3 THEN NVL((A.ETC_QTY * RC.BILL_RATE) ,0) END),0) 	REV_ETC_EXPENSE,
+                 NVL(SUM(CASE WHEN B.RESOURCE_TYPE= 3 THEN NVL((A.BASE_QTY * RC.BILL_RATE) ,0) END),0) 	REV_BASE_EXPENSE 
+                 FROM     NBI_PRT_FACTS A
+                 JOIN     SRM_RESOURCES B ON (B.ID = A.RESOURCE_ID AND B.RESOURCE_TYPE in (0,1,2,3))
+                 LEFT     JOIN NBI_PROJ_RES_RATES_AND_COSTS RC
+                 ON       A.FACT_DATE BETWEEN RC.FROM_DATE AND RC.TO_DATE
+                 AND      A.TASK_ID  = RC.TASK_ID
+				 /* Added BKT */
+				 AND      A.TEAM_ID = RC.TEAM_ID
+				 /* End BKT */
+                 AND      A.PROJECT_ID = RC.PROJECT_ID
+                 AND      A.RESOURCE_ID = RC.RESOURCE_ID                
+                 GROUP BY A.PROJECT_ID
+                ) LEMECR ON LEMECR.PROJECT_ID=PMP.ID;
+	--COMMIT; 
+	V_STMT := 'Done Populating the planning related information for each of the plan type for the given project';
+	DBMS_OUTPUT.PUT_LINE (V_STMT);
+EXCEPTION   
+   WHEN OTHERS THEN RAISE_APPLICATION_ERROR ( -20000,'Error in NBI_PRTF_FM_SP -'|| V_STMT|| ': '|| SQLERRM);
+END NBI_PRTF_FM_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_RF_EVENTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_RF_EVENTS_SP" 
+IS
+   V_STMT                        VARCHAR2(1000);
+   
+   TYPE NBI_RF_EVENTS_ARRAY IS TABLE OF NBI_R_FACTS_V%ROWTYPE INDEX BY BINARY_INTEGER;
+
+	NBI_RF_EVENTS_DATA NBI_RF_EVENTS_ARRAY;
+
+
+  CURSOR NBI_RF_EVENTS_CURSOR IS
+	SELECT RESOURCE_ID,
+             FACT_DATE,
+             AVAILABLE_HOURS,
+             ETC_HOURS,
+             ACTUAL_HOURS,
+             BASE_HOURS,
+             ALLOCATED_HOURS
+      FROM   NBI_R_FACTS_V V
+      WHERE  NOT EXISTS (SELECT 'RECORD HAS BEEN PREVIOUSLY EXTRACTED'
+                         FROM   NBI_R_FACTS F
+                         WHERE  F.RESOURCE_ID = V.RESOURCE_ID
+                            );
+	
+BEGIN
+   -- Insert facts that have changed into temp facts
+   V_STMT := 'INSERTING DELETE RECORDS INTO TEMP_NBI_R_FACTS';
+   INSERT  INTO TEMP_NBI_R_FACTS
+               (ACTION, RESOURCE_ID, FACT_DATE)
+			  SELECT 'D',
+              PRJ_OBJECT_ID RESOURCE_ID,
+              sysdate FACT_DATE 
+			  FROM NBI_EVENTS EVENTS
+			  WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+			  AND   EVENTS.PRJ_OBJECT_TYPE  IN ('ASSIGNMENT','RESOURCE','TEAM')
+			  AND EXISTS(SELECT RESOURCE_ID FROM NBI_R_FACTS WHERE  RESOURCE_ID=EVENTS.PRJ_OBJECT_ID);
+			   
+      /*  SELECT 'D',
+              RESOURCE_ID,
+              FACT_DATE
+       FROM   NBI_R_FACTS, 
+              (
+                 SELECT  ASSIGNMENT.PRRESOURCEID ID
+                   FROM NBI_EVENTS EVENTS,
+                        PRASSIGNMENT ASSIGNMENT,
+						SRM_RESOURCES RES
+                  WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                    AND EVENTS.PRJ_OBJECT_ID = ASSIGNMENT.PRID
+                    AND EVENTS.PRJ_OBJECT_TYPE = 'ASSIGNMENT'
+					AND ASSIGNMENT.prresourceid = RES.id
+					AND RES.include_flag = 1 --include data mart resources only
+              UNION
+                 -- FOR ALLOC
+                 SELECT TEAM.PRRESOURCEID ID
+                   FROM NBI_EVENTS EVENTS,
+                        PRTEAM TEAM,
+						SRM_RESOURCES RES
+                  WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                    AND EVENTS.PRJ_OBJECT_ID = TEAM.PRID
+                    AND EVENTS.PRJ_OBJECT_TYPE = 'TEAM'
+					AND TEAM.prresourceid = RES.id	   	  
+					AND RES.include_flag = 1 --include data mart resources only
+              UNION
+                 -- FOR AVAIL
+                 SELECT EVENTS.PRJ_OBJECT_ID ID
+                   FROM NBI_EVENTS EVENTS,
+						SRM_RESOURCES RES
+                  WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                    AND EVENTS.PRJ_OBJECT_TYPE = 'RESOURCE'
+					AND EVENTS.prj_object_id = RES.id	  
+					AND RES.include_flag = 1 --include data mart resources only
+                )TEMP_NBI_IDS
+       WHERE  NBI_R_FACTS.RESOURCE_ID = TEMP_NBI_IDS.ID
+      MINUS
+       SELECT 'D',
+              RESOURCE_ID,
+              FACT_DATE
+       FROM   NBI_R_FACTS_V; */
+
+   
+/*    V_STMT := 'INSERTING UPDATED RECORDS INTO TEMP_NBI_R_FACTS';
+   INSERT INTO TEMP_NBI_R_FACTS
+               (ACTION,
+                RESOURCE_ID,
+                FACT_DATE,
+                AVAILABLE_HOURS,
+                ETC_HOURS,
+                ACTUAL_HOURS,
+                BASE_HOURS,
+                ALLOCATED_HOURS
+               )
+      SELECT 'U',
+             V.RESOURCE_ID,
+             V.FACT_DATE,
+             V.AVAILABLE_HOURS,
+             V.ETC_HOURS,
+             V.ACTUAL_HOURS,
+             V.BASE_HOURS,
+             V.ALLOCATED_HOURS
+      FROM   (SELECT
+                    S.PRJ_OBJECT_ID RESOURCE_ID,
+                    S.SLICE_DATE FACT_DATE,
+                    S.SLICE AVAILABLE_HOURS,
+                    SUM(F.ETC_QTY) ETC_HOURS,
+                    SUM(F.ACTUAL_QTY) ACTUAL_HOURS,
+                    SUM(F.BASE_QTY) BASE_HOURS,
+                    SUM(F.ALLOCATED_QTY) ALLOCATED_HOURS
+              FROM     PRJ_BLB_SLICEREQUESTS SR,
+                       (
+                        SELECT  ASSIGNMENT.PRRESOURCEID ID
+                       FROM NBI_EVENTS EVENTS,
+                            PRASSIGNMENT ASSIGNMENT,
+							SRM_RESOURCES RES
+                      WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                        AND EVENTS.PRJ_OBJECT_ID = ASSIGNMENT.PRID
+                        AND EVENTS.PRJ_OBJECT_TYPE = 'ASSIGNMENT'
+						AND ASSIGNMENT.prresourceid = RES.id
+						AND RES.include_flag = 1 --include data mart resources only
+                  UNION
+                     -- FOR ALLOC
+                     SELECT TEAM.PRRESOURCEID ID
+                       FROM NBI_EVENTS EVENTS,
+                            PRTEAM TEAM,
+							SRM_RESOURCES RES
+                      WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                        AND EVENTS.PRJ_OBJECT_ID = TEAM.PRID
+                        AND EVENTS.PRJ_OBJECT_TYPE = 'TEAM'
+						AND TEAM.prresourceid = RES.id	   	  
+						AND RES.include_flag = 1 --include data mart resources only
+                  UNION
+                     -- FOR AVAIL
+                     SELECT EVENTS.PRJ_OBJECT_ID ID
+                       FROM NBI_EVENTS EVENTS,
+							SRM_RESOURCES RES
+                      WHERE EVENTS.STATUS IN ('PROCESSING', 'PRTF_PROCESSED')
+                        AND EVENTS.PRJ_OBJECT_TYPE = 'RESOURCE'
+						AND EVENTS.prj_object_id = RES.id	  
+						AND RES.include_flag = 1 --include data mart resources only
+                        ) RES,
+                       PRJ_BLB_SLICES S,
+                       NBI_PRT_FACTS F
+              WHERE    SR.REQUEST_NAME = 'DAILYRESOURCEAVAILCURVE'
+              AND      S.PRJ_OBJECT_ID = RES.ID
+              AND      S.SLICE_REQUEST_ID = SR.ID
+              and      F.RESOURCE_ID (+)= S.PRJ_OBJECT_ID
+              AND      F.FACT_DATE (+)= S.SLICE_DATE
+              GROUP BY S.PRJ_OBJECT_ID, S.SLICE_DATE, S.SLICE) V
+             , NBI_R_FACTS F
+      WHERE  F.RESOURCE_ID = V.RESOURCE_ID
+      AND    F.FACT_DATE = V.FACT_DATE
+      AND (  NVL (F.AVAILABLE_HOURS, -9) &lt;&gt; NVL (V.AVAILABLE_HOURS, -9)
+                            OR NVL (F.ETC_HOURS, -9) &lt;&gt; NVL (V.ETC_HOURS, -9)
+                            OR NVL (F.ACTUAL_HOURS, -9) &lt;&gt; NVL (V.ACTUAL_HOURS, -9)
+                            OR NVL (F.BASE_HOURS, -9) &lt;&gt; NVL (V.BASE_HOURS, -9)
+                            OR NVL (F.ALLOCATED_HOURS, -9) &lt;&gt; NVL (V.ALLOCATED_HOURS, -9));
+       */              
+   -- Update real facts table from temp
+   
+   V_STMT := 'DELETING FROM NBI_R_FACTS';
+/*    DELETE
+     FROM NBI_R_FACTS F
+    WHERE (RESOURCE_ID, FACT_DATE) IN (SELECT RESOURCE_ID,
+                                              FACT_DATE
+                                       FROM   TEMP_NBI_R_FACTS
+                                       WHERE  ACTION = 'D'); */
+	DELETE
+     FROM NBI_R_FACTS F
+    WHERE RESOURCE_ID IN (SELECT RESOURCE_ID
+                                       FROM   TEMP_NBI_R_FACTS
+                                       WHERE  ACTION = 'D');
+   
+/*    V_STMT := 'UPDATING NBI_R_FACTS';
+   UPDATE NBI_R_FACTS F
+      SET (RESOURCE_ID,
+           FACT_DATE,
+           AVAILABLE_HOURS,
+           ETC_HOURS,
+           ACTUAL_HOURS,
+           BASE_HOURS,
+           ALLOCATED_HOURS) = ( SELECT RESOURCE_ID,
+                                       FACT_DATE,
+                                       AVAILABLE_HOURS,
+                                       ETC_HOURS,
+                                       ACTUAL_HOURS,
+                                       BASE_HOURS,
+                                       ALLOCATED_HOURS
+                                FROM   TEMP_NBI_R_FACTS T
+                                WHERE  T.RESOURCE_ID = F.RESOURCE_ID
+                                   AND T.FACT_DATE = F.FACT_DATE
+                                   AND T.ACTION = 'U')
+    WHERE (RESOURCE_ID, FACT_DATE) IN (SELECT RESOURCE_ID,
+                                              FACT_DATE
+                                       FROM   TEMP_NBI_R_FACTS
+                                       WHERE  ACTION = 'U');
+ */
+
+	OPEN NBI_RF_EVENTS_CURSOR;
+	  LOOP
+		FETCH NBI_RF_EVENTS_CURSOR
+		BULK COLLECT INTO NBI_RF_EVENTS_DATA LIMIT 25000;
+		FORALL I IN 1..NBI_RF_EVENTS_DATA.COUNT
+		INSERT INTO NBI_R_FACTS VALUES NBI_RF_EVENTS_DATA(I);
+		EXIT WHEN NBI_RF_EVENTS_CURSOR%NOTFOUND;
+	END LOOP;
+	CLOSE NBI_RF_EVENTS_CURSOR;
+
+/*    V_STMT := 'INSERTING INTO NBI_R_FACTS';
+   INSERT INTO NBI_R_FACTS
+               (RESOURCE_ID,
+                FACT_DATE,
+                AVAILABLE_HOURS,
+                ETC_HOURS,
+                ACTUAL_HOURS,
+                BASE_HOURS,
+                ALLOCATED_HOURS
+               )
+      SELECT RESOURCE_ID,
+             FACT_DATE,
+             AVAILABLE_HOURS,
+             ETC_HOURS,
+             ACTUAL_HOURS,
+             BASE_HOURS,
+             ALLOCATED_HOURS
+      FROM   NBI_R_FACTS_V V
+      WHERE  NOT EXISTS (SELECT 'RECORD HAS BEEN PREVIOUSLY EXTRACTED'
+                         FROM   NBI_R_FACTS F
+                         WHERE  F.RESOURCE_ID = V.RESOURCE_ID
+                            );
+ */
+EXCEPTION
+   WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_RF_EVENTS_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

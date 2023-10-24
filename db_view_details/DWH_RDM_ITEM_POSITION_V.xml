@@ -1,0 +1,63 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RDM_ITEM_POSITION_V">
+    <indexes/>
+    <text_length>3065</text_length>
+    <text>SELECT TO_CHAR(ip.roadmap_item_id) || TO_CHAR(ip.picklist_def_id) || ip.type item_position_key,
+       ip.roadmap_item_id roadmap_item_key,
+       TO_CHAR(ip.picklist_def_id) || i.type picklist_key,
+       i.roadmap_id roadmap_key,
+       ip.picklist_def_id picklist_def_key,
+       ip.type display_type,
+       ip.position position,
+       GREATEST(i.last_updated_date, ip.last_updated_date, im.last_updated_date) clarity_updated_date
+FROM   rdm_roadmap_item_positions ip
+       INNER JOIN rdm_roadmap_items i ON ip.roadmap_item_id = i.id
+       INNER JOIN rdm_roadmaps im ON i.roadmap_id = im.id
+       INNER JOIN rdm_roadmap_picklist_defs pd ON ip.picklist_def_id = pd.id
+WHERE  pd.lookup_type = 'RDM_ROADMAP_ITEM_TYPE'
+AND    i.type IS NOT NULL
+UNION ALL
+SELECT TO_CHAR(ip.roadmap_item_id) || TO_CHAR(ip.picklist_def_id) || ip.type item_position_key,
+       ip.roadmap_item_id roadmap_item_key,
+       TO_CHAR(ip.picklist_def_id) || i.status picklist_key,
+       i.roadmap_id roadmap_key,
+       ip.picklist_def_id picklist_def_key,
+       ip.type display_type,
+       ip.position position,
+       GREATEST(i.last_updated_date, ip.last_updated_date, im.last_updated_date) clarity_updated_date
+FROM   rdm_roadmap_item_positions ip
+       INNER JOIN rdm_roadmap_items i ON ip.roadmap_item_id = i.id
+       INNER JOIN rdm_roadmaps im ON i.roadmap_id = im.id
+       INNER JOIN rdm_roadmap_picklist_defs pd ON ip.picklist_def_id = pd.id
+WHERE  pd.lookup_type = 'RDM_ROADMAP_ITEM_STATUS'
+AND    i.status IS NOT NULL
+UNION ALL
+SELECT TO_CHAR(ip.roadmap_item_id) || TO_CHAR(ip.picklist_def_id) || ip.type item_position_key,
+       ip.roadmap_item_id roadmap_item_key,
+       TO_CHAR(ip.picklist_def_id) || TO_CHAR(i.in_plan) picklist_key,
+       i.roadmap_id roadmap_key,
+       ip.picklist_def_id picklist_def_key,
+       ip.type display_type,
+       ip.position position,
+       GREATEST(i.last_updated_date, ip.last_updated_date, im.last_updated_date) clarity_updated_date
+FROM   rdm_roadmap_item_positions ip
+       INNER JOIN rdm_roadmap_items i ON ip.roadmap_item_id = i.id
+       INNER JOIN rdm_roadmaps im ON i.roadmap_id = im.id
+       INNER JOIN rdm_roadmap_picklist_defs pd ON ip.picklist_def_id = pd.id
+WHERE  pd.lookup_type = 'RDM_ROADMAP_ITEM_IN_PLAN'
+UNION ALL
+SELECT TO_CHAR(ip.roadmap_item_id) || TO_CHAR(ip.picklist_def_id) || ip.type item_position_key,
+       ip.roadmap_item_id roadmap_item_key,
+       TO_CHAR(ip.picklist_def_id) || TO_CHAR(iv.lookup_code) picklist_key,
+       i.roadmap_id roadmap_key,
+       ip.picklist_def_id picklist_def_key,
+       ip.type display_type,
+       ip.position position,
+       GREATEST(i.last_updated_date, ip.last_updated_date, im.last_updated_date) clarity_updated_date
+FROM   rdm_roadmap_items i
+       INNER JOIN rdm_roadmaps im ON i.roadmap_id = im.id
+       INNER JOIN rdm_roadmap_item_values iv ON i.id = iv.roadmap_item_id
+       INNER JOIN rdm_roadmap_item_positions ip ON iv.roadmap_item_id = ip.roadmap_item_id
+                                               AND iv.picklist_def_id = ip.picklist_def_id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_UPDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_UPDATE_SP" 
+(
+  matrixKey         NUMBER,
+  in_matrixName     IN VARCHAR2,
+  matrixType        VARCHAR2,
+  in_matrixLocation IN VARCHAR2,
+  in_matrixComments IN VARCHAR2,
+  matrixCurrency    IN VARCHAR2,
+  userId             NUMBER DEFAULT 1)
+AS
+  matrixName        GLOBALPKG.STRING;
+  matrixLocation    GLOBALPKG.STRING;
+  matrixComments    GLOBALPKG.STRING;
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+BEGIN
+	PAC_MNT_MATRIX_UPDATE_SP.matrixName := PAC_MNT_MATRIX_UPDATE_SP.in_matrixName;
+	PAC_MNT_MATRIX_UPDATE_SP.matrixLocation := PAC_MNT_MATRIX_UPDATE_SP.in_matrixLocation;
+	PAC_MNT_MATRIX_UPDATE_SP.matrixComments := PAC_MNT_MATRIX_UPDATE_SP.in_matrixComments;
+  PAC_MNT_MATRIX_UPDATE_SP.matrixName :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_UPDATE_SP.matrixName), '')));
+  PAC_MNT_MATRIX_UPDATE_SP.matrixLocation :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_UPDATE_SP.matrixLocation), '')));
+  PAC_MNT_MATRIX_UPDATE_SP.matrixComments :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_UPDATE_SP.matrixComments), '')));
+
+  IF PAC_MNT_MATRIX_UPDATE_SP.matrixType IS NULL THEN
+    BEGIN
+      raise_application_error(-20223, 'Matrix type must be specified');
+      RETURN;
+    END;
+	END IF;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  FieldName
+        FROM ppa_MatrixColDef
+        WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey
+        and FieldName  NOT IN (
+        SELECT  LOWER(LOOKUP_CODE) "CODE"
+        FROM PAC_MNT_MATRIX_TYPE_FIELDS, CMN_LOOKUPS
+        WHERE CMN_LOOKUPS.ID = PAC_MNT_MATRIX_TYPE_FIELDS.FIELD_TYPE_ID
+        and MATRIX_TYPE_ID = (SELECT ID
+                                FROM CMN_LOOKUPS
+                               WHERE LOOKUP_TYPE = 'PAC_MATRIX_TYPE'
+                                 and LOOKUP_CODE = PAC_MNT_MATRIX_UPDATE_SP.matrixType ) ) );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20224, 'Can not change type! Remove columns containing fields that not applicable for new type.');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+  IF PAC_MNT_MATRIX_UPDATE_SP.matrixLocation IS NOT NULL THEN
+		BEGIN
+      BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE not EXISTS (
+          SELECT  1
+          FROM locations
+          WHERE locationid = PAC_MNT_MATRIX_UPDATE_SP.matrixLocation );
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20202, 'Specified location does not exist! Use Browse button to find right location.');
+            RETURN;
+          END;
+        END IF;
+      END;
+		END IF;
+
+    SAVEPOINT Transactn;
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_Matrix
+         SET Description = PAC_MNT_MATRIX_UPDATE_SP.matrixName,
+             MatrixType = PAC_MNT_MATRIX_UPDATE_SP.matrixType,
+             Comments = PAC_MNT_MATRIX_UPDATE_SP.matrixComments,
+             default_currency_code = PAC_MNT_MATRIX_UPDATE_SP.matrixCurrency,
+             LAST_UPDATED_DATE = SYSDATE,
+             last_updated_by = userId
+       WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20225, 'Error Updating Matrix');
+        RETURN;
+      END;
+		END IF;
+
+    IF PAC_MNT_MATRIX_UPDATE_SP.matrixLocation IS NOT NULL THEN
+		BEGIN
+			BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM ppa_LocMatrixAssignments
+            WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+      IF StoO_selcnt != 0 THEN
+				BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_LocMatrixAssignments
+             SET LocationID = PAC_MNT_MATRIX_UPDATE_SP.matrixLocation,
+                 MatrixType = PAC_MNT_MATRIX_UPDATE_SP.matrixType,
+                 LAST_UPDATED_DATE = SYSDATE,
+                 last_updated_by = userId
+           WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+				END;
+			ELSE
+				BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          INSERT INTO ppa_LocMatrixAssignments (LocationID, MatrixKey, MatrixType, created_date, created_by, last_updated_date, last_updated_by)
+          VALUES (PAC_MNT_MATRIX_UPDATE_SP.matrixLocation, PAC_MNT_MATRIX_UPDATE_SP.matrixKey, PAC_MNT_MATRIX_UPDATE_SP.matrixType,
+          SYSDATE, userId, SYSDATE, userId);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+				END;
+			END IF;
+			END;
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM ppa_LocMatrixAssignments
+            WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+				BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          DELETE  ppa_LocMatrixAssignments
+            WHERE MatrixKey = PAC_MNT_MATRIX_UPDATE_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+				END;
+			END IF;
+			END;
+		END;
+		END IF;
+
+    IF StoO_error = 0 THEN
+			COMMIT WORK;
+		ELSE
+      BEGIN
+        ROLLBACK TO SAVEPOINT Transactn;
+        raise_application_error(-20206, 'Error Location Matrix  Assignments');
+        RETURN;
+      END;
+		END IF;
+END PAC_MNT_MATRIX_UPDATE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

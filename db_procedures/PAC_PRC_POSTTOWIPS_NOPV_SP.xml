@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_POSTTOWIPS_NOPV_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_POSTTOWIPS_NOPV_SP" 
+(
+  userid                VARCHAR2,
+  in_dfromdates         DATE,
+  in_dtodates           DATE,
+  in_cLocationlist      VARCHAR2 DEFAULT NULL,
+  in_cClntcodelist      VARCHAR2 DEFAULT NULL,
+  in_cProjcodelist      VARCHAR2 DEFAULT NULL,
+  in_cResource_Codelist VARCHAR2 DEFAULT NULL,
+  vlabor                NUMBER DEFAULT 1,
+  vmaterial             NUMBER DEFAULT 1,
+  vequipment            NUMBER DEFAULT 1,
+  vexpense              NUMBER DEFAULT 1,
+  vpoc                  NUMBER DEFAULT 0
+)
+AS
+  cLocationlist         VARCHAR2(4000);
+  cClntcodelist         VARCHAR2(4000);
+  cProjcodelist         VARCHAR2(4000);
+  cResource_Codelist    VARCHAR2(4000);
+  StoO_selcnt           INTEGER;
+  StoO_error            INTEGER;
+  StoO_rowcnt           INTEGER;
+  StoO_crowcnt          INTEGER := 0;
+  StoO_fetchstatus      INTEGER := 0;
+  StoO_errmsg           GLOBALPKG.STRING;
+  StoO_sqlstatus        INTEGER;
+  iLength               NUMBER;
+  iLength2              NUMBER;
+  iSubVal               NUMBER;
+  iSubVal2              NUMBER;
+  cSubStr               GLOBALPKG.STRING;
+  cSubStr2              GLOBALPKG.STRING;
+  iTransNo              NUMBER;
+  labor                 GLOBALPKG.STRING;
+  material              GLOBALPKG.STRING;
+  equipment             GLOBALPKG.STRING;
+  expense               GLOBALPKG.STRING;
+  poc                   GLOBALPKG.STRING;
+  transclass            GLOBALPKG.STRING;
+  codetype              GLOBALPKG.STRING;
+  COMPANY_CODE          GLOBALPKG.STRING;
+  p_TransNo             NUMBER;
+  v_string_array        get_string_pkg.v_string_type;
+  dfromdates            GLOBALPKG.STRING;
+  dtodates              GLOBALPKG.STRING;
+BEGIN
+  cLocationList := RTRIM(in_cLocationlist);
+  cClntcodelist := RTRIM(in_cClntcodelist);
+	cProjcodelist := RTRIM(in_cProjcodelist);
+  cResource_Codelist := RTRIM(in_cResource_Codelist);
+	dfromdates := TO_char(in_dfromdates);
+	dtodates   := TO_char(in_dtodates);
+
+  IF vLabor = 1 THEN
+    labor := 'L';
+	ELSE
+    labor := NULL;
+	END IF;
+
+  IF vmaterial = 1 THEN
+    material := 'M';
+	ELSE
+    material := NULL;
+	END IF;
+
+  IF vequipment = 1 THEN
+    equipment := 'Q';
+	ELSE
+    equipment := NULL;
+	END IF;
+
+  IF vexpense = 1 THEN
+    expense := 'X';
+	ELSE
+    expense := NULL;
+	END IF;
+
+  IF vPoc = 1 THEN
+    poc := 'POC';
+	ELSE
+    poc := NULL;
+	END IF;
+
+  IF cLocationList IS NULL AND cClntcodeList IS NULL AND cprojcodelist IS NULL AND cResource_Codelist IS NULL THEN
+    BEGIN
+      codetype :=  'All';
+          PAC_PRC_POSTTOWIPS_SP(
+            userid,
+            dFromdates,
+            dTodates,
+            codetype,
+            NULL,
+            NULL,
+            NULL,
+            labor,
+            material,
+            equipment,
+            expense,
+            poc,
+            null,
+            'false'
+          );
+    END;
+	END IF;
+
+  IF cLocationList IS NOT NULL THEN
+    BEGIN
+      codetype := 'Locations';
+      v_string_array := get_string_pkg.get_string(cLocationList);
+      for looper in 1..v_string_array.count loop
+        BEGIN
+            PAC_PRC_POSTTOWIPS_SP(userid,
+              dFromdates,
+              dTodates,
+              codetype,
+              v_string_array(looper),
+              NULL,
+              NULL,
+              labor,
+              material,
+              equipment,
+              expense,
+              poc,
+              null,
+              'false'
+            );
+        END;
+      end loop;
+		END;
+	END IF;
+
+  IF cClntcodeList IS NOT NULL THEN
+    BEGIN
+      codetype := 'Clients';
+      v_string_array := get_string_pkg.get_string(cClntcodeList);
+      for looper in 1..v_string_array.count loop
+        BEGIN
+            PAC_PRC_POSTTOWIPS_SP(
+              userid,
+              dFromdates,
+              dTodates,
+              codetype,
+              v_string_array(looper),
+              NULL,
+              NULL,
+              labor,
+              material,
+              equipment,
+              expense,
+              poc,
+              null,
+              'false'
+            );
+        END;
+      end loop;
+		END;
+	END IF;
+
+  IF cProjcodelist IS NOT NULL THEN
+    BEGIN
+      codetype := 'Projects';
+      v_string_array := get_string_pkg.get_string(cProjcodelist);
+      for looper in 1..v_string_array.count loop
+        BEGIN
+          iSubVal2 :=  INSTR( v_string_array(looper), ':');
+          COMPANY_CODE :=  SUBSTR(v_string_array(looper), 1,(iSubVal2 - 1));
+          cSubStr2 :=  SUBSTR(v_string_array(looper), (iSubVal2 + 1));
+            PAC_PRC_POSTTOWIPS_SP(
+              userid,
+              dFromdates,
+              dTodates,
+              codetype,
+              cSubStr2,
+              COMPANY_CODE,
+              NULL,
+              labor,
+              material,
+              equipment,
+              expense,
+              poc,
+              null,
+              'false'
+           );
+        END;
+      end loop;
+		END;
+	END IF;
+
+  IF cResource_Codelist IS NOT NULL THEN
+    BEGIN
+      codetype := 'Employees';
+      v_string_array := get_string_pkg.get_string(cResource_Codelist);
+      for looper in 1..v_string_array.count loop
+        BEGIN
+            PAC_PRC_POSTTOWIPS_SP(
+              userid,
+              dFromdates,
+              dTodates,
+              codetype,
+              v_string_array(looper),
+              NULL,
+              NULL,
+              labor,
+              material,
+              equipment,
+              expense,
+              poc,
+              null,
+              'false'
+            );
+        END;
+      end loop;
+		END;
+	END IF;
+END PAC_PRC_POSTTOWIPS_NOPV_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

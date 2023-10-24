@@ -1,0 +1,35 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RES_M_ALLOC_HRS_V">
+    <indexes/>
+    <text_length>1074</text_length>
+    <text>SELECT t.prResourceID RESOURCE_ID,
+       t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID, 
+       c.start_date MONTH_START_DATE,
+       0 ALLOC_HOURS,
+       0 HARD_ALLOC_HOURS
+FROM   prTeam t, srm_resources r, rpt_calendar c
+WHERE  t.prResourceID = r.id
+AND    r.resource_type &lt;= 1
+AND    c.period_type = 'MONTHLY'
+UNION
+SELECT t.prResourceID RESOURCE_ID,
+       t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID, 
+       s.slice_date MONTH_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEALLOCCURVE' THEN s.slice ELSE 0 END,0)) ALLOC_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEHARDALLOC' THEN s.slice ELSE 0 END,0)) HARD_ALLOC_HOURS
+FROM   prTeam t
+       INNER JOIN srm_resources r ON t.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON t.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name IN ('MONTHLYRESOURCEALLOCCURVE','MONTHLYRESOURCEHARDALLOC'))
+AND   (r.resource_type &lt;= 1)
+GROUP BY t.prResourceID, t.prProjectID, t.prID, s.slice_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

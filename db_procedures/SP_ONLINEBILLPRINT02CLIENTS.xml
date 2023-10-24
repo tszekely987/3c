@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_ONLINEBILLPRINT02CLIENTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_ONLINEBILLPRINT02CLIENTS" 
+(
+  in_location  IN VARCHAR2,
+  emplycodeinit   VARCHAR2,
+  reprint         VARCHAR2,
+  invcreditmemo   NUMBER,
+  rows_           NUMBER,
+  RC1      IN OUT SP_ONLINEBILLPRINT02CLIENTSPkg.RCT1
+)
+AS
+  location  GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  printedflag   NUMBER(5,0);
+  /**  Modifications madeto this proc must also be made to procs:
+    sp_onlinebillprint02clientsf1    ****/
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_onlinebillprint02clients.location := sp_onlinebillprint02clients.in_location;
+	IF  sp_onlinebillprint02clients.rows_ = 50 THEN
+		NULL;
+	ELSE
+		IF  sp_onlinebillprint02clients.rows_ = 100 THEN
+			NULL;
+		ELSE
+			IF  sp_onlinebillprint02clients.rows_ = 200 THEN
+				NULL;
+			END IF;
+		END IF;
+	END IF;
+	IF  sp_onlinebillprint02clients.reprint = 'Y' THEN
+		sp_onlinebillprint02clients.printedflag :=  1;
+	ELSE
+		sp_onlinebillprint02clients.printedflag :=  0;
+	END IF;
+	IF  sp_onlinebillprint02clients.location = ' ALL' THEN
+		sp_onlinebillprint02clients.location :=  NULL;
+	END IF;
+	IF  sp_onlinebillprint02clients.invcreditmemo = 0 THEN
+	BEGIN
+		OPEN RC1 FOR
+		SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+		WHERE EXISTS (
+		SELECT  1
+		 FROM projstaff
+		WHERE projstaff.billingaccess = 1
+		 AND projstaff.RESOURCE_CODE = sp_onlinebillprint02clients.emplycodeinit
+		 AND projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE )
+		 AND EXISTS (
+		SELECT  1
+		 FROM invoiceheader
+		WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+		 AND UPPER(SUBSTR(invoiceheader.invoiceno, 1, 5)) != 'MATCH'
+		 AND invoiceheader.printed = sp_onlinebillprint02clients.printedflag
+		   )
+		 AND clntsupp.locationid = NVL(sp_onlinebillprint02clients.location,
+		   clntsupp.locationid)
+		 AND clntsupp.status_type = 1
+		  UNION ALL
+		SELECT  ' ALL',  ''
+		FROM DUAL;
+	END;
+	ELSE
+		IF  sp_onlinebillprint02clients.invcreditmemo = 1 THEN
+		BEGIN
+			OPEN RC1 FOR
+			SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+			WHERE EXISTS (
+			SELECT  1
+			 FROM projstaff
+			WHERE projstaff.billingaccess = 1
+			 AND projstaff.RESOURCE_CODE = sp_onlinebillprint02clients.emplycodeinit
+			 AND projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE )
+			 AND EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+			 AND UPPER(SUBSTR(invoiceheader.invoiceno, 1, 5)) != 'MATCH'
+			 AND invoiceheader.printed = sp_onlinebillprint02clients.printedflag
+			 AND invoiceheader.invtype = 'I' )
+			 AND clntsupp.locationid = NVL(sp_onlinebillprint02clients.location,
+			   clntsupp.locationid)
+			 AND clntsupp.status_type = 1
+			  UNION ALL
+			SELECT  ' ALL',  ''
+			FROM DUAL;
+		END;
+		ELSE
+			IF  sp_onlinebillprint02clients.invcreditmemo = 2 THEN
+			BEGIN
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE EXISTS (
+				SELECT  1
+				 FROM projstaff
+				WHERE projstaff.billingaccess = 1
+				 AND projstaff.RESOURCE_CODE = sp_onlinebillprint02clients.emplycodeinit
+				 AND projstaff.COMPANY_CODE = clntsupp.COMPANY_CODE )
+				 AND EXISTS (
+				SELECT  1
+				 FROM invoiceheader
+				WHERE invoiceheader.COMPANY_CODE = clntsupp.COMPANY_CODE
+				 AND UPPER(SUBSTR(invoiceheader.invoiceno, 1, 5)) != 'MATCH'
+				 AND invoiceheader.printed = sp_onlinebillprint02clients.printedflag
+				 AND invoiceheader.invtype = 'C' )
+				 AND clntsupp.locationid = NVL(sp_onlinebillprint02clients.location,
+				   clntsupp.locationid)
+				 AND clntsupp.status_type = 1
+				  UNION ALL
+				SELECT  ' ALL',  ''
+				FROM DUAL;
+			END;
+			END IF;
+			END IF;
+			END IF;
+END sp_onlinebillprint02clients;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

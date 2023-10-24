@@ -1,0 +1,44 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CMN_LIC_RIGHT_V">
+    <indexes/>
+    <text_length>1477</text_length>
+    <text>SELECT id, group_code, lic_right_type lic_right_type, is_active,
+        CASE lic_right_type
+          WHEN 'viewer' THEN 2
+          WHEN 'participant' THEN 3
+          WHEN 'creator' THEN 4
+          WHEN 'studioDev' THEN 5
+        END licence_priority
+      FROM cmn_sec_groups
+      WHERE lic_right_type IN ( 'viewer' , 'participant' , 'creator' , 'studioDev')
+      AND NOT EXISTS (SELECT COV.VALUE FROM CMN_OPTION_VALUES COV, CMN_OPTIONS CO WHERE COV.OPTION_ID = CO.ID
+        AND OPTION_CODE = 'CMN_VIEW_LIC_TYPE' AND COV.VALUE = 'new' )
+
+      UNION
+
+	  SELECT id, group_code,
+        CASE lic_right_type
+          WHEN 'creator' THEN 'full'
+          WHEN 'studioDev' THEN 'full'
+          WHEN 'participant' THEN 'restricted'
+          WHEN 'viewer' THEN 'vo'
+        END lic_right_type,
+        is_active,
+        CASE lic_right_type
+          WHEN 'creator' THEN 13
+          WHEN 'studioDev' THEN 13
+          WHEN 'participant' THEN 12
+          WHEN 'viewer' THEN 11
+        END licence_priority
+      FROM cmn_sec_groups
+      WHERE lic_right_type IN ( 'idle' , 'viewer' , 'participant' , 'creator' , 'studioDev')
+      AND NOT EXISTS (SELECT COV.VALUE FROM CMN_OPTION_VALUES COV, CMN_OPTIONS CO WHERE COV.OPTION_ID = CO.ID
+        AND OPTION_CODE = 'CMN_VIEW_LIC_TYPE' AND COV.VALUE = 'old' )
+
+      UNION
+
+      SELECT id, group_code, lic_right_type lic_right_type, is_active, 10 licence_priority
+      FROM cmn_sec_groups
+      WHERE lic_right_type = 'other'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

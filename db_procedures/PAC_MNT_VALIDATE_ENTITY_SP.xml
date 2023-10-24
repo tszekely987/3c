@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_ENTITY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_ENTITY_SP" 
+(
+  projclass_in    VARCHAR2,
+  wipclass_in     VARCHAR2,
+  clntclass_in    VARCHAR2,
+  billcycle_in    VARCHAR2,
+  remitto_loc_in  VARCHAR2
+)
+AS
+  var_select      INTEGER := 0;
+  projclass       VARCHAR2(10);
+  wipclass        VARCHAR2(10);
+  clntclass       VARCHAR2(10);
+  billcycle       VARCHAR2(10);
+  remitto_loc     VARCHAR2(10);
+BEGIN
+  projclass   := TRIM(projclass_in);
+  wipclass    := TRIM(wipclass_in);
+  clntclass   := TRIM(clntclass_in);
+  billcycle   := TRIM(billcycle_in);
+  remitto_loc := TRIM(remitto_loc_in);
+
+  IF PAC_MNT_VALIDATE_ENTITY_SP.projclass IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO var_select
+        FROM projclass
+       WHERE projclass = PAC_MNT_VALIDATE_ENTITY_SP.projclass;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select != 1 then
+      raise_application_error(-20774, 'Invalid PROJECT_CODE Class.');
+    END IF;
+  END IF;
+
+  IF wipclass IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO var_select
+        FROM wipclass
+       WHERE wipclass = PAC_MNT_VALIDATE_ENTITY_SP.wipclass;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select != 1 then
+      raise_application_error(-20775, 'Invalid Wip Class.');
+    END IF;
+  END IF;
+
+  IF clntclass IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO var_select
+        FROM clntclass
+       WHERE clntclass = PAC_MNT_VALIDATE_ENTITY_SP.clntclass;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select != 1 then
+      raise_application_error(-20776, 'Invalid COMPANY_CODE Class.');
+    END IF;
+  END IF;
+
+  IF billcycle IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO var_select
+        FROM batchsettings
+        WHERE batchcycle = PAC_MNT_VALIDATE_ENTITY_SP.billcycle;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select != 1 then
+      raise_application_error(-20113, 'Invalid Batch Billing Cycle.');
+    END IF;
+  END IF;
+
+  IF remitto_loc IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO var_select
+        FROM locations
+      WHERE locations.locationid = remitto_loc;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select != 1 then
+      raise_application_error(-20772, 'Invalid location.');
+    END if;
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

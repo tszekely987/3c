@@ -1,0 +1,186 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_TEAM_I_PER_FACTS_V">
+    <indexes/>
+    <text_length>9584</text_length>
+    <text>SELECT S.TEAM_KEY,
+       S.PERIOD_KEY,
+      (S.ALLOC_HOURS - S.HARD_ALLOC_HOURS) SOFT_ALLOC_HOURS,
+       S.HARD_ALLOC_HOURS,
+       S.ALLOC_HOURS,
+       S.BASE_HOURS,
+      (S.ALLOC_COST - S.HARD_ALLOC_COST) SOFT_ALLOC_COST,
+       S.HARD_ALLOC_COST,
+       S.ALLOC_COST,
+       S.BASE_COST,
+       S.LAST_UPDATED_DATE CLARITY_UPDATED_DATE
+FROM  (WITH slice_range AS
+           (SELECT MIN(from_date) from_date,
+                   MAX(num_periods) row_count
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    1 = (SELECT fiscal_slices FROM dwh_settings)
+            AND    request_name IN ('team::hard_curve::dwh_fiscal',
+                                    'team::hardallccost_curve::dwh_fiscal',
+                                    'team::pralloccurve::dwh_fiscal',
+                                    'team::alloccost_curve::dwh_fiscal')),
+            fiscal_periods AS
+           (SELECT d.period_key,
+                   d.period_start,
+                   d.row_key
+            FROM  (SELECT p.id period_key,
+                          p.start_date period_start,
+                          r.row_count,
+                          ROW_NUMBER() OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                   FROM   biz_com_periods p,
+                          dwh_settings s,
+                          slice_range r
+                   WHERE  s.fiscal_slices = 1
+                   AND    p.entity_id = s.entity_key
+                   AND    p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                   AND    p.start_date >= r.from_date) d
+            WHERE  d.row_key &lt;= d.row_count),
+            slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name IN ('WEEKLYRESOURCEHARDALLOC','MONTHLYRESOURCEHARDALLOC') THEN 1
+                        WHEN request_name IN ('WEEKLYRESOURCEALLOCCURVE','MONTHLYRESOURCEALLOCCURVE') THEN 2
+                        WHEN request_name LIKE 'team::hardallccost_curve%' THEN 3
+                        WHEN request_name LIKE 'team::alloccost_curve%' THEN 4
+                   END field_type,
+                   CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+            FROM   prj_blb_slicerequests
+            WHERE  ((SELECT monthly_slices FROM dwh_settings) = 1
+            AND      request_name IN ('MONTHLYRESOURCEHARDALLOC',
+                                    'team::hardallccost_curve::dwh_month',
+                                    'MONTHLYRESOURCEALLOCCURVE',
+                                    'team::alloccost_curve::dwh_month'))
+            OR     ((SELECT weekly_slices FROM dwh_settings) = 1
+            AND      request_name IN ('WEEKLYRESOURCEHARDALLOC',
+                                    'team::hardallccost_curve::dwh_week',
+                                    'WEEKLYRESOURCEALLOCCURVE',
+                                    'team::alloccost_curve::dwh_week'))),
+            base_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name LIKE 'baseline::current_team_usage%' THEN 5
+                        WHEN request_name LIKE 'baseline::current_team_cost%' THEN 6
+                   END field_type,
+                   CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    is_active = 1
+            AND (((SELECT monthly_slices FROM dwh_settings) = 1
+            AND    request_name IN ('baseline::current_team_usage::dwh_month',
+                                    'baseline::current_team_cost::dwh_month'))
+            OR   ((SELECT weekly_slices FROM dwh_settings) = 1
+            AND    request_name IN ('baseline::current_team_usage::dwh_week',  
+                                    'baseline::current_team_cost::dwh_week')))),
+            fiscal_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name LIKE 'team::hard_curve%' THEN 1
+                        WHEN request_name LIKE 'team::pralloccurve%' THEN 2
+                        WHEN request_name LIKE 'team::hardallccost_curve%' THEN 3
+                        WHEN request_name LIKE 'team::alloccost_curve%' THEN 4
+                   END field_type,
+                   period period_type
+            FROM   prj_blb_slicerequests
+            WHERE (SELECT fiscal_slices FROM dwh_settings) = 1
+            AND    request_name IN ('team::hard_curve::dwh_fiscal',
+                                    'team::hardallccost_curve::dwh_fiscal',
+                                    'team::pralloccurve::dwh_fiscal',
+                                    'team::alloccost_curve::dwh_fiscal')),
+            fiscal_base_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name LIKE 'baseline::current_team_usage%' THEN 5
+                        WHEN request_name LIKE 'baseline::current_team_cost%' THEN 6
+                   END field_type,
+                   period period_type
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    is_active = 1
+            AND   (SELECT fiscal_slices FROM dwh_settings) = 1
+            AND    request_name IN ('baseline::current_team_usage::dwh_fiscal',
+                                    'baseline::current_team_cost::dwh_fiscal'))
+            SELECT s.prj_object_id team_key,
+                   CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END hard_alloc_hours,
+                   CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END alloc_hours,
+                   0 base_hours,
+                   CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END hard_alloc_cost,
+                   CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END alloc_cost,
+                   0 base_cost,
+                   CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE ('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER)
+                        ELSE CAST(s.slice_date - TO_DATE ('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+                   t.last_updated_date
+            FROM   dwh_tmp_record_keys t,
+                   prj_blb_slices s,
+                   slice_keys sk,
+                   rpt_calendar c
+            WHERE  t.record_key = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.slice_date = c.start_date
+            AND    sk.period_type = c.period_type
+            AND    s.slice &lt;&gt; 0
+            UNION ALL
+            SELECT s.prj_object_id team_key,
+                   CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END hard_alloc_hours,
+                   CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END alloc_hours,
+                   0 base_hours,
+                   CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END hard_alloc_cost,
+                   CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END alloc_cost,
+                   0 base_cost,
+                   fp.period_key,
+                   t.last_updated_date
+            FROM   dwh_tmp_record_keys t,
+                   prj_fiscal_blb_slices s,
+                   fiscal_slice_keys sk,
+                   fiscal_periods fp
+            WHERE  t.record_key = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.period_id = fp.period_key
+            AND    s.slice &lt;&gt; 0
+            UNION ALL
+            SELECT bd.object_id team_key,
+                   0 hard_alloc_hours,
+                   0 alloc_hours,
+                   CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+                   0 hard_alloc_cost,
+                   0 alloc_cost,
+                   CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+                   CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE ('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER)
+                        ELSE CAST(s.slice_date - TO_DATE ('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+                   t.last_updated_date
+            FROM   dwh_tmp_record_keys t,
+                   prj_baseline_details bd,
+                   prj_blb_slices s,
+                   base_slice_keys sk,
+                   rpt_calendar c
+            WHERE  t.record_key = bd.object_id
+            AND    bd.object_type = 'TEAM'
+            AND    bd.is_current = 1
+            AND    bd.id = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.slice_date = c.start_date
+            AND    sk.period_type = c.period_type
+            AND    s.slice &lt;&gt; 0
+            UNION ALL
+            SELECT bd.object_id team_key,
+                   0 hard_alloc_hours,
+                   0 alloc_hours,
+                   CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+                   0 hard_alloc_cost,
+                   0 alloc_cost,
+                   CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+                   fp.period_key,
+                   t.last_updated_date
+            FROM   dwh_tmp_record_keys t,
+                   prj_baseline_details bd,
+                   prj_fiscal_blb_slices s,
+                   fiscal_base_slice_keys sk,
+                   fiscal_periods fp
+            WHERE  t.record_key = bd.object_id
+            AND    bd.object_type = 'TEAM'
+            AND    bd.is_current = 1
+            AND    bd.id = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.period_id = fp.period_key
+            AND    s.slice &lt;&gt; 0) s</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_OPTIONS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_OPTIONS_INS_SP" (
+   P_OPTION_CODE          IN   VARCHAR2,
+   P_OPTION_NAME          IN   VARCHAR2,
+   P_OPTION_DESCRIPTION   IN   VARCHAR2,
+   P_IS_SYSTEM            IN   NUMBER,
+   P_IS_ACTIVE            IN   NUMBER,
+   P_CREATED_BY           IN   NUMBER DEFAULT 1,
+   P_DATA_TYPE            IN   VARCHAR2 DEFAULT 'string',
+   P_API_ENABLED          IN   NUMBER DEFAULT 0,
+   P_MULTI                IN   NUMBER DEFAULT 0
+     
+   
+)
+IS
+   V_ID                          NUMBER;
+BEGIN
+   SELECT   CMN_OPTIONS_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   INSERT INTO CMN_OPTIONS
+               (
+                  ID,
+                  OPTION_CODE,
+                  IS_SYSTEM,
+                  IS_ACTIVE,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY,
+                  API_ENABLED,
+                  MULTI_VALUED,
+                  DATA_TYPE
+               )
+      SELECT   V_ID,
+               P_OPTION_CODE,
+               P_IS_SYSTEM,
+               P_IS_ACTIVE,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY,
+               P_API_ENABLED,
+               P_MULTI,
+               P_DATA_TYPE
+      FROM     DUAL
+      WHERE    NOT EXISTS (SELECT   'OPTION EXISTS'
+                           FROM     CMN_OPTIONS
+                           WHERE    OPTION_CODE = P_OPTION_CODE);
+   CMN_CAPTIONS_NLS_INS_SP (
+      'CMN_OPTIONS',
+      V_ID,
+      P_OPTION_NAME,
+      P_OPTION_DESCRIPTION,
+      P_CREATED_BY,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL
+   );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

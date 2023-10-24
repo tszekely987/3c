@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RENAME_ODF_ATTRIBUTE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RENAME_ODF_ATTRIBUTE_SP" (
+  P_OBJECT_CODE            IN      VARCHAR2,
+  P_OLD_ATTR_CODE          IN      VARCHAR2,
+  P_PREFIX                 IN      VARCHAR2,
+  P_NEW_ATTR_CODE          IN      VARCHAR2
+  )
+AS
+  V_NEW_ATTR_CODE        VARCHAR2(20);
+  V_OLD_ATTR_CODE        VARCHAR2(20);
+  V_OBJECT_CODE          VARCHAR2(30);
+  V_STR_LENGTH           INTEGER;
+  V_COUNT                INTEGER;
+
+/*
+ * This procedure will rename an ODF custom attribute by adding a prefix to the name.
+ *
+ * The purpose of this procedure is to resolve conflicts with customer created attributes and attributes created by
+ * CA that have the same attribute code.
+ *
+ * This procedure accepts the following arguments:
+ * 1. Object code (varchar2) - The object code where the attribute to be renamed resides.
+ * 2. Old attribute code - The attribute code of the attribute to be renamed.
+ * 3. Prefix - A prefix to prepend to the old attribute code (optional)
+ * 4. New attribute code - The new attribute code that the old attribute code will be renamed to. If this parameter is
+ *                         present it is used instead of prepending the prefix to the old attribute code. (optional)
+ * 5. Comma separated list of IDs of system data providers that support the attribute code.
+ *
+ * This procedure will do the following:
+ * 1. If a new attribute code is passed then the new attribute code is checked to see that it doesn't conflict with
+ *    and existing custom attribute on the object. Note: The attribute code must be vetted to make sure it doesn't
+ *    conflict with a CA attribute on the object as this information isn't stored in the database and the procedure
+ *    cannot do that sort of checking. The result is the new attribute code will be lower-cased as we always store
+ *    attribute codes in lower-case. An error is raised if the attribute fails validation.
+ *
+ *    Ex.) parameter: new attribute code = 'FOO_Bar' - Result = 'foo_bar'
+ *
+ * 2. If a new attribute code is not passed then the prefix is prepended to the old attribute code using a '_' as
+ *    a separator. If the length of the prefix + '_' + old attribute code is greater than 20 then an error is raised.
+ *    This prefixed attribute code is then checked for unique-ness as a custom attribute on the object. The result is
+ *    the prefixed attribute will be lower-cased. An error is raised if the attribute fails validation.
+ *
+ *    Ex.) parameters: prefix = 'Z'; old attribute code = 'FOO_bar' - Result = 'z_foo_bar'
+ *
+ * 3. The old attribute code is replaced with the new attribute code in the following tables:
+ *
+ *    odf_custom_attributes - handles derived references as well
+ *    odf_view_attributes
+ *    odf_score_contributions
+ *    cmn_grid_cols for object data providers matching the object code passed
+ *    bpm_def_assignees
+ *    bpm_run_replace_assignees
+ *    odf_audited_attributes
+ *    odf_locked_attributes
+ *    odf_default_overrides
+ *    odf_display_mappings
+ *    odf_attribute_mapping
+ *    cmn_grids for object data providers matching the object code passed
+ *    cmn_gg_items for object data providers matching the object code passed
+ *    cmn_audits
+ *    cmn_audits_tsv
+ *    odf_multi_valued_lookups
+ *    odf_aud_multi_value_lovs
+ *    cmn_autonum_schemes
+ *    odf_lookup_parameters
+ *    cmn_attribute_values
+ *
+ *  4. IMPORTANT: This procedure does not handle references to attribute codes for grids and graphs using system data
+ *                providers. The odf_rename_attribute program in ${install.dir}\bin should be used to rename attributes
+ *                as it will call this stored procedure and handle grids and graphs using system data providers.
+ */
+
+BEGIN
+
+  V_OBJECT_CODE:=lower(P_OBJECT_CODE);
+  V_OLD_ATTR_CODE:= lower(P_OLD_ATTR_CODE);
+
+  select count(*) into V_COUNT from odf_custom_attributes where internal_name = V_OLD_ATTR_CODE and object_name = V_OBJECT_CODE;
+  IF V_COUNT = 0 THEN
+    RAISE_APPLICATION_ERROR(-20004, 'Unable to locate custom attribute to rename.');
+  END IF;
+
+  V_STR_LENGTH:= length(nvl(P_NEW_ATTR_CODE,''));
+  IF V_STR_LENGTH = 0 THEN
+    BEGIN
+      V_STR_LENGTH:=length(nvl(P_PREFIX,''));
+      IF V_STR_LENGTH = 0 THEN
+        RAISE_APPLICATION_ERROR(-20005, 'Missing parameters NEW_ATTR_CODE or PREFIX');
+      ELSE
+        V_NEW_ATTR_CODE := P_PREFIX || '_' || V_OLD_ATTR_CODE;
+      END IF;
+    END;
+  ELSE
+    V_NEW_ATTR_CODE := P_NEW_ATTR_CODE;
+  END IF;
+
+  V_STR_LENGTH:= length(nvl(V_NEW_ATTR_CODE,''));
+  IF V_STR_LENGTH &gt; 20 THEN
+    RAISE_APPLICATION_ERROR (-20007, 'New attribute code is too large.');
+  END IF;
+
+  V_NEW_ATTR_CODE:= lower(V_NEW_ATTR_CODE);
+  
+  /* Now start the updates */
+  update odf_view_attributes set attribute_code = V_NEW_ATTR_CODE
+  where attribute_code = V_OLD_ATTR_CODE
+  and view_id in (select id
+                  from odf_views
+                  where (view_type='property')
+                  and   (view_subtype='update' or view_subtype='create' or view_subtype='fieldList')
+                  and   object_code = V_OBJECT_CODE
+                  union
+                  select id
+                  from odf_views
+                  where view_type='filter'
+                  and object_code = V_OBJECT_CODE);
+
+  update cmn_grid_cols set col_code = V_NEW_ATTR_CODE
+  where col_code = V_OLD_ATTR_CODE and grid_id in (select id from cmn_grids
+                                                   where (dal_type='object'
+                                                         and dal_code = V_OBJECT_CODE));
+
+
+  update bpm_def_assignees set object_attribute_code=V_NEW_ATTR_CODE where object_attribute_code=V_OLD_ATTR_CODE and
+   object_type_code = V_OBJECT_CODE and principal_type_code='BPM_ASSIGNEE_CUSTOM_RES_LOV';
+
+  update bpm_run_replace_assignees set object_attribute_code=V_NEW_ATTR_CODE where object_attribute_code=V_OLD_ATTR_CODE and
+   object_type_code = V_OBJECT_CODE and principal_type_code='BPM_ASSIGNEE_CUSTOM_RES_LOV';
+
+  update odf_audited_attributes set attribute_code=V_NEW_ATTR_CODE where
+   attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update odf_locked_attributes set attribute_code=V_NEW_ATTR_CODE where
+   attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update odf_default_overrides set attribute_code=V_NEW_ATTR_CODE where
+   attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update odf_score_contributions set attribute_code=V_NEW_ATTR_CODE where
+   attribute_code=V_OLD_ATTR_CODE and object = V_OBJECT_CODE;
+
+  update odf_display_mappings set attribute=V_NEW_ATTR_CODE where
+   target_type='object' and
+   attribute=V_OLD_ATTR_CODE and object = V_OBJECT_CODE;
+
+  update odf_attribute_mapping set dest_attribute_code=V_NEW_ATTR_CODE where
+   dest_attribute_code=V_OLD_ATTR_CODE and object_mapping_code in
+     (select mapping_code from odf_object_mapping where dest_object_code = V_OBJECT_CODE);
+     
+  update odf_custom_attributes set internal_name=V_NEW_ATTR_CODE where
+    internal_name=V_OLD_ATTR_CODE and object_name = V_OBJECT_CODE;
+
+  update odf_custom_attributes set derived_reference=V_NEW_ATTR_CODE where
+    derived_reference=V_OLD_ATTR_CODE and object_name in (select code from odf_objects where parent_object_code = V_OBJECT_CODE);
+
+  update cmn_audits set attribute_code=V_NEW_ATTR_CODE where
+    attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update cmn_audits_tsv set attribute_code=V_NEW_ATTR_CODE where
+    attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update cmn_autonum_schemes set attribute_code=V_NEW_ATTR_CODE where
+    attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update odf_aud_multi_val_lovs set attribute_code=V_NEW_ATTR_CODE where
+    attribute_code=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update odf_multi_valued_lookups set attribute=V_NEW_ATTR_CODE where
+    attribute=V_OLD_ATTR_CODE and object = V_OBJECT_CODE;
+
+  update cmn_grids set default_sort_col_code=V_NEW_ATTR_CODE
+    where default_sort_col_code=V_OLD_ATTR_CODE
+    and id in
+    (select id from cmn_grids
+     where dal_type='object'
+     and dal_code = V_OBJECT_CODE);
+
+  update cmn_grids set sort_col_code_2=V_NEW_ATTR_CODE
+    where sort_col_code_2=V_OLD_ATTR_CODE
+    and id in
+    (select id from cmn_grids
+     where dal_type='object'
+     and dal_code = V_OBJECT_CODE);
+
+  update cmn_grids set sort_col_code_3=V_NEW_ATTR_CODE
+    where sort_col_code_3=V_OLD_ATTR_CODE
+    and id in
+    (select id from cmn_grids
+     where dal_type='object'
+     and dal_code = V_OBJECT_CODE);
+
+  update cmn_grids set sort_col_code_4=V_NEW_ATTR_CODE
+    where sort_col_code_4=V_OLD_ATTR_CODE
+    and id in
+    (select id from cmn_grids
+     where dal_type='object'
+     and dal_code = V_OBJECT_CODE);
+
+
+  update cmn_gg_items set item_name=V_NEW_ATTR_CODE
+  where item_name=V_OLD_ATTR_CODE and gg_id in (select id from cmn_grids
+                                                  where (dal_type='object'
+                                                         and dal_code = V_OBJECT_CODE))
+  and item_code in ('M','P')
+  and gg_table_name='CMN_GRIDS';
+
+  update cmn_gg_items set item_name=V_NEW_ATTR_CODE
+  where item_name=V_OLD_ATTR_CODE and gg_id in (select id from cmn_grid_cols where grid_id in (select id from cmn_grids
+                                                  where (dal_type='object'
+                                                         and dal_code = V_OBJECT_CODE)))
+  and item_code in ('M','P')
+  and gg_table_name='CMN_GRID_COLS';
+
+  update cmn_gg_items set item_name=V_NEW_ATTR_CODE
+  where item_name=V_OLD_ATTR_CODE and gg_id in (select id from cmn_graphs
+                                                  where (dal_type='object'
+                                                        and dal_code = V_OBJECT_CODE))
+  and item_code in ('M','P')
+  and gg_table_name='CMN_GRAPHS';
+
+  update odf_lookup_parameters set object_attribute_name=V_NEW_ATTR_CODE
+  where object_attribute_name=V_OLD_ATTR_CODE and object_code = V_OBJECT_CODE;
+
+  update cmn_attribute_values set attribute_code=V_NEW_ATTR_CODE
+  where attribute_code=V_OLD_ATTR_CODE and attribute_set_id in
+    (select id from cmn_attribute_value_sets where object_code=V_OBJECT_CODE);
+
+    
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

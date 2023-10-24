@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_LOOKUP_CODE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_LOOKUP_CODE_SP" (
+matrixType 	VARCHAR2 ,
+in_qbeValue 	IN VARCHAR2 ,
+in_qbeDescription 	IN VARCHAR2 ,
+language 	VARCHAR2 ,
+tempHeck 	NUMBER ,
+RC1 	IN OUT PAC_MNT_MATRIX_LOOKUP_CODE_Pkg.RCT1)
+AS
+qbeValue 	GLOBALPKG.STRING;
+qbeDescription 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue := PAC_MNT_MATRIX_LOOKUP_CODE_SP.in_qbeValue;
+	PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription := PAC_MNT_MATRIX_LOOKUP_CODE_SP.in_qbeDescription;
+
+	PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue),
+	   '') || '%'));
+	PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription :=  RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription),
+	   '') || '%'));
+
+
+	IF  PAC_MNT_MATRIX_LOOKUP_CODE_SP.matrixType = 'A' THEN
+	BEGIN
+		IF  PAC_MNT_MATRIX_LOOKUP_CODE_SP.tempHeck = 0 THEN
+			OPEN RC1 FOR
+			SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+			WHERE LOOKUP_CODE = 'ADMINCODE'
+			 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+			 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language;
+		ELSE
+			OPEN RC1 FOR
+			SELECT RTRIM(code) "code",  description "description", NULL, NULL FROM taxcode
+			WHERE taxtype = 'ADM'
+			 and code  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue
+			 and description  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription
+/* not sure why we are returning none, since invalid
+			  UNION
+			SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+			WHERE LOOKUP_CODE = 'NONE'
+			 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+			 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language
+*/
+			ORDER BY 1 ;
+		END IF;
+	END;
+	ELSE
+		IF  PAC_MNT_MATRIX_LOOKUP_CODE_SP.matrixType = 'T' THEN
+		BEGIN
+			IF  PAC_MNT_MATRIX_LOOKUP_CODE_SP.tempHeck = 0 THEN
+				OPEN RC1 FOR
+				SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+				WHERE LOOKUP_CODE = 'TAXCODE'
+				 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+				 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language;
+			ELSE
+				OPEN RC1 FOR
+				SELECT RTRIM(code) "code",  description "description", NULL, NULL FROM taxcode
+				WHERE taxtype = 'TAX'
+				 and code  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue
+				 and description  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription
+/* not sure why we are returning none, since invalid
+				  UNION
+				SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+				WHERE LOOKUP_CODE = 'NONE'
+				 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+				 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language
+*/
+				ORDER BY 1 ;
+			END IF;
+		END;
+		ELSE
+		BEGIN
+			IF  PAC_MNT_MATRIX_LOOKUP_CODE_SP.tempHeck = 0 THEN
+				OPEN RC1 FOR
+				SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+				WHERE LOOKUP_CODE = 'COSTPLUSCODE'
+				 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+				 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language;
+			ELSE
+				OPEN RC1 FOR
+				SELECT RTRIM(costpluscode) "code",  description "description", NULL, NULL  FROM costplus
+				WHERE costpluscode  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeValue
+				 and description  LIKE PAC_MNT_MATRIX_LOOKUP_CODE_SP.qbeDescription
+/* not sure why we are returning none, since invalid
+				  UNION
+				SELECT NAME,  DESCRIPTION, NULL, NULL FROM CMN_LOOKUPS_V
+				WHERE LOOKUP_CODE = 'NONE'
+				 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+				 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_CODE_SP.language
+*/
+				ORDER BY 1 ;
+			END IF;
+		END;
+		END IF;
+		END IF;
+END PAC_MNT_MATRIX_LOOKUP_CODE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

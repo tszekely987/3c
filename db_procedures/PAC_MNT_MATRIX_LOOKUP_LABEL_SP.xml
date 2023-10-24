@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_LOOKUP_LABEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_LOOKUP_LABEL_SP" (
+matrixKey 	NUMBER ,
+matrixColumnNo 	NUMBER ,
+language 	VARCHAR2 ,
+RC1 	IN OUT PAC_MNT_MATRIX_LOOKUP_LABELPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+matrixFiled 	GLOBALPKG.STRING;
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/26/01
+*/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   FieldName
+		INTO PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled FROM ppa_MatrixColDef
+		WHERE MatrixKey = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixKey
+		 and ColumnNo = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixColumnNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+
+
+		IF ( matrixKey = -99999 ) THEN
+      SELECT 'resource_role'
+			INTO PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled
+			FROM dual ;
+		END IF;
+
+/* ---------------------------------------------
+ *   ENTITY
+ */
+	IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'entity' THEN
+		OPEN RC1 FOR
+    SELECT NAME,  DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+    WHERE LOOKUP_CODE = 'ENTITY'
+		 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+		 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   LOCATIONID
+ */
+	ELSE
+		IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'locationid' THEN
+			OPEN RC1 FOR
+      SELECT NAME,  DESCRIPTION,  LOOKUP_CODE FROM CMN_LOOKUPS_V
+      WHERE LOOKUP_CODE = 'LOCATIONID'
+			 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+			 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   DEPARTCODE
+ */
+		ELSE
+			IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'departcode' THEN
+				OPEN RC1 FOR
+        SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+				WHERE LOOKUP_CODE = 'DEPARTMENT'
+				 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+				 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   COMPANY_CODE
+ */
+			ELSE
+				IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'company_code' THEN
+					OPEN RC1 FOR
+          SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+					WHERE LOOKUP_CODE = 'CLIENTNO'
+					 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+					 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   PROJECT_CODE
+ */
+				ELSE
+					IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'project_code' THEN
+						OPEN RC1 FOR
+            SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+						WHERE LOOKUP_CODE = 'PROJECTNO'
+						 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+						 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   CHARGECODE
+ */
+					ELSE
+            IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'chargecode' THEN
+							OPEN RC1 FOR
+              SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+              WHERE LOOKUP_CODE = 'CHARGECODE'
+							 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+							 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   INPUTTYPE
+ */
+						ELSE
+              IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'inputtype' THEN
+								OPEN RC1 FOR
+                SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+                WHERE LOOKUP_CODE = 'INPUTTYPE'
+								 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+								 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   RESOURCE_CODE
+ */
+							ELSE
+                IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'resource_code' THEN
+									OPEN RC1 FOR
+                  SELECT NAME, DESCRIPTION, LOOKUP_CODE
+                    FROM CMN_LOOKUPS_V
+                  WHERE LOOKUP_CODE = 'RESOURCE_CODE'
+									 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+									 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   CLNTCLASS
+ */
+								ELSE
+									IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'clntclass' THEN
+										OPEN RC1 FOR
+                    SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+										WHERE LOOKUP_CODE = 'CLIENTCLASS'
+										 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+										 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   PROJCLASS
+ */
+									ELSE
+										IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'projclass' THEN
+											OPEN RC1 FOR
+                      SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+											WHERE LOOKUP_CODE = 'PROJECTCLASS'
+											 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+											 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   COSTCLASS
+ */
+										ELSE
+											IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'costclass' THEN
+												OPEN RC1 FOR
+                        SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+												WHERE LOOKUP_CODE = 'COSTCLASS'
+												 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+												 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   RESOURCECLASS
+ */
+											ELSE
+                        IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'resource_class' THEN
+													OPEN RC1 FOR
+                          SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+                            WHERE LOOKUP_CODE = 'RESOURCECLASS'
+                            and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+                            and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   WIPCLASS
+ */
+												ELSE
+													IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'wipclass' THEN
+														OPEN RC1 FOR
+                            SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+														WHERE LOOKUP_CODE = 'WIPCLASS'
+														 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+														 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+/* ---------------------------------------------
+ *   EMPLYROLE
+ */
+														ELSE
+                              IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'resource_role' THEN
+																OPEN RC1 FOR
+                                SELECT NAME, DESCRIPTION, LOOKUP_CODE FROM CMN_LOOKUPS_V
+                                WHERE LOOKUP_CODE = 'ROLEID'
+																 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+																 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+                              END IF;
+													END IF;
+												END IF;
+											END IF;
+										END IF;
+									END IF;
+								END IF;
+							END IF;
+						END IF;
+					END IF;
+				END IF;
+			END IF;
+		END IF;
+	END IF;
+/* ---------------------------------------------
+ *   TRANSTYPE
+ */
+	IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'transtype' THEN
+		OPEN RC1 FOR
+    SELECT NAME, DESCRIPTION, LOOKUP_CODE
+      FROM CMN_LOOKUPS_V
+		WHERE LOOKUP_CODE = 'TYPE'
+		 and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+		 and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+  ELSE
+    IF  PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'transclass' THEN
+      OPEN RC1 FOR
+      SELECT NAME, DESCRIPTION, LOOKUP_CODE
+        FROM CMN_LOOKUPS_V
+      WHERE LOOKUP_CODE = 'TRANSCLASS'
+      and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+      and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+  ELSE
+  /* ---------------------------------------------
+   * COSTTYPE
+     ------------------------------------------- */
+      IF PAC_MNT_MATRIX_LOOKUP_LABEL_SP.matrixFiled = 'cost_type' THEN
+        OPEN RC1 FOR
+          SELECT NAME, DESCRIPTION, LOOKUP_CODE
+            FROM CMN_LOOKUPS_V
+            WHERE LOOKUP_CODE = 'COST_TYPE'
+              and LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+              and LANGUAGE_CODE = PAC_MNT_MATRIX_LOOKUP_LABEL_SP.language;
+      END IF;
+    END IF;
+  END IF;
+END PAC_MNT_MATRIX_LOOKUP_LABEL_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

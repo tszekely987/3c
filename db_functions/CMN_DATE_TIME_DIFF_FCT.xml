@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_DATE_TIME_DIFF_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_DATE_TIME_DIFF_FCT" 
+(
+  TIMEUNIT IN VARCHAR2,
+  STARTDATE IN DATE,
+  ENDDATE IN DATE  
+)    RETURN NUMBER
+IS
+   V_DAYS_DIFFERENCE   NUMBER;
+   TIMEUNITLOWER VARCHAR(6);
+   V_SECOND_DIFFERENCE   NUMBER;
+   IS_PASTDATETIME_MULTIPLIER NUMBER;
+BEGIN
+   IS_PASTDATETIME_MULTIPLIER:= 1;
+   V_DAYS_DIFFERENCE := 0;
+   TIMEUNITLOWER := lower(TIMEUNIT);
+   V_DAYS_DIFFERENCE := STARTDATE - ENDDATE;
+   
+  
+     IF V_DAYS_DIFFERENCE &lt; 0 THEN
+      IS_PASTDATETIME_MULTIPLIER := -1;
+     END IF;
+    
+   V_DAYS_DIFFERENCE := ABS(V_DAYS_DIFFERENCE); 	
+   V_SECOND_DIFFERENCE := round(V_DAYS_DIFFERENCE*24*60*60); 
+   
+ 
+   
+   IF TIMEUNITLOWER ='day' OR TIMEUNITLOWER ='dd'  THEN
+    V_DAYS_DIFFERENCE := floor(V_DAYS_DIFFERENCE);
+   ELSIF TIMEUNITLOWER ='hour' OR TIMEUNITLOWER ='hh'  THEN
+    V_DAYS_DIFFERENCE :=  floor(V_SECOND_DIFFERENCE/3600);
+ 	 ELSIF TIMEUNITLOWER ='minute' OR TIMEUNITLOWER ='mi' THEN
+    V_DAYS_DIFFERENCE :=  floor( V_SECOND_DIFFERENCE/60);
+   ELSIF TIMEUNITLOWER ='second' OR TIMEUNITLOWER ='ss' THEN
+    V_DAYS_DIFFERENCE :=  V_SECOND_DIFFERENCE;
+   ELSE
+    V_DAYS_DIFFERENCE := floor(V_DAYS_DIFFERENCE);
+    END IF;
+   RETURN V_DAYS_DIFFERENCE*IS_PASTDATETIME_MULTIPLIER;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

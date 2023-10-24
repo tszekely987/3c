@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_DATAMART_LIGHT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_DATAMART_LIGHT_SP" 
+(
+    P_EXTRACT_OBS         NUMBER DEFAULT 0,
+    P_EXTRACT_CALENDARS   NUMBER DEFAULT 0,
+    P_NUM_CAL_DAYS        NUMBER DEFAULT 730
+)
+AS
+
+BEGIN
+    NBI_VALIDATE_SETTINGS_SP;
+    IF P_EXTRACT_OBS = 1 THEN
+        BEGIN
+            EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_DIM_OBS';
+            EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_DIM_OBS_FLAT';
+            NBI_POPULATE_OBS_DIM_SP;
+        END;
+    END IF;
+
+    IF P_EXTRACT_CALENDARS = 1 THEN
+        BEGIN
+            NBI_POPULATE_CAL_DIM_SP(P_NUM_CAL_DAYS);
+            NBI_POPULATE_FISCAL_DIM_SP;
+        END;
+    END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

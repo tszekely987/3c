@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_BILLINGAPP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_BILLINGAPP_SP" 
+(
+  invoiceno             VARCHAR2,
+  RESOURCE_CODE         VARCHAR2,
+  billingapproval IN OUT NUMBER
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  COMPANY_CODE      GLOBALPKG.STRING  := NULL;
+  PROJECT_CODE        GLOBALPKG.STRING  := NULL;
+  option_       INTEGER  := 1;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	IF  PAC_PRC_BILLINGAPP_SP.option_ = 1 THEN
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  *
+			 FROM ppa_Billings, pac_mnt_projects
+			WHERE ppa_Billings.InvoiceNo = PAC_PRC_BILLINGAPP_SP.invoiceno
+			  AND ppa_Billings.COMPANY_CODE = pac_mnt_projects.COMPANY_CODE
+			  AND ppa_Billings.PROJECT_CODE = pac_mnt_projects.PROJECT_CODE
+			  AND  (   EXISTS (
+					SELECT object_id
+					  FROM cmn_sec_chk_user_r_v0
+					 WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = PAC_PRC_BILLINGAPP_SP.RESOURCE_CODE)
+					   AND permission_code = 'APPROVE')
+				  OR EXISTS (
+					SELECT object_id
+					  FROM cmn_sec_chk_user_inst_v0
+					 WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = PAC_PRC_BILLINGAPP_SP.RESOURCE_CODE)
+					   AND permission_code = 'APPROVE'
+					   AND object_instance_id = pac_mnt_projects.ID)
+			   )
+			);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+			PAC_PRC_BILLINGAPP_SP.billingapproval :=  1;
+		ELSE
+			PAC_PRC_BILLINGAPP_SP.billingapproval :=  0;
+		END IF;
+		END;
+	END;
+	ELSE
+		IF  PAC_PRC_BILLINGAPP_SP.option_ = 2 THEN
+		BEGIN
+			BEGIN
+			BEGIN
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			StoO_rowcnt := 0;
+			SELECT 1 INTO StoO_selcnt
+			FROM DUAL
+			WHERE  EXISTS (
+				SELECT  1
+				 FROM projstaff
+				WHERE PAC_PRC_BILLINGAPP_SP.COMPANY_CODE = projstaff.COMPANY_CODE
+				 AND PAC_PRC_BILLINGAPP_SP.PROJECT_CODE = projstaff.PROJECT_CODE
+				 AND PAC_PRC_BILLINGAPP_SP.RESOURCE_CODE = projstaff.RESOURCE_CODE
+				 AND projstaff.billingapproval = 1 );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+				PAC_PRC_BILLINGAPP_SP.billingapproval :=  1;
+			ELSE
+				PAC_PRC_BILLINGAPP_SP.billingapproval :=  0;
+			END IF;
+			END;
+		END;
+		END IF;
+		END IF;
+END PAC_PRC_BILLINGAPP_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

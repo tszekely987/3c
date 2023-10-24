@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.currentIssues" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Current Issues" languageCode="en" name="Current Issues"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:ISSUE:ISSUES.priority_code:priority_code@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:ISSUES.priority_code_caption:priority_name@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:COUNT(issues.odf_pk):total_count@
+FROM
+(SELECT DISTINCT
+        rim.priority_code priority_code,
+        priority.name priority_code_caption,
+        rim.id odf_pk
+ FROM   rim_risks_and_issues rim
+ INNER  JOIN   inv_investments inv 
+               ON   rim.pk_id = inv.id 
+               AND  inv.is_active <> 0
+ INNER  JOIN   inv_projects prj 
+               ON   inv.id = prj.prid 
+               AND  prj.is_template <> 1
+               AND  prj.is_program <> 1
+ LEFT   OUTER  JOIN prj_obs_associations assoc 
+               ON   inv.id = assoc.record_id
+               AND  @UPPER@(assoc.table_name) = 'SRM_PROJECTS'
+ LEFT   OUTER  JOIN prj_obs_units_flat flat 
+               ON   assoc.unit_id = flat.unit_id 
+               AND  flat.branch_unit_id = @WHERE:PARAM:USER_DEF:INTEGER:OBS@ 
+ LEFT   OUTER  JOIN cmn_lookups_v priority
+               ON   priority.lookup_code = rim.priority_code
+               AND  priority.lookup_type = 'RIM_PRIORITY' 
+               AND  priority.language_code =  @WHERE:PARAM:LANGUAGE@
+ WHERE  rim.status_code NOT IN ('CLOSED','RESOLVED')
+ AND    rim.type_code = 'ISSUE'
+ AND    rim.target_resolution_date BETWEEN (@NVL@(@WHERE:PARAM:USER_DEF:DATE:as_of_date@,@SYSDATE@) - @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:number_of_days@,45)) 
+                                   AND     (@NVL@(@WHERE:PARAM:USER_DEF:DATE:as_of_date@,@SYSDATE@) + @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:number_of_days@,45))
+ AND    (@WHERE:PARAM:USER_DEF:INTEGER:manager_id@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:manager_id@ = inv.manager_id)
+ AND    (@WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:OBS@ = flat.branch_unit_id)
+ AND    @WHERE:SECURITY:PROJECT:inv.id@
+) issues
+WHERE   @FILTER@
+GROUP   BY issues.priority_code_caption,
+           issues.priority_code
+HAVING  @HAVING_FILTER@]]></nsql>
+            <attribute id="priority_code" required="false">
+              
+              
+              
+              
+              <nls description="Priority ID" languageCode="en" name="Priority ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="priority_name" required="false">
+              
+              
+              
+              
+              <nls description="Priority" languageCode="en" name="Priority"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="total_count" required="false">
+              
+              
+              
+              
+              <nls description="Total Count" languageCode="en" name="Total Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_as_of_date" required="false">
+              
+              
+              
+              
+              <nls description="As of Date Filter" languageCode="en" name="As of Date Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_manager_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_number_of_days" required="false">
+              
+              <nls description="Days Outlook Filter" languageCode="en" name="Days Outlook Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="copCurrentIssuesLinkable" code="current.issues.drill.down">
+                
+                
+                
+                
+                <nls description="Current Issues Drill Down" languageCode="en" name="Current Issues Drill Down"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="priority_code" dataSource="data" paramCode="Priority"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

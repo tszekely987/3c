@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_CONTRACTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_CONTRACTS_SP" (
+--in_COMPANY_CODE 	VARCHAR2 ,
+in_id 		VARCHAR2,
+RC1 		IN OUT Pac_Mnt_Get_Contracts_Sppkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+MASTER_PROJECT_CODE	pac_mnt_projects.MASTER_PROJECT_CODE%TYPE;
+changeorder 	GLOBALPKG.STRING;
+contractnbr 	GLOBALPKG.STRING;
+contractdate 	DATE;
+contractamount  NUMBER(32,6);
+billamount  NUMBER(32,6);
+billfreq 	NUMBER(5,0);
+billnbr 	NUMBER(5,0);
+billdate 	DATE;
+TAXCODE 	GLOBALPKG.STRING;
+admincode 	GLOBALPKG.STRING;
+poc 	NUMBER(3,0);
+approved 	NUMBER(1,0);
+newrecord 	NUMBER(1,0);
+contractproject 	NUMBER(1,0);
+type_ 	GLOBALPKG.STRING;
+budget 	NUMBER(1);
+id        PAC_MNT_PROJECTS.id%TYPE;
+PROJECT_CODE    PAC_MNT_PROJECTS.PROJECT_CODE%TYPE;
+billing_currency_code 	pac_mnt_projects.billing_currency_code%TYPE;
+COMPANY_CODE 	PAC_MNT_PROJECTS.COMPANY_CODE%TYPE;
+v_ENFORCE_CONTRACT_AMOUNT   PROJCNTRTS.ENFORCE_CONTRACT_AMOUNT%TYPE;
+v_HAS_BILL_PROJECT  		INTEGER := 0;
+v_BILLING_PROJECT_ID	    PAC_MNT_PROJECTS.BILLING_PROJECT_ID%TYPE;
+v_BILLING_PROJECT_CODE	    PAC_MNT_PROJECTS.PROJECT_CODE%TYPE;
+v_contractnotes			VARCHAR2(765);
+
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	 BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT  PROJECT_CODE, COMPANY_CODE
+        INTO    Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE,Pac_Mnt_Get_Contracts_Sp.COMPANY_CODE
+		FROM 	pac_mnt_projects
+		WHERE 	id = Pac_Mnt_Get_Contracts_Sp.in_id;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT
+                   MASTER_PROJECT_CODE,
+                   changeorder,
+                   poc_method,
+                   DECODE(type_, 'P', 1 , 0),
+                   type_,
+                   approved,
+		   		   budget,
+		  		   billing_currency_code,
+				   BILLING_PROJECT_ID
+		INTO
+                   Pac_Mnt_Get_Contracts_Sp.MASTER_PROJECT_CODE,
+                   Pac_Mnt_Get_Contracts_Sp.changeorder,
+                   Pac_Mnt_Get_Contracts_Sp.poc,
+		   		   Pac_Mnt_Get_Contracts_Sp.contractproject,
+                   Pac_Mnt_Get_Contracts_Sp.type_ ,
+                   Pac_Mnt_Get_Contracts_Sp.approved,
+                   Pac_Mnt_Get_Contracts_Sp.budget,
+                   Pac_Mnt_Get_Contracts_Sp.billing_currency_code,
+				   Pac_Mnt_Get_Contracts_Sp.v_BILLING_PROJECT_ID
+		FROM 	pac_mnt_projects
+		WHERE 	COMPANY_CODE = Pac_Mnt_Get_Contracts_Sp.COMPANY_CODE
+		AND 	PROJECT_CODE = Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	  StoO_rowcnt := 0;
+	  StoO_selcnt := 0;
+	  StoO_error  := 0;
+	  SELECT PROJECT_CODE
+	    INTO v_BILLING_PROJECT_CODE
+		FROM PAC_MNT_PROJECTS
+		WHERE ID = v_BILLING_PROJECT_ID ;
+
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+		WHEN TOO_MANY_ROWS THEN
+			StoO_rowcnt := 2;
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MASTER_PROJECT_CODE,
+                         changeorder,
+                         contractnbr,
+                         contractamount,
+                         contractdate,
+                         billamount,
+                         billnbr,
+                         billfreq,
+                         billdate,
+                         TAXCODE,
+                         admincode,
+						 ENFORCE_CONTRACT_AMOUNT,
+						 notes
+		INTO
+                         Pac_Mnt_Get_Contracts_Sp.MASTER_PROJECT_CODE,
+                         Pac_Mnt_Get_Contracts_Sp.changeorder,
+                         Pac_Mnt_Get_Contracts_Sp.contractnbr,
+                         Pac_Mnt_Get_Contracts_Sp.contractamount,
+                         Pac_Mnt_Get_Contracts_Sp.contractdate,
+		         		 Pac_Mnt_Get_Contracts_Sp.billamount,
+                         Pac_Mnt_Get_Contracts_Sp.billnbr,
+                         Pac_Mnt_Get_Contracts_Sp.billfreq,
+                         Pac_Mnt_Get_Contracts_Sp.billdate,
+                         Pac_Mnt_Get_Contracts_Sp.TAXCODE,
+                         Pac_Mnt_Get_Contracts_Sp.admincode,
+						 Pac_Mnt_Get_Contracts_Sp.v_ENFORCE_CONTRACT_AMOUNT,
+						 Pac_Mnt_Get_Contracts_Sp.v_contractnotes
+                FROM PROJCNTRTS
+		WHERE COMPANY_CODE = Pac_Mnt_Get_Contracts_Sp.COMPANY_CODE
+		 AND PROJECT_CODE = Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+		Pac_Mnt_Get_Contracts_Sp.newrecord :=  1;
+	ELSE
+		Pac_Mnt_Get_Contracts_Sp.newrecord :=  0;
+	END IF;
+
+	/* If this project has a diferent Billing Project then we need to disable Enforce Contract Amount on the UI for Standards or
+	    Contract fields for Retainers and Contracts */
+	IF NVL( v_BILLING_PROJECT_CODE, Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE ) != Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE Then
+	  v_HAS_BILL_PROJECT := 1 ;
+	  v_ENFORCE_CONTRACT_AMOUNT := 0;
+
+      Pac_Mnt_Get_Contracts_Sp.billamount := NULL;
+      Pac_Mnt_Get_Contracts_Sp.billnbr := NULL;
+      Pac_Mnt_Get_Contracts_Sp.billfreq := NULL;
+      Pac_Mnt_Get_Contracts_Sp.billdate := NULL;
+      Pac_Mnt_Get_Contracts_Sp.TAXCODE := NULL;
+      Pac_Mnt_Get_Contracts_Sp.admincode := NULL;
+	End If ;
+
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	SELECT MAX(id)
+	INTO Pac_Mnt_Get_Contracts_Sp.id
+	FROM PAC_MNT_PROJECTS
+	WHERE 	COMPANY_CODE = Pac_Mnt_Get_Contracts_Sp.COMPANY_CODE
+	AND	PROJECT_CODE = Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE;
+	OPEN RC1 FOR
+	SELECT  Pac_Mnt_Get_Contracts_Sp.COMPANY_CODE "COMPANY_CODE",
+                Pac_Mnt_Get_Contracts_Sp.PROJECT_CODE "PROJECT_CODE",
+                Pac_Mnt_Get_Contracts_Sp.MASTER_PROJECT_CODE "MASTER_PROJECT_CODE",
+                Pac_Mnt_Get_Contracts_Sp.changeorder "changeorder",
+                Pac_Mnt_Get_Contracts_Sp.contractnbr "contractnbr",
+                Pac_Mnt_Get_Contracts_Sp.contractamount "contractamount",
+                Pac_Mnt_Get_Contracts_Sp.contractdate "contractdate",
+                Pac_Mnt_Get_Contracts_Sp.billamount "billamount",
+                Pac_Mnt_Get_Contracts_Sp.billnbr "billnbr",
+                Pac_Mnt_Get_Contracts_Sp.billfreq "billfreq",
+                Pac_Mnt_Get_Contracts_Sp.billdate "billdate",
+                Pac_Mnt_Get_Contracts_Sp.TAXCODE "taxcode",
+                Pac_Mnt_Get_Contracts_Sp.admincode "admincode",
+                Pac_Mnt_Get_Contracts_Sp.contractproject "contractproject",
+                Pac_Mnt_Get_Contracts_Sp.poc "poc",
+                Pac_Mnt_Get_Contracts_Sp.newrecord "newrecord",
+                Pac_Mnt_Get_Contracts_Sp.approved "approved",
+                Pac_Mnt_Get_Contracts_Sp.type_ "projecttype",
+				Pac_Mnt_Get_Contracts_Sp.budget "budget",
+				Pac_Mnt_Get_Contracts_Sp.id,
+              	Pac_Mnt_Get_Contracts_Sp.billing_currency_code,
+				Pac_Mnt_Get_Contracts_Sp.v_ENFORCE_CONTRACT_AMOUNT,
+				Pac_Mnt_Get_Contracts_Sp.v_HAS_BILL_PROJECT,
+				Pac_Mnt_Get_Contracts_Sp.v_contractnotes
+				
+	FROM DUAL;
+END Pac_Mnt_Get_Contracts_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_DEF_FRC_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_DEF_FRC_INS_SP" 
+(
+  projectId NUMBER,
+  periodType VARCHAR2,
+  startPeriod VARCHAR2,
+  endPeriod VARCHAR2,  
+  userId NUMBER,
+  P_FORECAST_TYPE NUMBER,
+  useDetailType NUMBER,
+  revision NUMBER,
+  P_IS_REVENUE_PLAN NUMBER,
+  p_xog    NUMBER DEFAULT 0  
+)
+AS
+  REVISION_STATUS  NUMBER;
+  REVISION_NUMBER  NUMBER;
+  FROM_FORECAST    NUMBER;
+  NEW_FORECAST_ID  NUMBER;
+  V_START_PERIOD_ID NUMBER;
+  V_END_PERIOD_ID  NUMBER;
+  V_USE_DETAIL_TYPE NUMBER;
+  V_UNIT_OF_MEASURE VARCHAR2(30);
+  V_DEFAULT_VIEW VARCHAR2(30);
+  V_SHOW_UNITS NUMBER;
+  V_SHOW_COST NUMBER;
+  V_SHOW_REVENUE NUMBER;
+  V_COUNT_PLAN_DETAILS NUMBER;
+  
+
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;  
+  StoO_errmsg      GLOBALPKG.STRING;
+
+BEGIN
+
+  -- Check to see if the time periods are valid.
+  BEGIN
+    SELECT BS.ID,BE.ID 
+	INTO V_START_PERIOD_ID,V_END_PERIOD_ID
+	FROM biz_com_periods BS, biz_com_periods BE 
+	WHERE BS.period_name = startPeriod 
+	AND BE.period_name = endPeriod
+	AND	BS.start_date &lt;= BE.start_date
+	AND BS.period_type=BE.period_type 
+	AND BS.period_type=periodType;
+	
+	EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	   RAISE_APPLICATION_ERROR(-20931, 'Invalid periods');
+       RETURN;
+	WHEN OTHERS THEN
+	   RAISE_APPLICATION_ERROR(-20931, 'Invalid periods');
+       RETURN;
+  END;  
+  -- get the latest revision forecast
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+	-- get the status and id of the latest revision.
+    SELECT F.STATUS, F.ID, F.USE_DETAIL_TYPE
+      INTO PAC_FRC_DEF_FRC_INS_SP.REVISION_STATUS,
+           PAC_FRC_DEF_FRC_INS_SP.FROM_FORECAST,
+		   V_USE_DETAIL_TYPE
+      FROM PAC_FRC_FORECAST_PROPERTIES F
+     WHERE F.PROJECT_ID = projectId
+       AND FORECAST_TYPE = P_FORECAST_TYPE
+       AND F.REVISION = (SELECT MAX( P.REVISION )
+  	   	   			  	 FROM PAC_FRC_FORECAST_PROPERTIES P
+  						 WHERE P.PROJECT_ID = projectId
+  						 AND P.FORECAST_TYPE = P_FORECAST_TYPE);
+	EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+  END;
+  
+  -- If plan revision is approved then raise an error that plan has been approved
+  IF PAC_FRC_DEF_FRC_INS_SP.REVISION_STATUS = 2 THEN
+    RAISE_APPLICATION_ERROR(-20069, 'This plan has been approved.');
+  END IF; 
+
+  -- If plan exists and not approved then update the properties else insert.
+  BEGIN 
+   -- update the revenue/benefits flag in inv_projects
+   UPDATE inv_projects SET IS_REVENUE_PLAN = P_IS_REVENUE_PLAN
+   WHERE PRID=projectId;
+    
+  IF REVISION_STATUS IS NOT NULL THEN      
+      BEGIN
+        UPDATE pac_frc_forecast_properties
+           SET period_type=NVL(PAC_FRC_DEF_FRC_INS_SP.periodType,period_type)
+              ,start_period=V_START_PERIOD_ID
+              ,end_period=V_END_PERIOD_ID
+			  ,use_detail_type = PAC_FRC_DEF_FRC_INS_SP.useDetailType			  
+              ,last_updated_date=SYSDATE
+              ,last_updated_by=PAC_FRC_DEF_FRC_INS_SP.userId			  
+        WHERE id=PAC_FRC_DEF_FRC_INS_SP.FROM_FORECAST;	   
+		
+	   IF p_xog = 0 THEN
+	   DELETE FROM pac_frc_proj_assoc
+	   WHERE forecast_id = PAC_FRC_DEF_FRC_INS_SP.FROM_FORECAST;
+	   
+	   select count(*) INTO V_COUNT_PLAN_DETAILS from pac_frc_forecast_details
+	   where forecast_id=PAC_FRC_DEF_FRC_INS_SP.FROM_FORECAST;	
+	   
+	   IF V_COUNT_PLAN_DETAILS != 0 THEN
+	    RAISE_APPLICATION_ERROR(-20068, 'Cannot edit plan set up because detail plan has been entered already for this plan');
+	   END IF;
+	   END IF; 	
+	END;      
+  ELSE
+    BEGIN
+        SELECT VALUE
+          INTO V_UNIT_OF_MEASURE
+          FROM CMN_OPTIONS O,
+              CMN_OPTION_VALUES V
+        WHERE O.OPTION_CODE = 'PAC_FRC_UNITS'
+          AND O.ID = V.OPTION_ID;
+        
+		SELECT VALUE
+          INTO V_DEFAULT_VIEW
+          FROM CMN_OPTIONS O,
+              CMN_OPTION_VALUES V
+        WHERE O.OPTION_CODE = 'PAC_FRC_DEFAULT_VIEW'
+          AND O.ID = V.OPTION_ID;
+
+        SELECT TO_NUMBER(VALUE)
+          INTO V_SHOW_UNITS
+          FROM CMN_OPTIONS O,
+              CMN_OPTION_VALUES V
+        WHERE O.OPTION_CODE = 'PAC_FRC_SHOW_UNITS'
+          AND O.ID = V.OPTION_ID;
+
+        SELECT TO_NUMBER(VALUE)
+          INTO V_SHOW_COST
+          FROM CMN_OPTIONS O,
+              CMN_OPTION_VALUES V
+        WHERE O.OPTION_CODE = 'PAC_FRC_SHOW_COST'
+          AND O.ID = V.OPTION_ID;
+
+        SELECT TO_NUMBER(VALUE)
+          INTO V_SHOW_REVENUE
+          FROM CMN_OPTIONS O,
+              CMN_OPTION_VALUES V
+        WHERE O.OPTION_CODE = 'PAC_FRC_SHOW_REVENUE'
+          AND O.ID = V.OPTION_ID;
+
+
+	  INSERT INTO PAC_FRC_FORECAST_PROPERTIES (
+                 ID, 
+				 PROJECT_ID, 
+				 REVISION, 
+				 PERIOD_TYPE, 
+				 START_PERIOD, 
+				 END_PERIOD, 
+				 UNIT_OF_MEASURE, 
+				 DEFAULT_VIEW, 
+				 SHOW_UNITS, 
+				 SHOW_COST, 
+				 SHOW_REVENUE, 
+				 USE_DETAIL_TYPE, 
+				 FORECAST_TYPE,
+                 CREATED_DATE, 
+				 CREATED_BY, 
+				 LAST_UPDATED_DATE, 
+				 LAST_UPDATED_BY)
+       VALUES (
+	   		     PAC_FRC_FORECAST_PROPERTIES_S1.NEXTVAL,
+				 projectId,
+				 0,
+				 periodType,
+				 V_START_PERIOD_ID,
+				 V_END_PERIOD_ID,
+				 V_UNIT_OF_MEASURE,
+				 V_DEFAULT_VIEW,
+				 V_SHOW_UNITS,
+				 V_SHOW_COST,
+				 V_SHOW_REVENUE,
+				 useDetailType,
+				 P_FORECAST_TYPE,
+				 SYSDATE,
+				 userId,
+				 SYSDATE,
+				 userId
+				 );
+	END;
+  END IF;
+  	EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		  RAISE_APPLICATION_ERROR(-20878,StoO_errmsg ); 
+  END;
+END PAC_FRC_DEF_FRC_INS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

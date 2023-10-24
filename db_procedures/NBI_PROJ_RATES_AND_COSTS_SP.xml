@@ -1,0 +1,760 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PROJ_RATES_AND_COSTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PROJ_RATES_AND_COSTS_SP" 
+(
+  P_SCHEDULER_PREP NUMBER,
+  P_CREATE_RECORDS NUMBER,
+  P_COPY_RECORDS NUMBER,
+  P_INCREMENTAL_ONLY NUMBER,
+  P_TEAM_ONLY NUMBER
+)
+AS
+  V_COST_RATE       NUMBER(32, 6);
+  V_BILL_RATE       NUMBER(32, 6);
+  V_NATURAL_COST_RATE       NUMBER(32, 6);
+  V_NATURAL_BILL_RATE       NUMBER(32, 6);
+  V_PROJECT_COST_RATE       NUMBER(32, 6);
+  V_PROJECT_BILL_RATE       NUMBER(32, 6);
+  V_CURRENCY_CODE   VARCHAR2(30);
+  V_SYSTEM_CURRENCY_CODE   VARCHAR2(30);
+  V_PROJECT_CURR_CODE   VARCHAR2(30);
+  V_RATE_FOUND      INTEGER;
+  V_ROLE_CODE       VARCHAR2(96);
+  V_RESOURCE_COLS_NUM NUMBER;
+  V_INCREMENTAL_ONLY NUMBER;
+  SUCCESSFUL_JOB_COUNT NUMBER;
+
+  X1                NUMBER;
+  X2                NUMBER;
+  X3                NUMBER;
+  X4                NUMBER;
+  X5                NUMBER;
+  X6                VARCHAR2(30);
+  V_BILL_CURRENCY   VARCHAR2(30);
+  V_COST_CURRENCY   VARCHAR2(30);
+  V_TODAY           DATE;
+  P_RC              Ppa_Getratepkg.RCT1;
+
+  V_STMT            VARCHAR2 (200);
+
+  COUNTER         NUMBER := 0;
+  V_MATRIX_COUNT            INTEGER;
+  INCREMENTAL_PROJECTS_FOUND INTEGER;
+  StoO_selcnt     INTEGER;
+  StoO_error      INTEGER;
+  StoO_rowcnt     INTEGER;
+  StoO_errmsg     Globalpkg.STRING;
+  v_indx_tablespace VARCHAR2(255);
+  V_COST_TYPE     VARCHAR2(30);
+
+  CURSOR C_GET_RATE_COST_REC IS
+  SELECT
+         PROJECT_ID,
+         PROJECT_CODE,
+         CHARGE_CODE,
+         TEAM_ID,
+         TASK_ID,
+         PROJECT_CURR_CODE,
+         INPUT_TYPE,
+         RESOURCE_ID,
+         RESOURCE_CODE,
+         TRANS_TYPE,
+         FROM_DATE,
+         IS_ROLE,
+         TKROLEID,
+         PRROLEID,
+         PRPRIMARYROLEID,
+         TRANSCLASS,
+         EXCHANGE_RATE_TYPE
+    FROM TEMP_NBI_GET_RATES_AND_COSTS;
+
+BEGIN
+V_INCREMENTAL_ONLY:=P_INCREMENTAL_ONLY;
+IF P_CREATE_RECORDS = 1 THEN
+
+  V_STMT := 'Getting sysdate and nbi currency code';
+
+  -- get sysdate and the nbi currency code
+  SELECT SYSDATE,
+         NVL(MAX(VALUE), NULL)
+    INTO V_TODAY,
+         V_CURRENCY_CODE
+    FROM CMN_OPTIONS O,
+         CMN_OPTION_VALUES V
+   WHERE O.OPTION_CODE = 'NBI_CURRENCY_CODE'
+     AND V.OPTION_ID = O.ID;
+
+  V_STMT := 'Getting system currency code';
+   SELECT V.VALUE
+      INTO V_SYSTEM_CURRENCY_CODE
+      FROM CMN_OPTIONS O, CMN_OPTION_VALUES V
+    WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY' AND O.ID = V.OPTION_ID;
+
+    V_STMT := 'Check if there are any resource columns in the matrix';
+    SELECT COUNT(*)
+      INTO V_RESOURCE_COLS_NUM
+      FROM PPA_MATRIXCOLDEF
+      WHERE FIELDNAME = 'resource_code';
+
+      /* If incremental only, get the last successful job run date*/
+    IF P_INCREMENTAL_ONLY=1 THEN
+    BEGIN
+    --get the last successful job run date
+    -- CLRT-55428  It should be checking the STATUS from the table CMN_SCH_JOB_RUNS instead of CMN_SCH_JOBS.
+    SELECT COUNT(JR.START_DATE) INTO SUCCESSFUL_JOB_COUNT
+        FROM CMN_SCH_JOBS J, CMN_SCH_JOB_DEFINITIONS JD, CMN_SCH_JOB_RUNS JR
+        WHERE J.JOB_DEFINITION_ID = JD.ID
+        AND JD.JOB_CODE = 'Rate_Matrix_Extraction'
+        AND J.ID = JR.JOB_ID
+        AND JR.STATUS_CODE = 'COMPLETED';
+    END;
+    END IF;
+
+    IF SUCCESSFUL_JOB_COUNT&lt;1 THEN
+    BEGIN
+    V_INCREMENTAL_ONLY:=0;
+    END;
+    END IF;
+
+	
+	CMN_DROP_INDEX_SP('TEMP_NBI_SLICE_DATA_U1');
+    V_STMT := 'Calling  NBI_PREPARE_PROJ_DATA_SP';
+    NBI_PREPARE_PROJ_DATA_SP(V_INCREMENTAL_ONLY);
+
+	/* check the count of the number of projects to process */
+   V_STMT := 'SELECT COUNT(1) FROM TEMP_INCREMENTAL_ONLY_PROJECTS';
+   SELECT COUNT(1) INTO INCREMENTAL_PROJECTS_FOUND from TEMP_INCREMENTAL_ONLY_PROJECTS;
+
+  /* if we are running incremental only and the job was successfully run before and there are NO projects to process now, then just return */
+    IF (V_INCREMENTAL_ONLY = 1 AND SUCCESSFUL_JOB_COUNT &gt; 0 AND INCREMENTAL_PROJECTS_FOUND &lt; 1) THEN
+    BEGIN
+    RETURN;
+    END;
+    END IF;
+	
+	-- Enable this index on TEMP_NBI_SLICE_DATA.
+	EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_NBI_SLICE_DATA_U1 ON TEMP_NBI_SLICE_DATA(PROJECT_ID)';
+	
+    V_STMT := 'Calling NBI_PREPARE_MATRIX_DATA_SP';
+	-- Drop the indexes and recreate after the insert within the procedure.
+	CMN_DROP_INDEX_SP('TEMP_NBI_MATRIX_DATA_U1');
+	CMN_DROP_INDEX_SP('TEMP_NBI_MATRIX_DATA_N1');
+	
+    NBI_PREPARE_MATRIX_DATA_SP();
+	--Recreate the indexes
+	EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_NBI_MATRIX_DATA_U1
+    ON TEMP_NBI_MATRIX_DATA(MATRIXKEY, PROJECT_CODE, RESOURCE_CODE, TRANSITION_DATE)';
+	EXECUTE IMMEDIATE 'CREATE INDEX TEMP_NBI_MATRIX_DATA_N1
+    ON TEMP_NBI_MATRIX_DATA(MATRIXKEY, PROJECT_CODE, TRANSITION_DATE)';
+	
+	-- Drop the indexes and recreate after the insert within the procedure.
+	CMN_DROP_INDEX_SP('TEMP_NBI_PROJ_RESOURCES_U1');
+	CMN_DROP_INDEX_SP('TEMP_NBI_PROJ_RESOURCES_N1');
+	CMN_DROP_INDEX_SP('TEMP_NBI_PROJ_DATES_U1');
+
+    V_STMT := 'Calling NBI_PREPARE_PROJ_DEF_DATA_SP';
+	
+    NBI_PREPARE_PROJ_DEF_DATA_SP( V_RESOURCE_COLS_NUM, P_SCHEDULER_PREP,V_INCREMENTAL_ONLY );
+
+	EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_NBI_PROJ_DATES_U1 ON TEMP_NBI_PROJ_DATES(PROJECT_ID)';
+	
+	
+    -- Check if there are any matrices
+    SELECT COUNT(1)
+      INTO V_MATRIX_COUNT
+      FROM PPA_MATRIX
+      WHERE MATRIXTYPE &lt;&gt; 'G';
+
+		 -- place the following tables in NOLOGGING mode
+		 EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJ_RES_RATES_AND_COSTS NOLOGGING';
+		 EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJ_RES_RATES_AND_COSTSCP NOLOGGING';
+		 EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRJ_MATRIX_DATES NOLOGGING';
+
+    V_STMT := '(P_COPY_RECORDS = 1 AND V_INCREMENTAL_ONLY = 0 )';
+	-- placed this code here to honor the above IF condition. Do this only for full load.
+	 IF (P_COPY_RECORDS = 1 AND V_INCREMENTAL_ONLY = 0 ) THEN
+		 BEGIN
+		 -- Get the index tablespace name so that, you can create the indexes on the index tablespace.
+		 --V_STMT := 'Getting the INDX TABLESPACE';
+		 --SELECT NVL(tablespace_name,'NONE') INTO v_indx_tablespace FROM USER_INDEXES WHERE INDEX_NAME='NBI_PRJ_RES_RATES_AND_COSTS_N1';
+		 V_STMT := 'drop the indexes from NBI_PROJ_RES_RATES_AND_COSTSCP';
+		CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N1');
+		CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N2');
+		CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N3');
+		CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N4');
+		END;
+	END IF;
+
+     IF  V_MATRIX_COUNT = 0 THEN
+     /* There are no matrices in the system. Simply use the project dates. */
+      V_STMT := 'Performing project-related activities, inserting rows associated with the team members';
+
+      -- insert the rows associated with the team members
+      INSERT   INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE)
+      SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL,
+             I.ID,
+             T.PRRESOURCEID,
+             -1,
+             T.PRID,
+             NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+             I.CURRENCY_CODE,
+             D.FROM_DATE,
+             D.TO_DATE,
+             V_TODAY
+        FROM TEMP_NBI_PROJ_DATES D,
+             SRM_RESOURCES R,
+             PRTEAM T,
+             INV_INVESTMENTS I,
+            PRCHARGECODE C
+       WHERE  T.PRPROJECTID = I.ID
+         AND NVL(I.CHARGECODEID, 1) = C.PRID
+         AND R.ID = T.PRRESOURCEID
+         AND D.PROJECT_ID = I.ID
+         AND I.IS_ACTIVE=1
+         AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+		
+      V_STMT := 'Performing project-related activities, inserting rows associated with the specific assignments';
+
+      -- insert the rows associated with specific assignments
+      IF P_TEAM_ONLY = 0 THEN
+      INSERT   INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, TASK_ROLE_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE)
+      SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL, I.ID,
+             A.PRRESOURCEID,
+             T.PRID,
+             A.TEAM_ID,
+             A.ROLE_ID,
+             NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+             I.CURRENCY_CODE,
+             D.FROM_DATE,
+             D.TO_DATE,
+             V_TODAY
+        FROM TEMP_NBI_PROJ_DATES D,
+             SRM_RESOURCES R,
+             PRASSIGNMENT A,
+             PRTASK T,
+             INV_INVESTMENTS I,
+             PRCHARGECODE C
+       WHERE T.PRPROJECTID = I.ID
+         AND NVL(T.PRCHARGECODEID, NVL(I.CHARGECODEID, 1)) = C.PRID
+         AND T.PRID = A.PRTASKID
+         AND R.ID = A.PRRESOURCEID
+         AND D.PROJECT_ID = I.ID
+         AND I.IS_ACTIVE=1
+         AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+         END IF;
+	ELSE
+
+      IF V_RESOURCE_COLS_NUM = 0
+      THEN
+        V_STMT := 'Performing project-related activities, inserting rows associated with the team members';
+        -- insert the rows associated with the team members
+        INSERT INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE, EXCHANGE_RATE_TYPE )
+        SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL,
+               I.ID,
+               T.PRRESOURCEID,
+               -1,
+               T.PRID,
+               NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+               I.CURRENCY_CODE,
+               D.FROM_DATE,
+               D.TO_DATE,
+               V_TODAY,
+               D.EXCHANGE_RATE_TYPE
+          FROM NBI_PRJ_MATRIX_DATES D,
+               SRM_RESOURCES R,
+               PRTEAM T,
+               INV_INVESTMENTS I,
+               PRCHARGECODE C
+         WHERE  T.PRPROJECTID = I.ID
+           AND NVL(I.CHARGECODEID, 1) = C.PRID
+           AND R.ID = T.PRRESOURCEID
+           AND D.PROJECT_ID = I.ID
+           AND D.RESOURCE_TYPE = R.RESOURCE_TYPE
+           AND I.IS_ACTIVE=1
+           AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+		V_STMT := 'Performing project-related activities, inserting rows associated with the specific assignments';
+
+        -- insert the rows associated with specific assignments
+        IF P_TEAM_ONLY = 0 THEN
+        INSERT   INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, TASK_ROLE_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE, EXCHANGE_RATE_TYPE)
+        SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL, I.ID,
+               A.PRRESOURCEID,
+               T.PRID,
+               A.TEAM_ID,
+               A.ROLE_ID,
+               NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+               I.CURRENCY_CODE,
+               D.FROM_DATE,
+               D.TO_DATE,
+               V_TODAY,
+               D.EXCHANGE_RATE_TYPE
+          FROM NBI_PRJ_MATRIX_DATES D,
+               SRM_RESOURCES R,
+               PRASSIGNMENT A,
+               PRTASK T,
+               INV_INVESTMENTS I,
+               PRCHARGECODE C
+         WHERE T.PRPROJECTID = I.ID
+           AND NVL(T.PRCHARGECODEID, NVL(I.CHARGECODEID, 1)) = C.PRID
+           AND T.PRID = A.PRTASKID
+           AND R.ID = A.PRRESOURCEID
+           AND D.PROJECT_ID = I.ID
+           AND D.RESOURCE_TYPE = R.RESOURCE_TYPE
+           AND I.IS_ACTIVE=1
+           AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+           END IF;
+		ELSE
+        V_STMT := 'Performing project-related activities, inserting rows associated with the team members';
+        -- insert the rows associated with the team members
+        INSERT  INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE, EXCHANGE_RATE_TYPE )
+        SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL,
+               I.ID,
+               T.PRRESOURCEID,
+               -1,
+               T.PRID,
+               NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+               I.CURRENCY_CODE,
+               D.FROM_DATE,
+               D.TO_DATE,
+               V_TODAY,
+               D.EXCHANGE_RATE_TYPE
+          FROM NBI_PRJ_MATRIX_DATES D,
+               SRM_RESOURCES R,
+               PRTEAM T,
+               INV_INVESTMENTS I,
+               PRCHARGECODE C
+         WHERE  T.PRPROJECTID = I.ID
+           AND NVL(I.CHARGECODEID, 1) = C.PRID
+           AND R.ID = T.PRRESOURCEID
+           AND D.PROJECT_ID = I.ID
+           AND D.RESOURCE_ID = R.ID
+           AND I.IS_ACTIVE=1
+           AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+		
+		V_STMT := 'Performing project-related activities, inserting rows associated with the specific assignments';
+
+        -- insert the rows associated with specific assignments
+        IF P_TEAM_ONLY = 0 THEN
+          INSERT   INTO NBI_PROJ_RES_RATES_AND_COSTSCP
+             (ID, PROJECT_ID, RESOURCE_ID, TASK_ID, TEAM_ID, TASK_ROLE_ID, CHARGE_CODE, PROJECT_CURR_CODE, FROM_DATE, TO_DATE, LAST_MODIFIED_DATE, EXCHANGE_RATE_TYPE )
+        SELECT NBI_PRJ_RES_RATES_AND_COSTS_S1.NEXTVAL, I.ID,
+               A.PRRESOURCEID,
+               T.PRID,
+               A.TEAM_ID,
+               A.ROLE_ID,
+               NVL(C.PREXTERNALID, '[N/A]') "CHARGE_CODE",
+               I.CURRENCY_CODE,
+               D.FROM_DATE,
+               D.TO_DATE,
+               V_TODAY,
+               D.EXCHANGE_RATE_TYPE
+          FROM NBI_PRJ_MATRIX_DATES D,
+               SRM_RESOURCES R,
+               PRASSIGNMENT A,
+               PRTASK T,
+               INV_INVESTMENTS I,
+               PRCHARGECODE C
+         WHERE T.PRPROJECTID = I.ID
+           AND NVL(T.PRCHARGECODEID, NVL(I.CHARGECODEID, 1)) = C.PRID
+           AND T.PRID = A.PRTASKID
+           AND R.ID = A.PRRESOURCEID
+           AND D.PROJECT_ID = I.ID
+           AND D.RESOURCE_ID = R.ID
+           AND I.IS_ACTIVE=1
+           AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND I.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+           END IF;
+           
+      END IF;
+   -- now that the project-related tasks are done,
+  --   loop through each project/task/resource combo and update the rates
+
+  V_STMT := 'Loop through each project/task/resource combo and update the rates';
+
+  V_STMT := 'Get total number of NBI_PROJ_RES_RATES_AND_COSTS rows for today';
+
+  -- Recreate the indexes only for full load
+  IF (P_COPY_RECORDS = 1 AND V_INCREMENTAL_ONLY = 0 ) THEN
+  -- Recreate the indexes
+	BEGIN
+		V_STMT := 'Creating the indexes on NBI_PROJ_RES_RATES_AND_COSTSCP';
+		EXECUTE IMMEDIATE 'CREATE INDEX NBI_PRJ_RES_RATES_AND_COST_N1 ON NBI_PROJ_RES_RATES_AND_COSTSCP(PROJECT_ID, TASK_ID, TEAM_ID)';
+		EXECUTE IMMEDIATE 'CREATE INDEX NBI_PRJ_RES_RATES_AND_COST_N2 ON NBI_PROJ_RES_RATES_AND_COSTSCP(PROJECT_ID, RESOURCE_ID, CHARGE_CODE, FROM_DATE)';
+		EXECUTE IMMEDIATE 'CREATE INDEX NBI_PRJ_RES_RATES_AND_COST_N3 ON NBI_PROJ_RES_RATES_AND_COSTSCP(RESOURCE_ID,PROJECT_ID)';
+		EXECUTE IMMEDIATE 'CREATE INDEX NBI_PRJ_RES_RATES_AND_COST_N4 ON NBI_PROJ_RES_RATES_AND_COSTSCP(TEAM_ID,TASK_ID)';
+		V_STMT := 'Gather Table Statistics';
+		CMN_GATHER_TABLE_STATS_SP('NBI_PROJ_RES_RATES_AND_COSTSCP');
+		END;
+  END IF;
+
+
+  V_STMT := 'Insert INTO TEMP_NBI_GET_RATES_AND_COSTS';
+
+  CMN_DROP_INDEX_SP('TEMP_NBI_GET_RATES_AND_COST_U1');
+  
+  INSERT   INTO TEMP_NBI_GET_RATES_AND_COSTS
+    (PROJECT_ID, PROJECT_CODE, CHARGE_CODE, TEAM_ID, TASK_ID, PROJECT_CURR_CODE, INPUT_TYPE, RESOURCE_ID, RESOURCE_CODE, TRANS_TYPE,
+      FROM_DATE, IS_ROLE, TKROLEID, PRROLEID, PRPRIMARYROLEID, TRANSCLASS, EXCHANGE_RATE_TYPE)
+    SELECT DISTINCT
+           N.PROJECT_ID,
+           NVL(FP.PROJECT_CODE, '[N/A]') "PROJECT_CODE",
+           N.CHARGE_CODE,
+           N.TEAM_ID,
+           N.TASK_ID,
+           N.PROJECT_CURR_CODE,
+           NVL(I.PREXTERNALID, '[N/A]') "INPUT_TYPE",
+           N.RESOURCE_ID,
+           NVL(SR.UNIQUE_NAME, '[N/A]') "RESOURCE_CODE",
+           DECODE (SR.RESOURCE_TYPE, 0, 'L', 1, 'Q', 2, 'M', 'X') "TRANS_TYPE",
+           N.FROM_DATE,
+           R.PRISROLE,
+           N.TASK_ROLE_ID,
+           TE.PRROLEID,
+           R.PRPRIMARYROLEID,
+           NVL(FR.TRANSCLASS, '[N/A]') "TRANSCLASS",
+           N.EXCHANGE_RATE_TYPE
+        FROM NBI_PROJ_RES_RATES_AND_COSTSCP N,
+           PAC_MNT_PROJECTS FP,
+           PAC_MNT_RESOURCES FR,
+           PRTEAM TE,
+           SRM_RESOURCES SR,
+           PRJ_RESOURCES R,
+           PRTYPECODE I,
+           INV_INVESTMENTS INV
+     WHERE
+                N.PROJECT_ID = FP.ID (+)
+       AND SR.ID = N.RESOURCE_ID
+       AND SR.ID = FR.ID (+)
+       AND TE.PRPROJECTID = N.PROJECT_ID
+       AND TE.PRRESOURCEID = N.RESOURCE_ID
+       AND R.PRID = SR.ID
+       AND R.PRTYPECODEID = I.PRID (+)
+       AND FP.ID=INV.ID
+       AND INV.IS_ACTIVE=1
+       AND ( V_INCREMENTAL_ONLY=0 OR (V_INCREMENTAL_ONLY=1 AND FP.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+	
+	EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_NBI_GET_RATES_AND_COST_U1
+    ON TEMP_NBI_GET_RATES_AND_COSTS(PROJECT_ID, RESOURCE_ID, CHARGE_CODE, TEAM_ID, TASK_ID, FROM_DATE, PRROLEID, TKROLEID)';
+
+	 V_STMT := 'Statistics for table PPA_MATRIXVALUES';
+     CMN_GATHER_TABLE_STATS_SP('PPA_MATRIXVALUES');
+	
+
+
+  V_STMT := 'For loop to get rates and costs';
+
+  FOR C_GET_RATE_COST_DATA IN C_GET_RATE_COST_REC
+    LOOP
+
+	  -- Need to reset the variable, in case an exception is thrown. Bug 90953.
+	  V_ROLE_CODE := NULL;
+    V_COST_TYPE := NULL;
+
+      IF C_GET_RATE_COST_DATA.IS_ROLE = 0 THEN
+        V_STMT := 'Get name';
+
+        BEGIN
+          SELECT UNIQUE_NAME
+            INTO V_ROLE_CODE
+            FROM SRM_RESOURCES
+          WHERE ID = NVL(C_GET_RATE_COST_DATA.TKROLEID,NVL(C_GET_RATE_COST_DATA.PRROLEID, C_GET_RATE_COST_DATA.PRPRIMARYROLEID));
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+          WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+              RAISE_APPLICATION_ERROR (-20229, 'Error Updating Matrix Row.  ' || STOO_ERRMSG);
+              RETURN;
+        END;
+      ELSE
+        V_STMT := 'Get role';
+
+        V_ROLE_CODE := C_GET_RATE_COST_DATA.RESOURCE_CODE;
+      END IF;
+
+      V_STMT := 'Calling PPA_GETRATE_WITHROLE';
+
+      -- Get cost type from the task. If null at task level get from the parent task else from investment
+    -- When a task is deleted during the RME job run assignment of COST_TYPE value to V_COST_TYPE variable fails as the query returns no records
+    -- Suppressing the error as that record by itself is not required.
+    BEGIN
+      IF C_GET_RATE_COST_DATA.TASK_ID = -1 THEN
+        SELECT COST_TYPE INTO V_COST_TYPE FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = C_GET_RATE_COST_DATA.PROJECT_CODE;
+      ELSE 
+        SELECT NVL(c.cost_type, (SELECT cost_type FROM PAC_MNT_PROJECTS  WHERE PROJECT_CODE = C_GET_RATE_COST_DATA.PROJECT_CODE))
+               INTO V_COST_TYPE
+           FROM ( SELECT NVL(PT1.COST_TYPE, NVL(PT2.COST_TYPE, P.COST_TYPE)) AS COST_TYPE, 
+                      ROW_NUMBER() OVER (ORDER BY PT2.PRWBSSEQUENCE DESC) ROW_NUM 
+               FROM PAC_MNT_PROJECTS P, PRTASK PT1
+                    LEFT OUTER JOIN PRTASK PT2 ON
+                      PT2.COST_TYPE IS NOT NULL
+                      AND PT2.PRPROJECTID = PT1.PRPROJECTID
+                      AND PT2.PRWBSSEQUENCE &lt;= PT1.PRWBSSEQUENCE
+                      AND PT2.WBS_NNBSEQ &gt; PT1.PRWBSSEQUENCE 
+                      AND PT2.PRID &lt;&gt; PT1.PRID
+               WHERE PT1.PRPROJECTID = P.ID AND
+                     PT1.PRID = C_GET_RATE_COST_DATA.TASK_ID
+             ) C 
+           WHERE C.ROW_NUM = 1;
+         END IF;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+    END;
+	V_BILL_RATE := NULL;
+	V_COST_RATE := NULL;
+	V_NATURAL_BILL_RATE := NULL;
+	V_NATURAL_COST_RATE := NULL;
+	V_BILL_CURRENCY := NULL;
+	V_COST_CURRENCY := NULL;
+	V_PROJECT_BILL_RATE := NULL;
+	V_PROJECT_COST_RATE := NULL;
+	V_PROJECT_CURR_CODE := C_GET_RATE_COST_DATA.PROJECT_CURR_CODE;
+
+      Ppa_Getrate_Withrole(
+          NULL, -- note: we changed ppa_GetRate to always read the client from the project
+          C_GET_RATE_COST_DATA.PROJECT_CODE,
+          C_GET_RATE_COST_DATA.CHARGE_CODE,
+          C_GET_RATE_COST_DATA.INPUT_TYPE,
+          C_GET_RATE_COST_DATA.RESOURCE_CODE,
+          NULL, -- cLocation, if not provided it is calculated
+          NULL, -- cDepartCode, if not provided it is calculated
+          C_GET_RATE_COST_DATA.TRANS_TYPE,
+          TO_CHAR(C_GET_RATE_COST_DATA.FROM_DATE, 'mm/dd/yyyy'),
+          1,
+          0, -- bAsResultSet
+          X1,
+          V_NATURAL_BILL_RATE,
+          V_NATURAL_COST_RATE,
+          X2,
+          X3,
+          X4,
+          X5,
+          X6,
+          V_RATE_FOUND,
+          0, -- budgetcall
+          0, -- bCostOverride
+          V_BILL_CURRENCY,
+          V_COST_CURRENCY,
+          V_ROLE_CODE,
+          C_GET_RATE_COST_DATA.TRANSCLASS,
+          C_GET_RATE_COST_DATA.TEAM_ID,   -- added for same role added twice to team
+          P_RC,
+          V_SYSTEM_CURRENCY_CODE,
+          V_COST_TYPE
+          );
+
+      V_COST_RATE := V_NATURAL_COST_RATE;
+      V_BILL_RATE := V_NATURAL_BILL_RATE;
+      V_PROJECT_COST_RATE := V_NATURAL_COST_RATE;
+      V_PROJECT_BILL_RATE := V_NATURAL_BILL_RATE;
+
+      -- see if we need to do a currency conversion
+      IF V_RATE_FOUND = 1 OR V_COST_RATE &lt;&gt; 0 THEN
+        BEGIN
+          IF V_BILL_CURRENCY &lt;&gt; V_CURRENCY_CODE OR V_COST_CURRENCY &lt;&gt; V_CURRENCY_CODE THEN
+            BEGIN
+
+              IF V_BILL_CURRENCY &lt;&gt; V_CURRENCY_CODE THEN
+                V_STMT := 'Converting bill currency';
+
+                SELECT Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                       C_GET_RATE_COST_DATA.FROM_DATE, V_BILL_CURRENCY, V_CURRENCY_CODE,
+                       V_NATURAL_BILL_RATE, C_GET_RATE_COST_DATA.EXCHANGE_RATE_TYPE)
+                  INTO V_BILL_RATE
+                  FROM DUAL;
+              END IF;
+
+              IF V_COST_CURRENCY &lt;&gt; V_CURRENCY_CODE THEN
+                V_STMT := 'Converting cost currency';
+
+                SELECT Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                       C_GET_RATE_COST_DATA.FROM_DATE, V_COST_CURRENCY, V_CURRENCY_CODE,
+                       V_NATURAL_COST_RATE, C_GET_RATE_COST_DATA.EXCHANGE_RATE_TYPE)
+                  INTO V_COST_RATE
+                  FROM DUAL;
+              END IF;
+            END;
+          END IF;
+          /* Converting to Project's Curreny-code if needed. */
+          IF V_BILL_CURRENCY &lt;&gt; V_PROJECT_CURR_CODE OR V_COST_CURRENCY &lt;&gt; V_PROJECT_CURR_CODE THEN
+            BEGIN
+
+              IF V_BILL_CURRENCY &lt;&gt; V_PROJECT_CURR_CODE THEN
+                V_STMT := 'Converting bill currency';
+
+                SELECT Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                       C_GET_RATE_COST_DATA.FROM_DATE, V_BILL_CURRENCY, V_PROJECT_CURR_CODE,
+                       V_NATURAL_BILL_RATE, C_GET_RATE_COST_DATA.EXCHANGE_RATE_TYPE)
+                  INTO V_PROJECT_BILL_RATE
+                  FROM DUAL;
+              END IF;
+
+              IF V_COST_CURRENCY &lt;&gt; V_PROJECT_CURR_CODE THEN
+                V_STMT := 'Converting cost currency';
+
+                SELECT Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                       C_GET_RATE_COST_DATA.FROM_DATE, V_COST_CURRENCY, V_PROJECT_CURR_CODE,
+                       V_NATURAL_COST_RATE, C_GET_RATE_COST_DATA.EXCHANGE_RATE_TYPE)
+                  INTO V_PROJECT_COST_RATE
+                  FROM DUAL;
+              END IF;
+            END;
+          END IF;
+        /* End of conversion to Project's Curreny-code */
+        END;
+      ELSE
+        BEGIN
+          V_COST_RATE := NULL;
+          V_BILL_RATE := NULL;
+          V_PROJECT_COST_RATE := NULL;
+          V_PROJECT_BILL_RATE := NULL;
+        END;
+      END IF;
+
+      V_STMT := 'Updating NBI_PROJ_RES_RATES_AND_COSTSCP';
+
+        EXECUTE IMMEDIATE 'UPDATE  /*+ INDEX(NBI_PROJ_RES_RATES_AND_COSTSCP NBI_PRJ_RES_RATES_AND_COST_N4) */  NBI_PROJ_RES_RATES_AND_COSTSCP
+         SET
+             COST_RATE = :1,
+             BILL_RATE = :2,
+             NATURAL_COST_RATE = :3,
+             NATURAL_BILL_RATE = :4,
+             PROJECT_COST_RATE = :5,
+             PROJECT_BILL_RATE = :6,
+             NATURAL_COST_RATE_CURR_CODE = :7,
+             NATURAL_BILL_RATE_CURR_CODE = :8
+       WHERE PROJECT_ID = :9
+           AND RESOURCE_ID = :10
+           AND CHARGE_CODE = :11
+           AND FROM_DATE = :12
+           AND TASK_ID = :13
+           AND TEAM_ID = :14'
+		   USING V_COST_RATE,V_BILL_RATE,V_NATURAL_COST_RATE,V_NATURAL_BILL_RATE,V_PROJECT_COST_RATE,V_PROJECT_BILL_RATE,V_COST_CURRENCY,V_COST_CURRENCY,
+				 C_GET_RATE_COST_DATA.PROJECT_ID,C_GET_RATE_COST_DATA.RESOURCE_ID,C_GET_RATE_COST_DATA.CHARGE_CODE,C_GET_RATE_COST_DATA.FROM_DATE,
+				 C_GET_RATE_COST_DATA.TASK_ID,C_GET_RATE_COST_DATA.TEAM_ID;
+    END LOOP;
+	
+  END IF;
+
+  V_STMT := 'TRUNCATE TABLE TEMP_INCREMENTAL_ONLY_PROJECTS';
+  EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_INCREMENTAL_ONLY_PROJECTS';
+  
+  V_STMT := 'End of rate update loop, committing...';
+
+
+ END IF;
+
+ /* Update NBI_PROJ_RES_RATES_AND_COSTS if records exist in NBI_PROJ_RES_RATES_AND_COSTSCP. Otherwise INSERT.*/
+ IF  (P_COPY_RECORDS = 1) THEN
+ BEGIN
+  IF  (V_INCREMENTAL_ONLY = 0) THEN
+    BEGIN
+      V_STMT := 'TRUNCATE TABLE NBI_PROJ_RES_RATES_AND_COSTS';
+      EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_PROJ_RES_RATES_AND_COSTS';
+    END;
+  ELSE
+    BEGIN
+      V_STMT := 'DELETE FROM NBI_PROJ_RES_RATES_AND_COSTS WHERE PROJECT_ID IN (SELECT DISTINCT PROJECT_ID FROM NBI_PROJ_RES_RATES_AND_COSTSCP)';
+      EXECUTE IMMEDIATE 'DELETE /*+ parallel(costs,8) */  FROM NBI_PROJ_RES_RATES_AND_COSTS costs WHERE PROJECT_ID IN (SELECT DISTINCT PROJECT_ID FROM NBI_PROJ_RES_RATES_AND_COSTSCP )';
+    END;
+  END IF;
+  
+  INSERT /*+ parallel(costs,8) */   INTO NBI_PROJ_RES_RATES_AND_COSTS costs
+  (
+ 	ID,
+    PROJECT_ID,
+    RESOURCE_ID,
+    TASK_ID,
+    TEAM_ID,
+    TASK_ROLE_ID,
+  	FROM_DATE,
+  	TO_DATE,
+  	LAST_MODIFIED_DATE,
+  	COST_RATE,
+  	BILL_RATE,
+  	NATURAL_COST_RATE,
+ 	NATURAL_BILL_RATE,
+  	NATURAL_COST_RATE_CURR_CODE,
+  	NATURAL_BILL_RATE_CURR_CODE,
+  	CHARGE_CODE,
+  	PROJECT_COST_RATE,
+  	PROJECT_BILL_RATE,
+  	PROJECT_CURR_CODE,
+  	EXCHANGE_RATE_TYPE)
+	SELECT /*+ parallel(costscp,8)  */
+     MIN(ID),
+	 PROJECT_ID,
+	 RESOURCE_ID,
+	 TASK_ID,
+	 TEAM_ID,
+	 TASK_ROLE_ID,
+/* changed below to include dates in group by. */
+--	 MIN(FROM_DATE),
+--	 MAX(TO_DATE),
+	 FROM_DATE,
+	 TO_DATE,
+	 MIN(LAST_MODIFIED_DATE),
+	 COST_RATE,
+	 BILL_RATE,
+	 NATURAL_COST_RATE,
+	 NATURAL_BILL_RATE,
+	 NATURAL_COST_RATE_CURR_CODE,
+	 NATURAL_BILL_RATE_CURR_CODE,
+	 CHARGE_CODE,
+	 PROJECT_COST_RATE,
+	 PROJECT_BILL_RATE,
+	 PROJECT_CURR_CODE,
+	 EXCHANGE_RATE_TYPE
+  	FROM NBI_PROJ_RES_RATES_AND_COSTSCP costscp 
+  	WHERE (COST_RATE IS NOT NULL OR BILL_RATE IS NOT NULL OR PROJECT_COST_RATE IS NOT NULL OR PROJECT_BILL_RATE IS NOT NULL)
+    group by PROJECT_ID,RESOURCE_ID,TASK_ID,TEAM_ID,TASK_ROLE_ID,COST_RATE,BILL_RATE,NATURAL_COST_RATE,FROM_DATE,TO_DATE,
+    NATURAL_BILL_RATE,NATURAL_COST_RATE_CURR_CODE,NATURAL_BILL_RATE_CURR_CODE,CHARGE_CODE,PROJECT_COST_RATE,PROJECT_BILL_RATE,PROJECT_CURR_CODE,EXCHANGE_RATE_TYPE;
+	
+  END;
+  END IF;
+
+	-- Drop indexes, gather table stats and place tables back in LOGGING mode for full run
+	IF (P_COPY_RECORDS = 1 AND V_INCREMENTAL_ONLY = 0 ) THEN
+	BEGIN
+	V_STMT := 'Drop Indexes N3 and N4 NBI_PROJ_RES_RATES_AND_COSTS';
+	CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N3');
+	CMN_DROP_INDEX_SP('NBI_PRJ_RES_RATES_AND_COST_N4');
+	END;
+	END IF;
+	
+	V_STMT := 'Gather Table Statistics NBI_PROJ_RES_RATES_AND_COSTS';
+	CMN_GATHER_TABLE_STATS_SP('NBI_PROJ_RES_RATES_AND_COSTS');
+
+	V_STMT := 'Place the tables back in LOGGING mode';
+	-- place the following tables back in LOGGING mode
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJ_RES_RATES_AND_COSTS LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJ_RES_RATES_AND_COSTSCP LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRJ_MATRIX_DATES LOGGING';
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_PROJ_RATES_AND_COSTS_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

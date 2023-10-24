@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_all_partition_model_codes" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_all_partition_model_codes"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT @SELECT:DIM:USER_DEF:IMPLIED:PARTITIONS:X.MODEL_CODE:CODE@,
+		@SELECT:DIM_PROP:USER_DEF:IMPLIED:PARTITIONS:X.LAST_UPDATED_DATE:LAST_UPDATED_DATE@,
+		@SELECT:DIM_PROP:USER_DEF:IMPLIED:PARTITIONS:CSU.USER_NAME:LAST_UPDATED_BY@
+
+FROM
+( select cp.MODEL_CODE, last_updated_by, last_updated_date from cmn_partitions cp
+	union all
+	select code as model_code, last_updated_by, last_updated_date from CMN_PARTITION_MODELS cpm
+) x
+LEFT JOIN cmn_sec_users csu ON csu.id = x.last_updated_by
+
+where EXISTS (
+select last_updated_date, MODEL_CODE from (
+	select max(xmax.LAST_UPDATED_DATE) last_updated_date , xmax.MODEL_CODE
+	from
+		(
+			select cp.MODEL_CODE, last_updated_date from cmn_partitions cp
+			union all
+			select code as model_code, last_updated_date from CMN_PARTITION_MODELS cpm
+		) xmax group by xmax.model_code
+	) xmaxx where xmaxx.last_updated_date = x.last_updated_date and x.model_code = xmaxx.model_code
+)
+and
+@FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="last_updated_date" required="false"/>
+            <attribute id="last_updated_by" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

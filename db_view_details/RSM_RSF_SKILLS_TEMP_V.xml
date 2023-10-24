@@ -1,0 +1,30 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RSM_RSF_SKILLS_TEMP_V">
+    <indexes/>
+    <text_length>1105</text_length>
+    <text>SELECT  rsa.object_id resource_id, 
+                  SUM (t.weight) skills_score   
+          FROM    temp_rsm_rsf_skills t, 
+                  rsm_skills_associations rsa, 
+                  cmn_lookups i, 
+                  cmn_lookups p, 
+                  cmn_lookups p2   
+          WHERE   t.skill_id         = rsa.skill_id   
+                  AND rsa.object_code = 'resource'
+                  AND i.lookup_type  = 'RSM_RESOURCE_INTLEV'   
+                  AND p.lookup_type  = 'RSM_RESOURCE_PROFLEV'   
+                  AND p2.lookup_type = 'RSM_RESOURCE_PROFLEV'   
+                  AND t.int_level    = i.id   
+                  AND t.prof_level   = p.id   
+                  AND t.prof_level2  = p2.id   
+                  AND i.sort_order  &lt;= (SELECT sort_order FROM cmn_lookups WHERE id = rsa.interest_level_id)   
+                  AND p.sort_order  &lt;= (SELECT sort_order FROM cmn_lookups WHERE id = rsa.proficiency_level_id)   
+                  AND p2.sort_order >= (SELECT sort_order FROM cmn_lookups WHERE id = rsa.proficiency_level_id)   
+          GROUP BY rsa.object_id
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

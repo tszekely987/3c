@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NBI_GET_OBS_FLAT_PATH_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NBI_GET_OBS_FLAT_PATH_FCT" (P_OBS_UNIT_ID IN NUMBER)
+   RETURN VARCHAR2
+IS
+   CURSOR C_PATH
+   IS
+      SELECT   BRANCH_UNITS.NAME
+      FROM     PRJ_OBS_UNITS_FLAT FLAT_UNITS,
+               PRJ_OBS_UNITS UNITS,
+               PRJ_OBS_UNITS BRANCH_UNITS
+      WHERE    FLAT_UNITS.UNIT_ID = UNITS.ID
+      AND      FLAT_UNITS.BRANCH_UNIT_ID = BRANCH_UNITS.ID
+      AND      FLAT_UNITS.UNIT_ID = P_OBS_UNIT_ID
+       ORDER BY BRANCH_UNITS.DEPTH;
+
+   V_RET_VAL   VARCHAR2 (4000);
+BEGIN
+   FOR C_REC IN C_PATH
+   LOOP
+      V_RET_VAL := V_RET_VAL || C_REC.NAME || '/';
+   END LOOP;
+
+   V_RET_VAL := SUBSTR (V_RET_VAL, 1, LENGTH (V_RET_VAL) - 1);
+   RETURN V_RET_VAL;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

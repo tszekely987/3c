@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_INVOICE_HISTORY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_INVOICE_HISTORY" (
+cUserID 	VARCHAR2 ,
+cCOMPANY_CODE 	VARCHAR2 ,
+cPROJECT_CODE 	VARCHAR2 ,
+RC1 	IN OUT PAC_BIL_INVOICE_HISTORYPkg.RCT1,
+RC2 	IN OUT PAC_BIL_INVOICE_HISTORYPkg.RCT2,
+RC3 	IN OUT PAC_BIL_INVOICE_HISTORYPkg.RCT3)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+BEGIN
+	OPEN RC1 FOR
+	SELECT I.invoiceno,
+		   I.invoicedate,
+		   ( NVL(IV.invoiceamount, 0) + NVL(IV.admincharge, 0) + NVL(IV.taxamount,0)) * ( 1 - (2 * INSTR('C', I.INVTYPE))),
+		   I.notes
+	    FROM invoiceheader I, invoiceheader_values IV
+	WHERE I.COMPANY_CODE = PAC_BIL_INVOICE_HISTORY.cCOMPANY_CODE
+	 and IV.CURRENCY_TYPE = 'BILLING'
+	 and I.InvoiceNo = IV.InvoiceNo
+	 and SUBSTR(I.invoiceno, 1, 5) != 'MATCH'
+	 and EXISTS (
+	SELECT  1
+	 FROM ppa_Billings B
+	WHERE B.InvoiceNo = I.invoiceno
+	 and B.TransType  IN ('B', 'BR', 'BP', 'BC')
+	 and B.COMPANY_CODE = PAC_BIL_INVOICE_HISTORY.cCOMPANY_CODE
+	 and B.PROJECT_CODE = PAC_BIL_INVOICE_HISTORY.cPROJECT_CODE )
+	GROUP BY I.INVTYPE,
+		  	 I.invoiceno,
+		   	 I.invoicedate,
+			 I.notes,
+			 IV.invoiceamount,
+			 IV.admincharge,
+			 IV.taxamount
+	ORDER BY 1;
+
+	OPEN RC2 FOR
+	SELECT SUM( (NVL(IV.invoiceamount, 0) + NVL(IV.admincharge, 0) + NVL(IV.taxamount,0))  * ( 1 - (2 * INSTR('C', I.INVTYPE))))
+	    FROM invoiceheader I, invoiceheader_values IV
+	WHERE I.COMPANY_CODE = PAC_BIL_INVOICE_HISTORY.cCOMPANY_CODE
+	 and IV.CURRENCY_TYPE = 'BILLING'
+	 and I.InvoiceNo = IV.InvoiceNo
+	 and SUBSTR(I.invoiceno, 1, 5) != 'MATCH'
+	 and EXISTS (
+	SELECT  1
+	 FROM ppa_Billings B
+	WHERE B.InvoiceNo = I.invoiceno
+	 and B.TransType  IN ('B', 'BR', 'BP', 'BC')
+	 and B.COMPANY_CODE = PAC_BIL_INVOICE_HISTORY.cCOMPANY_CODE
+	 and B.PROJECT_CODE = PAC_BIL_INVOICE_HISTORY.cPROJECT_CODE )
+	ORDER BY 1;
+
+	OPEN RC3 FOR
+	SELECT BILLING_CURRENCY_CODE
+		   FROM PAC_MNT_PROJECTS
+		   WHERE COMPANY_CODE = cCOMPANY_CODE AND
+		   		 PROJECT_CODE = cPROJECT_CODE;
+END PAC_BIL_INVOICE_HISTORY;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

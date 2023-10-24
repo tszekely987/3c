@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUTONUM_OBJECTS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUTONUM_OBJECTS_INS_SP" (
+   P_OBJECT_CODE    IN VARCHAR2,
+   P_ATTRIBUTE_CODE IN VARCHAR2,
+   P_PARTITION_CODE IN VARCHAR2 DEFAULT 'NIKU.ROOT',
+   P_OBJECT_NAME    IN VARCHAR2,
+   P_OBJECT_DESC    IN VARCHAR2,
+   P_IS_ACTIVE      IN INTEGER DEFAULT 1,
+   P_MAX_LENGTH     IN INTEGER DEFAULT 30,
+   P_CREATED_BY     IN NUMBER
+)
+IS
+   V_ID NUMBER := -1;
+   V_DEFAULT_COUNTER_LENGTH NUMBER := 8;
+
+   CURSOR c_scheme IS
+     SELECT id
+       FROM CMN_AUTONUM_SCHEMES
+      WHERE object_code = p_object_code
+        AND partition_code = p_partition_code
+        AND attribute_code = p_attribute_code;
+
+BEGIN
+
+  FOR scheme_rec IN c_scheme
+  LOOP
+    v_id := scheme_rec.id;
+  END LOOP;
+
+  IF v_id &lt; 0
+  THEN
+    SELECT CMN_AUTONUM_SCHEMES_S1.NEXTVAL
+    INTO   V_ID
+    FROM   DUAL;
+
+    INSERT INTO CMN_AUTONUM_SCHEMES (
+                  ID,
+                  NAME,
+                  OBJECT_CODE,
+                  ATTRIBUTE_CODE,
+                  PARTITION_CODE,
+                  IS_ACTIVE,
+                  NEXT_VALUE,
+                  MAX_LENGTH,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+        VALUES (
+           V_ID,
+           NULL,
+           P_OBJECT_CODE,
+           P_ATTRIBUTE_CODE,
+           P_PARTITION_CODE,
+           P_IS_ACTIVE,
+           NULL,
+           P_MAX_LENGTH,
+           SYSDATE,
+           P_CREATED_BY,
+           SYSDATE,
+           P_CREATED_BY
+        );
+   CMN_CAPTIONS_NLS_INS_SP (
+      P_TABLE_NAME =&gt; 'CMN_AUTONUM_SCHEMES',
+      P_PK_ID =&gt; V_ID,
+      P_NAME =&gt; P_OBJECT_NAME,
+      P_DESCRIPTION =&gt; P_OBJECT_DESC,
+      P_CREATED_BY =&gt; P_CREATED_BY
+   );
+
+   IF p_partition_code = 'NIKU.ROOT'
+   THEN
+
+     IF p_max_length &lt; v_default_counter_length
+     THEN
+       v_default_counter_length := p_max_length;
+     END IF;
+
+     -- Create default segment
+     CMN_AUTONUM_SEGMENTS_INS_SP (
+       P_Scheme_Id =&gt; v_id,
+       P_Seg_Code =&gt; 'NUMERIC',
+       P_Length =&gt; v_default_counter_length,
+       P_Start_Value =&gt; '1',
+       P_Text_Value =&gt; NULL,
+       P_Position =&gt; 0,
+       P_Is_Autoext =&gt; 1);
+   END IF;
+
+ END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

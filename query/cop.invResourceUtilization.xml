@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.invResourceUtilization" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Investment Resource Utilization" languageCode="en" name="Investment Resource Utilization"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:investment:slices.month_key:month_key@,
+       @select:dim_prop:user_def:implied:investment:slices.period_end_date:month_label@,
+       @select:metric:user_def:implied:SUM(CASE slices.request_name WHEN 'MONTHLYRESOURCEALLOCCURVE' THEN slices.hrs ELSE 0 END):allocation_hrs@,
+       @select:metric:user_def:implied:SUM(CASE slices.request_name WHEN 'MONTHLYRESOURCEESTCURVE'   THEN slices.hrs 
+                                                                    WHEN 'MONTHLYRESOURCEACTCURVE'   THEN slices.hrs ELSE 0 END):assignment_hrs@,
+       @select:metric:user_def:implied:CASE WHEN  SUM(CASE WHEN slices.request_name = 'MONTHLYRESOURCEALLOCCURVE' THEN slices.hrs ELSE 0 END) = 0 
+                                            THEN 0 
+                                            ELSE (SUM(CASE WHEN slices.request_name = 'MONTHLYRESOURCEESTCURVE'   THEN slices.hrs 
+                                                           WHEN slices.request_name = 'MONTHLYRESOURCEACTCURVE'   THEN slices.hrs ELSE 0 END)
+                                                                /  SUM(CASE WHEN slices.request_name = 'MONTHLYRESOURCEALLOCCURVE' THEN slices.hrs ELSE 0 END) ) END * 100:utilization_pct@
+FROM   inv_investments i
+       INNER JOIN
+       (SELECT inv.id inv_int_id,
+               cal.month_key month_key,
+               ld.period_end_date,
+               sr.request_name request_name,
+               SUM(@NVL@(s.slice,0)) hrs
+        FROM   cop_program_v prog 
+        INNER  JOIN inv_investments inv ON  inv.id = prog.project_id
+        INNER  JOIN prteam tm ON  inv.id = tm.prprojectid
+        INNER  JOIN srm_resources r ON  tm.prresourceid = r.id
+                                    AND r.resource_type = 0
+        INNER  JOIN prj_blb_slices s ON  tm.prid = s.prj_object_id
+        INNER  JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id
+                                             AND sr.request_name IN ('MONTHLYRESOURCEALLOCCURVE')
+        INNER  JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+        INNER  JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                             AND ld.hierarchy_level = 'MONTH'			   
+        WHERE  prog.program_id = @NVL@(@WHERE:PARAM:XML:INTEGER:/data/id/@value@,prog.program_id)
+        AND    inv.is_active <> 0
+        AND    inv.id NOT IN (SELECT prid from inv_projects WHERE is_template = 1)		
+        GROUP  BY inv.id, cal.month_key, ld.period_end_date, sr.request_name
+        UNION ALL
+        SELECT inv.id inv_int_id,
+               cal.month_key month_key,
+               ld.period_end_date,
+               sr.request_name request_name,
+               SUM(@NVL@(s.slice,0)) hrs
+        FROM   cop_program_v prog
+        INNER  JOIN inv_investments inv ON  inv.id = prog.project_id 
+        INNER  JOIN prtask t ON  inv.id = t.prprojectid
+        INNER  JOIN prassignment a ON  t.prid = a.prtaskid
+        INNER  JOIN srm_resources r ON  a.prresourceid = r.id
+                                    AND r.resource_type = 0
+        INNER  JOIN prj_blb_slices s ON  a.prID = s.prj_object_id
+        INNER  JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id
+                                             AND sr.request_name IN ('MONTHLYRESOURCEACTCURVE','MONTHLYRESOURCEESTCURVE')
+        INNER  JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+        INNER  JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                             AND ld.hierarchy_level = 'MONTH'			   
+        WHERE  prog.program_id = @NVL@(@WHERE:PARAM:XML:INTEGER:/data/id/@value@,prog.program_id)
+        AND    inv.id NOT IN (SELECT prid from inv_projects WHERE is_template = 1)
+        AND    inv.is_active <> 0		
+        GROUP  BY inv.id, cal.month_key, ld.period_end_date, sr.request_name) slices ON i.id = slices.inv_int_id
+WHERE  @WHERE:PARAM:USER_DEF:STRING:i.odf_object_code:INVESTMENT_TYPE@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:i.manager_id:INVESTMENT_MANAGER@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:i.id:INVESTMENT_ID@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:(CASE WHEN i.status IN (1,5,8) THEN 1 ELSE 0 END):INVESTMENT_STATUS@
+AND    @WHERE:SECURITY:PROJECT:i.id@
+AND    @FILTER@
+GROUP  BY slices.month_key, slices.period_end_date
+HAVING @HAVING_FILTER@]]></nsql>
+            <attribute id="month_key" lookup="COP_PORTLET_MONTHS" required="false">
+              
+              
+              
+              
+              <nls description="Time Period Filter" languageCode="en" name="Time Period Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="month_label" required="false">
+              
+              
+              
+              
+              <nls description="Month" languageCode="en" name="Month"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="allocation_hrs" required="false">
+              
+              
+              
+              
+              <nls description="Allocation" languageCode="en" name="Allocation"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assignment_hrs" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Assignment" languageCode="en" name="Assignment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="utilization_pct" required="false">
+              
+              
+              
+              
+              
+              <nls description="Utilization %" languageCode="en" name="Utilization %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_investment_type" lookup="BROWSE_INV_EXTENDED_OBJECTS" required="false">
+              
+              
+              
+              
+              <nls description="Investment Type Filter" languageCode="en" name="Investment Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_investment_manager" lookup="BROWSE_PROJMGR" required="false">
+              
+              <nls description="Investment Manager Filter" languageCode="en" name="Investment Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_investment_id" lookup="INV_BROWSE_INVESTMENT" required="false">
+              
+              
+              
+              
+              <nls description="Investment Filter" languageCode="en" name="Investment Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_investment_status" lookup="COP_PORTLET_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              
+              <nls description="Investment Status Filter" languageCode="en" name="Investment Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

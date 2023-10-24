@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>FED_FLATTEN_MVLOOKUPS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."FED_FLATTEN_MVLOOKUPS_FCT" (
+  object_code          VARCHAR2,
+  object_instance_id     NUMERIC,
+  attribute_code       VARCHAR2,
+  delimiter        VARCHAR2 DEFAULT ','
+                               )
+  RETURN VARCHAR2 IS
+
+  /******************************************************************************
+     NAME:       FED_FLATTEN_MULTI_VALUED_LOOKUPS
+     PURPOSE:    Flatten multi-valued lookups with the given delimiter, 
+   defaults delimiter to comma if none is specified
+  ******************************************************************************/
+
+   buffer         VARCHAR2(1000);
+   currentvalue   VARCHAR2(30);
+   CURSOR cursor_mvlookupvalue IS
+     SELECT value FROM ODF_MULTI_VALUED_LOOKUPS
+     WHERE object = object_code 
+     AND pk_id = object_instance_id
+     AND attribute = attribute_code
+     ORDER by seq;
+      
+     
+      BEGIN
+          OPEN cursor_mvlookupvalue;
+        
+        LOOP
+          FETCH cursor_mvlookupvalue INTO currentvalue;
+          EXIT WHEN cursor_mvlookupvalue%NOTFOUND;         
+            
+          BEGIN
+             buffer := buffer || currentvalue || delimiter;
+          END;
+        END LOOP;
+        
+        CLOSE cursor_mvlookupvalue;
+        
+        IF( 0 &lt; LENGTH(buffer) ) THEN
+          BEGIN
+             buffer := SUBSTR(buffer, 1, (LENGTH(buffer) - 1) ); 
+          END;
+        END IF;
+        
+       RETURN buffer;
+        
+       EXCEPTION
+        WHEN OTHERS THEN
+           IF( cursor_mvlookupvalue%ISOPEN ) THEN      
+             CLOSE cursor_mvlookupvalue;
+           END IF;   
+      END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>ODF_OBJECT_MAPPING_INS_T1</code>
+          <table_name>ODF_OBJECT_MAPPING</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."ODF_OBJECT_MAPPING_INS_T1" 
+AFTER INSERT
+ON ODF_OBJECT_MAPPING
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+	--	First to this mapping itself
+	--
+	lock table odf_object_mapping_flat in exclusive mode;
+
+	INSERT INTO odf_object_mapping_flat 
+	  (id,
+	  obj_mapping_code, 
+  	  ancestor_obj_mapping_code, 
+  	  created_date, 
+  	  created_by, 
+  	  last_updated_date, 
+  	  last_updated_by)
+	VALUES 
+	  (odf_object_mapping_flat_s1.nextval,
+	  :new.mapping_code, 
+	  :new.mapping_code, 
+	  sysdate, 
+	  1, 
+	  sysdate, 
+	  1);
+	
+	--
+	--	Now do the parent, and its parents, and its parents.....
+	--
+      INSERT INTO odf_object_mapping_flat
+	( id,
+	  obj_mapping_code, 
+  	  ancestor_obj_mapping_code, 
+  	  created_date, 
+  	  created_by, 
+  	  last_updated_date, 
+  	  last_updated_by)
+		SELECT	odf_object_mapping_flat_s1.nextval,
+            		:new.mapping_code, 
+		            ancestor_obj_mapping_code, 
+		            sysdate, 
+		            1, 
+		            sysdate, 
+		            1
+		FROM		odf_object_mapping_flat
+		WHERE	obj_mapping_code = :new.parent_mapping_code;
+		
+	commit;
+
+exception
+   when others
+   then
+      rollback;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,22 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_Q_AVAIL_FTE_V">
+    <indexes/>
+    <text_length>601</text_length>
+    <text>SELECT r.id RESOURCE_ID,
+       s.slice_date QUARTER_START_DATE,
+       ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE (s.slice / c.fte) * 100 END,2) AVAIL_L_PERCENT,
+       ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE s.slice / c.fte END,2) AVAIL_L_FTE
+FROM   srm_resources r
+       INNER JOIN prj_blb_slices s ON r.id = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+       INNER JOIN rpt_calendar c ON s.slice_date = c.start_date
+WHERE (sr.request_name = 'QUARTERLYRESOURCEAVAILCURVE')
+AND   (c.period_type = 'QUARTERLY')
+AND    r.resource_type = 0
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

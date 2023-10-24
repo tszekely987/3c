@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_DEL_DEACTIVE_VIEW_COL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_DEL_DEACTIVE_VIEW_COL_SP" ( P_IS_DELETE IN NUMBER DEFAULT 0, P_CUST_ATTR_ID IN NUMBER, P_USER_ID IN NUMBER, P_TIMESTAMP IN DATE )
+    	-- This stored procedure will be executed when a custom attribute is deleted or deactivated in classic PPM.
+        -- P_IS_DELETE is passed 1 if it is for delete, else it will be considered as for deactivate
+        IS
+          CURSOR C_VIEWS_COLUMNS ( CP_IS_DELETE IN NUMBER, CP_CUST_ATTR_ID IN NUMBER )
+          IS
+              SELECT uiViews.id ViewId, uiCols.id ColId, uiCols.sort_position, uiCols.group_by_position FROM  odf_custom_attributes ca, odf_ui_list_cols uiCols, odf_ui_views uiViews, odf_objects objects
+                       WHERE uiCols.metadata_url = ca.api_alias
+                       AND uiCols.view_id = uiViews.id
+                       AND objects.code = ca.object_name
+                       AND (uiViews.type = objects.api_alias or uiViews.type in (SELECT  o.api_alias
+                                         FROM    odf_objects o, odf_object_extensions oe
+                                         WHERE   oe.extension_code = objects.code
+                                         AND     oe.object_code = o.code
+                                         AND     o.is_customizable = 1) )
+                       AND ca.ID = CP_CUST_ATTR_ID;
+        BEGIN
+           -- Cursor C_VIEWS_COLUMNS holds the records of views that the given attribute is added. Loop over each view to perform action
+           -- If it is for delete, then deletes the column record and reorders the existing columns of the view using merge query
+           -- If it is for deactivate, then makes is_selected=0 and position=-999 of the column record and reorders the existing columns of the view using merge query
+           FOR C_VIEWS_COLUMNS_REC IN C_VIEWS_COLUMNS ( P_IS_DELETE , P_CUST_ATTR_ID )
+           LOOP
+
+            IF P_IS_DELETE = 1 THEN
+              DELETE odf_ui_list_cols WHERE view_id = C_VIEWS_COLUMNS_REC.ViewId AND id = C_VIEWS_COLUMNS_REC.ColId;
+            ELSE
+              UPDATE odf_ui_list_cols SET position = -999, is_selected=0, last_updated_by = P_USER_ID, last_updated_date = P_TIMESTAMP, sort_position = null, sort_order = null, is_grouped = null, group_by_position = null  WHERE view_id = C_VIEWS_COLUMNS_REC.ViewId AND id = C_VIEWS_COLUMNS_REC.ColId;
+            END IF;
+
+			-- Reorder the existing columns of the view
+            MERGE /*+ NOPARALLEL */ INTO odf_ui_list_cols s
+            USING ( SELECT id, view_id, ROW_NUMBER() OVER (PARTITION BY layout ORDER BY position) AS row_num FROM odf_ui_list_cols WHERE view_id = C_VIEWS_COLUMNS_REC.ViewId AND is_selected = 1) c
+            ON ( s.id = c.id and s.view_id = c.view_id )
+            WHEN MATCHED THEN UPDATE SET s.position = c.row_num;
+
+			-- reorder existing sort columns of the view
+			if coalesce(C_VIEWS_COLUMNS_REC.sort_position, 0) &gt; 0 then 
+				MERGE /*+ NOPARALLEL */ INTO odf_ui_list_cols s
+				USING ( SELECT id, view_id, ROW_NUMBER() OVER (PARTITION BY layout ORDER BY sort_position) AS row_num FROM odf_ui_list_cols WHERE view_id = C_VIEWS_COLUMNS_REC.ViewId 
+				and coalesce(sort_position, 0) &gt; 0 ) c
+				ON ( s.id = c.id and s.view_id = c.view_id )
+				WHEN MATCHED THEN UPDATE SET s.sort_position = c.row_num;
+			end if;
+			--reorder existing group by columns of the view
+			if coalesce(C_VIEWS_COLUMNS_REC.group_by_position, 0) &gt; 0 then
+				MERGE /*+ NOPARALLEL */ INTO odf_ui_list_cols s
+				USING ( SELECT id, view_id, ROW_NUMBER() OVER (PARTITION BY layout ORDER BY group_by_position) AS row_num FROM odf_ui_list_cols WHERE view_id = C_VIEWS_COLUMNS_REC.ViewId
+				and coalesce(group_by_position, 0) &gt; 0 ) c
+				ON ( s.id = c.id and s.view_id = c.view_id )
+				WHEN MATCHED THEN UPDATE SET s.group_by_position = c.row_num;
+			end if;
+           END LOOP;
+        END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

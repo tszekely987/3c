@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_RESCREDIT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_RESCREDIT_SP" 
+(
+  ID                NUMBER,
+  ENTITY_IN         VARCHAR2,
+  LOCATION_IN       VARCHAR2,
+  DEPARTMENT_IN     VARCHAR2,
+  TRANSCLASS_IN     VARCHAR2,
+  RESCLASS_IN       VARCHAR2,
+  P_RESOURCE_CODE 	VARCHAR2
+)
+AS
+  ENTITY_ID         NUMBER;
+  ENTITY            VARCHAR2(60);
+  LOCATION          VARCHAR2(60);
+  DEPARTMENT        VARCHAR2(60);
+  TRANS_CLASS       VARCHAR2(10);
+  RESOURCE_CLASS    VARCHAR(10);
+  LOCATION_ID       NUMBER;
+  DEPARTMENT_ID     NUMBER;
+  TRANS_CLASS_ID    NUMBER;
+  RESOURCE_CLASS_ID NUMBER;
+  V_TO_DATE         DATE;
+  var_select        INTEGER;
+BEGIN
+  PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY         := TRIM(PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY_IN);
+  PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION       := TRIM(PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION_IN);
+  PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT     := TRIM(PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT_IN);
+  PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS    := TRIM(PAC_MNT_VALIDATE_RESCREDIT_SP.TRANSCLASS_IN);
+  PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS := TRIM(PAC_MNT_VALIDATE_RESCREDIT_SP.RESCLASS_IN);
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY = '*' THEN
+    PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION = '*' THEN
+    PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION  := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT = '*' THEN
+    PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS = '*' THEN
+    PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS = '*' THEN
+    PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY IS NOT NULL THEN
+    BEGIN
+      SELECT ID
+        INTO ENTITY_ID
+        FROM entity
+       WHERE entity = PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY
+	   AND entity = NVL(PAC_FOS_RESOURCE_ENTITY_FCT(P_RESOURCE_CODE), entity) ;
+
+      EXCEPTION
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF NVL(ENTITY_ID, 0) = 0 OR var_select = 0 then
+      raise_application_error(-20121, 'The Entity code is invalid!');
+    END IF;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.location IS NOT NULL THEN
+    BEGIN
+      SELECT ID INTO PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION_ID
+        FROM LOCATIONS
+       WHERE LOCATIONS.locationid = PAC_MNT_VALIDATE_RESCREDIT_SP.location
+	   AND PAC_FOS_IS_VALID_LOCATION_FCT(P_RESOURCE_CODE, locationid) = 1;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+             var_select := 0;
+        WHEN OTHERS THEN
+             var_select := 0;
+    END;
+
+    IF PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION_ID IS NULL THEN
+	  	  RAISE_APPLICATION_ERROR(-20772, 'Invalid location.');
+	  END IF;
+
+    IF PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY IS NOT NULL THEN
+      BEGIN
+        SELECT 1 INTO var_select
+          FROM LOCATIONS
+         WHERE LOCATIONS.locationid = PAC_MNT_VALIDATE_RESCREDIT_SP.location
+           AND LOCATIONS.ENTITY = PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY;
+
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+              var_select := 0;
+          WHEN OTHERS THEN
+              var_select := 0;
+      END;
+
+      IF var_select != 1 THEN
+          RAISE_APPLICATION_ERROR(-20942, 'Invalid Location Entity Combination');
+      END IF;
+    END IF;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.department IS NOT NULL THEN
+	  BEGIN
+      SELECT ID INTO PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT_ID
+        FROM DEPARTMENTS
+       WHERE departcode = PAC_MNT_VALIDATE_RESCREDIT_SP.department;
+	 	   EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+						 var_select := 0;
+        WHEN OTHERS THEN
+             var_select := 0;
+     END;
+
+     IF PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT_ID IS NULL THEN
+       RAISE_APPLICATION_ERROR(-20773, 'Invalid Department.');
+     END IF;
+	 END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.location IS NOT NULL AND PAC_MNT_VALIDATE_RESCREDIT_SP.department IS NOT NULL THEN
+    BEGIN
+      SELECT 1 INTO var_select
+        FROM locationdept
+       WHERE locationid = PAC_MNT_VALIDATE_RESCREDIT_SP.location
+         AND departcode = PAC_MNT_VALIDATE_RESCREDIT_SP.department;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF var_select !=1 then
+      raise_application_error(-20038, 'Department is invalid for this location.');
+    END if;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS IS NOT NULL THEN
+    BEGIN
+      SELECT ID
+        INTO PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS_ID
+        FROM PAC_FOS_RESOURCE_CLASS
+       WHERE resource_class = PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS;
+         --AND resource_type = 'L';
+
+     EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+         var_select := 0;
+       WHEN OTHERS THEN
+         var_select := 0;
+    END;
+
+    IF PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS_ID IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20084, 'Invalid RESOURCE Class.');
+    END IF;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_RESCREDIT_SP.trans_class IS NOT NULL THEN
+    BEGIN
+      SELECT TC.ID
+        INTO PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS_ID
+        FROM TRANSCLASS TC
+       WHERE TC.TRANSCLASS = PAC_MNT_VALIDATE_RESCREDIT_SP.trans_class;
+         --AND TC.TRANSTYPE = 'L';
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          var_select := 0;
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS_ID IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20952, 'Invalid TRANSACTION Class.');
+    END IF;
+  END IF;
+
+  -- Check to see if a resource credit already exists
+  BEGIN
+    SELECT COUNT(1)
+      INTO var_select
+      FROM PAC_CHG_RESOURCE_CREDITS RC
+     WHERE RC.ID &lt;&gt; NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.ID, 0)
+       AND NVL(RC.ENTITY_ID, 0) = NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.ENTITY_ID, 0)
+       AND NVL(RC.LOCATION_ID, 0) = NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.LOCATION_ID, 0)
+       AND NVL(RC.DEPARTMENT_ID, 0) = NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.DEPARTMENT_ID, 0)
+       AND NVL(RC.TRANSACTION_CLASS_ID, 0) = NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.TRANS_CLASS_ID, 0)
+       AND NVL(RC.RESOURCE_CLASS_ID, 0) = NVL(PAC_MNT_VALIDATE_RESCREDIT_SP.RESOURCE_CLASS_ID, 0);
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20934, 'Error retrieving the allocation count');
+        RETURN;
+  END;
+
+  --error out if any record exists
+  IF var_select &lt;&gt; 0 THEN
+    RAISE_APPLICATION_ERROR(-20943, 'A row with the same entity/location/department/transaction class/resource class already exists');
+    RETURN;
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

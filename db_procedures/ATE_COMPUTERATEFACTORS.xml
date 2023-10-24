@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>ATE_COMPUTERATEFACTORS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."ATE_COMPUTERATEFACTORS" (
+  cCostPlusCode   VARCHAR2 ,
+  nQuantity       NUMBER,
+  nRate           IN OUT NUMBER,
+  nActualCost     NUMBER,
+  nStdCost        NUMBER,
+  nFactorAmount   IN OUT NUMBER,
+  nBurdenAmount   IN OUT NUMBER,
+  nOverheadAmount IN OUT NUMBER,
+  cRateCurrency   IN OUT VARCHAR2,
+  cCostCurrency   IN VARCHAR2
+)
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      VARCHAR2(255);
+  StoO_sqlstatus   INTEGER;
+  cApplyTo         VARCHAR2(1);
+  nCostVal         NUMBER(32,6);
+  cCPFlatPct       VARCHAR2(1);
+  cBurdenFlatPct   VARCHAR2(1);
+  cOvhFlatPct      VARCHAR2(1);
+  nCPVal           NUMBER(32,6);
+  nBurdenVal       NUMBER(32,6);
+  nOvhVal          NUMBER(32,6);
+  bCPEach          NUMBER(5,0);
+  bBurdenEach      NUMBER(5,0);
+  bOvhEach         NUMBER(5,0);
+  nQty             NUMBER(32,6);
+BEGIN
+
+	/* Called From:
+   Procedure         :- This procedure computes the burden, factor, overhead amounts.
+   Trigger           :-
+   PMD TransactionId :-
+   WMD ActionId      :-
+   Modified By   : partha
+   Modified Date : 10/01/01
+   */
+
+	/* set a different default value */
+  Ate_Computeratefactors.nFactorAmount := 0;
+  Ate_Computeratefactors.nBurdenAmount := 0;
+  Ate_Computeratefactors.nOverheadAmount := 0;
+  Ate_Computeratefactors.nQty := Ate_Computeratefactors.nQuantity;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT applytoactualstdcost
+		  INTO Ate_Computeratefactors.cApplyTo
+		  FROM COSTPLUS
+		 WHERE costpluscode = Ate_Computeratefactors.cCostPlusCode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF  StoO_rowcnt &lt; 1 THEN
+		RETURN ;
+	END IF;
+
+  IF  Ate_Computeratefactors.cApplyTo = 'A' THEN
+		Ate_Computeratefactors.nCostVal :=  Ate_Computeratefactors.nActualCost;
+	ELSE
+    /*  IF ISNULL(@nRate,0) = 0 this applied to ATE only... */
+		Ate_Computeratefactors.nCostVal :=  Ate_Computeratefactors.nStdCost;
+	END IF;
+
+  /*  Partha: rate should not be changed at all ???
+      A: this is a cost plus situation, so the cost becomes the rate...
+  */
+	Ate_Computeratefactors.nRate :=  Ate_Computeratefactors.nCostVal;
+  Ate_Computeratefactors.cRateCurrency :=  Ate_Computeratefactors.cCostCurrency;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT multflatpercent, burdenflatpercent, overheadflatpercent, multamount,
+           burdenamount,  overheadamount,  multeachunit,  burdeneachunit,  overheadeachunit
+      INTO Ate_Computeratefactors.cCPFlatPct, Ate_Computeratefactors.cBurdenFlatPct, Ate_Computeratefactors.cOvhFlatPct, Ate_Computeratefactors.nCPVal,
+           Ate_Computeratefactors.nBurdenVal, Ate_Computeratefactors.nOvhVal, Ate_Computeratefactors.bCPEach, Ate_Computeratefactors.bBurdenEach, Ate_Computeratefactors.bOvhEach
+      FROM COSTPLUSRULES
+     WHERE costpluscode = Ate_Computeratefactors.cCostPlusCode AND
+           ABS(Ate_Computeratefactors.nQuantity) &gt;= fromrange      AND
+           ABS(Ate_Computeratefactors.nQuantity) &lt; torange;
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF  StoO_rowcnt &lt; 1 THEN
+    RETURN ;
+	END IF;
+
+  /* perform costplus markup */
+  IF  Ate_Computeratefactors.cCPFlatPct = 'F' THEN
+	BEGIN
+    IF Ate_Computeratefactors.bCPEach = 0 THEN
+			Ate_Computeratefactors.nFactorAmount :=  Ate_Computeratefactors.nCPVal;
+		ELSE
+      Ate_Computeratefactors.nFactorAmount :=  Ate_Computeratefactors.nCPVal * Ate_Computeratefactors.nQty;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+    Ate_Computeratefactors.nFactorAmount :=  ( Ate_Computeratefactors.nCPVal * Ate_Computeratefactors.nCostVal * Ate_Computeratefactors.nQty ) / 100;
+  END;
+	END IF;
+
+  /* compute burden */
+  IF  Ate_Computeratefactors.cBurdenFlatPct = 'F' THEN
+	BEGIN
+		IF  Ate_Computeratefactors.bBurdenEach = 0 THEN
+			Ate_Computeratefactors.nBurdenAmount :=  Ate_Computeratefactors.nBurdenVal;
+		ELSE
+      Ate_Computeratefactors.nBurdenAmount :=  Ate_Computeratefactors.nBurdenVal * Ate_Computeratefactors.nQty;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+    Ate_Computeratefactors.nBurdenAmount := ( Ate_Computeratefactors.nBurdenVal * Ate_Computeratefactors.nQty * Ate_Computeratefactors.nCostVal ) / 100;
+/* compute overhead */
+	END;
+	END IF;
+	IF  Ate_Computeratefactors.cOvhFlatPct = 'F' THEN
+	BEGIN
+		IF  Ate_Computeratefactors.bOvhEach = 0 THEN
+			Ate_Computeratefactors.nOverheadAmount :=  Ate_Computeratefactors.nOvhVal;
+		ELSE
+			Ate_Computeratefactors.nOverheadAmount :=  Ate_Computeratefactors.nOvhVal
+			   * Ate_Computeratefactors.nQty;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+    Ate_Computeratefactors.nOverheadAmount := ( Ate_Computeratefactors.nOvhVal * Ate_Computeratefactors.nCostVal * Ate_Computeratefactors.nQty ) / 100;
+	END;
+	END IF;
+
+-- all rounding done by ppa_Computermarkup
+--  Ate_Computeratefactors.nOverheadAmount :=  ROUND(NVL(Ate_Computeratefactors.nOverheadAmount, 0), 2);
+--  Ate_Computeratefactors.nBurdenAmount :=  ROUND(NVL(Ate_Computeratefactors.nBurdenAmount, 0), 2);
+--  Ate_Computeratefactors.nFactorAmount :=  ROUND(NVL(Ate_Computeratefactors.nFactorAmount, 0), 2);
+END Ate_Computeratefactors;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

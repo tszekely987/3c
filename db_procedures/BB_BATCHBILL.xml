@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_BATCHBILL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_BATCHBILL" (
+  cUserID   VARCHAR2 ,
+  iBillRunKey   NUMBER ,
+  cActionID   VARCHAR2 ,
+  dActionDate   DATE ,
+  bSelective  NUMBER ,
+  cBegEntity  VARCHAR2 ,
+  in_cEndEntity   IN VARCHAR2 ,
+  cBegLocation  VARCHAR2 ,
+  in_cEndLocation   IN VARCHAR2 ,
+  cBegDepartment  VARCHAR2 ,
+  in_cEndDepartment   IN VARCHAR2 ,
+  cBegClient  VARCHAR2 ,
+  in_cEndClient   IN VARCHAR2 ,
+  cBegProjClass   VARCHAR2 ,
+  in_cEndProjClass  IN VARCHAR2 ,
+  in_cBillCycle   IN VARCHAR2 ,
+  cBillDate   VARCHAR2 ,
+  in_cFinProjectType VARCHAR2 ,
+  bConsolidateInvoices  NUMBER ,
+  generateNegativeInvoices NUMBER,
+  bAutoPost   NUMBER ,
+  iTotCount   IN OUT NUMBER,
+  nTotAmount  IN OUT NUMBER,
+  bError  OUT NUMBER,
+  errorCount  OUT NUMBER,
+  iRetainPrecision IN NUMBER DEFAULT 1 -- retain precision change
+)
+AS
+  cEndEntity  GLOBALPKG.STRING;
+  cEndLocation  GLOBALPKG.STRING;
+  cEndDepartment  GLOBALPKG.STRING;
+  cEndClient  GLOBALPKG.STRING;
+  cEndProjClass   GLOBALPKG.STRING;
+  cBillCycle  GLOBALPKG.STRING;
+  cFinProjectType   GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  cClient   GLOBALPKG.STRING;
+  cProject  GLOBALPKG.STRING;
+  cBillTo   GLOBALPKG.STRING;
+  cInvNoBase  GLOBALPKG.STRING;
+  cInvNo  GLOBALPKG.STRING;
+  iCountBilled  NUMBER;
+  nAmountBilled   NUMBER(32,6);
+  iIncrement  NUMBER(5,0);
+  errorFlag   NUMBER(10,0);
+  iLup  NUMBER;
+  iCount  NUMBER;
+  dNow  DATE;
+  iBatchNo  NUMBER;
+  seqOffset NUMBER;
+  sequenceNo NUMBER;  
+
+  ProjectCodeForBillingProject GLOBALPKG.STRING;
+  EnforceContractAmount   NUMBER(1);
+  TitleForBillingProject   GLOBALPKG.STRING;
+  cInvNoForConsolidation GLOBALPKG.STRING;
+
+  projType GLOBALPKG.STRING;
+  v_Status NUMBER(1);
+  v_HasSubProjects NUMBER(1);
+  countHasSubProjects NUMBER;
+  countProjectTypes NUMBER;
+  countSameClient NUMBER;
+  countBillingCurrencies NUMBER;
+  billing_currency_code VARCHAR2(10);
+  countSameBillTo NUMBER;
+
+
+  UF1_rowid   ROWID;
+  UF1_oval1   OLB_BILLINGCHECKOUT.PROJECT_ID%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT OLB_BILLINGCHECKOUT.ROWID, OLB_BILLINGCHECKOUT.PROJECT_ID
+    FROM OLB_BILLINGCHECKOUT
+    FOR UPDATE OF OLB_BILLINGCHECKOUT.BILLING_PROJECT_CODE;
+
+  UF2_rowid   ROWID;
+  UF2_oval1   TEMP_CPBB_BATCHBILL.PROJECT_CODE%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT TEMP_CPBB_BATCHBILL.ROWID, TEMP_CPBB_BATCHBILL.PROJECT_CODE
+    FROM TEMP_CPBB_BATCHBILL
+    FOR UPDATE OF TEMP_CPBB_BATCHBILL.HAS_BILLING_SUBPROJECTS, TEMP_CPBB_BATCHBILL.PROJECT_TYPE, TEMP_CPBB_BATCHBILL.BILLING_CURRENCY_CODE;
+
+  CUR_noconinv_company_code   OLB_BILLINGCHECKOUT.COMPANY_CODE%TYPE;
+  CUR_noconinv_project_code	  OLB_BILLINGCHECKOUT.PROJECT_CODE%TYPE;
+  CURSOR OLB_BILCHKOUT_CUR_NOCONINV IS
+  SELECT  OLB.COMPANY_CODE, OLB.BILLING_PROJECT_CODE
+			 FROM OLB_BILLINGCHECKOUT OLB
+			WHERE OLB.UserID = Bb_Batchbill.cUserID
+			 AND OLB.ActionID = Bb_Batchbill.cActionID
+			 GROUP BY OLB.COMPANY_CODE, OLB.BILLING_PROJECT_CODE;
+			 
+  CUR_company_code   OLB_BILLINGCHECKOUT.COMPANY_CODE%TYPE;
+  CUR_project_code	 OLB_BILLINGCHECKOUT.PROJECT_CODE%TYPE;
+  CUR_bill_to_project_code	 pac_mnt_projects.BILL_TO_COMPANY_CODE%TYPE;  
+  CURSOR OLB_BILCHKOUT_CUR IS
+  SELECT  OLB.COMPANY_CODE, OLB.BILLING_PROJECT_CODE, P.BILL_TO_COMPANY_CODE
+       FROM OLB_BILLINGCHECKOUT OLB, pac_mnt_projects P
+			WHERE OLB.UserID = Bb_Batchbill.cUserID
+			 AND OLB.ActionID = Bb_Batchbill.cActionID
+			 AND P.COMPANY_CODE = OLB.COMPANY_CODE
+			 AND P.PROJECT_CODE = OLB.PROJECT_CODE
+			GROUP BY OLB.COMPANY_CODE, P.BILL_TO_COMPANY_CODE, OLB.BILLING_PROJECT_CODE;			 
+			 
+BEGIN
+ /* Called From:
+     Procedure         :- BB_PROCESSBATCHES, PAC_BIL_PROCESS_BATCHES_SP
+     Trigger           :- None
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	Bb_Batchbill.cEndEntity := Bb_Batchbill.in_cEndEntity;
+	Bb_Batchbill.cEndLocation := Bb_Batchbill.in_cEndLocation;
+	Bb_Batchbill.cEndDepartment := Bb_Batchbill.in_cEndDepartment;
+	Bb_Batchbill.cEndClient := Bb_Batchbill.in_cEndClient;
+	Bb_Batchbill.cEndProjClass := Bb_Batchbill.in_cEndProjClass;
+	Bb_Batchbill.cBillCycle := Bb_Batchbill.in_cBillCycle;
+	Bb_Batchbill.cFinProjectType := Bb_Batchbill.in_cFinProjectType;
+
+	IF  Bb_Batchbill.cEndEntity IS NULL THEN
+		Bb_Batchbill.cEndEntity :=  'zzzzzzzzzz';
+	END IF;
+	IF  Bb_Batchbill.cEndLocation IS NULL THEN
+		Bb_Batchbill.cEndLocation :=  'zzzzzzzzzz';
+	END IF;
+	IF  Bb_Batchbill.cEndDepartment IS NULL THEN
+		Bb_Batchbill.cEndDepartment :=  'zzzzzzzzzz';
+	END IF;
+	IF  Bb_Batchbill.cEndClient IS NULL THEN
+		Bb_Batchbill.cEndClient :=  'zzzzzzzzzz';
+	END IF;
+	IF  Bb_Batchbill.cEndProjClass IS NULL THEN
+		Bb_Batchbill.cEndProjClass :=  'zzzzzzzzzz';
+	END IF;
+	IF  UPPER(Bb_Batchbill.cBillCycle) = '&lt;ALL&gt;' OR Bb_Batchbill.cBillCycle IS NULL THEN
+		Bb_Batchbill.cBillCycle :=  NULL;
+	END IF;
+	IF  UPPER(Bb_Batchbill.cFinProjectType) = '&lt;ALL&gt;' OR Bb_Batchbill.cFinProjectType IS NULL THEN
+		Bb_Batchbill.cFinProjectType :=  'SPR';
+	END IF;
+
+	DELETE FROM TEMP_CYCLESBB_BATCHBILL;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO TEMP_CYCLESBB_BATCHBILL (CYCLE)SELECT  batchcycle
+		 FROM BATCHBILLACCESS
+		WHERE batchcycle = NVL(Bb_Batchbill.cBillCycle, batchcycle)
+		 AND RESOURCE_CODE = Bb_Batchbill.cUserID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	Bb_Batchbill.dNow :=  SYSDATE;
+
+	Bb_Batchbill.cInvNoBase := 'B'|| TO_CHAR(Bb_Batchbill.dNow, 'Y')
+							   	  || LPAD(TO_CHAR(Bb_Batchbill.dNow, 'DDD'), 3, 0)
+							      || LPAD(TO_CHAR(Bb_Batchbill.dNow, 'HH'),2,0)
+							      || LPAD(TO_CHAR(Bb_Batchbill.dNow, 'MI'),2,0)
+							      || LPAD(TO_CHAR(Bb_Batchbill.dNow, 'SS'),2,0);
+	Bb_Batchbill.iIncrement :=  0;
+	Bb_Batchbill.iTotCount :=  0;
+	Bb_Batchbill.nTotAmount :=  0;
+	Bb_Batchbill.bError :=  0;
+	Bb_Batchbill.iLup :=  1;
+  Bb_Batchbill.errorCount := 0;
+/* lock COMPANY_CODE/projects */
+    SAVEPOINT CheckoutTrans2;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	/*** CHANGED FOR  MULTI CURRENCY  - get Amountremaining from ppa_WIP_values ***/
+
+	INSERT INTO OLB_BILLINGCHECKOUT (COMPANY_CODE, PROJECT_CODE, PROJECT_ID, UserID, ActionID, ActionDate)
+		 SELECT  P.COMPANY_CODE, P.PROJECT_CODE, P.ID, Bb_Batchbill.cUserID, Bb_Batchbill.cActionID,
+		   Bb_Batchbill.dActionDate
+     FROM pac_mnt_projects P, LOCATIONS L, TEMP_CYCLESBB_BATCHBILL C
+         WHERE P.COMPANY_CODE  BETWEEN Bb_Batchbill.cBegClient AND Bb_Batchbill.cEndClient
+		 AND P.APPROVED = 1
+		 AND P.STATUS IN ( 'O','H' )
+		 AND INSTR( Bb_Batchbill.cFinProjectType, RTRIM(P.type_)) &gt; 0
+		 AND P.locationid  BETWEEN Bb_Batchbill.cBegLocation AND Bb_Batchbill.cEndLocation
+		 AND P.departcode  BETWEEN Bb_Batchbill.cBegDepartment AND Bb_Batchbill.cEndDepartment
+		 AND P.class  BETWEEN Bb_Batchbill.cBegProjClass AND Bb_Batchbill.cEndProjClass
+		 AND C.CYCLE = P.billcycle
+		 AND L.locationid = P.locationid
+		 AND L.ENTITY  BETWEEN Bb_Batchbill.cBegEntity AND Bb_Batchbill.cEndEntity
+         AND (P.COMPANY_CODE, P.PROJECT_CODE) IN
+             (		 SELECT  W.COMPANY_CODE, W.PROJECT_CODE
+					 FROM PPA_WIP W, PPA_WIP_VALUES WV
+					 WHERE WV.AmountRemaining != 0
+					 AND W.TRANSNO = WV.TRANSNO
+					 AND WV.CURRENCY_TYPE = 'BILLING'
+					 AND W.TransDate &lt;= TRUNC(TO_DATE(Bb_Batchbill.cBillDate, 'mm/dd/yyyy'))
+					 AND W.Status = 0)
+                 AND  (   EXISTS (
+				    SELECT object_id
+					  FROM cmn_sec_chk_user_r_v0
+					 WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = BB_BATCHBILL.cUserID)
+					   AND permission_code = 'READ')
+			      OR EXISTS (
+				    SELECT object_id
+				      FROM cmn_sec_chk_user_inst_v0
+				     WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = BB_BATCHBILL.cUserID)
+					   AND permission_code = 'READ'
+				       AND object_instance_id = P.ID)
+	      	  )	 
+		 AND NOT EXISTS (
+		 	 	 		SELECT  1
+		 				FROM OLB_BILLINGCHECKOUT B
+						WHERE B.COMPANY_CODE = P.COMPANY_CODE
+		 				AND B.PROJECT_CODE = P.PROJECT_CODE );
+		 StoO_rowcnt := SQL%ROWCOUNT;
+
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		PAC_BIL_GET_BILLING_PROJECT_SP( UF1_oval1, BB_BATCHBILL.ProjectCodeForBillingProject, BB_BATCHBILL.EnforceContractAmount, BB_BATCHBILL.TitleForBillingProject );
+		UPDATE OLB_BILLINGCHECKOUT
+		SET
+		BILLING_PROJECT_CODE = BB_BATCHBILL.ProjectCodeForBillingProject
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+
+	if ( Bb_Batchbill.bSelective = 1 ) then
+	begin
+		 delete from olb_billingcheckout where not exists ( select 1 from bb_selectivebilling sb where sb.userid = Bb_Batchbill.cUserID
+		 			 					 	   	   		  	and sb.company_code = olb_billingcheckout.company_code
+															and sb.project_code = olb_billingcheckout.billing_project_code );
+
+		 StoO_rowcnt := SQL%ROWCOUNT;
+
+		 EXCEPTION
+		 WHEN NO_DATA_FOUND THEN
+			NULL;
+		 WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+
+		 IF  StoO_error != 0 THEN
+		 BEGIN
+			 ROLLBACK TO SAVEPOINT CheckoutTrans2;
+			 Bb_Batchbill.bError := StoO_error;
+			 RETURN ;
+		 END;
+		 ELSE
+			 COMMIT WORK;
+		 END IF;
+	end;
+	end if;
+
+	DELETE FROM TEMP_CPBB_BATCHBILL;
+    SELECT TEMP_CPBB_BATCHBILL_SEQ.NEXTVAL INTO seqOffset FROM DUAL;
+
+	--If consolidate invoices is selected --
+	IF  Bb_Batchbill.bConsolidateInvoices != 0 THEN
+		BEGIN
+		OPEN OLB_BILCHKOUT_CUR;
+		LOOP
+			FETCH OLB_BILCHKOUT_CUR INTO CUR_company_code, CUR_project_code, CUR_bill_to_project_code;
+			EXIT WHEN OLB_BILCHKOUT_CUR%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO TEMP_CPBB_BATCHBILL (SEQNO, COMPANY_CODE, PROJECT_CODE, BILL_TO_COMPANY_CODE)
+			VALUES (TEMP_CPBB_BATCHBILL_SEQ.NEXTVAL, CUR_company_code, CUR_project_code,  CUR_bill_to_project_code ); 
+			StoO_rowcnt := SQL%ROWCOUNT;
+			END;
+		END LOOP;
+		CLOSE OLB_BILCHKOUT_CUR;
+		END;
+	ELSE
+		BEGIN
+		OPEN OLB_BILCHKOUT_CUR_NOCONINV;
+		LOOP
+			FETCH OLB_BILCHKOUT_CUR_NOCONINV INTO CUR_noconinv_company_code, CUR_noconinv_project_code;
+			EXIT WHEN OLB_BILCHKOUT_CUR_NOCONINV%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO TEMP_CPBB_BATCHBILL (SEQNO, COMPANY_CODE, PROJECT_CODE)
+		    VALUES (TEMP_CPBB_BATCHBILL_SEQ.NEXTVAL , CUR_noconinv_company_code, CUR_noconinv_project_code );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;		
+			END;
+		END LOOP;
+		CLOSE OLB_BILCHKOUT_CUR_NOCONINV;
+		END;
+	END IF;
+
+	BEGIN
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE FROM TEMP_BIL_SUBPROJECTS;
+		INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+    SELECT COMPANY_CODE, PROJECT_CODE, ID, ID, ID, 0, NULL FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = UF2_oval1;
+
+		Bb_Batchbill.v_HasSubProjects := 0;
+		PAC_BIL_GET_SUBPROJECTS_SP ( 0, Bb_Batchbill.v_Status, Bb_Batchbill.v_HasSubProjects ) ;
+
+    SELECT TYPE_ INTO Bb_Batchbill.projType FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = UF2_oval1;
+    SELECT BILLING_CURRENCY_CODE INTO Bb_Batchbill.billing_currency_code FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = UF2_oval1;
+
+		UPDATE TEMP_CPBB_BATCHBILL
+		SET
+		HAS_BILLING_SUBPROJECTS = Bb_Batchbill.v_HasSubProjects,
+		PROJECT_TYPE = Bb_Batchbill.projType,
+		BILLING_CURRENCY_CODE = Bb_Batchbill.billing_currency_code
+		WHERE ROWID = UF2_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT COUNT(*)
+		INTO Bb_Batchbill.iCount FROM TEMP_CPBB_BATCHBILL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+
+	END;
+
+	Bb_Batchbill.iCount :=  NVL(Bb_Batchbill.iCount, 0);
+
+	BEGIN
+	IF ( Bb_Batchbill.bConsolidateInvoices != 0 ) AND ( Bb_Batchbill.iCount &gt; 0 ) THEN
+	BEGIN
+		 SELECT COUNT(DISTINCT( COMPANY_CODE )) INTO Bb_Batchbill.countSameClient FROM TEMP_CPBB_BATCHBILL;
+		 IF ( Bb_Batchbill.countSameClient &gt; 1 ) THEN
+		 	bError := 5;
+		 END IF;
+
+		 SELECT COUNT(DISTINCT( BILLING_CURRENCY_CODE )) INTO Bb_Batchbill.countBillingCurrencies FROM TEMP_CPBB_BATCHBILL;
+		 IF ( Bb_Batchbill.countBillingCurrencies &gt; 1 ) THEN
+		 	bError := 6;
+		 END IF;
+
+ 		 SELECT COUNT(DISTINCT( BILL_TO_COMPANY_CODE )) INTO Bb_Batchbill.countSameBillTo FROM TEMP_CPBB_BATCHBILL;
+		 IF ( Bb_Batchbill.countSameBillTo &gt; 1 ) THEN
+		    bError := 7;
+		 END IF;		 
+
+		 SELECT COUNT(*) INTO Bb_Batchbill.countHasSubProjects FROM TEMP_CPBB_BATCHBILL WHERE HAS_BILLING_SUBPROJECTS = 1;
+		 --allow only one project with hierarchy, or none
+		 IF ( Bb_Batchbill.countHasSubProjects &gt; 1 ) THEN
+		 	bError := 3;
+		 ELSIF ( Bb_Batchbill.countHasSubProjects = 1 ) THEN
+		 BEGIN
+		 	  SELECT COUNT(DISTINCT(PROJECT_TYPE)) INTO Bb_Batchbill.countProjectTypes FROM TEMP_CPBB_BATCHBILL;
+			  IF ( Bb_Batchbill.countProjectTypes &gt; 1 ) THEN
+			  	 bError := 4;
+			  END IF;
+		 END;
+		 END IF;
+	END;
+	END IF;
+
+	END;
+
+	IF ( Bb_Batchbill.bError = 0 ) THEN
+	BEGIN
+
+      BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO PPA_POSTINGBATCH (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+		   VALUES (S_307_1_PPA_POSTINGBATCH.nextval, TRUNC(SYSDATE), Bb_Batchbill.cUserID, 'TB', 'Batch Billing');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	SELECT S_BB_BATCHBILL.NEXTVAL INTO ibatchno FROM dual;
+-- Added following 2 lines to compensate for growing sequence value
+	Bb_Batchbill.iLup := seqOffset + 1;
+	Bb_Batchbill.iCount := seqOffset + Bb_Batchbill.iCount;
+
+	if ( Bb_Batchbill.iCount &gt; 0 ) and ( Bb_Batchbill.bConsolidateInvoices = 1 ) then
+		Bb_Batchbill.cInvNoForConsolidation :=  Bb_Batchbill.cInvNoBase || LPAD(TO_CHAR(Bb_Batchbill.iIncrement), 5, 0);
+	end if;
+	
+	&lt;&lt;i_loop1&gt;&gt;
+	WHILE  Bb_Batchbill.iLup &lt;= Bb_Batchbill.iCount LOOP
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   COMPANY_CODE,  PROJECT_CODE,  BILL_TO_COMPANY_CODE
+			INTO Bb_Batchbill.cClient, Bb_Batchbill.cProject, Bb_Batchbill.cBillTo
+			FROM TEMP_CPBB_BATCHBILL
+			WHERE SeqNo = Bb_Batchbill.iLup;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+
+		Bb_Batchbill.cInvNo := Bb_Batchbill.cInvNoBase || LPAD(TO_CHAR(Bb_Batchbill.iIncrement), 5, 0);
+
+		IF  Bb_Batchbill.bConsolidateInvoices = 1 THEN
+			Bb_Batchbill.cInvNo :=  Bb_Batchbill.cInvNoForConsolidation;
+		end if;
+
+		Bb_Batchbill.nAmountBilled :=  0;
+		Bb_Batchbill.iCountBilled :=  0;
+		BEGIN
+			Bb_Batchbilltrans(Bb_Batchbill.cClient,
+		 				   Bb_Batchbill.cProject,
+						   Bb_Batchbill.cBillTo,
+						   Bb_Batchbill.cInvNo,
+						   Bb_Batchbill.bAutoPost,
+						   Bb_Batchbill.cUserID,
+						   Bb_Batchbill.cActionID,
+						   Bb_Batchbill.iBatchNo,
+						   Bb_Batchbill.cBillDate,
+						   Bb_Batchbill.iCountBilled,
+						   Bb_Batchbill.nAmountBilled,
+						   Bb_Batchbill.generateNegativeInvoices,
+                    Bb_Batchbill.bConsolidateInvoices,
+                    Bb_Batchbill.bError,
+          			   Bb_Batchbill.iRetainPrecision -- retain precision change
+          			   );
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+    IF  Bb_Batchbill.bError = 2 THEN
+			Bb_Batchbill.errorCount := Bb_Batchbill.errorCount + 1;
+		END IF;
+		IF ( Bb_Batchbill.bConsolidateInvoices = 1 AND Bb_Batchbill.bError = 2 ) THEN
+		BEGIN
+			 ROLLBACK TO SAVEPOINT CheckoutTrans2;
+		END;
+		END IF;
+
+		IF  ( Bb_Batchbill.bError != 2  AND Bb_Batchbill.iCountBilled &gt; 0 ) THEN
+    BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO BB_BILLTRACKING (BillingRunKey, InvoiceNo, COMPANY_CODE, PROJECT_CODE, ActionType, TranCount, Amount)
+				   VALUES (Bb_Batchbill.iBillRunKey, Bb_Batchbill.cInvNo, Bb_Batchbill.cClient,
+				   		  Bb_Batchbill.cProject, 'B', Bb_Batchbill.iCountBilled, Bb_Batchbill.nAmountBilled);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			Bb_Batchbill.iTotCount :=  Bb_Batchbill.iTotCount + Bb_Batchbill.iCountBilled;
+			Bb_Batchbill.nTotAmount :=  Bb_Batchbill.nTotAmount + Bb_Batchbill.nAmountBilled;
+			Bb_Batchbill.iIncrement :=  Bb_Batchbill.iIncrement + 1;
+		END;
+		END IF;
+		Bb_Batchbill.iLup :=  Bb_Batchbill.iLup + 1;
+	END;
+	END LOOP;
+
+  IF ( Bb_Batchbill.bConsolidateInvoices = 1 AND Bb_Batchbill.bAutoPost != 0 ) THEN
+	BEGIN
+		 REV_BILL_FINALAPP_POSTTOWIP(Bb_Batchbill.cInvNo,
+									 Bb_Batchbill.cUserID);
+		 EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	END IF;
+
+  END;
+	END IF;
+/* unlock COMPANY_CODE/projects */
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM OLB_BILLINGCHECKOUT
+		WHERE UserID = Bb_Batchbill.cUserID
+		 AND ActionID = Bb_Batchbill.cActionID;
+  COMMIT;
+  StoO_rowcnt := SQL%ROWCOUNT;
+  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+  if (Bb_Batchbill.errorCount = 0 ) AND ( Bb_Batchbill.bError != 2 ) AND (Bb_Batchbill.bError != 3 ) 
+  AND (Bb_Batchbill.bError != 4 ) AND (Bb_Batchbill.bError != 5 ) AND (Bb_Batchbill.bError != 6 )    AND (Bb_Batchbill.bError != 7 ) THEN
+     Bb_Batchbill.bError := StoO_error;
+	end if;
+/*
+  Modified By: Deva
+  Changes 	: Date changes done
+*/
+END;
+END Bb_Batchbill;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

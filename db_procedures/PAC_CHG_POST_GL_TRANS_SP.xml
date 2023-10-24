@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_POST_GL_TRANS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_POST_GL_TRANS_SP" 
+(
+  P_SESSIONID         NUMBER,
+  P_GL_PERIOD         VARCHAR2,
+  P_USER_ID           NUMBER,
+  P_LANGUAGE_CODE     VARCHAR2
+)
+AS
+  V_BATCH_ID          NUMBER;
+  V_TRANS_ID          NUMBER;
+  V_DATE              DATE;
+  V_TRANSACTIONS      NUMBER;
+  V_TOTAL_AMOUNT      NUMBER(32, 6);
+  V_SYSTEM_CURRENCY   VARCHAR2(30);
+  V_TRANSDATE         DATE;
+  V_EXCHANGE_TYPE     VARCHAR2(30);
+  V_STMT              VARCHAR2(255);
+  V_LAST_TRANSNO      NUMBER;
+  V_LAST_TRANS_SOURCE CHAR(1);
+  V_COUNTER           NUMBER;
+  V_GL_PERIOD         DATE;
+  V_COUNT             NUMBER;
+  v_ret_val           NUMBER;
+  
+
+  StoO_selcnt         INTEGER;
+  StoO_error          INTEGER;
+  StoO_rowcnt         INTEGER;
+  StoO_crowcnt        INTEGER := 0;
+  StoO_fetchstatus    INTEGER := 0;
+  StoO_errmsg         GLOBALPKG.STRING;
+  StoO_sqlstatus      INTEGER;
+  BATCHHEADERS_LOCK   EXCEPTION;     
+
+  CURSOR C_TRIALRUN_REC (C_SESSIONID NUMBER) IS
+  SELECT T.ID,
+         T.CHARGEBACK_TYPE,
+         T.SOURCE_ID,
+         T.DATES_ID,
+         T.TRANS_SOURCE,
+         T.TRANSNO,
+         T.ENTITY_ID,
+         T.ACCOUNT_CODE_ID,
+         T.QUANTITY
+    FROM PAC_CHG_TRIALRUNS T
+   WHERE T.SESSIONID = C_SESSIONID
+     AND T.ERROR_CODE = 0
+     AND NOT EXISTS (SELECT 1
+                       FROM PAC_CHG_TRIALRUNS E
+                      WHERE E.SESSIONID = T.SESSIONID
+                        AND E.TRANS_SOURCE = T.TRANS_SOURCE
+                        AND E.TRANSNO = T.TRANSNO
+                        AND E.ERROR_CODE != 0)
+   ORDER BY T.TRANS_SOURCE, T.TRANSNO
+  ;
+
+  CURSOR C_TRIALRUN_VALUES_REC (C_TRIALRUN_ID NUMBER) IS
+  SELECT CURRENCY_TYPE,
+         CURRENCY_CODE,
+         AMOUNT
+    FROM PAC_CHG_TRIALRUNS_VALUES
+   WHERE TRIALRUN_ID = C_TRIALRUN_ID;
+
+  CURSOR C_DEL_TRIALRUN_REC (C_SESSIONID NUMBER) IS
+  SELECT TRIALRUN_ID
+    FROM TEMP_PAC_CHG_TRIALRUNS
+   WHERE SESSIONID = C_SESSIONID;
+
+BEGIN
+  V_TRANSACTIONS := 1;
+  V_TOTAL_AMOUNT := 0;
+  V_LAST_TRANS_SOURCE := '';
+  V_LAST_TRANSNO := 0;
+  V_COUNTER := 0;
+  V_DATE := SYSDATE;
+  V_COUNT :=0;
+
+  --check if table PAC_CHG_BATCH_HEADERS is locked
+  SELECT count(*)
+  INTO  v_count
+  FROM PRLOCK
+  WHERE  PRTABLENAME = 'PAC_CHG_BATCH_HEADERS';
+  IF  v_count != 0 THEN
+	  BEGIN
+		  RAISE  BATCHHEADERS_LOCK;
+          RETURN;
+      END;
+  END IF;
+
+  V_STMT := 'Selecting batch header ID';
+  SELECT PAC_CHG_BATCH_HEADERS_S1.NEXTVAL
+    INTO V_BATCH_ID
+    FROM DUAL;
+
+  -- Since only one person should be posting at the same time,
+  -- PAC_CHG_BATCH_HEADERS table is locked exclusively until the action is completed.
+  cmn_lock_sp ( P_USER_ID, 'PAC_CHG_BATCH_HEADERS', 'SCHEDULE_JOB', V_BATCH_ID,  v_ret_val, -1 );     
+
+
+  DELETE FROM TEMP_PAC_CHG_TRIALRUNS WHERE SESSIONID = P_SESSIONID;
+  
+  V_STMT := 'Selecting end date for GL period';
+  SELECT P.END_DATE
+    INTO V_GL_PERIOD
+    FROM BIZ_COM_PERIODS P
+   WHERE P.PERIOD_NAME = P_GL_PERIOD;
+
+  V_STMT := 'Selecting system currency';
+  SELECT NVL(MAX(V.VALUE), 'USD')
+    INTO V_SYSTEM_CURRENCY
+    FROM cmn_options O,
+         cmn_option_values V
+   WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY'
+     AND O.ID = V.OPTION_ID;
+
+  V_STMT := 'Inserting into batch header';
+  INSERT INTO PAC_CHG_BATCH_HEADERS
+  (
+    ID,
+    GL_PERIOD,
+    STATUS,
+    CREATED_DATE,
+    CREATED_BY,
+    LAST_UPDATED_DATE,
+    LAST_UPDATED_BY
+  )
+  SELECT
+    V_BATCH_ID,
+    V_GL_PERIOD,
+    1,
+    V_DATE,
+    P_USER_ID,
+    V_DATE,
+    P_USER_ID
+  FROM DUAL;
+
+  V_STMT := 'Generating GL Trans';
+  PAC_CHG_GENERATE_GL_TRANS_SP(P_USER_ID, P_SESSIONID, P_LANGUAGE_CODE);     
+
+
+  V_STMT := 'Loop through valid transactions';
+  FOR C_TRIALRUN_DATA IN C_TRIALRUN_REC(P_SESSIONID)
+    LOOP
+      V_STMT := 'Retrieving transaction ID';
+      SELECT PAC_CHG_TRANSACTIONS_S1.NEXTVAL
+        INTO V_TRANS_ID
+        FROM DUAL;
+
+      V_STMT := 'Inserting transaction';
+
+      INSERT INTO PAC_CHG_TRANSACTIONS
+      (
+        ID,
+        BATCH_ID,
+        CHARGEBACK_TYPE,
+        SOURCE_ID,
+        DATES_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        GL_PERIOD,
+        ENTITY_ID,
+        ACCOUNT_CODE_ID,
+        QUANTITY,
+        STATUS,
+        GL_BATCH_ID,
+        GL_POSTED_DATE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY
+      )
+      VALUES
+      (
+        V_TRANS_ID,
+        V_BATCH_ID,
+        C_TRIALRUN_DATA.CHARGEBACK_TYPE,
+        C_TRIALRUN_DATA.SOURCE_ID,
+        C_TRIALRUN_DATA.DATES_ID,
+        C_TRIALRUN_DATA.TRANS_SOURCE,
+        C_TRIALRUN_DATA.TRANSNO,
+        V_GL_PERIOD,
+        C_TRIALRUN_DATA.ENTITY_ID,
+        C_TRIALRUN_DATA.ACCOUNT_CODE_ID,
+        C_TRIALRUN_DATA.QUANTITY,
+        0,
+        NULL,
+        NULL,
+        V_DATE,
+        P_USER_ID,
+        V_DATE,
+        P_USER_ID
+      );
+
+       V_STMT := 'Loop through valid transaction values';
+      FOR C_TRIALRUN_VALUES_DATA IN C_TRIALRUN_VALUES_REC(C_TRIALRUN_DATA.ID)
+        LOOP
+          V_STMT := 'Insert in transaction values';
+          INSERT INTO PAC_CHG_TRANS_VALUES
+          (
+            ID,
+            TRANSACTION_ID,
+            CURRENCY_TYPE,
+            CURRENCY_CODE,
+            AMOUNT,
+            CREATED_DATE,
+            CREATED_BY,
+            LAST_UPDATED_DATE,
+            LAST_UPDATED_BY
+          )
+          SELECT
+            PAC_CHG_TRANS_VALUES_S1.NEXTVAL,
+            V_TRANS_ID,
+            C_TRIALRUN_VALUES_DATA.CURRENCY_TYPE,
+            C_TRIALRUN_VALUES_DATA.CURRENCY_CODE,
+            C_TRIALRUN_VALUES_DATA.AMOUNT,
+            V_DATE,
+            P_USER_ID,
+            V_DATE,
+            P_USER_ID
+          FROM
+            DUAL;
+
+          -- increment our total amount for the batch header
+          IF C_TRIALRUN_DATA.CHARGEBACK_TYPE = 'C' AND C_TRIALRUN_VALUES_DATA.CURRENCY_TYPE = 'HOME' THEN
+            -- convert to system currency if necessary
+            IF V_SYSTEM_CURRENCY != C_TRIALRUN_VALUES_DATA.CURRENCY_CODE THEN
+              IF C_TRIALRUN_DATA.TRANS_SOURCE = 'W' THEN
+                V_STMT := 'Selecting currency information for WIP transaction';
+                SELECT W.TRANSDATE,
+                       DECODE(W.TRANSTYPE,
+                              'L', P.LABOR_EXCHANGE_RATE_TYPE,
+                              'M', P.MATERIALS_EXCHANGE_RATE_TYPE,
+                              'Q', P.EQUIPMENT_EXCHANGE_RATE_TYPE,
+                              'X', P.EXPENSE_EXCHANGE_RATE_TYPE)
+                  INTO V_TRANSDATE,
+                       V_EXCHANGE_TYPE
+                  FROM PPA_WIP W,
+                       PAC_MNT_PROJECTS P
+                 WHERE W.TRANSNO = C_TRIALRUN_DATA.TRANSNO
+                   AND W.PROJECT_CODE = P.PROJECT_CODE;
+              ELSE
+                V_STMT := 'Selecting currency information for Billings or Adjustment';
+                SELECT W.TRANSDATE,
+                       DECODE(W.TRANSTYPE,
+                              'L', P.LABOR_EXCHANGE_RATE_TYPE,
+                              'M', P.MATERIALS_EXCHANGE_RATE_TYPE,
+                              'Q', P.EQUIPMENT_EXCHANGE_RATE_TYPE,
+                              'X', P.EXPENSE_EXCHANGE_RATE_TYPE)
+                  INTO V_TRANSDATE,
+                       V_EXCHANGE_TYPE
+                  FROM PPA_BILLINGS B,
+                       PPA_WIP W,
+                       PAC_MNT_PROJECTS P
+                 WHERE B.TRANSNO = C_TRIALRUN_DATA.TRANSNO
+                   AND B.APPLYTO = W.TRANSNO
+                   AND W.PROJECT_CODE = P.PROJECT_CODE;
+              END IF;
+
+              V_STMT := 'Adding amount to total';
+              V_TOTAL_AMOUNT := V_TOTAL_AMOUNT + NVL(CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                     V_TRANSDATE,
+                                                     V_SYSTEM_CURRENCY,
+                                                     C_TRIALRUN_VALUES_DATA.CURRENCY_CODE,
+                                                     C_TRIALRUN_VALUES_DATA.AMOUNT,
+                                                     V_EXCHANGE_TYPE), 0);
+            ELSE
+              V_TOTAL_AMOUNT := V_TOTAL_AMOUNT + C_TRIALRUN_VALUES_DATA.AMOUNT;
+            END IF;
+          END IF;
+        END LOOP;
+
+      IF (V_LAST_TRANSNO != 0 AND
+         (V_LAST_TRANSNO != C_TRIALRUN_DATA.TRANSNO OR V_LAST_TRANS_SOURCE != C_TRIALRUN_DATA.TRANS_SOURCE)) THEN
+
+        V_TRANSACTIONS := V_TRANSACTIONS + 1;
+
+        V_STMT := 'Set GL Posted flag';
+        IF C_TRIALRUN_DATA.TRANS_SOURCE = 'W' THEN
+          UPDATE PPA_WIP
+             SET GLPOSTED = 'Y', GLPERIOD = TO_CHAR(V_GL_PERIOD, 'YYYY-MM-DD')
+           WHERE TRANSNO = V_LAST_TRANSNO;
+        ELSE
+          UPDATE PPA_BILLINGS
+             SET GLPOSTED = 'Y', GLPERIOD = TO_CHAR(V_GL_PERIOD, 'YYYY-MM-DD')
+           WHERE TRANSNO = V_LAST_TRANSNO;
+        END IF;
+
+        V_COUNTER := V_COUNTER + 1;
+        IF MOD( V_COUNTER, 100 ) = 0 THEN
+         COMMIT;
+        END IF;
+      END IF;
+
+      V_LAST_TRANSNO := C_TRIALRUN_DATA.TRANSNO;
+      V_LAST_TRANS_SOURCE := C_TRIALRUN_DATA.TRANS_SOURCE;
+
+      -- records to be deleted when we're done were
+      V_STMT := 'Insert into TEMP_PAC_CHG_TRIALRUNS';
+      INSERT INTO TEMP_PAC_CHG_TRIALRUNS
+      (
+        SESSIONID,
+        TRIALRUN_ID
+      )
+      VALUES
+      (
+        P_SESSIONID,
+        C_TRIALRUN_DATA.ID
+      );
+
+    END LOOP;
+
+  V_TRANSACTIONS := V_TRANSACTIONS + 1;
+
+  V_STMT := 'Updating GL Posted and GL Period';
+  IF V_LAST_TRANS_SOURCE = 'W' THEN
+    UPDATE PPA_WIP
+       SET GLPOSTED = 'Y', GLPERIOD = TO_CHAR(V_GL_PERIOD, 'YYYY-MM-DD')
+     WHERE TRANSNO = V_LAST_TRANSNO;
+  ELSE
+    UPDATE PPA_BILLINGS
+       SET GLPOSTED = 'Y', GLPERIOD = TO_CHAR(V_GL_PERIOD, 'YYYY-MM-DD')
+     WHERE TRANSNO = V_LAST_TRANSNO;
+  END IF;
+
+  -- clean up the trial run data we successfully posted
+  V_STMT := 'Delete trial run data that posted successfully';
+  FOR C_DEL_TRIALRUN_DATA IN C_DEL_TRIALRUN_REC(P_SESSIONID)
+    LOOP
+      EXIT WHEN C_DEL_TRIALRUN_REC%NOTFOUND;
+
+      V_STMT := 'Delete from trial run values';
+      DELETE FROM PAC_CHG_TRIALRUNS_VALUES
+       WHERE TRIALRUN_ID = C_DEL_TRIALRUN_DATA.TRIALRUN_ID;
+
+     V_STMT := 'Select info to clean-up srch_gl_trans';
+     SELECT TRANS_SOURCE,
+            TRANSNO
+       INTO V_LAST_TRANS_SOURCE,
+            V_LAST_TRANSNO
+       FROM PAC_CHG_TRIALRUNS
+      WHERE ID = C_DEL_TRIALRUN_DATA.TRIALRUN_ID;
+
+     V_STMT := 'Delete from srch_gl_trans';
+      DELETE FROM PAC_CHG_SRCH_GL_TRANS
+       WHERE SESSIONID = P_SESSIONID
+         AND TRANS_SOURCE = V_LAST_TRANS_SOURCE
+         AND TRANSNO = V_LAST_TRANSNO;
+
+     V_STMT := 'Delete from trial run';
+      DELETE FROM PAC_CHG_TRIALRUNS
+       WHERE ID = C_DEL_TRIALRUN_DATA.TRIALRUN_ID;
+
+      V_COUNTER := V_COUNTER + 1;
+      IF MOD( V_COUNTER, 100 ) = 0 THEN
+        COMMIT;
+      END IF;
+    END LOOP;
+
+  V_STMT := 'Update batch header';
+  IF V_COUNTER = 0 THEN
+    V_TRANSACTIONS := 0;
+  END IF;
+  
+  UPDATE PAC_CHG_BATCH_HEADERS
+     SET STATUS = 0,
+         TRANSACTIONS = V_TRANSACTIONS,
+         TOTAL_AMOUNT = V_TOTAL_AMOUNT
+   WHERE ID = V_BATCH_ID;
+
+  COMMIT;
+
+  cmn_unlock_sp ( P_USER_ID, 'PAC_CHG_BATCH_HEADERS', 'SCHEDULE_JOB', V_BATCH_ID,  v_ret_val );
+
+EXCEPTION
+  WHEN BATCHHEADERS_LOCK THEN
+    raise_application_error(-20786, 'Another user is posting GL allocations. Please try again later.');
+  WHEN OTHERS THEN
+  BEGIN
+      ROLLBACK;
+      cmn_unlock_sp( P_USER_ID, 'PAC_CHG_BATCH_HEADERS', 'SCHEDULE_JOB', V_BATCH_ID,  v_ret_val );
+      RAISE_APPLICATION_ERROR(-20785, 'POSTING GL TRANS FAILED : ' || V_STMT || ': ' || SQLERRM);
+  END;
+
+END PAC_CHG_POST_GL_TRANS_SP;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

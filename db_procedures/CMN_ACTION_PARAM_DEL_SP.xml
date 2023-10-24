@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ACTION_PARAM_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ACTION_PARAM_DEL_SP" (
+   P_ACTION_CODE  		IN   VARCHAR2,
+   P_PARAMETER_CODE		IN   VARCHAR2
+)
+IS
+   V_ACTION_COUNT       NUMBER;
+   V_ACTION_ID          NUMBER;
+   V_PARAMETER_COUNT	NUMBER;
+   V_PARAMETER_ID		NUMBER;
+
+BEGIN
+
+	-- CHECK IF ACTION EXISTS FIRST
+
+	SELECT	 COUNT (*)
+	INTO     V_ACTION_COUNT
+	FROM     CMN_ACTIONS
+	WHERE    ACTION_CODE = P_ACTION_CODE;
+
+   	IF V_ACTION_COUNT = 0 THEN
+      RAISE_APPLICATION_ERROR (-20006, 'ACTION DOES NOT EXIST');
+   	END IF;
+
+
+	-- GET ACTION ID FOR THE PARAMETER
+	BEGIN
+		 SELECT  ID
+		 INTO    V_ACTION_ID
+		 FROM    CMN_ACTIONS
+		 WHERE   ACTION_CODE = P_ACTION_CODE;
+		 EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+
+	-- CHECK IF PARAMETER EXISTS FIRST
+
+	SELECT	COUNT (*)
+	INTO    V_PARAMETER_COUNT
+	FROM    CMN_ACTION_PARAMS
+	WHERE	ACTION_ID = V_ACTION_ID
+	AND		PARAMETER_CODE = P_PARAMETER_CODE;
+
+   	IF V_PARAMETER_COUNT = 0 THEN
+      RAISE_APPLICATION_ERROR (-20006, 'PARAMETER DOES NOT EXIST');
+   	END IF;
+
+
+	-- GET PARAMETER ID TO DELETE
+	BEGIN
+		 SELECT ID
+		 INTO	V_PARAMETER_ID
+		 FROM	CMN_ACTION_PARAMS
+		 WHERE	ACTION_ID = V_ACTION_ID
+		 AND	PARAMETER_CODE = P_PARAMETER_CODE;
+		 EXCEPTION
+		 	WHEN OTHERS THEN
+				 NULL;
+	END;
+
+	-- DELETE PARAMETER AND CAPTIONS
+
+	CMN_CAPTIONS_NLS_DEL_SP( 'CMN_ACTION_PARAMS', V_PARAMETER_ID );
+
+	DELETE
+	FROM   	  CMN_ACTION_PARAMS
+	WHERE	  ACTION_ID = V_ACTION_ID
+			  AND PARAMETER_CODE = P_PARAMETER_CODE;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

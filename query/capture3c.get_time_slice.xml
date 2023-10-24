@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_time_slice" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_time_slice"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:CODES:CODE:CODE@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:ROLLOVER_INTERVAL:ROLLOVER_INTERVAL@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:FROM_DATE:FROM_DATE@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:SLICE_PERIOD:SLICE_PERIOD@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:NUMBER_OF_PERIODS:NUMBER_OF_PERIODS@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:ITEM:ITEM@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:EXPIRATION:EXPIRATION@,
+            @SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:DATA_WAREHOUSE:DATA_WAREHOUSE@
+            FROM (
+                SELECT
+                    pbsr.request_name AS code
+                    , f.name AS rollover_interval
+                    , pbsr.from_date AS from_date
+                    , p.name AS slice_period
+                    , pbsr.num_periods AS number_of_periods
+                    , i.name AS item
+                    , pbsr.expiration_date AS expiration
+                    , pbsr.is_dwh_request AS data_warehouse
+                FROM prj_blb_slicerequests pbsr
+                LEFT JOIN cmn_lookups_v p ON p.lookup_enum = pbsr.period AND p.lookup_type = 'BLB_SLICE_PERIOD' AND p.language_code = 'en'
+                LEFT JOIN cmn_lookups_v f ON f.lookup_enum = pbsr.frequency AND f.lookup_type = 'BLB_SLICE_PERIOD' AND f.language_code = 'en'
+                LEFT JOIN cmn_lookups_v i ON i.lookup_enum = pbsr.field AND i.lookup_type = 'BLB_SLICE_ITEM' AND i.language_code = 'en'
+                WHERE pbsr.is_visible = 1
+                AND pbsr.is_template = 0
+                AND pbsr.is_synchronous = 0
+            ) x
+            WHERE  @FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="rollover_interval" required="false"/>
+            <attribute id="from_date" required="false"/>
+            <attribute id="slice_period" required="false"/>
+            <attribute id="number_of_periods" required="false"/>
+            <attribute id="item" required="false"/>
+            <attribute id="expiration" required="false"/>
+            <attribute id="data_warehouse" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,783 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_PPAXACTIONENTRY01</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_PPAXACTIONENTRY01" (
+  TRANSTYPE   VARCHAR2 ,
+  unitquantity  NUMBER,
+  in_cAdjType   IN VARCHAR2 ,
+  in_amountremaining  IN NUMBER ,
+  SOURCEMODULE  NUMBER ,
+  RESOURCE_CODE   VARCHAR2 ,
+  translocation   VARCHAR2 ,
+  transdept   VARCHAR2 ,
+  ENTITY  VARCHAR2 ,
+  transactiondate   DATE ,
+  transactiondate2  DATE ,
+  COMPANY_CODE  VARCHAR2 ,
+  PROJECT_CODE   VARCHAR2 ,
+  CHARGE_CODE   VARCHAR2 ,
+  COSTKEYLVL4   VARCHAR2 ,
+  costkeylevel6   VARCHAR2 ,
+  costkeylevel7   VARCHAR2 ,
+  input_type   VARCHAR2 ,
+  chargeable  NUMBER ,
+  in_bCalcNewRate   NUMBER,
+  rate  NUMBER ,
+  price   NUMBER ,
+  actualcost  NUMBER ,
+  stdcost   NUMBER ,
+  in_totalcost  IN NUMBER ,
+  factoramount  NUMBER ,
+  amount  NUMBER ,
+  totalamount   NUMBER ,
+  emplyactualcost   NUMBER ,
+  emplystdcost  NUMBER ,
+  emplyhomelocation   VARCHAR2 ,
+  --onsite  NUMBER ,
+  budgeted  NUMBER ,
+  LASTUPDTDBY_RESOURCE_CODE   VARCHAR2 ,
+  projecttype   VARCHAR2 ,
+  --multiplier  VARCHAR2 ,
+  notes   VARCHAR2 ,
+  MATLVENDORCODE  VARCHAR2 ,
+  matlvoucherno   VARCHAR2 ,
+  matlponumber  VARCHAR2 ,
+  matlitemnumber  VARCHAR2 ,
+  documentType  VARCHAR2 ,
+  CLNTCLASS   VARCHAR2 ,
+  PROJCLASS   VARCHAR2 ,
+  --COSTCLASS   VARCHAR2 ,
+  RESOURCE_CLASS  VARCHAR2 ,
+  WIPCLASS  VARCHAR2 ,
+  in_transtype  IN VARCHAR2 ,
+  in_transclass   IN VARCHAR2 ,
+  burdenamount  NUMBER ,
+  overheadamount  NUMBER ,
+  errorflag   IN OUT NUMBER,
+  newtransactionno  IN OUT NUMBER,
+  in_BatchNo  IN NUMBER ,
+  iExternalTransNo  NUMBER  DEFAULT NULL,
+  ENTRY_RESOURCE_CODE   VARCHAR2  DEFAULT NULL,
+  cLanguageCode VARCHAR2 DEFAULT 'en',
+  in_rateCurrency IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_ActualCostCurrency IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_TransNo    NUMBER DEFAULT NULL,
+  in_TaskID IN NUMBER DEFAULT NULL,
+  in_roleCode   IN VARCHAR2 DEFAULT NULL,
+  in_userLov1   IN VARCHAR2 DEFAULT NULL,
+  in_userLov2   IN VARCHAR2 DEFAULT NULL,
+  in_expenseType   IN VARCHAR2 DEFAULT NULL,
+  apinfoId   IN PPA_TRANSWIPADJUST.APINFO_ID%TYPE
+)
+AS
+  cAdjType  Globalpkg.STRING;
+  amountremaining   NUMBER(32,6);
+  totalcost   NUMBER(32,6);
+  costcodetranstype  Globalpkg.STRING;
+  TRANSCLASS  Globalpkg.STRING;
+  BatchNo   NUMBER;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg Globalpkg.STRING;
+  StoO_sqlstatus  INTEGER;
+  transdescription  Globalpkg.STRING;
+  mindec  NUMERIC(32,6);
+  emplyhomedepartment   Globalpkg.STRING;
+  localPostProcess  Globalpkg.STRING;
+
+
+  exr_rate Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  exr_AmountRemaining Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  exr_actualcost Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  exr_stdcost Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  currencyType VARCHAR2(30);
+  fromCurrency VARCHAR2(30);
+  toCurrency VARCHAR2(30);
+  convertedAmount NUMBER;
+  temp_cost_Exchange_Rate NUMBER;
+  temp_rate_Exchange_Rate NUMBER;
+  temp_rate_exchange_ID NUMBER;
+  temp_cost_exchange_ID NUMBER;
+  exchangeRateType VARCHAR2(30);
+  projectId PAC_MNT_PROJECTS.id%TYPE;
+  LABOR_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+  EXPENSE_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.EXPENSE_EXCHANGE_RATE_TYPE%TYPE;
+  MATERIALS_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.MATERIALS_EXCHANGE_RATE_TYPE%TYPE ;
+  EQUIPMENT_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.EQUIPMENT_EXCHANGE_RATE_TYPE%TYPE;
+  temp_Amount PPA_WIP_VALUES.amount%TYPE ;
+  tempCurrencyCode PPA_WIP_VALUES.currency_code%TYPE;
+  temp_BillRate PPA_WIP_VALUES.billrate%TYPE;
+  temp_Price PPA_WIP_VALUES.price%TYPE;
+  temp_FactorAmount  PPA_WIP_VALUES.factoramount%TYPE;
+  temp_Burden        PPA_WIP_VALUES.burden%TYPE;
+  temp_Overhead      PPA_WIP_VALUES.overhead%TYPE;
+  temp_TotalAmount   PPA_WIP_VALUES.totalamount%TYPE;
+  temp_ActualCost    PPA_WIP_VALUES.actualcost%TYPE;
+  temp_StdCost       PPA_WIP_VALUES.stdcost%TYPE;
+  temp_TotalCost     PPA_WIP_VALUES.totalcost%TYPE;
+  temp_EmplyActualCost PPA_WIP_VALUES.actualcost%TYPE;
+  temp_EmplyStdcost   PPA_WIP_VALUES.stdcost%TYPE;
+  temp_AmountRemaining PPA_WIP_VALUES.AMOUNTREMAINING%TYPE;
+  temp_rate_currency_code PPA_WIP_VALUES.rate_currency_code%TYPE;
+  temp_cost_currency_code PPA_WIP_VALUES.cost_currency_code%TYPE;
+  temp_natural_BillRate PPA_WIP_VALUES.natural_billrate%TYPE;
+  temp_natural_stdcost PPA_WIP_VALUES.natural_stdcost%TYPE;
+  temp_natural_actualcost PPA_WIP_VALUES.natural_actualcost%TYPE;
+
+  matxRateCurrCode PPA_WIP_VALUES.rate_currency_code%TYPE;
+  matxCostCurrCode PPA_WIP_VALUES.rate_currency_code%TYPE;
+  matxStdCostCurrCode PPA_WIP_VALUES.rate_currency_code%TYPE;
+  v_exchangeRate_err NUMBER ;
+  temp_ActualCostRet NUMBER ;
+  temp_stdcostRet  NUMBER ;
+
+  temp_stdcost_currency_code PPA_WIP_VALUES.STDCOST_CURRENCY_CODE%TYPE ;
+  --nCostRuleCode        VARCHAR2(30) ;
+  bUseCostPlus         NUMBER ;
+  bRateFound  NUMBER(1,0);
+  temp_RC1      PPA_GETRATEPkg.RCT1;
+  cCostplusRule   GLOBALPKG.STRING;
+  transDateForGetRate   GLOBALPKG.STRING;
+  cCostType             VARCHAR2(30);
+
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+	Rev_Prc_Ppaxactionentry01.cAdjType := Rev_Prc_Ppaxactionentry01.in_cAdjType;
+	Rev_Prc_Ppaxactionentry01.amountremaining := Rev_Prc_Ppaxactionentry01.in_amountremaining;
+	Rev_Prc_Ppaxactionentry01.totalcost := Rev_Prc_Ppaxactionentry01.in_totalcost;
+	Rev_Prc_Ppaxactionentry01.costcodetranstype := Rev_Prc_Ppaxactionentry01.in_transtype;
+	Rev_Prc_Ppaxactionentry01.TRANSCLASS := Rev_Prc_Ppaxactionentry01.in_transclass;
+	Rev_Prc_Ppaxactionentry01.BatchNo := Rev_Prc_Ppaxactionentry01.in_BatchNo;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   departcode
+		INTO Rev_Prc_Ppaxactionentry01.emplyhomedepartment
+    FROM PAC_MNT_RESOURCES
+    WHERE RESOURCE_CODE = Rev_Prc_Ppaxactionentry01.COSTKEYLVL4;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  NVL(Rev_Prc_Ppaxactionentry01.TRANSTYPE, '') IN ('WA') THEN
+	BEGIN
+		Rev_Prc_Ppaxactionentry01.transdescription :=  'RO';
+		Rev_Prc_Ppaxactionentry01.totalcost :=  Rev_Prc_Ppaxactionentry01.actualcost
+		   * Rev_Prc_Ppaxactionentry01.unitquantity;
+		IF  Rev_Prc_Ppaxactionentry01.projecttype = 'I' THEN
+			Rev_Prc_Ppaxactionentry01.amountremaining :=  0;
+		ELSE
+			Rev_Prc_Ppaxactionentry01.amountremaining :=  Rev_Prc_Ppaxactionentry01.totalamount;
+		END IF;
+		IF  NVL(Rev_Prc_Ppaxactionentry01.cAdjType, ' ') = ' ' THEN
+		BEGIN
+			IF  Rev_Prc_Ppaxactionentry01.TRANSTYPE = 'WA' THEN
+				Rev_Prc_Ppaxactionentry01.cAdjType :=  'T';
+			ELSE
+				Rev_Prc_Ppaxactionentry01.cAdjType :=  'M';
+			END IF;
+		END;
+		END IF;
+		IF  Rev_Prc_Ppaxactionentry01.TRANSTYPE = 'DM' THEN
+		BEGIN
+      Rev_Prc_Ppaxactionentry01.costcodetranstype :=  Rev_Prc_Ppaxactionentry01.TRANSTYPE;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   TRANSCLASS
+				INTO Rev_Prc_Ppaxactionentry01.TRANSCLASS
+				FROM TRANSCLASS
+				WHERE TRANSTYPE = Rev_Prc_Ppaxactionentry01.TRANSTYPE;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			Rev_Prc_Ppaxactionentry01.transdescription :=  'R';
+		END;
+		END IF;
+	-- NLR Changes
+    /*IF  Rev_Prc_Ppaxactionentry01.costcodetranstype = 'L' AND
+			Rev_Prc_Ppaxactionentry01.hours IS NULL AND
+			Rev_Prc_Ppaxactionentry01.minutes IS NULL THEN
+		BEGIN
+			Rev_Prc_Ppaxactionentry01.hours :=  FLOOR(Rev_Prc_Ppaxactionentry01.unitquantity);
+			Rev_Prc_Ppaxactionentry01.mindec :=  Rev_Prc_Ppaxactionentry01.unitquantity
+			   								 	 - Rev_Prc_Ppaxactionentry01.hours;
+			Rev_Prc_Ppaxactionentry01.minutes :=  Rev_Prc_Ppaxactionentry01.mindec
+			   								  	  * 60;
+		END;
+		END IF;*/
+		Rev_Prc_Ppaxactionentry01.amountremaining :=  ( ROUND( TO_NUMBER(Rev_Prc_Ppaxactionentry01.chargeable),0)
+		   										  	  * SIGN(ABS(ASCII(Rev_Prc_Ppaxactionentry01.projecttype) - 73))
+		   											  * ( Rev_Prc_Ppaxactionentry01.amountremaining ) );
+		IF  Rev_Prc_Ppaxactionentry01.BatchNo IS NULL THEN
+		BEGIN
+		/* Using Language Code to get the localized PostProcess - RD 05/25/01 */
+		 	BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+   		 	SELECT   lv.name
+				INTO Rev_Prc_Ppaxactionentry01.localPostProcess
+			FROM CMN_LOOKUPS_V lv
+			WHERE lv.LOOKUP_CODE = '1'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_POSTINGBATCH_POSTPROCESS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(Rev_Prc_Ppaxactionentry01.cLanguageCode);
+		  	EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO PPA_POSTINGBATCH (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+			VALUES (S_307_1_PPA_POSTINGBATCH.NEXTVAL, SYSDATE, Rev_Prc_Ppaxactionentry01.RESOURCE_CODE, 'T',
+			Rev_Prc_Ppaxactionentry01.localPostProcess	/*'Individual transaction'*/);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+
+			SELECT S_307_1_PPA_POSTINGBATCH.CURRVAL INTO REV_PRC_PPAXACTIONENTRY01.BatchNo FROM dual;
+		END;
+		END IF;
+
+    /* make sure the transaction is not currently being billed */
+    BEGIN
+      SELECT COUNT(*)
+        INTO StoO_rowcnt
+        FROM olb_BillingCheckout
+       WHERE COMPANY_CODE = REV_PRC_PPAXACTIONENTRY01.COMPANY_CODE
+         AND PROJECT_CODE = REV_PRC_PPAXACTIONENTRY01.PROJECT_CODE;
+
+       IF NVL(StoO_rowcnt, 0) &lt;&gt; 0 THEN
+         BEGIN
+          REV_PRC_PPAXACTIONENTRY01.errorflag :=  -14;
+          RETURN;
+         END;
+       END IF;
+    END;
+
+    BEGIN
+      /* CLRT::28045 - added for transaction capitalization. get the cost type from task, or its parent 
+         task (or grandparent, etc), or investment. No need to worry about TASK_ID being NULL becuase it has 
+         already been validated above. Hence cost_type will always be derived as in worst case it will default 
+         to investment cost type and that will never be null. */
+      SELECT NVL(c.cost_type, (SELECT cost_type FROM PAC_MNT_PROJECTS  WHERE PROJECT_CODE = Rev_Prc_Ppaxactionentry01.PROJECT_CODE)) INTO cCostType
+             FROM ( SELECT NVL(pt1.cost_type, NVL(pt2.cost_type, p.COST_TYPE)) as cost_type, 
+                    row_number() over (ORDER BY pt2.PRWBSSEQUENCE DESC) row_num 
+                    FROM PAC_MNT_PROJECTS p, PRTASK pt1
+                         LEFT OUTER JOIN PRTASK pt2 ON
+                         pt2.cost_type IS NOT NULL
+                         AND pt2.PRPROJECTID = pt1.PRPROJECTID
+                         AND pt2.PRWBSSEQUENCE &lt;= pt1.PRWBSSEQUENCE
+                         AND pt2.WBS_NNBSEQ &gt; pt1.PRWBSSEQUENCE 
+                         AND pt2.PRID &lt;&gt; pt1.PRID
+                    WHERE pt1.prprojectid = p.id
+                          AND pt1.prid = Rev_Prc_Ppaxactionentry01.in_TaskID
+             ) c 
+      WHERE c.row_num = 1;
+    END;
+    
+    BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		/* interchanged values with LASTUPDTDBY_RESOURCE_CODE for the new record - RD*/
+    INSERT INTO PPA_TRANSWIPADJUST (TRANSNO, ApplyTo, SOURCEMODULE, TRANSTYPE, BatchNo, ENTRY_RESOURCE_CODE,
+		 EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, ExternalTransNo, LocationID, DepartCode,
+     ENTITY, TransDate, COMPANY_CODE, PROJECT_CODE, CHARGE_CODE, INPUT_TYPE,
+     RESOURCE_CODE, Quantity,
+     --CostRuleCode,
+     Chargeable, Status, Notes,
+		 EmplyHomeLocation, EmplyHomeDepart, ProjectType,
+     ClientClass, ProjectClass, TRANSCLASS, RESOURCE_CLASS, WIPCLASS, GLPosted,
+     AdjustGroupNo, TransDescription, Del, AdjType, VENDOR_CODE, VoucherNo, PONo, DOCUMENT_TYPE, TASK_ID, ROLE_CODE, 
+	 USER_LOV1, USER_LOV2, EXPENSE_TYPE, APINFO_ID, COST_TYPE)
+    SELECT S_116_1_PPA_TRANSWIPADJUST.NEXTVAL, 0 "ApplyTo", Rev_Prc_Ppaxactionentry01.SOURCEMODULE "SourceModule",
+			   Rev_Prc_Ppaxactionentry01.costcodetranstype "TransType", Rev_Prc_Ppaxactionentry01.BatchNo "BatchNo",
+			   Rev_Prc_Ppaxactionentry01.LASTUPDTDBY_RESOURCE_CODE "ENTRY_RESOURCE_CODE",
+			   NVL(Rev_Prc_Ppaxactionentry01.transactiondate2, SYSDATE) "EntryDate",
+			   Rev_Prc_Ppaxactionentry01.ENTRY_RESOURCE_CODE "LASTUPDTDBY_RESOURCE_CODE",
+			   SYSDATE "LastUpdateDate", Rev_Prc_Ppaxactionentry01.iExternalTransNo "ExternalTransNo",
+			   Rev_Prc_Ppaxactionentry01.translocation "LocationID",
+			   Rev_Prc_Ppaxactionentry01.transdept "DepartCode", Rev_Prc_Ppaxactionentry01.ENTITY "Entity",
+			   Rev_Prc_Ppaxactionentry01.transactiondate "TransDate", Rev_Prc_Ppaxactionentry01.COMPANY_CODE "COMPANY_CODE",
+         Rev_Prc_Ppaxactionentry01.PROJECT_CODE "PROJECT_CODE", Rev_Prc_Ppaxactionentry01.CHARGE_CODE "Charge_Code",
+         Rev_Prc_Ppaxactionentry01.INPUT_TYPE "INPUT_TYPE", Rev_Prc_Ppaxactionentry01.COSTKEYLVL4 "RESOURCE_CODE",
+         Rev_Prc_Ppaxactionentry01.unitquantity "Quantity",
+         Rev_Prc_Ppaxactionentry01.chargeable "Chargeable",
+			   0 "Status", Rev_Prc_Ppaxactionentry01.notes "Notes",
+			   Rev_Prc_Ppaxactionentry01.emplyhomelocation "EmplyHomeLocation",
+			   Rev_Prc_Ppaxactionentry01.emplyhomedepartment "EmplyHomeDepart",
+			   Rev_Prc_Ppaxactionentry01.projecttype "ProjectType",
+			   Rev_Prc_Ppaxactionentry01.CLNTCLASS "ClientClass",
+         Rev_Prc_Ppaxactionentry01.PROJCLASS "ProjectClass", --Rev_Prc_Ppaxactionentry01.COSTCLASS "CostClass",
+         Rev_Prc_Ppaxactionentry01.TRANSCLASS "TransClass", Rev_Prc_Ppaxactionentry01.RESOURCE_CLASS "Resource_Class",
+			   Rev_Prc_Ppaxactionentry01.WIPCLASS "WIPClass", 'N' "GLPosted", 0 "AdjustGroupNo",
+			   Rev_Prc_Ppaxactionentry01.transdescription "TransDescription", 0 "Del",
+			   Rev_Prc_Ppaxactionentry01.cAdjType "AdjType", Rev_Prc_Ppaxactionentry01.MATLVENDORCODE "VENDOR_CODE",
+			   Rev_Prc_Ppaxactionentry01.matlvoucherno "VoucherNo", Rev_Prc_Ppaxactionentry01.matlponumber "PONo",
+			   documentType,
+         Rev_Prc_Ppaxactionentry01.in_TaskID "TASK_ID",
+         Rev_Prc_Ppaxactionentry01.in_roleCode "ROLE_CODE",
+         Rev_Prc_Ppaxactionentry01.in_userLov1 "USER_LOV1",
+         Rev_Prc_Ppaxactionentry01.in_userLov2 "USER_LOV2",
+         Rev_Prc_Ppaxactionentry01.in_expenseType "EXPENSE_TYPE",
+		 apinfoId, cCostType
+      FROM DUAL
+			;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+      Rev_Prc_Ppaxactionentry01.errorflag :=  -46;
+			RETURN ;
+		END;
+		END IF;
+
+		SELECT S_116_1_PPA_TRANSWIPADJUST.CURRVAL INTO newtransactionno FROM dual;
+
+/* checin - start */
+BEGIN
+
+		SELECT id, LABOR_EXCHANGE_RATE_TYPE,EXPENSE_EXCHANGE_RATE_TYPE, MATERIALS_EXCHANGE_RATE_TYPE,
+		EQUIPMENT_EXCHANGE_RATE_TYPE
+		INTO projectId,LABOR_EXCHANGE_RATE_TYPE,
+		EXPENSE_EXCHANGE_RATE_TYPE, MATERIALS_EXCHANGE_RATE_TYPE,
+		EQUIPMENT_EXCHANGE_RATE_TYPE FROM PAC_MNT_PROJECTS
+    WHERE project_code =  Rev_Prc_Ppaxactionentry01.PROJECT_CODE ;
+
+			temp_natural_BillRate := Rev_Prc_Ppaxactionentry01.rate ;
+			temp_rate_currency_code := Rev_Prc_Ppaxactionentry01.in_rateCurrency ;
+			temp_cost_currency_code := Rev_Prc_Ppaxactionentry01.in_ActualCostCurrency ;
+			temp_natural_actualcost := Rev_Prc_Ppaxactionentry01.actualcost ;
+
+			IF( temp_rate_currency_code IS NULL AND temp_cost_currency_code IS NULL ) THEN
+
+			SELECT
+							rate_currency_code,
+							cost_currency_code,
+							natural_BillRate ,
+							natural_stdcost ,
+							natural_actualcost,
+
+							/* added */
+							factoramount,
+							burden,
+							overhead,
+							stdcost_currency_code
+							/* added */
+
+						    INTO
+						   	temp_rate_currency_code,
+							temp_cost_currency_code,
+						    temp_natural_BillRate ,
+							temp_natural_stdcost ,
+							temp_natural_actualcost,
+
+							/* added */
+							temp_factoramount,
+							temp_burden,
+							temp_overhead,
+							temp_stdcost_currency_code
+							/* added */
+
+						    FROM PPA_WIP_VALUES
+							WHERE transno = Rev_Prc_Ppaxactionentry01.in_TransNo AND currency_type = 'NATURAL';
+			ELSE
+				SELECT
+								natural_stdcost,
+								/* added */
+								stdcost_currency_code
+								/* added */
+
+							    INTO
+								temp_natural_stdcost,
+								/* added */
+								temp_stdcost_currency_code
+								/* added */
+
+							    FROM PPA_WIP_VALUES
+								WHERE transno = Rev_Prc_Ppaxactionentry01.in_TransNo AND currency_type = 'NATURAL';
+			END IF;
+
+
+    IF Rev_Prc_Ppaxactionentry01.costcodetranstype = 'L' THEN
+		   exchangeRateType := LABOR_EXCHANGE_RATE_TYPE;
+		END IF;
+    IF Rev_Prc_Ppaxactionentry01.costcodetranstype = 'M' THEN
+				exchangeRateType := MATERIALS_EXCHANGE_RATE_TYPE;
+		END IF;
+    IF Rev_Prc_Ppaxactionentry01.costcodetranstype = 'Q' THEN
+				exchangeRateType := EQUIPMENT_EXCHANGE_RATE_TYPE;
+		END IF;
+    IF Rev_Prc_Ppaxactionentry01.costcodetranstype = 'X' THEN
+				exchangeRateType := EXPENSE_EXCHANGE_RATE_TYPE;
+		END IF;
+
+		BEGIN
+
+
+		 IF ( in_bCalcNewRate = 1 ) THEN
+			 BEGIN
+
+			   temp_natural_BillRate := null;
+			   temp_natural_actualcost := null;
+			   transDateForGetRate :=  RPAD(TO_CHAR(transactiondate,'mm/dd/yyyy'), 10, ' ');
+			   ppa_GetRate_WithRole(cClient=&gt;COMPANY_CODE,
+				 cProject=&gt;PROJECT_CODE,
+		     	 cCharge_Code=&gt;CHARGE_CODE,
+		     	 cInput_Type=&gt;input_type,
+		     	 cResource_Code=&gt;RESOURCE_CODE,
+				 cLocation =&gt; translocation,
+				 cDepartCode =&gt; transdept,
+				 IN_cTransType=&gt;costcodetranstype,
+				 cTransDate=&gt;transDateForGetRate,
+				 nQuantity=&gt;unitquantity,
+				 bAsResultSet=&gt;0,
+				 nAmount=&gt;temp_amount,
+				 nRate=&gt;temp_natural_BillRate,
+				 nCost=&gt;temp_natural_actualcost,
+				 nStdCost=&gt;temp_natural_stdcost,
+				 nFactorAmt=&gt;temp_factoramount,
+				 nBurdenAmt=&gt;temp_burden,
+				 nOverheadAmt=&gt;temp_overhead,
+				 --cCostPlusCode=&gt;cCostplusRule,
+				 cCostPlusCode =&gt; cCostplusRule,
+				 bRateFound=&gt;bRateFound,
+				 budgetcall=&gt;0,
+				 BCOSTOVERRIDE=&gt;0,
+				 currencyCodeReturned=&gt;temp_rate_currency_code,
+				 costCurrencyCode=&gt;temp_cost_currency_code,
+		         cRoleCode=&gt;in_roleCode,
+		              cTransClass =&gt;in_transclass,
+				 RC1=&gt;temp_rc1,
+				 cCost_type=&gt;cCostType);
+			END;
+			
+			IF bRateFound &lt;&gt; 1 THEN         
+			  RAISE_APPLICATION_ERROR( -20240, 'A rate matrix could not be found, or the rate matrix found was unable to match the transaction data' );
+        	END IF;
+		END IF;
+
+	
+ 
+		exr_rate :=  Cmn_Exchangerate_Pkg.CMN_GET_EXCHANGE_RATES_FCT
+				(
+				projectId,
+		    	Rev_Prc_Ppaxactionentry01.transactiondate,
+     		    temp_rate_currency_code,
+				temp_natural_BillRate ,
+				exchangeRateType );
+
+
+		exr_actualcost :=  Cmn_Exchangerate_Pkg.CMN_GET_EXCHANGE_RATES_FCT
+				(
+				projectId,
+		    	Rev_Prc_Ppaxactionentry01.transactiondate,
+     		    temp_cost_currency_code,
+				temp_natural_actualcost ,--to be done later..it can be either actaul cost or standard cost
+				exchangeRateType );
+
+		IF temp_stdcost_currency_code IS NOT NULL THEN
+			exr_stdcost :=  Cmn_Exchangerate_Pkg.CMN_GET_EXCHANGE_RATES_FCT
+				(
+				projectId,
+		    	Rev_Prc_Ppaxactionentry01.transactiondate,
+     		    temp_stdcost_currency_code,
+				temp_natural_stdcost ,--to be done later..it can be either actaul cost or standard cost
+				exchangeRateType );
+		END IF;
+
+		EXCEPTION
+
+  				WHEN NO_DATA_FOUND THEN
+					RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+					RETURN ;
+				WHEN OTHERS THEN
+					RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+					RETURN ;
+			END;
+
+
+		StoO_error := 0;
+
+
+		FOR i IN 1  .. exr_rate.COUNT
+		LOOP
+			BEGIN
+
+			currencyType := exr_rate(i).currencyTYPE;
+			fromCurrency := exr_rate(i).fromCurrencyCode;
+			toCurrency := exr_rate(i).toCurrencyCode;
+			temp_BillRate := exr_rate(i).convertedAmount;
+			temp_rate_Exchange_Rate := exr_rate(i).exchangeRate;
+			temp_rate_Exchange_ID := exr_rate(i).exchangeRateID;
+
+			temp_ActualCost := exr_actualcost(i).convertedAmount;--to be done later
+			temp_cost_Exchange_Rate := exr_actualcost(i).exchangeRate;
+			temp_cost_Exchange_ID := exr_actualcost(i).exchangeRateID;
+
+/*
+			temp_stdcost := exr_stdcost(i).convertedAmount;
+			temp_Burden := 0;
+			temp_Overhead := 0;
+			temp_FactorAmount := 0;
+			temp_TotalAmount := REV_PRC_PPAXACTIONENTRY01.unitQuantity * temp_BillRate + temp_Burden + temp_Overhead +
+							 							 temp_FactorAmount;
+*/
+
+			IF temp_stdcost_currency_code IS NOT NULL THEN
+			   temp_stdcost := exr_stdcost(i).convertedAmount;
+			ELSE
+			   temp_stdcost := 0;
+			END IF;
+
+			/**** added *****/
+			IF UPPER(currencyType) = 'NATURAL' THEN
+
+			BEGIN
+
+			IF temp_cost_currency_code != temp_rate_currency_code
+
+			THEN
+			/* convert the actual cost to rate currency code */
+			temp_ActualCost := Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT(
+			   					Rev_Prc_Ppaxactionentry01.transactiondate,
+								temp_cost_currency_code,
+								temp_rate_currency_code,
+								temp_natural_actualcost,
+								exchangeRateType );
+
+			END IF;
+
+			IF temp_stdCost_Currency_Code IS NOT NULL AND
+			   (temp_stdCost_Currency_Code != temp_rate_currency_code)
+			   THEN
+			/* convert the std. cost to rate currency code */
+			temp_stdcost := Cmn_Exchangerate_Pkg.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                Rev_Prc_Ppaxactionentry01.transactiondate,
+								temp_stdcost_currency_code,
+								temp_rate_currency_code,
+								temp_natural_stdcost,
+								exchangeRateType );
+				END IF;
+
+			EXCEPTION
+
+  				WHEN NO_DATA_FOUND THEN
+  					RAISE_APPLICATION_ERROR( SQLCODE, SQLERRM );
+					RETURN ;
+				WHEN OTHERS THEN
+  					RAISE_APPLICATION_ERROR( SQLCODE, SQLERRM );
+					RETURN ;
+			END;
+
+			END IF;
+			/**** added ****/
+			-- call here procedure to calculate the burden, factor and overhead amt.
+
+			-- check if the cost plus rule is null or not
+      --IF Rev_Prc_Ppaxactionentry01.multiplier IS NOT NULL THEN
+        -- bUseCostPlus :=1;
+      --ELSE
+			   bUseCostPlus := 0;
+      --END IF;
+
+			/* compute all the amount and get the flag that it is based on
+			actual cost or std. cost */
+			Ppa_Computemarkup( bUseCostPlus,
+							   NULL,
+                 Rev_Prc_Ppaxactionentry01.CHARGE_CODE,
+                 Rev_Prc_Ppaxactionentry01.input_type,
+                 Rev_Prc_Ppaxactionentry01.costcodetranstype,
+							   temp_ActualCost,
+							   Rev_Prc_Ppaxactionentry01.unitquantity,
+							   temp_stdcost,
+							   temp_natural_BillRate,
+							   temp_Amount,
+							   temp_factoramount,
+							   temp_burden,
+							   temp_overhead,
+                 temp_rate_currency_code,
+                 temp_stdcost_currency_code,
+                 Rev_Prc_Ppaxactionentry01.transactiondate,
+                 Rev_Prc_Ppaxactionentry01.PROJECT_CODE
+							  );
+
+			temp_burden := NVL( temp_burden, 0 ) ;
+			temp_factorAmount := NVL( temp_factorAmount, 0 ) ;
+			temp_overhead := NVL( temp_overhead, 0 ) ;
+
+
+			select round(Rev_Prc_Ppaxactionentry01.unitquantity * temp_BillRate + temp_Burden + temp_Overhead +
+							 							 temp_FactorAmount, c.currency_precision) into temp_TotalAmount 
+				from cmn_currencies c where c.currency_code = toCurrency;
+							 							 
+						INSERT INTO PPA_TRANSWIPADJUST_VALUES (ID,
+				   					   	TRANSNO,
+										CURRENCY_TYPE,
+										CURRENCY_CODE,
+										/* added */
+										STDCOST_CURRENCY_CODE,
+										/* added */
+										RATE_EXCHANGE_ID,
+										RATE_EXCHANGE_RATE,
+										RATE_CURRENCY_CODE,
+										NATURAL_BILLRATE,
+										BillRate ,
+										amount,
+										COST_EXCHANGE_ID,
+										COST_EXCHANGE_RATE,
+										COST_CURRENCY_CODE,
+										NATURAL_ACTUALCOST,
+										NATURAL_STDCOST,
+										ActualCost                ,
+										StdCost                    ,
+										totalCost                ,
+										Price ,
+										FactorAmount                ,
+										Burden                     ,
+										overhead                   ,
+										TotalAmount               ,
+										EmplyActualCost            ,
+										EmplyStdcost,
+										AmountRemaining
+							 )
+					VALUES	  (
+							   			PPA_TRANSWIPADJUST_VALUES_S1.NEXTVAL,
+										S_116_1_PPA_TRANSWIPADJUST.CURRVAL,--wip_rec.transno,
+										currencyType,
+										toCurrency,
+										/* added */
+										temp_stdcost_currency_code,
+										/* added */
+										temp_rate_exchange_ID,
+										temp_rate_exchange_rate ,
+										temp_rate_currency_code,
+										NVL(temp_natural_billrate,0),
+										temp_BillRate,
+
+										Rev_Prc_Ppaxactionentry01.unitQuantity * temp_BillRate, --qty(=hrs + min) * temp_BillRate
+										temp_cost_exchange_ID,
+										temp_cost_exchange_rate ,
+										temp_cost_currency_code,
+										temp_natural_ActualCost,
+										temp_natural_StdCost,
+										temp_ActualCost                ,
+										temp_StdCost                    ,
+										Rev_Prc_Ppaxactionentry01.unitQuantity * temp_ActualCost,--qty * temp_ActualCost,
+										1 , --price hardcoed since it is obsolete
+										temp_factoramount,  --Factor percent * totalcost
+										temp_burden, --Burden percent * totalcost                     ,
+										temp_overhead, --Overhead percent * totalcost                  ,
+										temp_TotalAmount,-- burden + factor + overhead + Amount               ,
+										0,--:1:2:3tempEmplyActualCost            ,
+										0,--:4:5:6tempEmplyStdcost ,
+										Rev_Prc_Ppaxactionentry01.Chargeable * SIGN(ABS(ASCII(Rev_Prc_Ppaxactionentry01.ProjectType) - 73)) * ( temp_TotalAmount )
+										);
+
+			EXCEPTION
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+
+		END;
+		END LOOP;
+		IF StoO_error != 0 THEN
+		   ROLLBACK ;
+		   RAISE_APPLICATION_ERROR( -2999, 'Exception occured :' || StoO_errmsg ) ;
+		END IF;
+
+END;
+/* checkin - end */
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE PPA_TRANSWIPADJUST
+		SET ApplyTo = TransNo, costrulecode=cCostplusRule
+		WHERE TransNo = Rev_Prc_Ppaxactionentry01.newtransactionno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+      Rev_Prc_Ppaxactionentry01.errorflag :=  -44;
+			RETURN ;
+		END;
+		END IF;
+	END;
+	ELSE
+		RAISE_APPLICATION_ERROR(-2999, 'This part of the code should never be executed');
+	END IF;
+
+
+END Rev_Prc_Ppaxactionentry01;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

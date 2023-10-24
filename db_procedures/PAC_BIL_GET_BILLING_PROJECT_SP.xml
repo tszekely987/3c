@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GET_BILLING_PROJECT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GET_BILLING_PROJECT_SP" (
+  IdForCurrentProject         NUMBER,
+  ProjectCodeForBillingProject    IN OUT VARCHAR2,
+  EnforceContractAmount       IN OUT NUMBER,
+  TitleForBillingProject        IN OUT VARCHAR2
+)
+AS
+  billingProjectId NUMBER(32,6);
+  tempbillingProjectId NUMBER(32,6);
+  id NUMBER;
+  IdForBillingProject NUMBER(32,6);
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+BEGIN
+
+	SELECT billing_project_id
+	  INTO PAC_BIL_GET_BILLING_PROJECT_SP.billingProjectId
+	  FROM pac_mnt_projects
+	  WHERE id = PAC_BIL_GET_BILLING_PROJECT_SP.IdForCurrentProject;
+
+PAC_BIL_GET_BILLING_PROJECT_SP.IdForBillingProject := PAC_BIL_GET_BILLING_PROJECT_SP.IdForCurrentProject;
+
+--as long as they are not the same, keep looking
+while PAC_BIL_GET_BILLING_PROJECT_SP.billingProjectId IS NOT NULL AND PAC_BIL_GET_BILLING_PROJECT_SP.billingProjectId != PAC_BIL_GET_BILLING_PROJECT_SP.IdForBillingProject
+loop
+	  begin
+	  	   PAC_BIL_GET_BILLING_PROJECT_SP.tempbillingProjectId := PAC_BIL_GET_BILLING_PROJECT_SP.billingProjectId;
+	 	   select billing_project_id, id into PAC_BIL_GET_BILLING_PROJECT_SP.billingProjectId, PAC_BIL_GET_BILLING_PROJECT_SP.id from pac_mnt_projects where id = PAC_BIL_GET_BILLING_PROJECT_SP.tempbillingProjectId;
+   		   PAC_BIL_GET_BILLING_PROJECT_SP.IdForBillingProject := PAC_BIL_GET_BILLING_PROJECT_SP.id;
+	  end;
+end loop;
+select p.project_code, cnts.enforce_contract_amount, inv.name
+  into PAC_BIL_GET_BILLING_PROJECT_SP.ProjectCodeForBillingProject, PAC_BIL_GET_BILLING_PROJECT_SP.EnforceContractAmount, PAC_BIL_GET_BILLING_PROJECT_SP.TitleForBillingProject
+  from PAC_MNT_PROJECTS p,
+       INV_INVESTMENTS INV,
+       PROJCNTRTS cnts 
+  where p.id = inv.id and
+        p.project_code = cnts.project_code(+) and 
+        p.id = PAC_BIL_GET_BILLING_PROJECT_SP.IdForBillingProject;
+
+	EXCEPTION
+	  WHEN TOO_MANY_ROWS THEN
+		NULL;
+	  WHEN NO_DATA_FOUND THEN
+		NULL;
+	  WHEN OTHERS THEN
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+
+end PAC_BIL_GET_BILLING_PROJECT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,31 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_TEAM_V">
+    <indexes/>
+    <text_length>3553</text_length>
+    <text>select prteam.prid odf_pk, prteam.prid as team_key, prteam.prid as clarity_team_key, prteam.prProjectID as investment_key, NVL(prteam.prResourceID,0) as resource_key, 
+        SRM_RESOURCES.FULL_NAME
+      prresourceid_caption, srm_resources.UNIQUE_NAME as resource_id, NVL(prteam.prroleid,0) as role_key, 
+        (select srmres.full_name from srm_resources srmres where srmres.id =
+        (NVL(prteam.prroleid,0)))
+      prroleid_caption, (SELECT unique_name FROM srm_resources WHERE id =  NVL(prteam.prroleid,0)) as role_id, CASE WHEN PRTEAM.PRAVAILSTART IS NULL THEN CMN_DATE_TRUNC_FCT(INV_INVESTMENTS.SCHEDULE_START) ELSE
+      CMN_DATE_TRUNC_FCT(PRTEAM.PRAVAILSTART) END as start_date, CASE WHEN PRTEAM.PRAVAILFINISH IS NULL THEN COP_CALC_FINISH_FCT(INV_INVESTMENTS.SCHEDULE_FINISH) ELSE
+      COP_CALC_FINISH_FCT(PRTEAM.PRAVAILFINISH) END as finish_date, CMN_DATE_TRUNC_FCT(BASEREC.START_DATE) as base_start_date, COP_CALC_FINISH_FCT(BASEREC.FINISH_DATE) as base_finish_date, prteam.prBooking as booking_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'BOOKING_STATUS_LIST' and rownum = 1 and LOOKUP_ENUM = prteam.prBooking) as prbooking_caption, prteam.prStatus as request_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'REQUEST_STATUS_LIST' and rownum = 1 and LOOKUP_ENUM = prteam.prStatus) as prstatus_caption, prteam.prIsOpen as is_open_for_te, NVL(prteam.rsf_obsunit_id,0) as staff_obs_unit_key, 
+        (SELECT name FROM prj_obs_units WHERE id = PRTEAM.rsf_obsunit_id)
+      rsf_obsunit_id_caption, (SELECT prj_obs_types.name FROM prj_obs_units prj_obs_units, prj_obs_types prj_obs_types WHERE prj_obs_units.type_id = prj_obs_types.id
+      AND prj_obs_units.id = prteam.rsf_obsunit_id) as staff_obs_type, (CASE WHEN PRJ_RESOURCES.PRISROLE = 1 THEN
+        NVL(PRTEAM.REQUIREMENT_NAME,SUBSTR(SRM_RESOURCES.FULL_NAME,1,100))
+        ELSE SRM_RESOURCES.FULL_NAME END) as requirement_name, (select count(1) from dual where exists (
+        select 1
+        from rsm_req_requisitions rq
+        where rq.requirement_id = prteam.prid  and rq.status_code = (select lookup_code from cmn_lookups where lookup_type = 'REQUEST_STATUS_LIST' and lookup_enum = prteam.prstatus))) as has_requisition, PRJ_RESOURCES.PRISROLE as is_role, COP_CALC_FINISH_FCT(prj_max_actthru_fct(prteam.prprojectid, prteam.prresourceid)) as actuals_thru_date, PRTEAM.CREATED_DATE as clarity_created_date, NVL(REQUESTED_MANAGER.USER_ID, 0) as requested_manager_key, 
+        REQUESTED_MANAGER.FULL_NAME
+      requested_manager_id_caption, (
+        CASE
+        WHEN BASEREC.LAST_UPDATED_DATE IS NULL
+          THEN PRTEAM.LAST_UPDATED_DATE
+        ELSE
+          GREATEST(PRTEAM.LAST_UPDATED_DATE, BASEREC.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, dataw_context.language_code, dataw_context.id language_id from prteam prteam inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN srm_resources srm_resources ON srm_resources.id=prteam.prresourceid JOIN prj_resources prj_resources ON prj_resources.prid=prteam.prresourceid JOIN inv_investments inv_investments ON inv_investments.id=prteam.prprojectid LEFT OUTER JOIN prj_baseline_details BASEREC ON BASEREC.OBJECT_ID = PRTeam.PRID AND BASEREC.OBJECT_TYPE='TEAM' and BASEREC.IS_CURRENT = 1 LEFT OUTER JOIN srm_resources REQUESTED_MANAGER ON PRTEAM.REQUESTED_MANAGER_ID = REQUESTED_MANAGER.USER_ID  where 1 = 1 and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

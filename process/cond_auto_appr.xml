@@ -1,0 +1,928 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="cond_auto_appr" createdBy="admin" endStep="End" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Process for automatically approving a labor resource's timesheet if hours fall within a certain range." languageCode="en" name="Conditional Automatic Approval"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisTimesheet" objectType="timesheet" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step expirationType="Days" id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls description="Verifies the timesheet is submitted" languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="step_1"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" group="Return Timesheet" id="step_5" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls description="Send action item to resource to correct and resubmit timesheet." languageCode="en" name="Resubmit Action Item"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="Please correct and resubmit the timesheet" aiObjectName="ActionItem-step_5" aiPriority="CAL_LOW" aiSubject="Correct and Resubmit Timesheet" aiUserStatusOnly="0" code="correct_and_resubmit_timesheet" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Send action item to resource to correct and resubmit timesheet." languageCode="en" name="Resubmit Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="Corregeixi el full de temps i reenviï-la." languageCode="ca" name="Corregir i reenviar full de temps"/>
+                    <message description="Opravte pracovní výkaz a odešlete ho znovu." languageCode="cs" name="Opravit a znovu odeslat pracovní výkaz"/>
+                    <message description="Korriger timesedlen, og indsend den igen" languageCode="da" name="Ret timeseddel, og indsend igen"/>
+                    <message description="Beheben Sie den Fehler und legen Sie das Zeitformular erneut vor" languageCode="de" name="Zeitformulare korrigieren und erneut vorlegen"/>
+                    <message description="Please correct and resubmit the timesheet" languageCode="en" name="Correct and Resubmit Timesheet"/>
+                    <message description="Corrija la hoja de tiempo y reenvíela." languageCode="es" name="Corregir y reenviar hoja de tiempo"/>
+                    <message description="Korjaa ja lähetä työaikaraportti uudelleen" languageCode="fi" name="Korjaa työaikaraportti ja lähetä se uudelleen"/>
+                    <message description="Corrigez la feuille de temps avant de la resoumettre." languageCode="fr" name="Corriger et resoumettre la feuille de temps"/>
+                    <message description="Javítsa ki, majd küldje be újra az időjelentést." languageCode="hu" name="Időjelentés kijavítása és elküldése"/>
+                    <message description="Correggere e inviare nuovamente la scheda attività" languageCode="it" name="Correggi e invia nuovamente la scheda attività"/>
+                    <message description="タイムシートを訂正して再提出してください" languageCode="ja" name="タイムシートの訂正と再提出"/>
+                    <message description="타임시트를 수정하여 다시 제출하십시오." languageCode="ko" name="타임시트 수정 및 다시 제출"/>
+                    <message description="Corrigeer de urenstaat en verzend deze opnieuw" languageCode="nl" name="Urenstaten corrigeren en opnieuw verzenden"/>
+                    <message description="Korriger timeregistreringen, og send den inn på nytt" languageCode="no" name="Rett og send inn timeregistreringer på nytt"/>
+                    <message description="Skoryguj grafik i prześlij go ponownie" languageCode="pl" name="Popraw i prześlij ponownie grafik"/>
+                    <message description="Corrija-a e reenvie a planilha de horas" languageCode="pt" name="Corrigir e reenviar planilha de horas"/>
+                    <message description="Исправьте и повторно представьте этот табель учета времени" languageCode="ru" name="Исправить и повторно отправить табель учета времени"/>
+                    <message description="Korrigera och skicka tidkortet igen" languageCode="sv" name="Korrigera och skicka om tidkort"/>
+                    <message description="Lütfen zaman çizelgesini düzeltip yeniden gönderin" languageCode="tr" name="Zaman Çizelgesini Düzelt ve Yeniden Gönder"/>
+                    <message description="请更正并重新提交该时间表" languageCode="zh" name="更正并重新提交时间表"/>
+                    <message description="請修正並重新提交工時表" languageCode="zh_TW" name="修正並重新提交工時表"/>
+                    <Assignees>
+                      <Assignee id="Editors" objectName="thisTimesheet" objectTypeCode="timesheet" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="DONE" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 2) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_1"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_5.ActionItem-step_5.allassignees-DONE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5b"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="step_1" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls description="Determines whether the timesheet can be automatically approved" languageCode="en" name="Automatic Approval Check"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( timesheet.thisTimesheet.v_time_periods_ago == 0 ||  timesheet.thisTimesheet.v_time_periods_ago == -1) &&   timesheet.thisTimesheet.v_res_type ==  lookup("RESOURCE_TYPE", 0) &&  timesheet.thisTimesheet.v_total >= 30 &&  timesheet.thisTimesheet.v_total <= 50]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_4"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[1==1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_2"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" group="Return Timesheet" id="step_5a" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls description="Marks a timesheet status as returned" languageCode="en" name="Mark Timesheet Returned"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="mark_timesheet_status_as_returned" objectMethod="prstatus" objectName="thisTimesheet" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Marks a timesheet status as returned" languageCode="en" name="Mark Timesheet Returned"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="2"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 3) ||  timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="step_5"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="step_2" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="Sends action item to approver to approve the timesheet" languageCode="en" name="Approval Action Item"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="Please review the timesheet and approve or return if there are errors." aiObjectName="ActionItem-step_2" aiPriority="CAL_LOW" aiSubject="Approve Timesheet" aiUserStatusOnly="0" code="send_ai_to_approver" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Sends action item to approver to approve the timesheet" languageCode="en" name="Approval Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="Revisi el full de temps i aprovi-la o torni-la en el cas que contingui algun error." languageCode="ca" name="Aprovar full de temps"/>
+                    <message description="Posuďte pracovní výkaz a poté ho schvalte, nebo v případě chyb zamítněte." languageCode="cs" name="Schválit pracovní výkaz"/>
+                    <message description="Gennemgå timesedlen, og godkend den eller returnér den, hvis der er fejl." languageCode="da" name="Godkend timeseddel"/>
+                    <message description="Prüfen Sie das Zeitformular, und genehmigen Sie oder senden Sie es zurück, wenn es Fehler aufweist." languageCode="de" name="Zeitformular genehmigen"/>
+                    <message description="Please review the timesheet and approve or return if there are errors." languageCode="en" name="Approve Timesheet"/>
+                    <message description="Revise la hoja de tiempo y apruébela o devuélvala en el caso de que contenga algún error." languageCode="es" name="Aprobar hoja de tiempo"/>
+                    <message description="Tarkista työaikaraportti ja hyväksy tai palauta se, jos siinä ei ole virheitä." languageCode="fi" name="Hyväksy työaikaraportti"/>
+                    <message description="Révisez la feuille de temps, puis approuvez-la ou renvoyez-la en cas d'erreur." languageCode="fr" name="Approuver la feuille de temps"/>
+                    <message description="Ellenőrizze az időjelentést, és hagyja jóvá, vagy ha hibás, küldje vissza." languageCode="hu" name="Időjelentés jóváhagyása"/>
+                    <message description="Rivedere e approvare la scheda attività oppure restituirla in caso di errori." languageCode="it" name="Approva scheda attività"/>
+                    <message description="タイムシートをレビューして承認するか、エラーがある場合は返却してください。" languageCode="ja" name="タイムシートの承認"/>
+                    <message description="타임시트를 검토한 후 승인하거나 오류가 있는 경우 반환하십시오." languageCode="ko" name="타임시트 승인"/>
+                    <message description="Controleer de urenstaat en keur deze goed of retourneer deze als het fouten bevat." languageCode="nl" name="Urenstaat goedkeuren"/>
+                    <message description="Gjennomgå timeregistreringen og godkjenn, eller returner hvis det er feil." languageCode="no" name="Godkjenn timeregistreringer"/>
+                    <message description="Przejrzyj grafik i zatwierdź go lub zwróć, jeśli zawiera błędy." languageCode="pl" name="Zatwierdź grafik"/>
+                    <message description="Analise a planilha de horas e aprove ou devolva se houver erros." languageCode="pt" name="Aprovar planilha de horas"/>
+                    <message description="Выполните проверку табеля учета времени и при отсутствии ошибок утвердите или верните." languageCode="ru" name="Утвердить табель учета времени"/>
+                    <message description="Granska tidkortet och godkänn eller returnera om det finns fel." languageCode="sv" name="Godkänn tidkort"/>
+                    <message description="Lütfen zaman çizelgesini gözden geçirin ve onaylayın veya hatalar varsa iade edin." languageCode="tr" name="Zaman Çizelgesini Onayla"/>
+                    <message description="请复查时间表进行核准，或在有错误的情况下退回。" languageCode="zh" name="核准时间表"/>
+                    <message description="請檢閱工時表並核准，如有錯誤則請退回。" languageCode="zh_TW" name="核准工時表"/>
+                    <Assignees>
+                      <Assignee id="Resource Manager" objectName="thisTimesheet" objectTypeCode="timesheet" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="RETURN" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                      <AIAction statusCode="APPROVE" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 3) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 2) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="3" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_2.ActionItem-step_2.allassignees-APPROVE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_4"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="4" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_2.ActionItem-step_2.allassignees-RETURN == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5a"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="5" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ step.step_2.days_elapsed == 2]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_3"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" group="Return Timesheet" id="step_5b" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="Sets the timesheet status to submitted" languageCode="en" name="Mark Timesheet Submitted"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="set_timesheet_status_to_submitted" objectMethod="prstatus" objectName="thisTimesheet" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Sets the timesheet status to submitted" languageCode="en" name="Mark Timesheet Submitted"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="1"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 0) ||  timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 2) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="step_1"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="step_3" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="Send approvers an action if process is idle" languageCode="en" name="Idle Escalation"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="Please review the timesheet and approve or return if there are errors." aiObjectName="ActionItem-step_3" aiPriority="CAL_LOW" aiSubject="Approve Timesheet" aiUserStatusOnly="0" code="ai_approvers_on_idle" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Send approvers an action if process is idle" languageCode="en" name="Idle Escalation"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="Revisi el full de temps i aprovi-la o torni-la en el cas que contingui algun error." languageCode="ca" name="Aprovar full de temps"/>
+                    <message description="Posuďte pracovní výkaz a poté ho schvalte, nebo v případě chyb zamítněte." languageCode="cs" name="Schválit pracovní výkaz"/>
+                    <message description="Gennemgå timesedlen, og godkend den eller returnér den, hvis der er fejl." languageCode="da" name="Godkend timeseddel"/>
+                    <message description="Prüfen Sie das Zeitformular, und genehmigen Sie oder senden Sie es zurück, wenn es Fehler aufweist." languageCode="de" name="Zeitformular genehmigen"/>
+                    <message description="Please review the timesheet and approve or return if there are errors." languageCode="en" name="Approve Timesheet"/>
+                    <message description="Revise la hoja de tiempo y apruébela o devuélvala en el caso de que contenga algún error." languageCode="es" name="Aprobar hoja de tiempo"/>
+                    <message description="Tarkista työaikaraportti ja hyväksy tai palauta se, jos siinä ei ole virheitä." languageCode="fi" name="Hyväksy työaikaraportti"/>
+                    <message description="Révisez la feuille de temps, puis approuvez-la ou renvoyez-la en cas d'erreur." languageCode="fr" name="Approuver la feuille de temps"/>
+                    <message description="Ellenőrizze az időjelentést, és hagyja jóvá, vagy ha hibás, küldje vissza." languageCode="hu" name="Időjelentés jóváhagyása"/>
+                    <message description="Rivedere e approvare la scheda attività oppure restituirla in caso di errori." languageCode="it" name="Approva scheda attività"/>
+                    <message description="タイムシートをレビューして承認するか、エラーがある場合は返却してください。" languageCode="ja" name="タイムシートの承認"/>
+                    <message description="타임시트를 검토한 후 승인하거나 오류가 있는 경우 반환하십시오." languageCode="ko" name="타임시트 승인"/>
+                    <message description="Controleer de urenstaat en keur deze goed of retourneer deze als het fouten bevat." languageCode="nl" name="Urenstaat goedkeuren"/>
+                    <message description="Gjennomgå timeregistreringen og godkjenn, eller returner hvis det er feil." languageCode="no" name="Godkjenn timeregistreringer"/>
+                    <message description="Przejrzyj grafik i zatwierdź go lub zwróć, jeśli zawiera błędy." languageCode="pl" name="Zatwierdź grafik"/>
+                    <message description="Analise a planilha de horas e aprove ou devolva se houver erros." languageCode="pt" name="Aprovar planilha de horas"/>
+                    <message description="Выполните проверку табеля учета времени и при отсутствии ошибок утвердите или верните." languageCode="ru" name="Утвердить табель учета времени"/>
+                    <message description="Granska tidkortet och godkänn eller returnera om det finns fel." languageCode="sv" name="Godkänn tidkort"/>
+                    <message description="Lütfen zaman çizelgesini gözden geçirin ve onaylayın veya hatalar varsa iade edin." languageCode="tr" name="Zaman Çizelgesini Onayla"/>
+                    <message description="请复查时间表进行核准，或在有错误的情况下退回。" languageCode="zh" name="核准时间表"/>
+                    <message description="請檢閱工時表並核准，如有錯誤則請退回。" languageCode="zh_TW" name="核准工時表"/>
+                    <Assignees>
+                      <Assignee id="Approvers" objectName="thisTimesheet" objectTypeCode="timesheet" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="APPROVE" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                      <AIAction statusCode="RETURN" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 1) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 3) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 2) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="3" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_3.ActionItem-step_3.assignees-APPROVE >= 1 &&  actionitem.step_3.ActionItem-step_3.assignees-RETURN == 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_4"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="4" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_3.ActionItem-step_3.assignees-RETURN >= 1 &&  actionitem.step_3.ActionItem-step_3.assignees-APPROVE == 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5a"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="5" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_3.ActionItem-step_3.assignees-APPROVE >= 1 &&  actionitem.step_3.ActionItem-step_3.assignees-RETURN >= 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_6"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="step_4" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls description="Mark the timesheet as approved" languageCode="en" name="Mark Timesheet Approved"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="mark_timesheet_approved" objectMethod="prstatus" objectName="thisTimesheet" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Mark the timesheet as approved" languageCode="en" name="Mark Timesheet Approved"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="3"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus !=  lookup("TIMESHEET_STATUS", 5) &&  timesheet.thisTimesheet.prstatus !=  lookup("TIMESHEET_STATUS", 4) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="End" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                <nls languageCode="en" name="End"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 3) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="step_6" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="The timesheet was approved by one approver and returned by another. The resource manager should resolve the ambiguous status." languageCode="en" name="Ambiguous Status Escalation"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="The timesheet has been approved by one approver and rejected by another. Please resolve the status." aiObjectName="ActionItem-step_6" aiPriority="CAL_LOW" aiSubject="Resolve Timesheet Status" aiUserStatusOnly="0" code="resolve_timesheet_status" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="The timesheet was approved by one approver and returned by another. The resource manager should resolve the ambiguous status." languageCode="en" name="Ambiguous Status Escalation"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="El full de temps va ser aprovat per un aprovador i tornada per un altre. Resolgui l'estat." languageCode="ca" name="Estat del full de temps de resolució"/>
+                    <message description="Pracovní výkaz byl schválen jedním schvalovatelem a odmítnut druhým. Vyřešte tento stav." languageCode="cs" name="Vyřešit stav pracovního výkazu"/>
+                    <message description="Timesedlen er blevet godkendt af én godkender og afvist af en anden. Løs denne status." languageCode="da" name="Løs status for timeseddel"/>
+                    <message description="Das Zeitformular wurde von einem Genehmiger genehmigt und von einem anderen zurückgeschickt. Klären Sie den Status." languageCode="de" name="Zeitformularstatus lösen"/>
+                    <message description="The timesheet has been approved by one approver and rejected by another. Please resolve the status." languageCode="en" name="Resolve Timesheet Status"/>
+                    <message description="La hoja de tiempo fue aprobada por un aprobador y devuelta por otro. Resuelva el estado." languageCode="es" name="Estado de la hoja de tiempo de resolución"/>
+                    <message description="Yksi hyväksyjä hyväksyi työaikaraportin ja toinen hylkäsi sen. Ratkaise tila." languageCode="fi" name="Ratkaise työaikaraportin tila"/>
+                    <message description="La feuille de temps a été approuvée par un approbateur et rejetée par un autre. Résolvez le statut." languageCode="fr" name="Résoudre le statut de la feuille de temps"/>
+                    <message description="Az időjelentést egy jóváhagyó jóváhagyta, egy másik pedig elutasította. Oldja fel az állapotütközést." languageCode="hu" name="Időjelentés állapotának eldöntése"/>
+                    <message description="La scheda attività è stata approvata da un responsabile e rifiutata da un altro responsabile. Risolvere lo stato." languageCode="it" name="Risolvi stato scheda attività"/>
+                    <message description="このタイムシートは、承認した人と拒否した人が異なります。ステータスを解決してください。" languageCode="ja" name="タイムシート ステータスの解決"/>
+                    <message description="타임시트가 한 명의 승인자에 의해 승인되고 다른 승인자에 의해 거부되었습니다. 상태를 해결하십시오." languageCode="ko" name="타임시트 상태 해결"/>
+                    <message description="De urenstaat is goedgekeurd door één goedkeurder en afgewezen door een andere. Los deze status op." languageCode="nl" name="Status urenstaat oplossen"/>
+                    <message description="Timeregistreringen er godkjent av én godkjenner og forkastet av en annen. Løs statusen." languageCode="no" name="Løs status for timeregistrering"/>
+                    <message description="Grafik został zatwierdzony przez jedną osobę zatwierdzającą, a odrzucony przez inną. Rozstrzygnij status." languageCode="pl" name="Rozwiąż status grafiku"/>
+                    <message description="A planilha de horas foi aprovada por um aprovador e rejeitada por outro. Resolva o status." languageCode="pt" name="Resolver o status da planilha de horas"/>
+                    <message description="Табель учета времени был утвержден одним утверждающим, но отклонен другим. Уточните статус." languageCode="ru" name="Разрешить статус табеля учета времени"/>
+                    <message description="Tidkortet har godkänts av en godkännare och avvisats av en annan. Lös aktuell status." languageCode="sv" name="Lös tidkortsstatus"/>
+                    <message description="Zaman çizelgesi bir onaylayan tarafından onaylandı ve başka biri tarafından reddedildi. Lütfen durumu çözümleyin." languageCode="tr" name="Zaman Çizelgesi Durumunu Çözümle"/>
+                    <message description="时间表已被一位核准者核准，但被另一位核准者拒绝。请解决此状态。" languageCode="zh" name="解决时间表状态"/>
+                    <message description="工時表已由一位核准者核准，並由另一位核准者否決。請解決這個狀態。" languageCode="zh_TW" name="解決工時表狀態"/>
+                    <Assignees>
+                      <Assignee id="Resource Manager" objectName="thisTimesheet" objectTypeCode="timesheet" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="APPROVE" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                      <AIAction statusCode="RETURN" statusTypeCode="TIMESHEET_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 3) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( timesheet.thisTimesheet.prstatus ==  lookup("TIMESHEET_STATUS", 2) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="3" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_6.ActionItem-step_6.allassignees-APPROVE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_4"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="4" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.step_6.ActionItem-step_6.allassignees-RETURN == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="step_5a"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups>
+              <Group sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Return Timesheet"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </Group>
+            </Groups>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="3" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

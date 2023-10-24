@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_BILLINGAPPROVAL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_BILLINGAPPROVAL" (
+invoiceno 	VARCHAR2 ,
+RESOURCE_CODE 	VARCHAR2 ,
+COMPANY_CODE 	VARCHAR2  DEFAULT NULL,
+PROJECT_CODE 	VARCHAR2  DEFAULT NULL,
+option_ 	NUMBER  DEFAULT 1,
+RC1 	IN OUT SP_BILLINGAPPROVALPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+billingapproval   NUMBER;
+/* 2/16/00 LB Added @COMPANY_CODE, @PROJECT_CODE and @option for Approve Schedule Bills */
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	IF  sp_billingapproval.option_ = 1 THEN
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  *
+			 FROM ppa_Billings, pac_mnt_projects
+			WHERE ppa_Billings.InvoiceNo = sp_billingapproval.invoiceno
+			 AND ppa_Billings.COMPANY_CODE = pac_mnt_projects.COMPANY_CODE
+			 AND ppa_Billings.PROJECT_CODE = pac_mnt_projects.PROJECT_CODE
+			 AND  (   EXISTS (
+				SELECT object_id
+				  FROM cmn_sec_chk_user_r_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = sp_billingapproval.RESOURCE_CODE)
+				   AND permission_code = 'APPROVE')
+			  OR EXISTS (
+				SELECT object_id
+				  FROM cmn_sec_chk_user_inst_v0
+				 WHERE object_id = 51560
+				   AND user_id = (select user_id from srm_resources where unique_name = sp_billingapproval.RESOURCE_CODE)
+				   AND permission_code = 'APPROVE'
+				   AND object_instance_id = pac_mnt_projects.ID)
+				) );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+			sp_billingapproval.billingapproval :=  1;
+		ELSE
+			sp_billingapproval.billingapproval :=  0;
+		END IF;
+		END;
+	END;
+	ELSE
+		IF  sp_billingapproval.option_ = 2 THEN
+		BEGIN
+			BEGIN
+			BEGIN
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			StoO_rowcnt := 0;
+			SELECT 1 INTO StoO_selcnt
+			FROM DUAL
+			WHERE  EXISTS (
+				SELECT  1
+				 FROM pac_mnt_projects
+				WHERE sp_billingapproval.COMPANY_CODE = pac_mnt_projects.COMPANY_CODE
+				 AND sp_billingapproval.PROJECT_CODE = pac_mnt_projects.PROJECT_CODE
+				 AND  (   EXISTS (
+					SELECT object_id
+					  FROM cmn_sec_chk_user_r_v0
+					 WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = sp_billingapproval.RESOURCE_CODE)
+					   AND permission_code = 'APPROVE')
+				  OR EXISTS (
+					SELECT object_id
+					  FROM cmn_sec_chk_user_inst_v0
+					 WHERE object_id = 51560
+					   AND user_id = (select user_id from srm_resources where unique_name = sp_billingapproval.RESOURCE_CODE)
+					   AND permission_code = 'APPROVE'
+					   AND object_instance_id = pac_mnt_projects.ID)
+					) );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+				sp_billingapproval.billingapproval :=  1;
+			ELSE
+				sp_billingapproval.billingapproval :=  0;
+			END IF;
+			END;
+		END;
+		END IF;
+		END IF;
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  sp_billingapproval.billingapproval
+		FROM DUAL;
+END sp_billingapproval;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

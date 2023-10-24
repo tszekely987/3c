@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_slow_top_20_det" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Slow Page Top 20 Details Drill Down"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:RESOURCE:URL_ACTION:URL_ACTION@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:CASE WHEN MAX_RESP<=3000 THEN 0 WHEN MAX_RESP BETWEEN 3000 and 10000 THEN 1 ELSE 2 END:INDICATOR@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:LOG_DATE:LOG_DATE@,
+	@SELECT:METRIC:USER_DEF:IMPLIED:ROUND((MAX_RESP/1000),1):MAX_RESP@
+FROM
+(SELECT	URL_SHORT url_action,
+		round(max(elapsed_time),0) max_resp,
+		log_date log_date,
+		RANK() OVER (ORDER BY round(max(elapsed_time),0) DESC) count_rank
+FROM     LOG_DETAILS
+WHERE    LOG_DATE=CAST(@WHERE:PARAM:XML:DATE:/data/log_date/@value@ AS DATE)
+AND (@WHERE:PARAM:XML:STRING:/data/hostname/@value@ IS NULL OR @WHERE:PARAM:XML:STRING:/data/hostname/@value@=ENVIRONMENT)
+AND (@WHERE:PARAM:XML:STRING:/data/env/@value@ IS NULL OR @WHERE:PARAM:XML:STRING:/data/env/@value@=ENVIRONMENT)
+AND      @FILTER@
+GROUP BY log_date, URL_SHORT
+HAVING @HAVING_FILTER@)
+WHERE COUNT_RANK<=20
+AND ROWNUM<=20]]></nsql>
+            <attribute id="url_action" required="false"/>
+            <attribute id="indicator" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="indicator"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="FlagRed" type="image">
+                <mapping hi="2" lo="2" mappingCode="mapping-1" typeCode="FlagRed"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-2" typeCode="FlagFollowup"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-3" typeCode="FlagGreen"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="log_date" required="false"/>
+            <attribute id="max_resp" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

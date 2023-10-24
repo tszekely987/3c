@@ -1,0 +1,337 @@
+<ClarityDBViewQuery>
+  <QueryResult code="COP_USR_ACCESS_RIGHTS_V">
+    <indexes/>
+    <text_length>15673</text_length>
+    <text>SELECT DISTINCT
+       a.right_id,
+       g.right_type right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Instance' access_right_type,
+       'Resource' granted_through_type,
+       r.full_name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN srm_resources r ON u.id = r.user_id
+       INNER JOIN cmn_sec_assgnd_obj_perm a ON u.id = a.principal_id
+                                           AND a.principal_type = 'USER' 
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND g.is_active = 1
+       INNER JOIN odf_objects_v o ON g.right_type = o.right_code
+                                 AND o.language_code = g.language_code
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Resource - OBS Rights                                  */
+/**********************************************************/
+SELECT DISTINCT
+       a.right_id,
+       g.right_type right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'OBSUnit' access_right_type,
+       'Resource' granted_through_type,
+       r.full_name granted_through,
+       obst.name || ': ' || obsu.name access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN srm_resources r ON u.id = r.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON u.id = a.principal_id
+                                        AND a.principal_type = 'USER'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+       INNER JOIN prj_obs_units obsu ON a.instance_id = obsu.id
+       INNER JOIN prj_obs_types obst ON obsu.type_id = obst.id
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Resource - Global Rights                               */
+/**********************************************************/
+SELECT a.right_id,
+       g.group_name right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Global' access_right_type,
+       'Resource' granted_through_type,
+       r.full_name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN srm_resources r ON u.id = r.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON u.id = a.principal_id 
+                                        AND a.principal_type = 'USER'
+                                        AND a.instance_type = 'SYSTEM'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND (g.is_automatic != 1 OR g.is_automatic IS NULL)
+                                    AND g.right_type IS NOT NULL
+                                    AND g.is_active = 1
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Group - Instance Rights                                */
+/**********************************************************/
+SELECT DISTINCT
+       a.right_id,
+       g.right_type right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Instance' access_right_type,
+       'Group' granted_through_type,
+       gn.group_name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN cmn_sec_user_groups ug ON u.id = ug.user_id 
+       INNER JOIN cmn_sec_assgnd_obj_perm a ON ug.group_id = a.principal_id
+                                           AND a.principal_type = 'GROUP'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND g.is_active = 1
+       INNER JOIN odf_objects_v o ON g.right_type = o.right_code
+                                 AND g.language_code = o.language_code
+       INNER JOIN cmn_sec_groups_v gn ON a.principal_id = gn.id
+                                     AND gn.language_code = g.language_code
+                                     AND gn.is_active = 1
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Group - OBS Rights                                     */
+/**********************************************************/
+SELECT DISTINCT
+       a.right_id,
+       g.right_type right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'OBSUnit' access_right_type,
+       'Group' granted_through_type,
+       gn.group_name granted_through,
+       obst.name || ':' || obsu.name access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN cmn_sec_user_groups ug ON u.id = ug.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON ug.group_id = a.principal_id
+                                        AND a.principal_type = 'GROUP'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND g.is_active = 1
+       INNER JOIN cmn_sec_groups_v gn ON a.principal_id = gn.id
+                                     AND g.language_code = gn.language_code
+                                     AND gn.is_active = 1
+       INNER JOIN prj_obs_units obsu on a.instance_id = obsu.id
+       INNER JOIN prj_obs_types obst on obsu.type_id = obst.id
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Group - Global Rights                                  */
+/**********************************************************/
+SELECT ri.id right_id,
+       ri.right_type right_source,
+       ri.description description,
+       ri.group_name right_name,
+       ri.group_code right_code,
+       'Global' access_right_type,
+       'Group' granted_through_type,
+       g.group_name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN ri.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN ri.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN ri.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       ri.language_code
+FROM   cmn_sec_users u
+       INNER JOIN cmn_sec_user_groups ug ON u.id = ug.user_id
+       INNER JOIN cmn_sec_groups_v g ON ug.group_id = g.id
+                                    AND g.group_role_type = 'GROUP'
+                                    AND g.is_active = 1
+       INNER JOIN cmn_sec_group_flat_hiers h ON ug.group_id = h.parent_group_id
+       INNER JOIN cmn_sec_groups_v ri ON h.group_id = ri.id
+                                     AND g.language_code = ri.language_code
+                                     AND (ri.is_automatic != 1 OR ri.is_automatic IS NULL)
+                                     AND ri.right_type IS NOT NULL
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* OBS - Instance Rights                                  */
+/**********************************************************/
+SELECT a.right_id,
+       g.group_name right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Instance' access_right_type,
+       'OBSUnit' granted_through_type,
+       t.name || ':' || u2.name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN obs_unit_users_v obsu ON u.id = obsu.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON obsu.unit_id = a.principal_id
+                                        AND a.instance_type = 'INSTANCE'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND (g.is_automatic != 1 OR g.is_automatic IS NULL)
+                                    AND g.right_type IS NOT NULL
+                                    AND g.is_active = 1 
+       INNER JOIN prj_obs_units u2 ON a.principal_id = u2.id
+       INNER JOIN prj_obs_types t ON u2.type_id = t.id
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* OBS - OBS Unit Rights                                  */
+/**********************************************************/
+SELECT a.right_id,
+       g.group_name right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'OBSUnit' access_right_type,
+       'OBSUnit' granted_through_type,
+       t.name || ':' || u2.name granted_through,
+       obst.name || ':' || obsu.name access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN obs_unit_users_v ou ON u.id = ou.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON ou.unit_id = a.principal_id
+                                        AND ou.unit_mode = a.principal_type
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND (g.is_automatic != 1 OR g.is_automatic IS NULL)
+                                    AND g.right_type IS NOT NULL
+                                    AND g.is_active = 1 
+       INNER JOIN prj_obs_units u2 ON a.principal_id = u2.id
+       INNER JOIN prj_obs_types t ON u2.type_id = t.id
+       INNER JOIN prj_obs_units obsu on a.instance_id = obsu.id
+       INNER JOIN prj_obs_types obst on obsu.type_id = obst.id
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* OBS - Global Rights                                    */
+/**********************************************************/
+SELECT a.right_id,
+       g.group_name right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Global' access_right_type,
+       'OBSUnit' granted_through_type,
+       t.name || ':' || u2.name granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN obs_unit_users_v obsu ON u.id = obsu.user_id
+       INNER JOIN cmn_sec_assgnd_right a ON obsu.unit_id = a.principal_id
+                                        AND obsu.unit_mode = a.principal_type
+                                        AND a.instance_type = 'SYSTEM'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND (g.is_automatic != 1 OR g.is_automatic IS NULL)
+                                    AND g.right_type IS NOT NULL
+                                    AND g.is_active = 1 
+       INNER JOIN prj_obs_units u2 ON a.principal_id = u2.id
+       INNER JOIN prj_obs_types t ON u2.type_id = t.id
+WHERE  u.user_status_id = 200
+UNION
+/**********************************************************/
+/* Project - Participant Rights                           */
+/**********************************************************/
+SELECT DISTINCT
+       a.right_id,
+       g.right_type right_source,
+       g.description description,
+       g.group_name right_name,
+       g.group_code right_code,
+       'Instance' access_right_type,
+       'Project' granted_through_type,
+       CASE WHEN a.right_id = 3811 THEN
+                'Collaboration Manager'
+            ELSE
+                'Participant - Resource' END granted_through,
+       '' access_right_obs_unit,
+       CASE WHEN g.lic_right_type IN ('creator','studioDev') THEN 'manager'
+            WHEN g.lic_right_type = 'participant' THEN 'teamMember'
+            WHEN g.lic_right_type = 'viewer' THEN 'viewer' END lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN cmn_sec_user_groups ug ON u.id = ug.user_id
+       INNER JOIN cmn_sec_assgnd_obj_perm a ON ug.group_id = a.principal_id
+                                           AND a.principal_type = 'GROUP'
+       INNER JOIN cmn_sec_groups_v g ON a.right_id = g.id
+                                    AND (g.right_type = 'SRM_PROJECTS'
+                                    OR   g.right_type LIKE 'INV%')
+                                    AND g.is_active = 1
+       INNER JOIN inv_investments i ON a.object_instance_id = i.id
+WHERE  u.user_status_id = 200
+AND   (SELECT DISTINCT gn.id
+       FROM   cmn_sec_groups_v gn
+       WHERE  gn.id = a.principal_id) IS NULL
+UNION
+/**********************************************************/
+/* Project - Participant Groups (Auto) Rights             */
+/**********************************************************/
+SELECT DISTINCT
+       x.right_id,
+       x.right_type right_source,
+       x.description description,
+       x.group_name right_name,
+       x.group_code right_code,
+       'Instance' access_right_type,
+       'Project' granted_through_type,
+       'Participant - System Group' granted_through,
+       '' access_right_obs_unit,
+       'teamMember' lic_right_type,
+       u.id user_id,
+       g.language_code
+FROM   cmn_sec_users u
+       INNER JOIN cmn_sec_user_groups ug ON u.id = ug.user_id
+       INNER JOIN (SELECT l.id right_id,
+                          l.right_type,
+                          l.description,
+                          l.group_name,
+                          l.group_code,
+                          l.language_code
+                   FROM   cmn_sec_groups_v l
+                   WHERE  l.id = 3812) x ON 1=1
+       INNER JOIN cmn_sec_groups_v g ON ug.group_id = g.id
+                                    AND x.language_code = g.language_code
+                                    AND g.group_role_type = 'GROUP'
+       INNER JOIN cmn_sec_assgnd_obj_perm a ON ug.group_id = a.principal_id
+                                           AND a.object_id = 200
+       INNER JOIN clb_dms_folders f ON a.object_instance_id = f.id 
+                                   AND f.folder_type = 'ProjectFolder'
+       INNER JOIN inv_investments i ON f.name = i.code
+WHERE  u.user_status_id = 200</text>
+  </QueryResult>
+</ClarityDBViewQuery>

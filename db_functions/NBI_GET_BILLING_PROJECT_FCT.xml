@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NBI_GET_BILLING_PROJECT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NBI_GET_BILLING_PROJECT_FCT" (P_PROJECT_ID INTEGER)
+   RETURN INTEGER
+IS
+   V_PROJECT_ID                  INTEGER := 0;
+   V_BILLING_PROJECT_ID          INTEGER := 0;
+BEGIN
+   V_PROJECT_ID := P_PROJECT_ID;
+   SELECT   NVL (MAX (BILLING_PROJECT_ID), -9)
+   INTO     V_BILLING_PROJECT_ID
+   FROM     PAC_MNT_PROJECTS
+   WHERE    ID = P_PROJECT_ID;
+
+   IF V_BILLING_PROJECT_ID not in ( -9, V_PROJECT_ID )
+   THEN
+      V_PROJECT_ID := NBI_GET_BILLING_PROJECT_FCT (V_BILLING_PROJECT_ID);
+   END IF;
+
+   RETURN V_PROJECT_ID;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_GET_BILLING_PROJECT_FCT - ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

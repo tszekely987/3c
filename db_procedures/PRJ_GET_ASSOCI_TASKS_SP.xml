@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_GET_ASSOCI_TASKS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_GET_ASSOCI_TASKS_SP" ( 
+projectId NUMBER, 
+object_instance_id NUMBER, 
+item_id NUMBER, 
+task_id NUMBER,
+RC1 IN OUT PRJ_GET_ASSOCI_TASKS_SPPkg.RCT1)
+AS
+taskSequence NUMBER;
+taskName VARCHAR2(3000);
+taskLevel NUMBER;
+tsk_id   NUMBER;
+prj_id   NUMBER;
+counter  NUMBER;
+top_node VARCHAR2(2000);
+
+  UF1_oval2   PRTASK.PRNAME%TYPE;
+  UF1_oval3   PRTASK.PRWBSLEVEL%TYPE;  
+  CURSOR UF1_cursor IS
+    SELECT TEMP_TBL_FOR_TASK_PATH.PRNAME, TEMP_TBL_FOR_TASK_PATH.PRWBSLEVEL
+	FROM TEMP_TBL_FOR_TASK_PATH WHERE TEMP_TBL_FOR_TASK_PATH.PRWBSSEQUENCE &lt;= taskSequence AND TEMP_TBL_FOR_TASK_PATH.PRWBSSEQUENCE != 0 order by TEMP_TBL_FOR_TASK_PATH.PRWBSSEQUENCE desc;
+	
+  UF2_oval1   PRTASK.PRID%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT PRID FROM PRTASK WHERE 
+    PRID IN (SELECT task_id FROM XDM_TSK_ITEM_ASSOCIATION 
+    WHERE object_instance_id=PRJ_GET_ASSOCI_TASKS_SP.object_instance_id AND item_id = PRJ_GET_ASSOCI_TASKS_SP.item_id) 
+	UNION
+	(SELECT PRID FROM PRTASK WHERE PRID = PRJ_GET_ASSOCI_TASKS_SP.tsk_id); 
+
+	
+BEGIN
+   PRJ_GET_ASSOCI_TASKS_SP.tsk_id := PRJ_GET_ASSOCI_TASKS_SP.task_id;
+   PRJ_GET_ASSOCI_TASKS_SP.prj_id := PRJ_GET_ASSOCI_TASKS_SP.projectId;
+      
+   IF PRJ_GET_ASSOCI_TASKS_SP.projectId IS NULL THEN
+   BEGIN
+   		SELECT PRPROJECTID INTO PRJ_GET_ASSOCI_TASKS_SP.prj_id FROM PRTASK WHERE PRID = PRJ_GET_ASSOCI_TASKS_SP.tsk_id;
+   END;
+   END IF;
+
+   INSERT INTO TEMP_TBL_FOR_TASK_PATH ( SELECT PRTASK.PRID,PRTASK.PRNAME,PRTASK.PRWBSLEVEL,PRTASK.PRWBSSEQUENCE FROM PRTASK WHERE PRPROJECTID = PRJ_GET_ASSOCI_TASKS_SP.prj_id );
+   
+   OPEN UF2_cursor;
+   LOOP
+   FETCH UF2_cursor INTO UF2_oval1;
+   EXIT WHEN UF2_cursor%NOTFOUND;
+   BEGIN
+   		SELECT PRNAME, PRWBSLEVEL, PRWBSSEQUENCE INTO taskName, taskLevel, taskSequence FROM PRTASK WHERE PRID = UF2_oval1;
+		counter := 1;
+		top_node := taskName;
+		
+		OPEN UF1_cursor;
+		LOOP
+		FETCH UF1_cursor INTO UF1_oval2, UF1_oval3;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+	   	BEGIN
+			 IF UF1_oval3 &lt; taskLevel THEN
+			 BEGIN
+			 	  top_node := UF1_oval2;
+				  
+			 	  IF counter &lt; 2 THEN
+				  BEGIN
+				  	   taskName := UF1_oval2 || '/' || taskName;
+				  END;
+				  END IF;
+				  
+				  counter := counter + 1;
+				  
+			      IF UF1_oval3 = 1 THEN 
+				  	 EXIT;
+				  END IF; 		  				  
+			 END;
+			 END IF;
+		END;
+		END LOOP;
+		CLOSE UF1_cursor;
+		
+		IF counter &gt; 2 THEN
+		BEGIN
+		  taskName := top_node || '/.../' || taskName;
+		END;
+		END IF;   
+		
+		INSERT INTO TEMP_FULL_TASK_INFO( TASK_ID, TASK_NAME ) VALUES ( UF2_oval1, taskName );
+		taskName := '';
+	END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	
+	DELETE FROM TEMP_TBL_FOR_TASK_PATH;
+	
+	OPEN RC1 FOR
+		SELECT TASK_ID,
+			   TASK_NAME
+		FROM TEMP_FULL_TASK_INFO
+		ORDER BY 2;
+		
+	DELETE FROM TEMP_FULL_TASK_INFO;
+END PRJ_GET_ASSOCI_TASKS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

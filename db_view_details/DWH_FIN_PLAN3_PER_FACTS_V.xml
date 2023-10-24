@@ -1,0 +1,154 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_PLAN3_PER_FACTS_V">
+    <indexes/>
+    <text_length>9251</text_length>
+    <text>SELECT p.object_id investment_key,
+       p.id plan_key,
+       s.plan_detail_key,
+       s.period_key,
+       s.plan_units plan_units,
+       s.plan_cost plan_cost,
+       s.billing_plan_cost billing_plan_cost,
+       s.plan_revenue plan_revenue,
+       s.billing_plan_revenue billing_plan_revenue,
+	   s.actual_cost actual_cost,
+	   s.actual_units actual_units,
+	   s.actual_revenue actual_revenue,
+       GREATEST(d.last_updated_date,p.last_updated_date) clarity_updated_date
+FROM  (WITH plans
+                AS (SELECT fpd.id,
+                           fp.period_type_code
+                    FROM   fin_plans fp
+                           INNER JOIN fin_cost_plan_details fpd ON (fp.id = fpd.plan_id AND fpd.parent_detail_id is null
+                                                               AND fp.is_plan_of_record = (SELECT CASE WHEN fin_plans_por_only = 1
+                                                                                                       THEN 1 ELSE fp.is_plan_of_record END
+                                                                                           FROM   dwh_settings))),
+           dwh_dates
+                    AS (SELECT pp.id parent_period_key,
+                              pp.period_type parent_period_type,
+                              p.id period_key,
+                              pp.start_date parent_period_start,
+                              pp.end_date - 1 AS parent_period_end,
+                              p.start_date period_start,
+                              p.end_date period_finish
+                        FROM   biz_com_periods pp, biz_com_periods p
+                        WHERE  pp.entity_id = p.entity_id
+                        AND    p.start_date >= pp.start_date
+                        AND    p.end_date &lt;= pp.end_date
+                        AND    p.id IN (SELECT DISTINCT d.period_key
+                                        FROM  (SELECT p.id period_key,
+                                                      p.start_date period_start,
+                                                      r.row_count,
+                                                      ROW_NUMBER () OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                                               FROM   biz_com_periods p,
+                                                      dwh_settings s,
+                                                     (SELECT MIN (from_date) from_date,
+                                                             MAX (num_periods) row_count
+                                                      FROM   prj_blb_slicerequests
+                                                      WHERE  is_dwh_request = 1
+                                                      AND request_name LIKE '%dwh_fiscal') r
+                                               WHERE  p.entity_id = s.entity_key
+                                               AND    p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                                               AND    p.start_date >= r.from_date) d
+                                        WHERE  d.row_key &lt;= d.row_count)),
+            plan_details
+                    AS (SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               1 field,
+                               s.slice * (d.period_finish - d.period_start) slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_units s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fpd.period_type_code = d.parent_period_type
+                        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               3 field,
+                               s.slice * (d.period_finish - d.period_start) slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_cost s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fpd.period_type_code = d.parent_period_type
+                        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               5 field,
+                               s.slice * (d.period_finish - d.period_start) slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_bcost s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fpd.period_type_code = d.parent_period_type
+                        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               6 field,
+                               s.slice * (d.period_finish - d.period_start) slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_rev s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fpd.period_type_code = d.parent_period_type
+                        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               8 field,
+                               s.slice * (s.finish_date - s.start_date) slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_brev s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date = d.parent_period_start AND fpd.period_type_code = d.parent_period_type
+				        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               9 field,
+                               s.slice /* (s.finish_date - s.start_date) */ slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_acost s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date between d.parent_period_start AND d.parent_period_end AND fpd.period_type_code = d.parent_period_type
+				        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               10 field,
+                               s.slice /* (s.finish_date - s.start_date) */ slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_aunits s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date between d.parent_period_start AND d.parent_period_end AND fpd.period_type_code = d.parent_period_type
+				        UNION ALL
+                        SELECT fpd.id plan_detail_key,
+                               d.period_key,
+                               d.period_finish,
+                               11 field,
+                               s.slice /* (s.finish_date - s.start_date) */ slice
+                         FROM plans fpd
+                               INNER JOIN odf_ssl_cst_dtl_arev s ON fpd.id = s.prj_object_id
+                               INNER JOIN dwh_dates d ON s.start_date between d.parent_period_start AND d.parent_period_end AND fpd.period_type_code = d.parent_period_type)
+             SELECT plan_detail_key,
+                    period_key,
+                    NVL (plan_units, 0) plan_units,
+                    NVL (plan_cost, 0) plan_cost,
+                    NVL (billing_plan_cost, 0) billing_plan_cost,
+                    NVL (plan_revenue, 0) plan_revenue,
+                    NVL (billing_plan_revenue, 0) billing_plan_revenue,
+					NVL (actual_cost, 0) actual_cost,
+					NVL (actual_units, 0) actual_units,
+					NVL (actual_revenue, 0) actual_revenue
+             FROM  (SELECT plan_detail_key,
+                           period_key,
+                           period_finish,
+                           field,
+                           slice
+                    FROM plan_details) PIVOT (SUM (slice)
+                                         FOR field IN (1 AS plan_units,
+                                                       3 AS plan_cost,
+                                                       5 AS billing_plan_cost,
+                                                       6 AS plan_revenue,
+                                                       8 AS billing_plan_revenue,
+													   9 AS actual_cost,
+													   10 AS actual_units,
+													   11 AS actual_revenue))
+       ORDER BY plan_detail_key, period_key) s
+       INNER JOIN fin_cost_plan_details d ON s.plan_detail_key = d.id AND d.parent_detail_id is null
+       INNER JOIN fin_plans p ON d.plan_id = p.id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

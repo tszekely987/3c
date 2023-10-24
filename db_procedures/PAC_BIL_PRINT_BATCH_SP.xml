@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_PRINT_BATCH_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_PRINT_BATCH_SP" 
+(
+  cUserID         VARCHAR2,
+  iBillRunKey     NUMBER,
+  cInvoiceDate    VARCHAR2,
+  bHighSpeedPrint NUMBER  DEFAULT 0,
+  iHSDetailMode   NUMBER  DEFAULT 0,
+  languageId      VARCHAR2  DEFAULT '',
+  RC1      IN OUT Pac_Bil_Print_Batch_Sppkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  bInvNoAssigned  NUMBER;
+  iSeqNo  NUMBER;
+  iCount  INTEGER;
+  iLup    INTEGER;
+  cRDFName  GLOBALPKG.STRING;
+  cInvNo  GLOBALPKG.STRING;
+  cClient   GLOBALPKG.STRING;
+  cProject  GLOBALPKG.STRING;
+  seqOffset NUMBER;
+BEGIN
+	 /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+  BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM BB_HSINVOICELAYOUT
+		WHERE BillingRunKey = Pac_Bil_Print_Batch_Sp.iBillRunKey
+		 AND UserID = Pac_Bil_Print_Batch_Sp.cUserID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT  DISTINCT InvNumbersGenerated
+		INTO Pac_Bil_Print_Batch_Sp.bInvNoAssigned FROM BB_BILLINGRUN
+		WHERE BillingRunKey = Pac_Bil_Print_Batch_Sp.iBillRunKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  Pac_Bil_Print_Batch_Sp.bInvNoAssigned = 0 THEN
+		BEGIN
+		Bb_Geninvoicenumbers(Pac_Bil_Print_Batch_Sp.cUserID,
+		 					 Pac_Bil_Print_Batch_Sp.iBillRunKey,
+							 Pac_Bil_Print_Batch_Sp.cInvoiceDate,
+							 Pac_Bil_Print_Batch_Sp.bHighSpeedPrint,
+							 Pac_Bil_Print_Batch_Sp.iHSDetailMode);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	IF  Pac_Bil_Print_Batch_Sp.bHighSpeedPrint != 0 THEN
+		BEGIN
+		Pac_Bil_Hs_Gen_Invoices_Sp(Pac_Bil_Print_Batch_Sp.iBillRunKey,
+		 Pac_Bil_Print_Batch_Sp.cUserID,
+		 Pac_Bil_Print_Batch_Sp.iHSDetailMode,
+ 		 Pac_Bil_Print_Batch_Sp.languageId);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+	END IF;
+END Pac_Bil_Print_Batch_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

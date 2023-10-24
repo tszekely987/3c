@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_HTML_PORTLET_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_HTML_PORTLET_DEL_SP" (
+   P_PORTLET_CODE		   IN   VARCHAR2
+)
+IS
+   V_PORTLET_ID            	              NUMBER;
+   V_SERVICE_ID		         	              NUMBER;
+   V_PORTLET_SERVICE_ID		 	              NUMBER;
+BEGIN
+
+		BEGIN
+			SELECT   ID
+			INTO     V_PORTLET_ID
+			FROM     CMN_PORTLETS
+			WHERE    PORTLET_CODE 		= P_PORTLET_CODE;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'PORTLET DOES NOT EXIST');
+   	END;
+
+		BEGIN
+			SELECT   ID
+			INTO     V_SERVICE_ID
+			FROM     CMN_SERVICES
+			WHERE    SERVICE_CODE 		= 'htmlPortlet' || V_PORTLET_ID;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'SERVICE DOES NOT EXIST');
+   	END;
+
+		BEGIN
+			SELECT  ID
+			INTO    V_PORTLET_SERVICE_ID
+			FROM    CMN_PORTLET_SERVICES
+			WHERE   SERVICE_ID 		= V_SERVICE_ID
+			AND			PORTLET_ID = V_PORTLET_ID;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'PORTLET SERVICE DOES NOT EXIST');
+   	END;
+
+		CMN_CAPTIONS_NLS_DEL_SP( 'CMN_PORTLET_SERVICES', V_PORTLET_SERVICE_ID );
+
+		DELETE 
+		FROM 		CMN_PORTLET_SERVICES
+		WHERE 	ID = V_PORTLET_SERVICE_ID;
+
+		CMN_CAPTIONS_NLS_DEL_SP( 'CMN_PORTLETS', V_PORTLET_ID );
+
+		DELETE 
+		FROM 		CMN_PORTLETS
+		WHERE 	ID = V_PORTLET_ID;
+
+		CMN_CAPTIONS_NLS_DEL_SP( 'CMN_SERVICES', V_SERVICE_ID );
+
+		DELETE 
+		FROM 		CMN_SERVICES
+		WHERE 	ID = V_SERVICE_ID;
+		
+		DELETE 
+		FROM 		CMN_PAGE_PORTLETS
+		WHERE		PORTLET_ID = V_PORTLET_ID;
+
+		DELETE 
+		FROM 		CMN_ACTION_PORTLET_SERVICES
+		WHERE		PORTLET_SERVICE_ID = V_PORTLET_SERVICE_ID;
+
+		DELETE 
+		FROM 		cmn_html_retrieve_services
+		WHERE		PORTLET_ID = V_PORTLET_SERVICE_ID;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

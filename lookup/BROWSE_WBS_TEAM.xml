@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="BROWSE_WBS_TEAM" displayAttributeName="full_name" hiddenAttributeName="prid" objectCode="" sortAttributeName="full_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List team members for a project hierarchy" languageCode="en" name="Browse Team Members for a Project Hierarchy"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[
+                  
+                  SELECT @SELECT:q.prid:prid@,
+             @SELECT:q.first_name:first_name@,
+             @SELECT:q.last_name:last_name@,
+             @SELECT:q.full_name:full_name@,
+             @SELECT:q.unique_name:unique_name@,
+             @SELECT:q.unique_name:UNIQUE_CODE@,
+             @SELECT:q.investment_name:investment_name@,
+             @SELECT:q.last_updated_date:last_updated_date@,
+             @SELECT:q.subproject:subproject@            
+      FROM   (
+      select team.prid
+             , isnull( team.requirement_name, sres.last_name) last_name
+             , sres.first_name
+             , isnull( team.requirement_name, sres.full_name) full_name
+             , inv.name investment_name
+             , sres.unique_name
+			 , team.last_updated_date
+             , ( CASE WHEN team.prprojectid = @where:param:xml:integer:/data/id/@value@ THEN 0 ELSE 1 END ) subproject
+        from prteam team, inv_investments inv, srm_resources sres
+       where team.prprojectid = inv.id
+         and team.prresourceid = sres.id
+         AND team.prprojectid IN (
+             select id
+             from   inv_investments
+             where  id = @where:param:xml:integer:/data/id/@value@
+              union
+             select child_id
+               from inv_flat_hierarchies
+              where parent_id = @where:param:xml:integer:/data/id/@value@
+              )
+		@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@:BROWSE-ONLY@ 
+         ) q
+      WHERE 1=1 AND @FILTER@
+                ]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT @SELECT:q.prid:prid@,
+             @SELECT:q.first_name:first_name@,
+             @SELECT:q.last_name:last_name@,
+             @SELECT:q.full_name:full_name@,
+             @SELECT:q.unique_name:unique_name@,
+             @SELECT:q.unique_name:UNIQUE_CODE@,
+             @SELECT:q.investment_name:investment_name@,
+             @SELECT:q.last_updated_date:last_updated_date@,
+             @SELECT:q.subproject:subproject@
+      FROM   (
+      select team.prid
+             , nvl( team.requirement_name, sres.last_name) last_name        , sres.first_name
+             , nvl( team.requirement_name, sres.full_name) full_name
+             , inv.name investment_name
+             , sres.unique_name
+			 , team.last_updated_date
+             , ( CASE WHEN team.prprojectid = @where:param:xml:integer:/data/id/@value@ THEN 0 ELSE 1 END ) subproject
+
+        from prteam team, inv_investments inv, srm_resources sres
+       where team.prprojectid = inv.id
+         and team.prresourceid = sres.id
+         AND team.prprojectid IN (
+             select id
+             from   inv_investments
+             where  id = @where:param:xml:integer:/data/id/@value@
+              union
+             select child_id
+               from inv_flat_hierarchies
+              where parent_id = @where:param:xml:integer:/data/id/@value@
+              )
+		@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@:BROWSE-ONLY@
+         ) q
+      WHERE 1=1 AND @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT @SELECT:q.prid:prid@,
+             @SELECT:q.first_name:first_name@,
+             @SELECT:q.last_name:last_name@,
+             @SELECT:q.full_name:full_name@,
+             @SELECT:q.unique_name:unique_name@,
+             @SELECT:q.unique_name:UNIQUE_CODE@,
+             @SELECT:q.investment_name:investment_name@,
+             @SELECT:q.last_updated_date:last_updated_date@,
+             @SELECT:q.subproject:subproject@
+      FROM   (
+      select team.prid
+             , COALESCE( team.requirement_name, sres.last_name) last_name        , sres.first_name
+             , COALESCE( team.requirement_name, sres.full_name) full_name
+             , inv.name investment_name
+             , sres.unique_name
+			 , team.last_updated_date
+             , ( CASE WHEN team.prprojectid = @where:param:xml:integer:/data/id/@value@ THEN 0 ELSE 1 END ) subproject
+
+        from prteam team, inv_investments inv, srm_resources sres
+       where team.prprojectid = inv.id
+         and team.prresourceid = sres.id
+         AND team.prprojectid IN (
+             select id
+             from   inv_investments
+             where  id = @where:param:xml:integer:/data/id/@value@
+              union
+             select child_id
+               from inv_flat_hierarchies
+              where parent_id = @where:param:xml:integer:/data/id/@value@
+              )
+		@BROWSE-ONLY: AND @WHERE:SECURITY:INV:INV.ID@:BROWSE-ONLY@
+         ) q
+      WHERE 1=1 AND @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="last_name"/>
+              <displayedSuggestionAttribute value="first_name"/>
+              <displayedSuggestionAttribute value="unique_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="last_name"/>
+              <searchedSuggestionAttribute value="first_name"/>
+              <searchedSuggestionAttribute value="unique_name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Team Member" languageCode="en" name="Select Team Member"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Team Members" languageCode="en" name="Select Team Members"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="first_name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="First Name" languageCode="en" name="First Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="last_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Last Name" languageCode="en" name="Last Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="unique_name" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Unique Name" languageCode="en" name="Unique Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="investment_name" defaultValue="" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment" languageCode="en" name="Investment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="subproject" defaultValue="" lookupCode="PSP_YESNO" order="4" widgetType="select">
+                
+                
+                
+                
+                <nls description="Include Subprojects" languageCode="en" name="Include Subprojects"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="4" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="prid" languageCode="en" name="prid"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="first_name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="First Name" languageCode="en" name="First Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="last_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Last Name" languageCode="en" name="Last Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="full_name" order="5" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="full_name" languageCode="en" name="full_name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="unique_name" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Unique Name" languageCode="en" name="Unique Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="investment_name" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment" languageCode="en" name="Investment"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

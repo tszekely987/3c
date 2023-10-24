@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_UPDATE_TIME_FACTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_UPDATE_TIME_FACTS_SP" (
+   P_PROJECT_ID NUMBER,
+   T_WEEK_TAB NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE,
+   T_MONTH_TAB NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE,
+   T_PERIOD_TAB NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE,
+   P_CURRENCY_CODE VARCHAR2
+)
+AS
+   V_PROJECT_ID                  NUMBER := NULL;
+   V_ACTUAL_HOURS                NUMBER := NULL;
+   V_IDX                         INTEGER := NULL;
+   V_CURRENT_PERIOD              VARCHAR2 (100) := NULL;
+   V_PRIOR_PERIOD                VARCHAR2 (100) := NULL;
+   V_CURRENT_PERIOD_END_DATE     DATE := NULL;
+   V_PRIOR_PERIOD_END_DATE       DATE := NULL;
+   V_PRIOR_ACTUAL_HOURS          NUMBER := NULL;
+   V_CURRENT_ACTUAL_HOURS        NUMBER := NULL;
+   V_REV_ACT_LABOR               NUMBER := NULL;
+   V_REV_ACT_EQUIP               NUMBER := NULL;
+   V_REV_ACT_EXPENSE             NUMBER := NULL;
+   V_REV_ACT_MATL                NUMBER := NULL;
+   V_REV_ACT_TOTAL               NUMBER := NULL;
+   V_COST_ACT_LABOR              NUMBER := NULL;
+   V_COST_ACT_EQUIP              NUMBER := NULL;
+   V_COST_ACT_EXPENSE            NUMBER := NULL;
+   V_COST_ACT_MATL               NUMBER := NULL;
+   V_COST_ACT_TOTAL              NUMBER := NULL;
+   V_STMT                        VARCHAR2 (200) := NULL;
+   V_BILLING_CURRENCY_CODE       PAC_MNT_PROJECTS.BILLING_CURRENCY_CODE%TYPE := P_CURRENCY_CODE;
+   V_LABOR_EXCHANGE_RATE_TYPE    PAC_MNT_PROJECTS.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+   V_EQUIPMENT_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.EQUIPMENT_EXCHANGE_RATE_TYPE%TYPE;
+   V_MATERIAL_EXCHANGE_RATE_TYPE PAC_MNT_PROJECTS.MATERIALS_EXCHANGE_RATE_TYPE%TYPE;
+   V_EXPENSE_EXCHANGE_RATE_TYPE  PAC_MNT_PROJECTS.EXPENSE_EXCHANGE_RATE_TYPE%TYPE;
+   V_IS_FM_ENABLED               NUMBER := 0;
+   V_COUNT                       NUMBER := 0;
+BEGIN
+   SELECT   COUNT (*)
+   INTO     V_COUNT
+   FROM     PAC_MNT_PROJECTS
+   WHERE    ID = P_PROJECT_ID;
+
+   IF V_COUNT &gt; 0
+   THEN
+      V_IS_FM_ENABLED := 1;
+   END IF;
+
+------------------------------------------------------
+-- Update weekly records in  NBI_PM_PROJECT_TIME_FACTS
+------------------------------------------------------
+
+   V_PRIOR_PERIOD := T_WEEK_TAB (0);
+   V_STMT := 'Get current period end date';
+   SELECT   MAX (DAY)
+   INTO     V_PRIOR_PERIOD_END_DATE
+   FROM     NBI_DIM_CALENDAR_TIME
+   WHERE    HIERARCHY_LEVEL = 'DAY'
+   AND      WEEK_KEY = V_PRIOR_PERIOD;
+   V_STMT := 'Get prior period actual hours';
+   SELECT   NVL (SUM (A.ACTUAL_QTY), 0)
+   INTO     V_PRIOR_ACTUAL_HOURS
+   FROM     NBI_PROJECT_RES_TASK_FACTS A,
+            SRM_RESOURCES B
+   WHERE    B.ID = A.RESOURCE_ID
+   AND      A.PROJECT_ID = P_PROJECT_ID
+   AND      B.RESOURCE_TYPE = 0
+   AND      A.FACT_DATE &lt;= V_PRIOR_PERIOD_END_DATE;
+
+   FOR V_IDX IN 1 .. T_WEEK_TAB.LAST
+   LOOP
+      V_CURRENT_PERIOD := T_WEEK_TAB (V_IDX);
+      V_STMT := 'WEEK: Get last day of current period';
+      SELECT   MAX (DAY)
+      INTO     V_CURRENT_PERIOD_END_DATE
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'DAY'
+      AND      WEEK_KEY = V_CURRENT_PERIOD;
+      SELECT   NVL (SUM (A.ACTUAL_QTY), 0)
+      INTO     V_CURRENT_ACTUAL_HOURS
+      FROM     NBI_PROJECT_RES_TASK_FACTS A,
+               SRM_RESOURCES B
+      WHERE    B.ID = A.RESOURCE_ID
+      AND      A.PROJECT_ID = P_PROJECT_ID
+      AND      B.RESOURCE_TYPE = 0
+      AND      A.FACT_DATE &lt;= V_CURRENT_PERIOD_END_DATE;
+
+      BEGIN
+         V_STMT := 'Update current week';
+
+         UPDATE NBI_PM_PT_FACTS
+            SET ACTUAL_HOURS = V_CURRENT_ACTUAL_HOURS,
+                ACTUAL_HOURS_THIS_PERIOD = V_CURRENT_ACTUAL_HOURS - V_PRIOR_ACTUAL_HOURS
+          WHERE PROJECT_ID = P_PROJECT_ID
+       AND      CALENDAR_TIME_KEY = V_CURRENT_PERIOD;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            NULL;
+      END;
+
+      V_PRIOR_ACTUAL_HOURS := V_CURRENT_ACTUAL_HOURS;
+   END LOOP;
+
+------------------------------------------------------
+-- Update monthly records in  NBI_PM_PROJECT_TIME_FACTS
+------------------------------------------------------
+
+   V_PRIOR_PERIOD := T_MONTH_TAB (0);
+   V_STMT := 'Get current periods end date';
+   SELECT   MAX (DAY)
+   INTO     V_PRIOR_PERIOD_END_DATE
+   FROM     NBI_DIM_CALENDAR_TIME
+   WHERE    HIERARCHY_LEVEL = 'DAY'
+   AND      MONTH_KEY = V_PRIOR_PERIOD;
+   V_STMT := 'Get prior period actual hours';
+   SELECT   NVL (SUM (A.ACTUAL_QTY), 0)
+   INTO     V_PRIOR_ACTUAL_HOURS
+   FROM     NBI_PROJECT_RES_TASK_FACTS A,
+            SRM_RESOURCES B
+   WHERE    B.ID = A.RESOURCE_ID
+   AND      A.PROJECT_ID = P_PROJECT_ID
+   AND      B.RESOURCE_TYPE = 0
+   AND      A.FACT_DATE &lt;= V_PRIOR_PERIOD_END_DATE;
+
+   FOR V_IDX IN 1 .. T_MONTH_TAB.LAST
+   LOOP
+      V_CURRENT_PERIOD := T_MONTH_TAB (V_IDX);
+      V_STMT := 'MONTH: Get last day of current period';
+      SELECT   MAX (DAY)
+      INTO     V_CURRENT_PERIOD_END_DATE
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'DAY'
+      AND      MONTH_KEY = V_CURRENT_PERIOD;
+      SELECT   NVL (SUM (A.ACTUAL_QTY), 0)
+      INTO     V_CURRENT_ACTUAL_HOURS
+      FROM     NBI_PROJECT_RES_TASK_FACTS A,
+               SRM_RESOURCES B
+      WHERE    B.ID = A.RESOURCE_ID
+      AND      A.PROJECT_ID = P_PROJECT_ID
+      AND      B.RESOURCE_TYPE = 0
+      AND      A.FACT_DATE &lt;= V_CURRENT_PERIOD_END_DATE;
+
+      BEGIN
+         V_STMT := 'Update current month';
+
+         UPDATE NBI_PM_PT_FACTS
+            SET ACTUAL_HOURS = V_CURRENT_ACTUAL_HOURS,
+                ACTUAL_HOURS_THIS_PERIOD = V_CURRENT_ACTUAL_HOURS - V_PRIOR_ACTUAL_HOURS
+          WHERE PROJECT_ID = P_PROJECT_ID
+       AND      CALENDAR_TIME_KEY = V_CURRENT_PERIOD;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            NULL;
+      END;
+
+      V_PRIOR_ACTUAL_HOURS := V_CURRENT_ACTUAL_HOURS;
+   END LOOP;
+
+------------------------------------------------------
+-- Update records in  NBI_FM_PT_FACTS
+------------------------------------------------------
+
+   IF V_IS_FM_ENABLED = 1
+   THEN
+      V_STMT := 'Getting exchange rate types for the project';
+      SELECT   BILLING_CURRENCY_CODE,
+               LABOR_EXCHANGE_RATE_TYPE,
+               EQUIPMENT_EXCHANGE_RATE_TYPE,
+               EXPENSE_EXCHANGE_RATE_TYPE,
+               MATERIALS_EXCHANGE_RATE_TYPE
+      INTO     V_BILLING_CURRENCY_CODE,
+               V_LABOR_EXCHANGE_RATE_TYPE,
+               V_EQUIPMENT_EXCHANGE_RATE_TYPE,
+               V_EXPENSE_EXCHANGE_RATE_TYPE,
+               V_MATERIAL_EXCHANGE_RATE_TYPE
+      FROM     PAC_MNT_PROJECTS PMP
+      WHERE    PMP.ID = P_PROJECT_ID;
+   END IF;
+
+   FOR V_IDX IN 0 .. T_PERIOD_TAB.LAST
+   LOOP
+      V_CURRENT_PERIOD := T_PERIOD_TAB (V_IDX);
+      V_STMT := 'PERIOD: Get last day of current period';
+      SELECT   PERIOD_END_DATE
+      INTO     V_CURRENT_PERIOD_END_DATE
+      FROM     NBI_DIM_FISCAL_TIME
+      WHERE    HIERARCHY_LEVEL = 'PERIOD'
+      AND      PERIOD_KEY = V_CURRENT_PERIOD;
+
+      SELECT   NVL (SUM (A.ACTUAL_QTY), 0)
+      INTO     V_CURRENT_ACTUAL_HOURS
+      FROM     NBI_PROJECT_RES_TASK_FACTS A,
+               SRM_RESOURCES B
+      WHERE    B.ID = A.RESOURCE_ID
+      AND      A.PROJECT_ID = P_PROJECT_ID
+      AND      B.RESOURCE_TYPE = 0
+      AND      A.FACT_DATE &lt;= V_CURRENT_PERIOD_END_DATE;
+
+      IF V_IS_FM_ENABLED = 1
+      THEN
+         V_STMT := 'Getting labor/equip/matl/expense cost/rev';
+         SELECT              NVL (SUM (DECODE (A.TRANSTYPE, 'L', SUM (NVL (V.AMOUNT, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'Q', SUM (NVL (V.AMOUNT, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'X', SUM (NVL (V.AMOUNT, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'M', SUM (NVL (V.AMOUNT, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'L', SUM (NVL (V.TOTALCOST, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'Q', SUM (NVL (V.TOTALCOST, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'X', SUM (NVL (V.TOTALCOST, 0)), 0)), 0),
+                             NVL (SUM (DECODE (A.TRANSTYPE, 'M', SUM (NVL (V.TOTALCOST, 0)), 0)), 0)
+         INTO     V_REV_ACT_LABOR,
+                  V_REV_ACT_EQUIP,
+                  V_REV_ACT_EXPENSE,
+                  V_REV_ACT_MATL,
+                  V_COST_ACT_LABOR,
+                  V_COST_ACT_EQUIP,
+                  V_COST_ACT_EXPENSE,
+                  V_COST_ACT_MATL
+         FROM     PPA_WIP_VALUES V,
+                  PPA_WIP A,
+                  PAC_MNT_PROJECTS P
+         WHERE    P.ID = P_PROJECT_ID
+         AND      P.PROJECT_CODE = A.PROJECT_CODE
+         AND      A.TRANSTYPE || '' IN ('L', 'Q', 'X', 'M')
+         AND      A.STATUS &lt;&gt; 2
+         AND      A.TRANSNO = V.TRANSNO
+         AND      V.CURRENCY_TYPE = 'BILLING'
+         AND      A.TRANSDATE &lt;= V_CURRENT_PERIOD_END_DATE
+         GROUP BY A.TRANSTYPE,
+                  A.QUANTITY,
+                  P.BILLING_CURRENCY_CODE,
+                  P.LABOR_EXCHANGE_RATE_TYPE,
+                  P.EQUIPMENT_EXCHANGE_RATE_TYPE,
+                  P.EXPENSE_EXCHANGE_RATE_TYPE,
+                  P.MATERIALS_EXCHANGE_RATE_TYPE;
+
+         IF V_BILLING_CURRENCY_CODE &lt;&gt; P_CURRENCY_CODE
+         THEN
+            V_STMT := 'Applying the exchange rate on totalamount/cost/amountremaining';
+            V_REV_ACT_LABOR :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_REV_ACT_LABOR, 0),
+                 V_LABOR_EXCHANGE_RATE_TYPE
+              );
+            V_REV_ACT_EQUIP :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_REV_ACT_EQUIP, 0),
+                 V_EQUIPMENT_EXCHANGE_RATE_TYPE
+              );
+            V_REV_ACT_EXPENSE :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_REV_ACT_EXPENSE, 0),
+                 V_EXPENSE_EXCHANGE_RATE_TYPE
+              );
+            V_REV_ACT_MATL :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_REV_ACT_MATL, 0),
+                 V_MATERIAL_EXCHANGE_RATE_TYPE
+              );
+            V_COST_ACT_LABOR :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_COST_ACT_LABOR, 0),
+                 V_LABOR_EXCHANGE_RATE_TYPE
+              );
+            V_COST_ACT_EQUIP :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_COST_ACT_EQUIP, 0),
+                 V_EQUIPMENT_EXCHANGE_RATE_TYPE
+              );
+            V_COST_ACT_EXPENSE :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_COST_ACT_EXPENSE, 0),
+                 V_EXPENSE_EXCHANGE_RATE_TYPE
+              );
+            V_COST_ACT_MATL :=
+              CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                 SYSDATE,
+                 V_BILLING_CURRENCY_CODE,
+                 P_CURRENCY_CODE,
+                 NVL (V_COST_ACT_MATL, 0),
+                 V_MATERIAL_EXCHANGE_RATE_TYPE
+              );
+         END IF;
+
+         V_REV_ACT_TOTAL := V_REV_ACT_LABOR + V_REV_ACT_EQUIP + V_REV_ACT_EXPENSE + V_REV_ACT_MATL;
+         V_COST_ACT_TOTAL := V_COST_ACT_LABOR + V_COST_ACT_EQUIP + V_COST_ACT_EXPENSE + V_COST_ACT_MATL;
+      ELSE
+         V_REV_ACT_LABOR := 0;
+         V_REV_ACT_EQUIP := 0;
+         V_REV_ACT_EXPENSE := 0;
+         V_REV_ACT_MATL := 0;
+         V_COST_ACT_LABOR := 0;
+         V_COST_ACT_EQUIP := 0;
+         V_COST_ACT_EXPENSE := 0;
+         V_COST_ACT_MATL := 0;
+      END IF;
+
+      BEGIN
+         V_STMT := 'Update current PERIOD';
+
+         UPDATE NBI_FM_PT_FACTS
+            SET ACTUAL_HOURS = V_CURRENT_ACTUAL_HOURS,
+                REV_ACT_LABOR = V_REV_ACT_LABOR,
+                REV_ACT_EQUIP = V_REV_ACT_EQUIP,
+                REV_ACT_EXPENSE = V_REV_ACT_EXPENSE,
+                REV_ACT_MATL = V_REV_ACT_MATL,
+                COST_ACT_LABOR = V_COST_ACT_LABOR,
+                COST_ACT_EQUIP = V_COST_ACT_EQUIP,
+                COST_ACT_EXPENSE = V_COST_ACT_EXPENSE,
+                COST_ACT_MATL = V_COST_ACT_MATL
+          WHERE PROJECT_ID = P_PROJECT_ID
+       AND      FISCAL_TIME_KEY = V_CURRENT_PERIOD;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            NULL;
+      END;
+   END LOOP;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_UPDATE_TIME_FACTS_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

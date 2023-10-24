@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>PRTASK_UPD_TRG1</code>
+          <table_name>PRTASK</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."PRTASK_UPD_TRG1" 
+AFTER INSERT OR UPDATE OF PRPCTCOMPLETE ON PRTASK
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+  </description>
+          <trigger_body>DECLARE v_exist number := 0;
+BEGIN
+  SELECT count(*) INTO v_exist
+  FROM EVM_TASK_COMPLETION
+  WHERE :new.PRID = EVM_TASK_COMPLETION.TASK_ID
+  AND trunc(SYSDATE) - trunc(EVM_TASK_COMPLETION.EFFECTIVE_DATE) &lt; 1;
+
+  IF INSERTING OR v_exist = 0 THEN
+   INSERT INTO EVM_TASK_COMPLETION
+        (
+        PROJECT_ID
+        ,TASK_ID
+        ,EFFECTIVE_DATE
+        ,PRPCTCOMPLETE
+        )
+        VALUES
+        (
+        :new.PRPROJECTID
+        ,:new.PRID
+        ,trunc(SYSDATE)
+        ,:new.PRPCTCOMPLETE
+        );
+    ELSE
+      UPDATE EVM_TASK_COMPLETION
+      SET EVM_TASK_COMPLETION.PRPCTCOMPLETE = :new.PRPCTCOMPLETE
+      WHERE TASK_ID = :new.PRID
+      AND trunc(SYSDATE) - trunc(EVM_TASK_COMPLETION.EFFECTIVE_DATE) &lt; 1;
+    END IF;
+END;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_BATCHBILLTRANS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_BATCHBILLTRANS" (
+  cClient   VARCHAR2 ,
+  cProject  VARCHAR2 ,
+  cBillTo   VARCHAR2 ,
+  cInvNo  VARCHAR2 ,
+  bAutoPost   NUMBER ,
+  cUserID   VARCHAR2 ,
+  cActionID   VARCHAR2 ,
+  iBatchNo  NUMBER ,
+  cBillDate   VARCHAR2 ,
+  iCountBilled  IN OUT NUMBER,
+  nAmountBilled   IN OUT NUMBER,
+  generateNegativeInvoices NUMBER,
+  bConsolidateInvoices NUMBER,
+  bError  OUT NUMBER,
+  iRetainPrecision NUMBER DEFAULT 1 -- retain precision change
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iNextTransNo  NUMBER;
+  PPA_BILLINGS_TRANSNO NUMBER;
+  netInvoiceAmt NUMBER;
+  pType GLOBALPKG.STRING;
+  amountExceeded NUMBER(32,6);
+  enforceContractAmt NUMBER(1);
+
+  UF1_rowid   ROWID;
+  UF1_oval1   PPA_WIP.Status%TYPE;
+  UF1_oval2   PPA_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF1_oval3   PPA_WIP.LastUpdateDate%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT W.ROWID, Bitwise.op(Status,'or', 8), Bb_Batchbilltrans.cUserID, TRUNC(SYSDATE)
+    FROM TEMP_TEMPBB_BATCHBILLTRANS T, PPA_WIP W
+    WHERE W.TransNo = T.TransNo
+    FOR UPDATE OF W.Status, W.LASTUPDTDBY_RESOURCE_CODE, W.LastUpdateDate;
+BEGIN
+ /* Called From:
+     Procedure         :- BB_BATCHBILL
+     Trigger           :- None
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	Bb_Batchbilltrans.nAmountBilled :=  0;
+	Bb_Batchbilltrans.iCountBilled :=  0;
+	Bb_Batchbilltrans.bError :=  0;
+
+	DELETE FROM TEMP_TEMPBB_BATCHBILLTRANS;
+
+	BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		/*** CHANGED FOR MULTI CURRENCY --get Amountremaining from ppa_WIP_values --***/
+
+    INSERT INTO TEMP_TEMPBB_BATCHBILLTRANS (SEQNO, TransNo, AmtRemain, QtyBilled)
+         SELECT temp_tempbb_BatchBillTrans_SEQ.nextval, W.TransNo, WV.AmountRemaining, 0
+			   FROM PPA_WIP W, PPA_WIP_VALUES WV, OLB_BILLINGCHECKOUT O
+			   WHERE W.TRANSNO = WV.TRANSNO
+			   AND WV.CURRENCY_TYPE = 'BILLING'
+			   AND W.COMPANY_CODE = Bb_Batchbilltrans.cClient
+			   AND W.COMPANY_CODE = O.COMPANY_CODE
+			   AND WV.AmountRemaining != 0
+			   AND W.PROJECT_CODE = O.PROJECT_CODE
+			   AND O.BILLING_PROJECT_CODE = Bb_Batchbilltrans.cProject
+			    -- Fix for Bug#45959 (date comparison should NOT be done after converting into stirngs )
+			   AND W.TransDate &lt;= TRUNC(TO_DATE(Bb_Batchbilltrans.cBillDate, 'mm/dd/yyyy'))
+			   AND W.Status = 0;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	--END IF;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    UPDATE TEMP_TEMPBB_BATCHBILLTRANS
+       SET QtyBilled = (SELECT NVL(SUM(B.QUANTITY), 0)
+                          FROM PPA_BILLINGS B
+                         WHERE TEMP_TEMPBB_BATCHBILLTRANS.TRANSNO  = B.APPLYTO
+                           AND B.TRANSTYPE = 'B'
+                           AND B.STATUS = 0);
+
+    EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(*)
+		INTO Bb_Batchbilltrans.iCountBilled FROM TEMP_TEMPBB_BATCHBILLTRANS;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	Bb_Batchbilltrans.iCountBilled :=  NVL(Bb_Batchbilltrans.iCountBilled, 0);
+	IF  Bb_Batchbilltrans.iCountBilled &gt; 0 THEN
+	BEGIN
+		SAVEPOINT BillTrans;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		-- Here we get the sum total of all the transactions for the given project only if it is a stand-alond project
+		-- or get all the transactions for all the projects that belong in this project's billing hierarchy.
+		SELECT SUM(AmtRemain) INTO Bb_Batchbilltrans.netInvoiceAmt FROM TEMP_TEMPBB_BATCHBILLTRANS;
+
+    SELECT TYPE_, ENFORCE_CONTRACT_AMOUNT INTO Bb_Batchbilltrans.pType, Bb_Batchbilltrans.enforceContractAmt  FROM PAC_MNT_PROJECTS P, PROJCNTRTS CNTRTS
+		WHERE P.PROJECT_CODE = Bb_Batchbilltrans.cProject
+		AND P.PROJECT_CODE = CNTRTS.PROJECT_CODE(+);
+
+		IF ( Bb_Batchbilltrans.pType = 'S' AND Bb_Batchbilltrans.enforceContractAmt = 1 ) OR ( Bb_Batchbilltrans.pType = 'P' ) THEN
+		BEGIN
+			 SP_CHECKCONTRACTAMOUNT( Bb_Batchbilltrans.cClient, Bb_Batchbilltrans.cProject, Bb_Batchbilltrans.netInvoiceAmt, Bb_Batchbilltrans.amountExceeded );
+			 IF Bb_Batchbilltrans.amountExceeded &lt; 0 THEN
+				bb_batchbilltrans.bError := 2;
+			 END IF;
+		END;
+		END IF;
+
+		IF ( bb_batchbilltrans.bError = 0 ) THEN
+		BEGIN
+		IF  Bb_Batchbilltrans.generateNegativeInvoices = 1 OR NVL(Bb_Batchbilltrans.netInvoiceAmt,0) &gt;= 0 THEN
+		BEGIN
+			 BEGIN
+				 /*** CHANGED FOR MULTI CURRENCY --get Amountremaining /TotalAmount from ppa_WIP_values --***/
+				 INSERT INTO PPA_TRANSBILL (TRANSNO, ApplyTo, SOURCEMODULE, TRANSTYPE, ApplyToTransType, InvoiceNo, BatchNo, ENTRY_RESOURCE_CODE,
+               EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, BillingDate, COMPANY_CODE, PROJECT_CODE, CHARGE_CODE, INPUT_TYPE,
+						 RESOURCE_CODE, Quantity, Notes, WorkInt, WorkBuf,external_id)
+           SELECT  S_395_1_PPA_TRANSBILL.nextval, T.TransNo, 12, 'B', W.TRANSTYPE, Bb_Batchbilltrans.cInvNo, Bb_Batchbilltrans.iBatchNo,
+                 Bb_Batchbilltrans.cUserID, TRUNC(SYSDATE), Bb_Batchbilltrans.cUserID, TRUNC(SYSDATE),
+               TRUNC(SYSDATE), /*TO_DATE(Bb_Batchbilltrans.cBillDate, 'mm/dd/yyyy'),*/ W.COMPANY_CODE, W.PROJECT_CODE, W.CHARGE_CODE, W.INPUT_TYPE,
+						   W.RESOURCE_CODE,
+--               ROUND(WV.AmountRemaining / WV.TotalAmount * W.Quantity, C.Currency_Precision) + 1 - SIGN(ROUND(WV.AmountRemaining / WV.TotalAmount * W.Quantity, C.Currency_Precision)),
+               W.QUANTITY - T.QTYBILLED,
+               W.Notes, 0, NULL,W.external_id
+	    		   FROM TEMP_TEMPBB_BATCHBILLTRANS T, PPA_WIP W , PPA_WIP_VALUES WV, CMN_CURRENCIES C
+				   WHERE W.TransNo = T.TransNo
+				   AND WV.TRANSNO = W.TRANSNO
+				   AND WV.CURRENCY_CODE = C.CURRENCY_CODE
+				   AND WV.CURRENCY_TYPE = 'BILLING'
+				   AND W.STATUS = 0;
+	 			   StoO_rowcnt := SQL%ROWCOUNT;
+				   EXCEPTION
+				   		WHEN NO_DATA_FOUND THEN
+							 NULL;
+						WHEN OTHERS THEN
+							 StoO_error := SQLCODE;
+							 StoO_errmsg := SQLERRM;
+			 END;
+
+			 IF StoO_error != 0 THEN
+			 BEGIN
+
+			 	  ROLLBACK TO SAVEPOINT BillTrans;
+			 	  Bb_Batchbilltrans.bError :=  1;
+			 END;
+			 ELSE
+	   		 BEGIN
+				-- get the ppa_transbill entries transaction number
+				--select S_395_1_PPA_TRANSBILL.currval into BB_BATCHBILLTRANS.PPA_BILLINGS_TRANSNO from dual;
+				StoO_rowcnt := 0;
+				INSERT INTO PPA_TRANSBILL_VALUES( ID,
+													 TRANSNO ,
+													 EXCHANGE_ID ,
+													 BILLRATE,
+													 AMOUNT ,
+													 CURRENCY_TYPE,
+													 CURRENCY_CODE,
+													 EXCHANGE_RATE
+													)
+            SELECT  PPA_TRANSBILL_VALUES_S1.nextval,
+							   TB.TRANSNO,
+							   WV.RATE_EXCHANGE_ID,
+--                 ROUND( WV.TotalAmount /  W.Quantity, C.Currency_Precision),
+-- retain precision change				   		  
+                 DECODE( iRetainPrecision, 1, ROUND( WV.AmountRemaining / (TB.QUANTITY + (1 - ABS(1 * SIGN(TB.QUANTITY)))), C.Currency_Precision),
+				 		 				  	 WV.AmountRemaining / (TB.QUANTITY + (1 - ABS(1 * SIGN(TB.QUANTITY))))
+					   ), 						 
+                 WV.AmountRemaining,
+							   WV.CURRENCY_TYPE,
+							   WV.CURRENCY_CODE,
+							   WV.RATE_EXCHANGE_RATE
+						FROM PPA_WIP_VALUES WV, PPA_WIP W, TEMP_TEMPBB_BATCHBILLTRANS T, PPA_TRANSBILL TB, CMN_CURRENCIES C
+						WHERE W.TRANSNO = T.TRANSNO AND
+							  WV.TRANSNO = W.TRANSNO AND
+							  WV.CURRENCY_CODE = C.CURRENCY_CODE AND
+							  W.STATUS = 0 AND
+							  TB.APPLYTO = T.TRANSNO;/** to get the ppa_transbill.transno **/
+							  StoO_rowcnt := SQL%ROWCOUNT;
+	 					EXCEPTION
+					   		WHEN NO_DATA_FOUND THEN
+								 NULL;
+							WHEN OTHERS THEN
+								 StoO_error := SQLCODE;
+								 StoO_errmsg := SQLERRM;
+
+			 END;
+
+    		 IF  StoO_error != 0 THEN
+			 BEGIN
+					ROLLBACK TO SAVEPOINT BillTrans;
+					Bb_Batchbilltrans.bError :=  1;
+			 END;
+			 ELSE
+			   BEGIN
+			  	   OPEN UF1_cursor;
+				   LOOP
+				   	   FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2, UF1_oval3;
+					   EXIT WHEN UF1_cursor%NOTFOUND;
+					   BEGIN
+							StoO_error   := 0;
+							StoO_rowcnt  := 0;
+							UPDATE PPA_WIP W
+							SET
+							Status = UF1_oval1,
+							LASTUPDTDBY_RESOURCE_CODE = UF1_oval2,
+							LastUpdateDate = UF1_oval3
+							WHERE ROWID = UF1_rowid;
+							StoO_rowcnt := SQL%ROWCOUNT;
+							EXCEPTION
+								WHEN NO_DATA_FOUND THEN
+									NULL;
+								WHEN OTHERS THEN
+									StoO_error := SQLCODE;
+									StoO_errmsg := SQLERRM;
+						END;
+					END LOOP;
+					CLOSE UF1_cursor;
+					IF  StoO_error != 0 THEN
+					BEGIN
+						ROLLBACK TO SAVEPOINT BillTrans;
+						Bb_Batchbilltrans.bError :=  1;
+					END;
+					ELSE
+						COMMIT WORK;
+					END IF;
+			  END;
+			  END IF;
+		END IF;
+		END;
+		END IF;
+
+
+
+		END;
+		END IF;
+	END;
+
+		IF  Bb_Batchbilltrans.bAutoPost != 0
+    AND Bb_Batchbilltrans.bError = 0
+		AND Bb_Batchbilltrans.bConsolidateInvoices != 1 THEN
+		BEGIN
+		  IF  Bb_Batchbilltrans.generateNegativeInvoices = 1 OR NVL(Bb_Batchbilltrans.netInvoiceAmt,0) &gt;= 0 THEN
+			BEGIN
+			REV_BILL_FINALAPP_POSTTOWIP(Bb_Batchbilltrans.cInvNo,
+									   Bb_Batchbilltrans.cUserID);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END IF;
+		END;
+		END IF;
+	END;
+	END IF;
+	IF  Bb_Batchbilltrans.iCountBilled &gt; 0
+	AND Bb_Batchbilltrans.bError = 0 THEN
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT SUM(AmtRemain)
+			INTO Bb_Batchbilltrans.nAmountBilled FROM TEMP_TEMPBB_BATCHBILLTRANS;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+
+			--We want to delete all records from the temp table TEMP_TEMPBB_BATCHBILLTRANS as it stores
+			--the transactions for the specific company/project.  If we don't want to handle negative
+			--invoices then we don't want any entries in the temp table if the net invoice amount(nAmountBilled)
+			--is less than zero.  Also, since nAmountBilled is returned to the calling procedure, we want to make
+			--sure we set its value to zero if this is the case.
+			--We also need set the value of iCountBilled to zero as it should look like we never processed this
+			--project as the net invoice amount on this was negative.
+			IF Bb_Batchbilltrans.generateNegativeInvoices = 0 AND Bb_Batchbilltrans.nAmountBilled &lt; 0 THEN
+			BEGIN
+				 DELETE FROM TEMP_TEMPBB_BATCHBILLTRANS;
+				 Bb_Batchbilltrans.nAmountBilled := 0;
+		 		 Bb_Batchbilltrans.iCountBilled := 0;
+			END;
+			END IF;
+		END;
+		Bb_Batchbilltrans.nAmountBilled :=  NVL(Bb_Batchbilltrans.nAmountBilled, 0);
+	END;
+	END IF;
+	IF ( Bb_Batchbilltrans.bError != 2 ) THEN
+	   Bb_Batchbilltrans.bError :=  StoO_error;
+	END IF;
+	RETURN ;
+/*
+  Modified By: Deva
+  Changes 	: Date changes done
+*/
+END Bb_Batchbilltrans;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

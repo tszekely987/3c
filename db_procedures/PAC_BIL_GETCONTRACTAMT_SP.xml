@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GETCONTRACTAMT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GETCONTRACTAMT_SP" (
+COMPANY_CODE 	VARCHAR2 ,
+PROJECT_CODE 	VARCHAR2 ,
+contractamount 	IN OUT NUMBER,
+type_ 	IN OUT VARCHAR2)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   C.contractamount,  P.type_
+    INTO PAC_BIL_GETCONTRACTAMT_SP.contractamount, PAC_BIL_GETCONTRACTAMT_SP.type_ FROM PAC_MNT_PROJECTS P, PROJCNTRTS C
+		WHERE P.COMPANY_CODE = PAC_BIL_GETCONTRACTAMT_SP.COMPANY_CODE
+		 and P.PROJECT_CODE = PAC_BIL_GETCONTRACTAMT_SP.PROJECT_CODE
+		 and C.COMPANY_CODE (+) = P.COMPANY_CODE
+		 and C.PROJECT_CODE (+) = P.PROJECT_CODE ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+END PAC_BIL_GETCONTRACTAMT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>ESC_ESCALATION_RULE_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."ESC_ESCALATION_RULE_INS_SP" (
+   P_OBJECT_TYPE_CODE            IN   VARCHAR2,
+   P_OBJECT_NAME              	 IN   VARCHAR2,
+   P_OBJECT_DESCRIPTION       	 IN   VARCHAR2,
+   P_INITIAL_PERIOD_INTERVAL     IN   NUMBER,
+   P_INITIAL_PERIOD_TYPE_CODE    IN   VARCHAR2,
+   P_SUBSEQUENT_PERIOD_INTERVAL  IN   NUMBER,
+   P_SUBSEQUENT_PERIOD_TYPE_CODE IN   VARCHAR2,
+   P_AI_W_DUE_DATE_ACTION_CODE 	 IN   VARCHAR2 DEFAULT 'ESC_ACTION_DUE_DATE',
+   P_AI_WO_DUE_DATE_ACTION_CODE  IN   VARCHAR2 DEFAULT 'ESC_ACTION_CRE_DATE_PLUS_IWP',
+   P_MAX_NO_OF_LEVELS         	 IN   NUMBER DEFAULT 0,
+   P_PATH_TYPE_CODE           	 IN   VARCHAR2 DEFAULT 'ESC_PATH_RESOURCE_HIERARCHY',
+   P_PATH_ID				     IN   NUMBER DEFAULT NULL,
+   P_PARENT_OBJECT_TYPE_CODE  	 IN   VARCHAR2 DEFAULT NULL,
+   P_PARENT_OBJECT_ID		     IN   NUMBER DEFAULT NULL,
+   P_IS_ACTIVE                	 IN   NUMBER DEFAULT 1,
+   P_CREATED_BY               	 IN   NUMBER DEFAULT 1   
+)
+IS
+   V_ID                       NUMBER;
+BEGIN
+   SELECT   ESC_DEF_RULES_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   
+   INSERT INTO ESC_DEF_RULES (
+			     ID,
+				 OBJECT_TYPE_CODE, 
+				 PARENT_OBJECT_TYPE_CODE, 
+   				 PARENT_OBJECT_ID, 
+				 PATH_TYPE_CODE, 
+				 PATH_ID, 
+   				 INITIAL_PERIOD_INTERVAL, 
+				 INITIAL_PERIOD_TYPE_CODE, 
+   				 SUBSEQUENT_PERIOD_INTERVAL, 
+				 SUBSEQUENT_PERIOD_TYPE_CODE, 
+   				 AI_W_DUE_DATE_ACTION_CODE, 
+				 AI_WO_DUE_DATE_ACTION_CODE, 
+				 MAX_NO_OF_LEVELS, 
+   				 IS_ACTIVE, 
+				 CREATED_DATE, 
+				 CREATED_BY, 
+   				 LAST_UPDATED_DATE, 
+				 LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               P_OBJECT_TYPE_CODE,
+               P_PARENT_OBJECT_TYPE_CODE,
+               P_PARENT_OBJECT_ID,			   
+               P_PATH_TYPE_CODE,
+               P_PATH_ID,
+               P_INITIAL_PERIOD_INTERVAL,
+               P_INITIAL_PERIOD_TYPE_CODE,			   			   
+   			   P_SUBSEQUENT_PERIOD_INTERVAL, 
+			   P_SUBSEQUENT_PERIOD_TYPE_CODE, 
+   			   P_AI_W_DUE_DATE_ACTION_CODE, 
+			   P_AI_WO_DUE_DATE_ACTION_CODE, 
+               P_MAX_NO_OF_LEVELS,
+               P_IS_ACTIVE,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     DUAL
+      WHERE    NOT EXISTS (SELECT   'RULE ALREADY EXISTS'
+                           FROM     ESC_DEF_RULES
+                           WHERE    OBJECT_TYPE_CODE = P_OBJECT_TYPE_CODE
+                           AND      PARENT_OBJECT_TYPE_CODE IS NULL 
+						   AND      PARENT_OBJECT_ID IS NULL )
+      		   AND NOT EXISTS (SELECT   'RULE ALREADY EXISTS'
+                           FROM     ESC_DEF_RULES
+                           WHERE    OBJECT_TYPE_CODE = P_OBJECT_TYPE_CODE
+                           AND      PARENT_OBJECT_TYPE_CODE = P_PARENT_OBJECT_TYPE_CODE 
+						   AND      PARENT_OBJECT_ID = P_PARENT_OBJECT_ID );
+
+   CMN_CAPTIONS_NLS_INS_SP (
+      'ESC_DEF_RULES',
+      V_ID,
+      P_OBJECT_NAME,
+      P_OBJECT_DESCRIPTION,
+      P_CREATED_BY,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL
+   );
+   
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

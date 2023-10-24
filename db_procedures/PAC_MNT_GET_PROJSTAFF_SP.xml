@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_PROJSTAFF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_PROJSTAFF_SP" 
+(
+  in_id        IN VARCHAR2 ,
+  in_emplycode IN VARCHAR2 ,
+  RC1   IN OUT PAC_MNT_GET_PROJSTAFF_SPPkg.RCT1
+)
+AS
+  COMPANY_CODE     GLOBALPKG.STRING;
+  PROJECT_CODE     GLOBALPKG.STRING;
+  RESOURCE_CODE    GLOBALPKG.STRING;
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+  BEGIN
+    SELECT COMPANY_CODE,
+           PROJECT_CODE
+      INTO PAC_MNT_GET_PROJSTAFF_SP.COMPANY_CODE,
+           PAC_MNT_GET_PROJSTAFF_SP.PROJECT_CODE
+      FROM PAC_MNT_PROJECTS
+     WHERE ID = PAC_MNT_GET_PROJSTAFF_SP.IN_ID;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20177,'NO CLIENT/PROJECT FOUND');
+      WHEN TOO_MANY_ROWS THEN
+        RAISE_APPLICATION_ERROR(-20188,'MORE THAN ONE CLIENT/PROJECT FOUND');
+      WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20199,'ERROR IN GETTING CLIENT/PROJECT FOR GIVEN ID');
+   END;
+
+	PAC_MNT_GET_PROJSTAFF_SP.RESOURCE_CODE := PAC_MNT_GET_PROJSTAFF_SP.in_emplycode;
+  PAC_MNT_GET_PROJSTAFF_SP.RESOURCE_CODE := TRIM(NVL(TRIM(PAC_MNT_GET_PROJSTAFF_SP.RESOURCE_CODE), ' ') || '%');
+
+  OPEN RC1 FOR
+  SELECT COMPANY_CODE,
+         PROJECT_CODE,
+         RESOURCE_CODE,
+         projectaccess,
+         billingaccess,
+         forecastaccess,
+         individualtogo,
+         projectapproval,
+         billingapproval,
+         forecastapproval,
+         projecttogo
+    FROM projstaff
+   WHERE COMPANY_CODE = PAC_MNT_GET_PROJSTAFF_SP.COMPANY_CODE
+     AND PROJECT_CODE = PAC_MNT_GET_PROJSTAFF_SP.PROJECT_CODE
+     AND RESOURCE_CODE LIKE PAC_MNT_GET_PROJSTAFF_SP.RESOURCE_CODE;
+
+END PAC_MNT_GET_PROJSTAFF_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

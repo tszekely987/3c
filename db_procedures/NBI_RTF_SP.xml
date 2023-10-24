@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_RTF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_RTF_SP" (P_PERIODS_TO_ROLL_UP INTEGER, P_LAST_CURVE_DATE DATE)
+AS
+   -- Dimension Variables
+   V_TIME_TYPE_IDX               INTEGER;
+   V_TIME_TYPE                   VARCHAR2 (20);
+   V_ROLLUP_FROM_TIME_TYPE       VARCHAR2 (20);
+   V_SQL                         VARCHAR2 (32000);
+   V_IDX                         INTEGER;
+   V_NUM_RECORDS                 INTEGER;
+   V_TIME_SQL                    VARCHAR2 (32000);
+   V_START_TIME                  DATE;
+   V_END_TIME                    DATE;
+   V_ROWID                       VARCHAR2 (100);
+   V_COMMIT_CNT                  INTEGER := 1000;
+   V_STMT                        VARCHAR2 (200);
+   V_UPDATE_FROM_DATE            DATE;
+   V_CNT                         INTEGER;
+   V_FROM_DATE                   DATE := SYSDATE;
+   V_TO_DATE                     DATE := SYSDATE;
+   V_LAST_CURVE_DATE             DATE := SYSDATE;
+   T_TIME_TAB                    NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE;
+   V_CONTINUE_LOOP               BOOLEAN;
+   V_LOOP_RESOURCE_ID            INTEGER;
+   V_LOOP_RESOURCES_CNT          INTEGER := 50;
+
+   TYPE T_RESOURCE_TAB IS TABLE OF NBI_RESOURCE_FACTS%ROWTYPE
+      INDEX BY BINARY_INTEGER;
+
+   V_RESOURCE_TAB                T_RESOURCE_TAB;
+   V_IDX_MAX                     INTEGER;
+
+   TYPE T_ROLLUP_CURSOR IS REF CURSOR;-- define weak REF CURSOR type
+
+   TYPE T_DELETE_CURSOR IS REF CURSOR;-- define weak REF CURSOR type
+
+   C_ROLLUP_CURSOR               T_ROLLUP_CURSOR;-- declare cursor variable
+   C_DELETE_CURSOR               T_DELETE_CURSOR;-- declare cursor variable
+   C_ROLLUP_REC                  NBI_RT_FACTS%ROWTYPE;
+
+   CURSOR C_WEEKS
+   IS
+      SELECT   WEEK_KEY
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'WEEK'
+       ORDER BY YEAR DESC,
+                WEEK DESC;
+
+   CURSOR C_MONTHS
+   IS
+      SELECT   MONTH_KEY
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'MONTH'
+       ORDER BY YEAR DESC,
+                MONTH DESC;
+
+   CURSOR C_ROLLUP_SQL
+   IS
+      SELECT   SQL_STATEMENT
+      FROM     NBI_ROLLUP_SQL
+      WHERE    TABLE_NAME = 'NBI_RT_FACTS'
+       ORDER BY DECODE (TIME_TYPE, 'WEEK', 1, 'MONTH', 2, 3);
+
+   CURSOR C_RESOURCE_FACTS
+   IS
+      SELECT   F1.RESOURCE_ID,
+               F1.RESOURCE_CODE,
+               F1.LAST_NAME,
+               F1.FIRST_NAME,
+               F1.ROLE_ID,
+               F1.ROLE_NAME,
+               F1.RESOURCE_COMPANY_ID,
+               F1.RESOURCE_COMPANY,
+               F1.EXTERNAL_OR_INTERNAL,
+               F1.MANAGER_ID,
+               F1.MANAGER_LAST_NAME,
+               F1.MANAGER_FIRST_NAME,
+               F1.ENTITY,
+               F1.ENTITY_NAME,
+               F1.LOCATION,
+               F1.LOCATION_NAME,
+               F1.DEPARTMENT,
+               F1.DEPARTMENT_NAME,
+               F1.IS_ROLE
+      FROM     NBI_RESOURCE_FACTS F1
+      WHERE    F1.FACT_DATE = (SELECT   MAX (F2.FACT_DATE)
+                               FROM     NBI_RESOURCE_FACTS F2
+                               WHERE    F2.RESOURCE_ID = F1.RESOURCE_ID)
+      AND      EXISTS (SELECT   'at least one resource was updated'
+                       FROM     NBI_RESOURCE_FACTS F
+                       WHERE    F.RESOURCE_ID = F1.RESOURCE_ID
+                       AND      F.FACT_DATE &lt;&gt; F1.FACT_DATE
+                       AND      (
+                                   NVL (F1.RESOURCE_CODE, '@') &lt;&gt; NVL (F.RESOURCE_CODE, '@')
+                                   OR NVL (F1.LAST_NAME, '@') &lt;&gt; NVL (F.LAST_NAME, '@')
+                                   OR NVL (F1.FIRST_NAME, '@') &lt;&gt; NVL (F.FIRST_NAME, '@')
+                                   OR NVL (F1.ROLE_ID, -9) &lt;&gt; NVL (F.ROLE_ID, -9)
+                                   OR NVL (F1.ROLE_NAME, '@') &lt;&gt; NVL (F.ROLE_NAME, '@')
+                                   OR NVL (F1.RESOURCE_COMPANY_ID, '@') &lt;&gt; NVL (F.RESOURCE_COMPANY_ID, '@')
+                                   OR NVL (F1.RESOURCE_COMPANY, '@') &lt;&gt; NVL (F.RESOURCE_COMPANY, '@')
+                                   OR NVL (F1.EXTERNAL_OR_INTERNAL, -9) &lt;&gt; NVL (F.EXTERNAL_OR_INTERNAL, -9)
+                                   OR NVL (F1.MANAGER_ID, -9) &lt;&gt; NVL (F.MANAGER_ID, -9)
+                                   OR NVL (F1.MANAGER_LAST_NAME, '@') &lt;&gt; NVL (F.MANAGER_LAST_NAME, '@')
+                                   OR NVL (F1.MANAGER_FIRST_NAME, '@') &lt;&gt; NVL (F.MANAGER_FIRST_NAME, '@')
+                                   OR NVL (F1.ENTITY, '@') &lt;&gt; NVL (F.ENTITY, '@')
+                                   OR NVL (F1.ENTITY_NAME, '@') &lt;&gt; NVL (F.ENTITY_NAME, '@')
+                                   OR NVL (F1.LOCATION, '@') &lt;&gt; NVL (F.LOCATION, '@')
+                                   OR NVL (F1.LOCATION_NAME, '@') &lt;&gt; NVL (F.LOCATION_NAME, '@')
+                                   OR NVL (F1.DEPARTMENT, '@') &lt;&gt; NVL (F.DEPARTMENT, '@')
+                                   OR NVL (F1.DEPARTMENT_NAME, '@') &lt;&gt; NVL (F.DEPARTMENT_NAME, '@')
+                                   OR NVL (F1.IS_ROLE, -9) &lt;&gt; NVL (F.IS_ROLE, -9)
+                                ));
+BEGIN
+   V_LAST_CURVE_DATE := P_LAST_CURVE_DATE;
+   /* Update NBI_RESOURCE_FACTS with latest denormalized values */
+
+   /* Populate PL/SQL table with all the records to be updated */
+
+   V_IDX := 0;
+
+   FOR C_REC IN C_RESOURCE_FACTS
+   LOOP
+      V_RESOURCE_TAB (V_IDX).RESOURCE_ID := C_REC.RESOURCE_ID;
+      V_RESOURCE_TAB (V_IDX).RESOURCE_CODE := C_REC.RESOURCE_CODE;
+      V_RESOURCE_TAB (V_IDX).LAST_NAME := C_REC.LAST_NAME;
+      V_RESOURCE_TAB (V_IDX).FIRST_NAME := C_REC.FIRST_NAME;
+      V_RESOURCE_TAB (V_IDX).ROLE_ID := C_REC.ROLE_ID;
+      V_RESOURCE_TAB (V_IDX).ROLE_NAME := C_REC.ROLE_NAME;
+      V_RESOURCE_TAB (V_IDX).RESOURCE_COMPANY_ID := C_REC.RESOURCE_COMPANY_ID;
+      V_RESOURCE_TAB (V_IDX).RESOURCE_COMPANY := C_REC.RESOURCE_COMPANY;
+      V_RESOURCE_TAB (V_IDX).EXTERNAL_OR_INTERNAL := C_REC.EXTERNAL_OR_INTERNAL;
+      V_RESOURCE_TAB (V_IDX).MANAGER_ID := C_REC.MANAGER_ID;
+      V_RESOURCE_TAB (V_IDX).MANAGER_LAST_NAME := C_REC.MANAGER_LAST_NAME;
+      V_RESOURCE_TAB (V_IDX).MANAGER_FIRST_NAME := C_REC.MANAGER_FIRST_NAME;
+      V_RESOURCE_TAB (V_IDX).ENTITY := C_REC.ENTITY;
+      V_RESOURCE_TAB (V_IDX).ENTITY_NAME := C_REC.ENTITY_NAME;
+      V_RESOURCE_TAB (V_IDX).LOCATION := C_REC.LOCATION;
+      V_RESOURCE_TAB (V_IDX).LOCATION_NAME := C_REC.LOCATION_NAME;
+      V_RESOURCE_TAB (V_IDX).DEPARTMENT := C_REC.DEPARTMENT;
+      V_RESOURCE_TAB (V_IDX).DEPARTMENT_NAME := C_REC.DEPARTMENT_NAME;
+      V_RESOURCE_TAB (V_IDX).IS_ROLE := C_REC.IS_ROLE;
+      V_IDX := V_IDX + 1;
+   END LOOP;
+
+   IF V_IDX &lt;&gt; 0
+   THEN
+      V_IDX_MAX := V_IDX - 1;
+
+      FOR V_IDX IN 0 .. V_IDX_MAX
+      LOOP
+         UPDATE NBI_RESOURCE_FACTS
+            SET RESOURCE_CODE = V_RESOURCE_TAB (V_IDX).RESOURCE_CODE,
+                LAST_NAME = V_RESOURCE_TAB (V_IDX).LAST_NAME,
+                FIRST_NAME = V_RESOURCE_TAB (V_IDX).FIRST_NAME,
+                ROLE_ID = V_RESOURCE_TAB (V_IDX).ROLE_ID,
+                ROLE_NAME = V_RESOURCE_TAB (V_IDX).ROLE_NAME,
+                RESOURCE_COMPANY_ID = V_RESOURCE_TAB (V_IDX).RESOURCE_COMPANY_ID,
+                RESOURCE_COMPANY = V_RESOURCE_TAB (V_IDX).RESOURCE_COMPANY,
+                EXTERNAL_OR_INTERNAL = V_RESOURCE_TAB (V_IDX).EXTERNAL_OR_INTERNAL,
+                MANAGER_ID = V_RESOURCE_TAB (V_IDX).MANAGER_ID,
+                MANAGER_LAST_NAME = V_RESOURCE_TAB (V_IDX).MANAGER_LAST_NAME,
+                MANAGER_FIRST_NAME = V_RESOURCE_TAB (V_IDX).MANAGER_FIRST_NAME,
+                ENTITY = V_RESOURCE_TAB (V_IDX).ENTITY,
+                ENTITY_NAME = V_RESOURCE_TAB (V_IDX).ENTITY_NAME,
+                LOCATION = V_RESOURCE_TAB (V_IDX).LOCATION,
+                LOCATION_NAME = V_RESOURCE_TAB (V_IDX).LOCATION_NAME,
+                DEPARTMENT = V_RESOURCE_TAB (V_IDX).DEPARTMENT,
+                DEPARTMENT_NAME = V_RESOURCE_TAB (V_IDX).DEPARTMENT_NAME,
+                IS_ROLE = V_RESOURCE_TAB (V_IDX).IS_ROLE
+          WHERE RESOURCE_ID = V_RESOURCE_TAB (V_IDX).RESOURCE_ID;
+
+         COMMIT;
+      END LOOP;
+   END IF;
+
+   /* Clean out rollup SQL table */
+   V_STMT := 'Deleting nbi_rollup_sql';
+
+   DELETE
+     FROM NBI_ROLLUP_SQL
+    WHERE TABLE_NAME = 'NBI_RT_FACTS';
+
+   COMMIT;
+   SELECT   COUNT (*)
+   INTO     V_CNT
+   FROM     NBI_R_FACTS;
+
+   IF V_CNT &lt;&gt; 0
+   THEN
+      /* Build rollup SQL */
+
+      V_STMT := 'Building rollup SQL';
+
+      FOR V_TIME_TYPE_IDX IN 0 .. 1
+      LOOP
+         SELECT   DECODE (V_TIME_TYPE_IDX, 0, 'WEEK', 1, 'MONTH', 'NA')
+         INTO     V_TIME_TYPE
+         FROM     DUAL;
+         SELECT   DECODE (V_TIME_TYPE, 'WEEK', 'DAY', 'MONTH', 'DAY', 'MONTH')
+         INTO     V_ROLLUP_FROM_TIME_TYPE
+         FROM     DUAL;
+         /* To roll up weeks, we only select the last 8 weeks. Need to prepare dynamic SQL string for those last 8 weeks */
+         /* To roll up months, we only select the last 2 months. Need to prepare dynamic SQL string for those last 2 months */
+
+         V_TIME_SQL := NULL;
+         V_STMT := 'Building string of weeks that need to be rolled up again';
+
+         IF V_TIME_TYPE = 'WEEK'
+         THEN
+            NBI_GET_ROLLUP_TIME_INFO_SP ('NBI_RT_FACTS', P_PERIODS_TO_ROLL_UP, 'WEEK', V_TIME_SQL, V_UPDATE_FROM_DATE, T_TIME_TAB);
+            /* Clean out week records for the week series so we can insert them back in later */
+
+            V_STMT := 'Deleting weeks that need to be rolled up again';
+
+            FOR V_IDX IN T_TIME_TAB.FIRST .. T_TIME_TAB.LAST
+            LOOP
+               DELETE
+                 FROM NBI_RT_FACTS
+                WHERE CALENDAR_TIME_KEY = T_TIME_TAB (V_IDX);
+
+               COMMIT;
+            END LOOP;
+         END IF;
+
+         V_STMT := 'Building string of months that need to be rolled up again';
+
+         IF V_TIME_TYPE = 'MONTH'
+         THEN
+            NBI_GET_ROLLUP_TIME_INFO_SP ('NBI_RT_FACTS', P_PERIODS_TO_ROLL_UP, 'MONTH', V_TIME_SQL, V_UPDATE_FROM_DATE, T_TIME_TAB);
+            /* Clean out month records for the month series so we can insert them back in later */
+            V_STMT := 'Deleting months that need to be rolled up again';
+            
+            V_STMT := 'Deleting weeks that need to be rolled up again';
+
+            FOR V_IDX IN T_TIME_TAB.FIRST .. T_TIME_TAB.LAST
+            LOOP
+               DELETE
+                 FROM NBI_RT_FACTS
+                WHERE CALENDAR_TIME_KEY = T_TIME_TAB (V_IDX);
+
+               COMMIT;
+            END LOOP;
+         END IF;
+
+
+         /* Building SQL to roll up weeks and months - we're going to roll up from NBI_RT_FACTS in day increments of 7 days each otherwise
+            we're going to blow out the TEMP tablespace */
+
+         V_STMT := 'Building actual rollup SQL for weeks and months';
+         V_FROM_DATE := V_UPDATE_FROM_DATE;
+
+         IF V_TIME_TYPE = 'WEEK'
+         THEN
+            V_TO_DATE := V_FROM_DATE + 6;
+         ELSE
+           SELECT   MAX (NEXT.DAY)
+           INTO     V_TO_DATE
+           FROM     NBI_DIM_CALENDAR_TIME NEXT, NBI_DIM_CALENDAR_TIME CURR
+           WHERE    NEXT.HIERARCHY_LEVEL = 'DAY'
+           AND      (NEXT.MONTH + (NEXT.YEAR * 12)) = (CURR.MONTH + (CURR.YEAR * 12) + 1)
+           AND      CURR.HIERARCHY_LEVEL = 'DAY'
+           AND      CURR.DAY = V_FROM_DATE;
+         END IF;
+
+         V_CONTINUE_LOOP := TRUE;
+
+        --  If we have a partial period then we have nothing at all
+         IF TRUNC (V_TO_DATE) &gt; TRUNC (V_LAST_CURVE_DATE)
+         THEN
+            V_CONTINUE_LOOP := FALSE;
+         END IF;
+
+         WHILE V_CONTINUE_LOOP
+         LOOP
+
+            --            DBMS_OUTPUT.PUT_LINE ('From Date: ' || V_FROM_DATE || ' To Date: ' || V_TO_DATE);
+            V_SQL :=
+              'SELECT f.resource_id, t.' || V_TIME_TYPE || '_key calendar_time_key, ' || CHR (10) ||
+                 'f.resource_code, f.last_name, f.first_name, f.role_id, f.role_name, ' ||
+                 CHR (10) ||
+                 'f.resource_company_id, f.resource_company, f.external_or_internal, ' ||
+                 CHR (10) ||
+                 'f.manager_id, f.manager_last_name, ' ||
+                 CHR (10) ||
+                 'f.manager_first_name, f.entity, f.entity_name, f.location, f.location_name, ' ||
+                 CHR (10) ||
+                 'f.department, f.department_name, f.is_role, ' ||
+                 CHR (10) ||
+                 'sum(f.available_hours) available_hours, sum(f.etc_hours) etc_hours, ' ||
+                 CHR (10) ||
+                 'sum(f.actual_hours) actual_hours, sum(f.base_hours) base_hours, ' ||
+                 CHR (10) ||
+                 'sum(f.allocated_hours) allocated_hours ' ||
+                 CHR (10) ||
+                 'FROM nbi_dim_calendar_time t, nbi_resource_facts f ' ||
+                 CHR (10) ||
+                 'WHERE t.day = f.fact_date ' ||
+                 CHR (10) ||
+                 'and t.hierarchy_level = ''DAY'' ' ||
+                 CHR (10) ||
+                 'and f.fact_date between ''' ||
+                 V_FROM_DATE ||
+                 ''' and ''' ||
+                 V_TO_DATE ||
+                 '''' ||
+                 CHR (10) ||
+                 ' GROUP BY f.resource_id, t.' ||
+                 V_TIME_TYPE ||
+                 '_key, ' ||
+                 CHR (10) ||
+                 'f.resource_code, f.last_name, f.first_name, f.role_id, f.role_name, ' ||
+                 CHR (10) ||
+                 'f.resource_company_id, f.resource_company, f.external_or_internal, ' ||
+                 CHR (10) ||
+                 'f.manager_id, f.manager_last_name, ' ||
+                 CHR (10) ||
+                 'f.manager_first_name, f.entity, f.entity_name, f.location, f.location_name, ' ||
+                 CHR (10) ||
+                 'f.department, f.department_name, f.is_role';
+
+            INSERT INTO NBI_ROLLUP_SQL
+                        (TABLE_NAME, TIME_TYPE, SQL_STATEMENT, TIME_IN_SECS)
+                 VALUES ('NBI_RT_FACTS', V_TIME_TYPE, V_SQL, NULL);
+
+            V_FROM_DATE := V_TO_DATE + 1;
+
+            IF V_TIME_TYPE = 'WEEK'
+            THEN
+              V_TO_DATE := V_FROM_DATE + 6;
+            ELSE
+              SELECT   MAX (NEXT.DAY)
+              INTO     V_TO_DATE
+              FROM     NBI_DIM_CALENDAR_TIME NEXT, NBI_DIM_CALENDAR_TIME CURR
+              WHERE    NEXT.HIERARCHY_LEVEL = 'DAY'
+              AND      (NEXT.MONTH + (NEXT.YEAR * 12)) = (CURR.MONTH + (CURR.YEAR * 12) + 1)
+              AND      CURR.HIERARCHY_LEVEL = 'DAY'
+              AND      CURR.DAY = V_FROM_DATE;
+            END IF;
+            --  If its a partial period then exit
+           IF TRUNC (V_TO_DATE) &gt; TRUNC (V_LAST_CURVE_DATE)
+           THEN
+              V_CONTINUE_LOOP := FALSE;
+           END IF;
+         END LOOP;
+      END LOOP;
+
+      COMMIT;
+      /* Process Rollup SQL and insert into summary table */
+      V_STMT := 'Processing Rollup SQL and insert into summary table';
+
+      FOR C_ROLLUP_SQL_REC IN C_ROLLUP_SQL
+      LOOP
+         V_START_TIME := SYSDATE;
+         V_NUM_RECORDS := 0;
+         V_SQL := C_ROLLUP_SQL_REC.SQL_STATEMENT;
+         OPEN C_ROLLUP_CURSOR FOR
+            V_SQL;
+         V_IDX := 0;
+
+         LOOP
+            FETCH C_ROLLUP_CURSOR INTO C_ROLLUP_REC;
+            EXIT WHEN C_ROLLUP_CURSOR%NOTFOUND;
+
+            INSERT INTO NBI_RT_FACTS
+                        (
+                           RESOURCE_ID,
+                           CALENDAR_TIME_KEY,
+                           RESOURCE_CODE,
+                           LAST_NAME,
+                           FIRST_NAME,
+                           ROLE_ID,
+                           ROLE_NAME,
+                           RESOURCE_COMPANY_ID,
+                           RESOURCE_COMPANY,
+                           EXTERNAL_OR_INTERNAL,
+                           MANAGER_ID,
+                           MANAGER_LAST_NAME,
+                           MANAGER_FIRST_NAME,
+                           ENTITY,
+                           ENTITY_NAME,
+                           LOCATION,
+                           LOCATION_NAME,
+                           DEPARTMENT,
+                           DEPARTMENT_NAME,
+                           IS_ROLE,
+                           AVAILABLE_HOURS,
+                           ETC_HOURS,
+                           ACTUAL_HOURS,
+                           BASE_HOURS,
+                           ALLOCATED_HOURS
+                        )
+                 VALUES (
+                    C_ROLLUP_REC.RESOURCE_ID,
+                    C_ROLLUP_REC.CALENDAR_TIME_KEY,
+                    C_ROLLUP_REC.RESOURCE_CODE,
+                    C_ROLLUP_REC.LAST_NAME,
+                    C_ROLLUP_REC.FIRST_NAME,
+                    C_ROLLUP_REC.ROLE_ID,
+                    C_ROLLUP_REC.ROLE_NAME,
+                    C_ROLLUP_REC.RESOURCE_COMPANY_ID,
+                    C_ROLLUP_REC.RESOURCE_COMPANY,
+                    C_ROLLUP_REC.EXTERNAL_OR_INTERNAL,
+                    C_ROLLUP_REC.MANAGER_ID,
+                    C_ROLLUP_REC.MANAGER_LAST_NAME,
+                    C_ROLLUP_REC.MANAGER_FIRST_NAME,
+                    C_ROLLUP_REC.ENTITY,
+                    C_ROLLUP_REC.ENTITY_NAME,
+                    C_ROLLUP_REC.LOCATION,
+                    C_ROLLUP_REC.LOCATION_NAME,
+                    C_ROLLUP_REC.DEPARTMENT,
+                    C_ROLLUP_REC.DEPARTMENT_NAME,
+                    C_ROLLUP_REC.IS_ROLE,
+                    C_ROLLUP_REC.AVAILABLE_HOURS,
+                    C_ROLLUP_REC.ETC_HOURS,
+                    C_ROLLUP_REC.ACTUAL_HOURS,
+                    C_ROLLUP_REC.BASE_HOURS,
+                    C_ROLLUP_REC.ALLOCATED_HOURS
+                 );
+
+            V_NUM_RECORDS := V_NUM_RECORDS + 1;
+            V_IDX := V_IDX + 1;
+
+            IF V_IDX = V_COMMIT_CNT
+            THEN
+               COMMIT;
+               V_IDX := 0;
+            END IF;
+         END LOOP;
+
+         V_END_TIME := SYSDATE;
+
+         UPDATE NBI_ROLLUP_SQL
+            SET NUM_RECORDS = V_NUM_RECORDS,
+                TIME_IN_SECS = (V_END_TIME - V_START_TIME) * 24 * 60 * 60
+          WHERE SQL_STATEMENT = V_SQL
+       AND      TABLE_NAME = 'NBI_RT_FACTS';
+
+         COMMIT;
+         CLOSE C_ROLLUP_CURSOR;
+      END LOOP;
+
+      COMMIT;
+   END IF;-- IF COUNT(*) FROM FROM NBI_RESOURCE_FACTS &lt;&gt; 0
+   
+   DELETE /*+index (nbi_rt_facts nbi_rt_facts_pk)*/
+   FROM nbi_rt_facts
+   WHERE resource_id IN
+      (SELECT id
+       FROM   srm_resources
+       WHERE  srm_resources.include_flag = 0);
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_RTF - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

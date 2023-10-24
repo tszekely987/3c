@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_ADD_MEMBER_SLICES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_ADD_MEMBER_SLICES_SP" (
+  P_TARGET_TABLE          IN      VARCHAR2,
+  P_SOURCE_TABLE          IN      VARCHAR2,
+  P_INV_ID                IN      NUMBER,
+  P_SCENARIO_ID           IN      NUMBER,
+  P_SLICE_TYPE            IN      VARCHAR2
+  )
+AS
+  V_SQLString        VARCHAR2(500);
+  V_SQLWhereString   VARCHAR2(500);
+  V_SLICE_REQUEST_ID NUMBER;
+
+BEGIN
+
+  IF P_INV_ID = 0 THEN
+    RAISE_APPLICATION_ERROR (-20006, 'INVALID INVESTMENT ID');
+  END IF;
+
+  IF P_SCENARIO_ID = 0 THEN
+    RAISE_APPLICATION_ERROR (-20006, 'INVALID SCENARIO ID');
+  END IF;
+
+  SELECT ID INTO V_SLICE_REQUEST_ID FROM PRJ_BLB_SLICEREQUESTS WHERE TABLE_NAME = UPPER(P_TARGET_TABLE);
+  IF V_SLICE_REQUEST_ID = NULL THEN 
+    RAISE_APPLICATION_ERROR (-20006, 'CAN NOT FIND DESTINATION SLICE REQUEST ID');
+  END IF;
+  
+  IF UPPER(P_SLICE_TYPE) = 'ALC' THEN
+    BEGIN
+      V_SQLWhereString := ' (select prid from prteam where prprojectid = ' ||
+                            TO_CHAR(P_INV_ID) || ' )';
+    END;
+  ELSE 
+    BEGIN
+      V_SQLWhereString := ' (select a.prid from prassignment a, prtask t where a.prtaskid = t.prid ' ||
+                            ' AND t.prprojectid = ' || 
+                            CAST(P_INV_ID AS varchar) || ' )';
+    END;
+  END IF;
+
+--  V_SQLString := 'DELETE ' || P_TARGET_TABLE || ' WHERE PRJ_OBJECT_ID IN ' || V_SQLWhereString;
+--  EXECUTE IMMEDIATE V_SQLString;
+
+  V_SQLString :=  'INSERT INTO ' || P_TARGET_TABLE ||
+      '( slice_request_id, scenario_id, prj_object_id, investment_id, resource_id, ' ||
+      'role_id, slice_date, slice, created_date ) (SELECT ' || TO_CHAR(V_SLICE_REQUEST_ID) || ',' || 
+      TO_CHAR(P_SCENARIO_ID) ||
+      ', prj_object_id, investment_id, resource_id, role_id, slice_date, slice, sysdate FROM ' ||
+      P_SOURCE_TABLE || ' WHERE prj_object_id in ' || V_SQLWhereString || ')';
+         
+  EXECUTE IMMEDIATE V_SQLString;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

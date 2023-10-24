@@ -1,0 +1,32 @@
+<ClarityDBViewQuery>
+  <QueryResult code="COP_TSK_DAYS_LATE_V">
+    <indexes/>
+    <text_length>2309</text_length>
+    <text>SELECT t.prid task_id,
+              cop_days_late_fct (t.prfinish, bdt.finish_date, t.prstatus) days_late,
+              CASE WHEN t.pristask = 0 THEN
+                        cop_days_late_pct_fct (t.prfinish, bdt.finish_date, t.prstart, t.prfinish, bdt.start_date, bdt.finish_date, t.prstatus)
+                   WHEN t.pristask = 1 AND t.prwbslevel = 1 THEN
+                        cop_days_late_pct_fct (t.prfinish, bdt.finish_date, i.schedule_start, i.schedule_finish, bdi.start_date, bdi.finish_date, t.prstatus)
+                   ELSE cop_days_late_pct_fct (t.prfinish, bdt.finish_date, p.prstart, p.prfinish, bdp.start_date, bdp.finish_date, t.prstatus) END days_late_pct,
+              cop_start_days_late_fct (t.prStart, bdt.start_date, t.prstatus) start_days_late,
+              CASE WHEN t.pristask = 0 THEN
+                        cop_start_days_late_pct_fct (t.prStart, bdt.start_date, t.prstart, t.prfinish, bdt.start_date, bdt.finish_date, t.prstatus)
+                   WHEN t.pristask = 1 AND t.prwbslevel = 1 THEN
+                        cop_start_days_late_pct_fct (t.prStart, bdt.start_date, i.schedule_start, i.schedule_finish, bdi.start_date, bdi.finish_date, t.prstatus)
+                   ELSE cop_start_days_late_pct_fct (t.prStart, bdt.start_date, p.prstart, p.prfinish, bdp.start_date, bdp.finish_date, t.prstatus) END start_days_late_pct
+       FROM   inv_investments i 
+              INNER JOIN prtask t ON i.ID = t.prprojectid
+              LEFT OUTER JOIN prtask p ON t.prprojectid = p.prprojectid AND t.wbs_parseq = p.prwbssequence
+              LEFT OUTER JOIN prj_baseline_details bdi ON i.ID = bdi.object_id
+                                                      AND bdi.object_type = 'PROJECT'
+                                                      AND bdi.is_current = 1
+              LEFT OUTER JOIN prj_baseline_details bdt ON t.prid = bdt.object_id
+                                                      AND bdt.object_type = 'TASK'
+                                                      AND bdt.is_current = 1
+              LEFT OUTER JOIN prj_baseline_details bdp ON p.prid = bdp.object_id
+                                                      AND bdp.object_type = 'TASK'
+                                                      AND bdp.is_current = 1
+       WHERE  1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

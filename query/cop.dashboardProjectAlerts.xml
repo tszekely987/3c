@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.dashboardProjectAlerts" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project Indicators (Instance = Project)" languageCode="en" name="Project Indicators"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:odf_proj.odf_pk:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:odf_proj.name:project_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:odf_proj.unique_code:project_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:odf_proj.stage_code:stage_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:stage.name:stage_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:odf_proj.obj_alignment:business_alignment@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:odf_proj.risk_score:risk_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late:schedule@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late:schedule_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late_pct:schedule_pct@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late_pct:schedule_pct_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_proj.obj_cost_pct_var:cv_percent_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_proj.obj_effort_var:effort_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_proj.stage_number:stage_number@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_proj.stage_count:stage_count@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:issue.issue_sl:issue_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:change.change_exists:change_sl@
+FROM   ODF_PROJECT_V2 odf_proj
+INNER  JOIN  COP_INV_DAYS_LATE_V inv_d
+             ON  odf_proj.odf_pk =  inv_d.investment_id
+-- Issues --
+LEFT   OUTER JOIN cop_inv_rim_stoplights_v issue
+             ON   odf_proj.odf_pk = issue.investment_id
+-- Change Requests --
+LEFT   OUTER JOIN (SELECT c.pk_id project_id,
+                          COUNT(c.odf_pk) change_exists
+                   FROM   odf_change_v2 c
+                   WHERE  c.pk_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+                   AND    c.status_code NOT IN ('CLOSED','RESOLVED') 
+                   GROUP  BY c.pk_id) change 
+             ON   odf_proj.odf_pk = change.project_id 
+LEFT   OUTER JOIN  CMN_LOOKUPS_V stage
+             ON    stage.lookup_code = odf_proj.stage_code
+             AND   stage.lookup_type = 'INV_STAGE_TYPE' 
+             AND   stage.language_code =  @WHERE:PARAM:LANGUAGE@
+WHERE  odf_proj.odf_pk = @WHERE:PARAM:XML:INTEGER:/data/id/@value@  
+AND    @WHERE:SECURITY:PROJECT:odf_proj.odf_pk@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project Name" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_id" required="false">
+              
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage_id" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Stage ID" languageCode="en" name="Stage ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage_name" required="false">
+              
+              
+              
+              
+              <nls description="Stage Name" languageCode="en" name="Stage Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="business_alignment" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Business Alignment" languageCode="en" name="Business Alignment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="34" lo="0" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="68" lo="34" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="68" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="risk_sl" required="false">
+              
+              
+              
+              
+              <nls description="Risk Score" languageCode="en" name="Risk Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="34" lo="0" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="68" lo="34" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="68" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule" required="false">
+              
+              
+              
+              
+              <nls description="Days Late" languageCode="en" name="Days Late"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule_pct" required="false">
+              
+              
+              
+              
+              <nls description="Days Late %" languageCode="en" name="Days Late %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_pct_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule %" languageCode="en" name="Schedule %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="cv_percent_sl" required="false">
+              
+              
+              
+              
+              <nls description="Projected Cost Variance %" languageCode="en" name="Projected Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="effort_sl" required="false">
+              
+              
+              
+              
+              <nls description="Projected Effort Variance %" languageCode="en" name="Projected Effort Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="stage_number" required="false">
+              
+              
+              
+              
+              <nls description="Stage Number" languageCode="en" name="Stage Number"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage_count" required="false">
+              
+              
+              
+              
+              
+              <nls description="Stage Count" languageCode="en" name="Stage Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="issue_sl" required="false">
+              
+              
+              
+              
+              <nls description="Issue" languageCode="en" name="Issue"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="2" lo="2" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="3" lo="3" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="change_sl" required="false">
+              
+              
+              
+              
+              <nls description="Change Request" languageCode="en" name="Change"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1000" lo="1" mappingCode="mapping-1" typeCode="Checkmark"/>
+              </displayMapping>
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

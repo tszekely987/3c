@@ -1,0 +1,50 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ORE_ASND_OBJ_PERM_PRINCIPALS_V">
+    <indexes/>
+    <text_length>1222</text_length>
+    <text>select    
+   users.id principal_id,
+   users.user_name principal_name,
+   users.first_name first_name,
+   users.middle_name middle_name,
+   users.last_name last_name,
+   users.description description,
+   users.email_address email_address,
+   languages.language_code language_code,
+   assgnd_perm.principal_type,
+   assgnd_perm.object_id,
+   assgnd_perm.object_instance_id,
+   assgnd_perm.permission_id
+from
+   cmn_languages languages,
+   cmn_sec_assgnd_obj_perm assgnd_perm,
+   cmn_sec_users users
+where
+           assgnd_perm.principal_type = 'USER'
+and        assgnd_perm.principal_id = users.id
+union
+select      
+   groups.id principal_id,
+   nls.name principal_name,
+   '' first_name,
+   '' middle_name,
+   '' last_name,
+   nls.description description,
+   '' email_address,
+   nls.language_code language_code,
+   assgnd_perm.principal_type,
+   assgnd_perm.object_id,
+   assgnd_perm.object_instance_id,
+   assgnd_perm.permission_id
+from
+   cmn_sec_assgnd_obj_perm assgnd_perm,
+   cmn_sec_groups groups,
+   cmn_captions_nls nls
+where
+           assgnd_perm.principal_type = 'GROUP'
+and        assgnd_perm.principal_id = groups.id
+and	groups.id = nls.pk_id
+and groups.is_active = 1
+and	nls.table_name = 'CMN_SEC_GROUPS'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

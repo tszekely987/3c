@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_USER_INST_PRIVS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_SEC_USER_INST_PRIVS_FCT" ( p_user_id numeric, p_object_instance_id numeric ) 
+      RETURN cmn_security_pkg.t_security_table
+    pipelined is  
+    
+    cursor c_sec_cursor is
+        select  object_id, permission_code, permission_value
+        from    cmn_sec_user_inst_privileges_v a
+        where   user_id = p_user_id
+        and     object_instance_id = p_object_instance_id;
+    
+    l_sec_rec cmn_security_pkg.t_security_rec;
+
+    begin
+      FOR c_sec IN c_sec_cursor
+      LOOP
+        l_sec_rec.user_id             := p_user_id;
+        l_sec_rec.object_id           := c_sec.object_id;
+        l_sec_rec.object_instance_id  := p_object_instance_id;
+        l_sec_rec.permission_code     := c_sec.permission_code;
+        l_sec_rec.permission_value    := c_sec.permission_value;
+        pipe row(l_sec_rec);
+      end loop;
+      return;
+    end;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

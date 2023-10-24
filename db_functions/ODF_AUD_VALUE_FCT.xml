@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>ODF_AUD_VALUE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."ODF_AUD_VALUE_FCT" (
+      P_VALUE VARCHAR2,
+      P_TYPE INTEGER,
+      P_LANGUAGE_CODE VARCHAR2 DEFAULT 'en')
+    RETURN CLOB
+    IS
+      V_RETURN_VALUE CLOB;
+  
+      CURSOR STATIC_VALUES IS
+      SELECT C.NAME
+      FROM ODF_AUD_LOOKUP_CAPTIONS C,ODF_AUD_MULTI_VAL_LOVS L
+      WHERE L.ID = to_number(P_VALUE)
+       AND C.ID = to_number(L.VALUE)  /*  convert L.VALUE to number to avoid performance problem in case of P_TYPE=3 L.VALUE is numeric */
+       AND C.LANGUAGE_CODE=P_LANGUAGE_CODE;
+  
+      CURSOR DYNAMIC_VALUES IS
+      SELECT VALUE NAME
+      FROM ODF_AUD_MULTI_VAL_LOVS L
+      WHERE L.ID = to_number(P_VALUE);
+  
+    BEGIN
+      IF P_VALUE IS NOT NULL THEN
+      IF P_TYPE = 0 THEN
+         V_RETURN_VALUE := P_VALUE;
+      ELSIF P_TYPE = 1 THEN
+         SELECT NAME INTO V_RETURN_VALUE
+         FROM ODF_AUD_LOOKUP_CAPTIONS
+         WHERE ID= to_number(P_VALUE)
+         AND LANGUAGE_CODE=P_LANGUAGE_CODE;
+      ELSIF P_TYPE = 3 THEN
+         FOR VALUE IN STATIC_VALUES LOOP
+         IF V_RETURN_VALUE IS NULL THEN
+           V_RETURN_VALUE := VALUE.NAME;
+         ELSE
+           V_RETURN_VALUE := V_RETURN_VALUE || '; ' || VALUE.NAME;
+         END IF;
+       END LOOP;
+      ELSIF P_TYPE = 4 THEN
+         FOR VALUE IN DYNAMIC_VALUES LOOP
+         IF V_RETURN_VALUE IS NULL THEN
+           V_RETURN_VALUE := VALUE.NAME;
+         ELSE
+           V_RETURN_VALUE := V_RETURN_VALUE || '; ' || VALUE.NAME;
+         END IF;
+       END LOOP;
+      END IF;
+      END IF;
+      RETURN V_RETURN_VALUE;
+    END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

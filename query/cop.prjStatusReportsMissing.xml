@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.prjStatusReportsMissing" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Missing Status Reports" languageCode="en" name="Missing Status Reports"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:project:i.id:project_int_id@,
+       @select:dim_prop:user_def:implied:project:i.code:project_id@,
+       @select:dim_prop:user_def:implied:project:i.name:project_name@,
+       @select:dim_prop:user_def:implied:project:@UPPER@(i.odf_object_code):investment_type_upper@,
+       @select:dim_prop:user_def:implied:project:i.manager_id:project_manager_int_id@,
+       @select:dim_prop:user_def:implied:project:m.full_name:project_manager@,
+       @select:dim_prop:user_def:implied:project:pc.obj_request_type:project_type_id@,
+       @select:dim_prop:user_def:implied:project:pt.name:project_type@,
+       @select:dim_prop:user_def:implied:project:c.name:project_category@,
+       @select:dim_prop:user_def:implied:project:CASE WHEN i.status IN (1,5,8) THEN 1 ELSE 0 END:status_id@,
+       @select:dim_prop:user_def:implied:project:stat.name:status@,
+       @select:dim_prop:user_def:implied:project:i.progress:progress_id@,
+       @select:dim_prop:user_def:implied:project:pg.name:progress@,
+       @select:dim_prop:user_def:implied:project:ic.obj_work_status:work_status_id@,
+       @select:dim_prop:user_def:implied:project:ws.name:work_status@,
+       @select:dim_prop:user_def:implied:project:pc.obj_status_reporting:status_reporting_id@,
+       @select:dim_prop:user_def:implied:project:srf.name:status_reporting@,
+       @select:dim_prop:user_def:implied:project:s.name:stage@,
+       @select:dim_prop:user_def:implied:project:i.schedule_start:start_date@,
+       @select:dim_prop:user_def:implied:project:@DBUSER@.COP_CALC_FINISH_FCT(i.schedule_finish):finish_date@
+FROM   inv_investments i
+INNER  JOIN  odf_ca_inv ic ON  i.id = ic.id
+INNER  JOIN  odf_ca_project pc ON  i.id = pc.id
+INNER  JOIN  inv_projects p ON  i.id = p.prID
+LEFT   OUTER JOIN cop_prj_statusrpt_latest_v r ON  i.id = r.investment_id
+                                               AND r.report_order = 1
+LEFT   OUTER JOIN srm_resources m ON  i.manager_id = m.user_id
+LEFT   OUTER JOIN cmn_lookups_v pt ON  pc.obj_request_type = pt.lookup_code
+                                   AND pt.lookup_type = 'OBJ_IDEA_PROJECT_TYPE'
+                                   AND pt.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v c ON  pc.obj_request_category = c.lookup_code
+                                  AND c.lookup_type = 'OBJ_IDEA_PROJECT_CATEGORY'
+                                  AND c.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v stat ON  i.status = stat.lookup_enum
+                                     AND stat.lookup_type = 'INVESTMENT_OBJ_STATUS'
+                                     AND stat.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v pg ON  i.progress = pg.lookup_enum
+                                   AND pg.lookup_type = 'INVESTMENT_OBJ_PROGRESS'
+                                   AND pg.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v ws  ON  ic.obj_work_status = ws.lookup_code
+                                    AND ws.lookup_type = 'OBJ_INVESTMENT_WORK_STATUS'
+                                    AND ws.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v srf ON  pc.obj_status_reporting = srf.lookup_code
+                                    AND srf.lookup_type = 'OBJ_PROJECT_STATUS_REPORTING'
+                                    AND srf.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN cmn_lookups_v s ON  i.stage_code = s.lookup_code
+                                  AND s.lookup_type = 'INV_STAGE_TYPE'
+                                  AND s.language_code = @WHERE:PARAM:LANGUAGE@
+WHERE  i.is_active = 1
+AND    p.is_template = 0
+AND   (p.is_program = 0 OR @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:program@,0) = 1)
+AND    @NVL@(r.report_order,0) = 0
+AND   (@NVL@(@WHERE:PARAM:USER_DEF:INTEGER:obs@,0) = 0 OR
+       i.id IN (SELECT obsa.record_id
+                FROM   prj_obs_associations obsa, prj_obs_units_flat obsf
+                WHERE  obsa.unit_id = obsf.unit_id
+                AND    obsa.table_name  = 'SRM_PROJECTS'
+                AND    obsf.branch_unit_id = @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:obs@,0)))
+AND    @WHERE:SECURITY:PROJECT:i.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_id" required="false">
+              
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager_int_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_type_id" lookup="OBJ_IDEA_PROJECT_TYPE" required="false">
+              
+              
+              
+              
+              <nls description="Project Type Filter" languageCode="en" name="Project Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_type" required="false">
+              
+              
+              
+              
+              <nls description="Project Type" languageCode="en" name="Project Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_category" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Category" languageCode="en" name="Project Category"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_id" lookup="COP_PORTLET_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status Filter" languageCode="en" name="Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status" required="false">
+              
+              
+              
+              
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="progress_id" lookup="INVESTMENT_OBJ_PROGRESS" required="false">
+              
+              <nls description="Progress Filter" languageCode="en" name="Progress Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="progress" required="false">
+              
+              
+              
+              
+              <nls description="Progress" languageCode="en" name="Progress"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="work_status_id" lookup="OBJ_INVESTMENT_WORK_STATUS" required="false">
+              
+              
+              
+              
+              
+              <nls description="Work Status Filter" languageCode="en" name="Work Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="work_status" required="false">
+              
+              
+              
+              
+              <nls description="Work Status" languageCode="en" name="Work Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_reporting_id" lookup="OBJ_PROJECT_STATUS_REPORTING" required="false">
+              
+              
+              
+              
+              <nls description="Status Reporting Filter" languageCode="en" name="Status Reporting Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_reporting" required="false">
+              
+              
+              
+              
+              <nls description="Status Reporting" languageCode="en" name="Status Reporting"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage" required="false">
+              
+              
+              
+              
+              <nls description="Stage" languageCode="en" name="Stage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Start Date" languageCode="en" name="Start Date"/>
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish Date" languageCode="en" name="Finish Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_program" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Include Programs Filter" languageCode="en" name="Include Programs Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

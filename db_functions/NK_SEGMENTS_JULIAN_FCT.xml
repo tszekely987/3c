@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_SEGMENTS_JULIAN_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_SEGMENTS_JULIAN_FCT" (P_CURVE IN NK_CURVE, P_START IN INTEGER DEFAULT 2, P_FINISH IN INTEGER DEFAULT 65534)
+RETURN NK_SEGMENTS
+AS
+  V_SEGMENT NK_SEGMENT;
+  V_SEGMENTS NK_SEGMENTS;
+  V_START INTEGER := 2; V_FINISH INTEGER := 65534;
+  S_IDX INTEGER; V_IDX INTEGER := 0;
+BEGIN
+
+  V_SEGMENTS := NK_SEGMENTS();
+  V_START := NVL(P_START,V_START);
+  V_FINISH := NVL(P_FINISH,V_FINISH);
+
+  /*
+    Iterate through the curve including a sum from each segment that is in the date range
+
+    It is also possible to query but would have to recreate each segment instead of just
+    returning the existing ones.
+  */
+  IF( P_CURVE IS NOT NULL AND P_CURVE.SEGMENTS IS NOT NULL) THEN
+    FOR s_idx IN 1 .. P_CURVE.SEGMENTS.COUNT LOOP
+      V_SEGMENT := P_CURVE.SEGMENTS(s_idx);
+      IF( V_SEGMENT.SEGMENT_START &lt; V_FINISH AND V_SEGMENT.SEGMENT_FINISH &gt;= V_START ) THEN
+        V_IDX := V_IDX + 1;
+        V_SEGMENTS.EXTEND(1);
+        V_SEGMENTS(V_IDX) := V_SEGMENT;
+
+      /*
+        Stop the process if the segment is beyond the requested finish date
+      */
+      ELSIF (V_SEGMENT.SEGMENT_START &gt; V_FINISH) THEN
+        EXIT;
+      END IF;
+    END LOOP;
+  END IF;
+
+  RETURN V_SEGMENTS;
+
+-- safety check ... if anything goes wrong just return zero
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN V_SEGMENTS;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

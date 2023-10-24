@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PREPARE_MATRIX_DATA_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PREPARE_MATRIX_DATA_SP" 
+AS
+   V_MATRIXKEY                                           NUMBER;
+   V_RATE_MAT_PROJ_CODE_COL_POS    INTEGER;
+   V_RATE_MAT_RES_CODE_COL_POS      INTEGER;
+   V_MAT_PROJ_COL_VALUE                     VARCHAR2(2000);
+   V_MAT_RES_COL_VALUE                       VARCHAR2(2000);
+   V_FROM_DATE_SELECT_SQL                 VARCHAR2(2000);
+   V_FROM_DATE_WHERE_SQL                  VARCHAR2(2000);
+   V_ALL_DATES_SQL                                VARCHAR2(2000);
+   STOO_SELCNT                                         INTEGER;
+   STOO_ERROR                                          INTEGER;
+   STOO_ROWCNT                                       INTEGER;
+   STOO_ERRMSG                                       GLOBALPKG.STRING;
+   V_STMT                                                    VARCHAR2 (200);
+
+  CURSOR C_PPA_MATRIX_REC IS
+    SELECT MATRIXKEY
+      FROM PPA_MATRIX
+      WHERE MATRIXTYPE &lt;&gt; 'G'
+      ORDER BY MATRIXKEY;
+
+BEGIN
+
+FOR C_PPA_MATRIX_DATA IN C_PPA_MATRIX_REC
+LOOP
+
+      V_MATRIXKEY := C_PPA_MATRIX_DATA.MATRIXKEY;
+      V_RATE_MAT_PROJ_CODE_COL_POS := 0;
+      V_RATE_MAT_RES_CODE_COL_POS := 0;
+
+      /* Get the matrix column position for Project_code*/
+      BEGIN
+      SELECT COLUMNNO INTO V_RATE_MAT_PROJ_CODE_COL_POS
+       FROM  PPA_MATRIXCOLDEF
+       WHERE MATRIXKEY = V_MATRIXKEY
+              AND FIELDNAME = 'project_code';
+       EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+            STOO_ROWCNT := 0;
+            STOO_SELCNT := 0;
+    END;
+
+      /* Get the matrix column position for Resource_code*/
+      BEGIN
+      SELECT COLUMNNO INTO V_RATE_MAT_RES_CODE_COL_POS
+       FROM  PPA_MATRIXCOLDEF
+       WHERE MATRIXKEY = V_MATRIXKEY
+              AND FIELDNAME = 'resource_code';
+       EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+            STOO_ROWCNT := 0;
+            STOO_SELCNT := 0;
+    END;
+
+    V_FROM_DATE_SELECT_SQL := 'SELECT  :rate_matrix_key MATRIXKEY, ';
+    V_FROM_DATE_WHERE_SQL := ' FROM PPA_MATRIXVALUES WHERE MATRIXKEY = :rate_matrix_key ';
+
+    IF V_RATE_MAT_PROJ_CODE_COL_POS &lt;&gt; 0 THEN
+      V_MAT_PROJ_COL_VALUE := 'VALUE' || TO_CHAR( V_RATE_MAT_PROJ_CODE_COL_POS );
+      V_FROM_DATE_SELECT_SQL := V_FROM_DATE_SELECT_SQL || V_MAT_PROJ_COL_VALUE || ' PROJECT_CODE, ';
+    ELSE
+      V_FROM_DATE_SELECT_SQL := V_FROM_DATE_SELECT_SQL || ' null  PROJECT_CODE, ';
+    END IF;
+
+    IF V_RATE_MAT_RES_CODE_COL_POS &lt;&gt; 0 THEN
+      V_MAT_RES_COL_VALUE := 'VALUE' || TO_CHAR( V_RATE_MAT_RES_CODE_COL_POS );
+      V_FROM_DATE_SELECT_SQL := V_FROM_DATE_SELECT_SQL || V_MAT_RES_COL_VALUE || ' RESOURCE_CODE, ';
+    ELSE
+      V_FROM_DATE_SELECT_SQL := V_FROM_DATE_SELECT_SQL || ' null RESOURCE_CODE, ';
+    END IF;
+
+    V_ALL_DATES_SQL := 'INSERT /*+ APPEND */ INTO TEMP_NBI_MATRIX_DATA '
+      || ' (MATRIXKEY, PROJECT_CODE, RESOURCE_CODE, TRANSITION_DATE) '
+      || ' SELECT DISTINCT MATRIXKEY, PROJECT_CODE, RESOURCE_CODE, TRANSITION_DATE FROM ( '
+      || V_FROM_DATE_SELECT_SQL || ' (FROMDATE -1) TRANSITION_DATE ' || V_FROM_DATE_WHERE_SQL || ' ) UNION ( '
+      ||  V_FROM_DATE_SELECT_SQL || ' TODATE TRANSITION_DATE ' || V_FROM_DATE_WHERE_SQL
+      || ' ) ORDER BY PROJECT_CODE, RESOURCE_CODE, TRANSITION_DATE ';
+      EXECUTE IMMEDIATE V_ALL_DATES_SQL USING V_MATRIXKEY, V_MATRIXKEY, V_MATRIXKEY, V_MATRIXKEY;
+      COMMIT;
+END LOOP;
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_PREPARE_PROJ_DATA_SP - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

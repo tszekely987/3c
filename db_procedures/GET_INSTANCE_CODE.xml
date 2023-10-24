@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>GET_INSTANCE_CODE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."GET_INSTANCE_CODE" 
+(P_OBJECT_CODE   VARCHAR2,
+ P_ID            NUMBER,
+ P_IS_CUSTOM     NUMBER,
+ P_CODE    OUT   VARCHAR2,
+ P_NAME    OUT   VARCHAR2 )
+IS
+    V_CODE_COL      VARCHAR2(100) := 'CODE';
+    V_NAME_COL      VARCHAR2(100) := 'NAME';
+    V_TABLE_NAME    VARCHAR2(100) := P_OBJECT_CODE;
+    V_CODE_VAL      VARCHAR2(100);
+    V_NAME_VAL      VARCHAR2(100);
+    V_CODE_TMPVAL   VARCHAR2(100);
+    V_NAME_TMPVAL   VARCHAR2(100);
+    queryString     VARCHAR2(1000);
+    params          VARCHAR2(200);
+    V_TEMPLATE_EXTENSION    VARCHAR2(100);
+ BEGIN
+
+      SELECT TEMPLATE_EXTENSION INTO V_TEMPLATE_EXTENSION from ODF_OBJECTS where UPPER(CODE) = UPPER(P_OBJECT_CODE);
+
+      SELECT
+        (CASE
+          WHEN (P_IS_CUSTOM &lt;&gt; 0 and (V_TEMPLATE_EXTENSION &lt;&gt; 'inv_extension' or V_TEMPLATE_EXTENSION is null)) THEN 'ODF_CA_' || UPPER( P_OBJECT_CODE)
+          WHEN (P_IS_CUSTOM &lt;&gt; 0 and V_TEMPLATE_EXTENSION = 'inv_extension') or
+               P_OBJECT_CODE IN ('project','application','asset','idea','other','product','service') THEN 'INV_INVESTMENTS'
+          WHEN P_OBJECT_CODE = 'company' THEN 'SRM_COMPANIES'
+          WHEN P_OBJECT_CODE = 'release' THEN 'RQP_RELEASES'
+          WHEN P_OBJECT_CODE = 'releaseplan' THEN 'RQP_RELEASE_PLANS'
+          WHEN P_OBJECT_CODE = 'requirement' THEN 'RQP_REQUIREMENTS'
+          WHEN P_OBJECT_CODE = 'resource' THEN 'SRM_RESOURCES'
+        END),
+        (CASE
+          WHEN P_IS_CUSTOM &lt;&gt; 0 or
+               P_OBJECT_CODE IN ('project','application','asset','idea','other','product','service','release','releaseplan','requirement') THEN 'CODE'
+          WHEN P_OBJECT_CODE = 'company' THEN     'COMPANY_ID'
+          WHEN P_OBJECT_CODE = 'resource' THEN    'UNIQUE_NAME'
+        END),
+        (CASE
+         WHEN P_IS_CUSTOM &lt;&gt; 0 or
+              P_OBJECT_CODE IN ('project','application','asset','idea','other','product','service','release','releaseplan') THEN 'NAME'
+         WHEN P_OBJECT_CODE = 'company' THEN        'COMPANY_NAME'
+         WHEN P_OBJECT_CODE = 'requirement' THEN    'TITLE'
+         WHEN P_OBJECT_CODE = 'resource' THEN       'FULL_NAME'
+        END)
+        INTO V_TABLE_NAME,V_CODE_COL,V_NAME_COL
+      FROM DUAL;
+
+   IF ( LENGTH( V_CODE_COL ) &gt; 0 AND LENGTH( V_NAME_COL ) &gt; 0 AND LENGTH( V_TABLE_NAME ) &gt; 0 ) THEN
+      queryString := 'SELECT ' || V_CODE_COL || ',' || V_NAME_COL || ' FROM ' || V_TABLE_NAME || ' WHERE ID = ' || TO_CHAR(P_ID);
+      execute immediate queryString into P_CODE,P_NAME;
+   END IF;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN NULL;
+    WHEN OTHERS THEN RAISE;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

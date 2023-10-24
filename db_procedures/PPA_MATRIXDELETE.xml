@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXDELETE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_MATRIXDELETE" (
+iMatrixKey 	NUMBER )
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/25/01
+*/
+
+	SAVEPOINT Tran1;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_MatrixValues
+		WHERE MatrixKey = ppa_MatrixDelete.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20214, 'Error Removing Matrix Data');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_MatrixColDef
+		WHERE MatrixKey = ppa_MatrixDelete.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20215, 'Error Removing Matrix Columns');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_Matrix
+		WHERE MatrixKey = ppa_MatrixDelete.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20217, 'Error Removing Matrix Entry');
+		RETURN ;
+	END;
+	END IF;
+END ppa_MatrixDelete;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

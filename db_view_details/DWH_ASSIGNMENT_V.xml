@@ -1,0 +1,23 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_ASSIGNMENT_V">
+    <indexes/>
+    <text_length>2884</text_length>
+    <text>select prassignment.prid odf_pk, PRASSIGNMENT.PRID as assignment_key, PRASSIGNMENT.PRID as clarity_assignment_key, prtask.PRPROJECTID as investment_key, prassignment.prTaskID as task_key, prtask.PREXTERNALID as task_id, prtask.PRNAME as task_name, prassignment.TEAM_ID as team_key, prassignment.prResourceID as resource_key, 
+        SRM_RESOURCES.FULL_NAME
+      prresourceid_caption, NVL ( NVL( PRASSIGNMENT.ROLE_ID, NVL( PRTEAM.PRROLEID, PRJ_RESOURCES.PRPRIMARYROLEID ) ), 0 ) as role_key, 
+       (select srmres.full_name from srm_resources srmres where srmres.id =
+        (NVL ( NVL( PRASSIGNMENT.ROLE_ID, NVL( PRTEAM.PRROLEID, PRJ_RESOURCES.PRPRIMARYROLEID ) ), 0 )))
+      role_id_caption, CMN_DATE_TRUNC_FCT( NVL(PRASSIGNMENT.PRSTART, PRTASK.PRSTART) ) as start_date, COP_CALC_FINISH_FCT( NVL(PRASSIGNMENT.PRFINISH, PRTASK.PRFINISH) ) as finish_date, CMN_DATE_TRUNC_FCT( BASEREC.START_DATE ) as base_start_date, COP_CALC_FINISH_FCT( BASEREC.FINISH_DATE ) as base_finish_date, prassignment.prStatus as assignment_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'prTaskStatus' and rownum = 1 and LOOKUP_ENUM = prassignment.prStatus) as prstatus_caption, COP_CALC_FINISH_FCT( PRASSIGNMENT.PRACTTHRU ) as actuals_thru_date, prassignment.prEstPattern as loading_pattern_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'prAssignmentPattern' and rownum = 1 and LOOKUP_ENUM = prassignment.prEstPattern) as prestpattern_caption, PRASSIGNMENT.CREATED_DATE as clarity_created_date, (
+        CASE
+        WHEN PRTASK.LAST_UPDATED_DATE IS NULL AND BASEREC.LAST_UPDATED_DATE IS NULL
+          THEN PRASSIGNMENT.LAST_UPDATED_DATE
+        WHEN PRTASK.LAST_UPDATED_DATE IS NOT NULL AND BASEREC.LAST_UPDATED_DATE IS NULL
+          THEN GREATEST(PRASSIGNMENT.LAST_UPDATED_DATE, PRTASK.LAST_UPDATED_DATE)
+        WHEN PRTASK.LAST_UPDATED_DATE IS NULL AND BASEREC.LAST_UPDATED_DATE IS NOT NULL
+          THEN GREATEST(PRASSIGNMENT.LAST_UPDATED_DATE, BASEREC.LAST_UPDATED_DATE)
+        ELSE
+          GREATEST(PRASSIGNMENT.LAST_UPDATED_DATE, PRTASK.LAST_UPDATED_DATE, BASEREC.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, dataw_context.language_code, dataw_context.id language_id from prassignment prassignment inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN prtask prtask ON prtask.prid=prassignment.prtaskid JOIN srm_resources srm_resources ON srm_resources.id=prassignment.prresourceid JOIN prteam prteam ON prteam.prid=prassignment.team_id JOIN prj_resources prj_resources ON prj_resources.prid=prassignment.prresourceid LEFT OUTER JOIN prj_baseline_details BASEREC ON BASEREC.OBJECT_ID = PRASSIGNMENT.PRID AND BASEREC.OBJECT_TYPE='ASSIGNMENT' and BASEREC.IS_CURRENT = 1  where 1 = 1 and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

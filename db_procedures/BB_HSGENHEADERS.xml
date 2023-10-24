@@ -1,0 +1,1428 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_HSGENHEADERS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_HSGENHEADERS" 
+(
+  iBillRunKey   NUMBER,
+  cUserID       VARCHAR2 ,
+  iHSDetailMode NUMBER,
+  cLanguageCode VARCHAR2 DEFAULT 'en'
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  cLocation   GLOBALPKG.STRING;
+  cCRLF   GLOBALPKG.STRING;
+  iLup  INTEGER;
+  UF1_rowid   ROWID;
+  UF1_oval1   temp_tempbb_HSGenHeaders.RemitLocation%TYPE;
+  loc_Invoice GLOBALPKG.STRING;
+  loc_PleaseRemit GLOBALPKG.STRING;
+  loc_InvoiceNo GLOBALPKG.STRING;
+  loc_InvoiceDate GLOBALPKG.STRING;
+  loc_Date GLOBALPKG.STRING;
+  loc_Activity GLOBALPKG.STRING;
+  loc_Employee GLOBALPKG.STRING;
+  loc_Quantity GLOBALPKG.STRING;
+  loc_Amount GLOBALPKG.STRING;
+  loc_Project GLOBALPKG.STRING;
+  loc_Total GLOBALPKG.STRING;
+
+  CURSOR UF1_cursor IS
+    SELECT temp_tempbb_HSGenHeaders.ROWID, C.locationid
+    FROM clntsupp C, temp_tempbb_HSGenHeaders
+    WHERE C.COMPANY_CODE = temp_tempbb_HSGenHeaders.COMPANY_CODE
+    FOR UPDATE OF temp_tempbb_HSGenHeaders.RemitLocation;
+  UF2_rowid   ROWID;
+  UF2_oval1   temp_tempbb_HSGenHeaders.RemitToAddr1%TYPE;
+  UF2_oval2   temp_tempbb_HSGenHeaders.RemitToAddr2%TYPE;
+  UF2_oval3   temp_tempbb_HSGenHeaders.RemitToAddr3%TYPE;
+  UF2_oval4   temp_tempbb_HSGenHeaders.RemitToAddr4%TYPE;
+  UF2_oval5   temp_tempbb_HSGenHeaders.RemitToAddr5%TYPE;
+  UF2_oval6   temp_tempbb_HSGenHeaders.RemitToAddr6%TYPE;
+  UF2_oval7   temp_tempbb_HSGenHeaders.RemitToAddr7%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT temp_tempbb_HSGenHeaders.ROWID, NVL(RTRIM(E.description), ' '),
+    NVL(RTRIM(L.address1), ' '), NVL(RTRIM(L.address2), ' '),
+    NVL(RTRIM(L.address3), ' '), NVL(RTRIM(L.city), ' ') || ', ' || NVL(RTRIM(L.stateprov), ' ') || '  ' || NVL(RTRIM(L.zip), ' '),
+    NVL(RTRIM(L.countryid), ' '), NVL(RTRIM(L.phone), ' ')
+    FROM entity E, locations L, temp_tempbb_HSGenHeaders
+    WHERE L.locationid = temp_tempbb_HSGenHeaders.RemitLocation
+    and E.entity = L.entity
+    FOR UPDATE OF temp_tempbb_HSGenHeaders.RemitToAddr1, temp_tempbb_HSGenHeaders.RemitToAddr2, temp_tempbb_HSGenHeaders.RemitToAddr3, temp_tempbb_HSGenHeaders.RemitToAddr4, temp_tempbb_HSGenHeaders.RemitToAddr5, temp_tempbb_HSGenHeaders.RemitToAddr6, temp_tempbb_HSGenHeaders.RemitToAddr7;
+  UF3_rowid   ROWID;
+  UF3_oval1   temp_tempbb_HSGenHeaders.ClientName1%TYPE;
+  UF3_oval2   temp_tempbb_HSGenHeaders.ClientName2%TYPE;
+  UF3_oval3   temp_tempbb_HSGenHeaders.ClientName3%TYPE;
+  UF3_oval4   temp_tempbb_HSGenHeaders.ClientName4%TYPE;
+  UF3_oval5   temp_tempbb_HSGenHeaders.ClientName5%TYPE;
+  UF3_oval6   temp_tempbb_HSGenHeaders.ClientName6%TYPE;
+  UF3_oval7   temp_tempbb_HSGenHeaders.ClientName7%TYPE;
+CURSOR UF3_cursor IS
+	SELECT  temp_tempbb_HSGenHeaders.ROWID, addr1, addr2, addr3, addr4, addr5, addr6, 'Attn. ' || attention_name
+	FROM armaster A, temp_tempbb_HSGenHeaders
+	where upper(temp_tempbb_hsgenheaders.company_code) = upper(a.company_code)
+      and  temp_tempbb_hsgenheaders.bill_to_company_code = a.ship_to_company_code
+	FOR UPDATE OF temp_tempbb_HSGenHeaders.ClientName1, temp_tempbb_HSGenHeaders.ClientName2, temp_tempbb_HSGenHeaders.ClientName3, temp_tempbb_HSGenHeaders.ClientName4, temp_tempbb_HSGenHeaders.ClientName5, temp_tempbb_HSGenHeaders.ClientName6, temp_tempbb_HSGenHeaders.ClientName7;
+	BEGIN
+	bb_HSGenHeaders.cCRLF :=  CHR(13) || CHR(10);
+
+  StoO_rowcnt := 0;
+  StoO_selcnt := 0;
+  StoO_error  := 0;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Invoice
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'INVOICE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_PleaseRemit
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'PLEASEREMIT'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_InvoiceNo
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'INVOICENO'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_InvoiceDate
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'INVOICEDATE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Date
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'DATE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Activity
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'ACTIVITY'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Employee
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'RESOURCE_CODE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Quantity
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'QUANTITY'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Amount
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'AMOUNT'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Project
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'PROJECT_CODE'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		SELECT   lv.name
+		INTO bb_HSGenHeaders.loc_Total
+		FROM CMN_LOOKUPS_V lv
+		WHERE lv.LOOKUP_CODE = 'TOTAL'
+	 			  AND lv.LOOKUP_TYPE = 'PAC_BB_HEADERS'
+	 			  AND lv.LANGUAGE_CODE = RTRIM(bb_HSGenHeaders.cLanguageCode);
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   RTRIM(dfltbillinglocation)
+		INTO bb_HSGenHeaders.cLocation FROM nameoptions;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  DELETE FROM temp_tempbb_HSGenHeaders;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO temp_tempbb_HSGenHeaders (InvoiceNo, InvoiceDate, COMPANY_CODE, BILL_TO_COMPANY_CODE, RemitLocation)
+    SELECT  IL.InvoiceNo, I.invoicedate, I.COMPANY_CODE, I.BILL_TO_COMPANY_CODE,
+        bb_HSGenHeaders.cLocation
+      FROM bb_HSInvoiceList IL, invoiceheader I
+      WHERE IL.BillingRunKey = bb_HSGenHeaders.iBillRunKey
+      and I.invoiceno = IL.InvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF RTRIM(bb_HSGenHeaders.cLocation) IS NULL THEN
+		OPEN UF1_cursor;
+		LOOP
+			FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+			EXIT WHEN UF1_cursor%NOTFOUND;
+			BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET RemitLocation = UF1_oval1
+          WHERE ROWID = UF1_rowid;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF1_cursor;
+	END IF;
+
+  OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1, UF2_oval2, UF2_oval3, UF2_oval4, UF2_oval5, UF2_oval6, UF2_oval7;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE temp_tempbb_HSGenHeaders
+         SET RemitToAddr1 = UF2_oval1,
+             RemitToAddr2 = UF2_oval2,
+             RemitToAddr3 = UF2_oval3,
+             RemitToAddr4 = UF2_oval4,
+             RemitToAddr5 = UF2_oval5,
+             RemitToAddr6 = UF2_oval6,
+             RemitToAddr7 = UF2_oval7
+       WHERE ROWID = UF2_rowid;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr5 = ' '
+     WHERE LTRIM(RTRIM(RemitToAddr5)) = ',';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr2 = RemitToAddr3,
+           RemitToAddr3 = RemitToAddr4,
+           RemitToAddr4 = RemitToAddr5,
+           RemitToAddr5 = RemitToAddr6,
+           RemitToAddr6 = RemitToAddr7,
+           RemitToAddr7 = ' '
+    WHERE RTRIM(RemitToAddr2) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+
+  &lt;&lt;i_loop1&gt;&gt;
+	WHILE  StoO_rowcnt &gt; 0 and   bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET RemitToAddr2 = RemitToAddr3,
+               RemitToAddr3 = RemitToAddr4,
+               RemitToAddr4 = RemitToAddr5,
+               RemitToAddr5 = RemitToAddr6,
+               RemitToAddr6 = RemitToAddr7,
+               RemitToAddr7 = ' '
+         WHERE RTRIM(RemitToAddr2) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr3 = RemitToAddr4,
+           RemitToAddr4 = RemitToAddr5,
+           RemitToAddr5 = RemitToAddr6,
+           RemitToAddr6 = RemitToAddr7,
+           RemitToAddr7 = ' '
+     WHERE RTRIM(RemitToAddr3) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+
+  &lt;&lt;i_loop2&gt;&gt;
+	WHILE  StoO_rowcnt &gt; 0 and   bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET RemitToAddr3 = RemitToAddr4,
+               RemitToAddr4 = RemitToAddr5,
+               RemitToAddr5 = RemitToAddr6,
+               RemitToAddr6 = RemitToAddr7,
+               RemitToAddr7 = ' '
+         WHERE RTRIM(RemitToAddr3) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr4 = RemitToAddr5,
+           RemitToAddr5 = RemitToAddr6,
+           RemitToAddr6 = RemitToAddr7,
+           RemitToAddr7 = ' '
+     WHERE RTRIM(RemitToAddr4) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop3&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET RemitToAddr4 = RemitToAddr5,
+               RemitToAddr5 = RemitToAddr6,
+               RemitToAddr6 = RemitToAddr7,
+               RemitToAddr7 = ' '
+         WHERE RTRIM(RemitToAddr4) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr5 = RemitToAddr6,
+           RemitToAddr6 = RemitToAddr7,
+           RemitToAddr7 = ' '
+     WHERE RTRIM(RemitToAddr5) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop4&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET RemitToAddr5 = RemitToAddr6,
+               RemitToAddr6 = RemitToAddr7,
+               RemitToAddr7 = ' '
+         WHERE RTRIM(RemitToAddr5) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+ BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET RemitToAddr6 = RemitToAddr7,
+           RemitToAddr7 = ' '
+     WHERE RTRIM(RemitToAddr6) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+	OPEN UF3_cursor;
+	LOOP
+		FETCH UF3_cursor INTO UF3_rowid, UF3_oval1, UF3_oval2, UF3_oval3, UF3_oval4, UF3_oval5, UF3_oval6, UF3_oval7;
+		EXIT WHEN UF3_cursor%NOTFOUND;
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE temp_tempbb_HSGenHeaders
+         SET ClientName1 = UF3_oval1,
+             ClientName2 = UF3_oval2,
+             ClientName3 = UF3_oval3,
+             ClientName4 = UF3_oval4,
+             ClientName5 = UF3_oval5,
+             ClientName6 = UF3_oval6,
+             ClientName7 = UF3_oval7
+       WHERE ROWID = UF3_rowid;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF3_cursor;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName1 = ClientName2,
+           ClientName2 = ClientName3,
+           ClientName3 = ClientName4,
+           ClientName4 = ClientName5,
+           ClientName5 = ClientName6,
+           ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE ClientName1 = ClientName2;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName2 = ClientName3,
+           ClientName3 = ClientName4,
+           ClientName4 = ClientName5,
+           ClientName5 = ClientName6,
+           ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE RTRIM(ClientName2) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop5&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET ClientName2 = ClientName3,
+               ClientName3 = ClientName4,
+               ClientName4 = ClientName5,
+               ClientName5 = ClientName6,
+               ClientName6 = ClientName7,
+               ClientName7 = ' '
+         WHERE RTRIM(ClientName2) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName3 = ClientName4,
+           ClientName4 = ClientName5,
+           ClientName5 = ClientName6,
+           ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE RTRIM(ClientName3) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop6&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET ClientName3 = ClientName4,
+               ClientName4 = ClientName5,
+               ClientName5 = ClientName6,
+               ClientName6 = ClientName7,
+               ClientName7 = ' '
+         WHERE RTRIM(ClientName3) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName4 = ClientName5,
+           ClientName5 = ClientName6,
+           ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE RTRIM(ClientName4) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop7&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET ClientName4 = ClientName5,
+               ClientName5 = ClientName6,
+               ClientName6 = ClientName7,
+               ClientName7 = ' '
+         WHERE RTRIM(ClientName4) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName5 = ClientName6,
+           ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE RTRIM(ClientName5) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_HSGenHeaders.iLup :=  1;
+	&lt;&lt;i_loop8&gt;&gt;
+  WHILE StoO_rowcnt &gt; 0 and bb_HSGenHeaders.iLup &lt; 7 LOOP
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE temp_tempbb_HSGenHeaders
+           SET ClientName5 = ClientName6,
+               ClientName6 = ClientName7,
+               ClientName7 = ' '
+         WHERE RTRIM(ClientName5) IS NULL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      bb_HSGenHeaders.iLup :=  bb_HSGenHeaders.iLup + 1;
+    END;
+	END LOOP;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE temp_tempbb_HSGenHeaders
+       SET ClientName6 = ClientName7,
+           ClientName7 = ' '
+     WHERE RTRIM(ClientName6) IS NULL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 1, RPAD( ' ', 36 )
+        || RTRIM(bb_HSGenHeaders.loc_Invoice)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 10, RPAD(bb_HSGenHeaders.loc_PleaseRemit, 47, ' ')
+        ||RPAD(bb_HSGenHeaders.loc_INVOICENO, 16, ' ')
+        || InvoiceNo
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 20, SUBSTR(RemitToAddr1 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 30, SUBSTR(RemitToAddr2 || RPAD( ' ', 40 ), 1, 40)
+        || RPAD( ' ', 7 )
+        ||RPAD(bb_HSGenHeaders.loc_InvoiceDate, 16, ' ')|| RPAD(TO_CHAR(InvoiceDate,'mm/dd/yyyy'), 12, ' ')
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 40, SUBSTR(RemitToAddr3 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 50, SUBSTR(RemitToAddr4 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 60, SUBSTR(RemitToAddr5 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 70, SUBSTR(RemitToAddr6 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 80, SUBSTR(RemitToAddr7 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 90, ''
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 100, ' '
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 110, SUBSTR(ClientName1 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 120, SUBSTR(ClientName2 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 130, SUBSTR(ClientName3 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 140, SUBSTR(ClientName4 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 150, SUBSTR(ClientName5 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 160, SUBSTR(ClientName6 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 170, SUBSTR(ClientName7 || RPAD( ' ', 40 ), 1, 40)
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+    SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+        InvoiceNo, 1, 180, ' '
+    FROM temp_tempbb_HSGenHeaders;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF bb_HSGenHeaders.iHSDetailMode = 0 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1000, RPAD( ' ', 9 )
+            ||RPAD(bb_HSGenHeaders.loc_Project, 42, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Total, 16, ' ')
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1010, '         __________________________________________________________'
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END;
+	END IF;
+
+  IF bb_HSGenHeaders.iHSDetailMode = 1 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1000,RPAD( ' ', 2 )
+            ||RPAD(bb_HSGenHeaders.loc_Activity, 42, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Quantity, 12, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Amount, 12, ' ')
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1010, '  __________________________________________________________________'
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END;
+	END IF;
+
+  IF bb_HSGenHeaders.iHSDetailMode = 2 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1000,RPAD( ' ', 2 )
+            ||RPAD(bb_HSGenHeaders.loc_Employee, 42, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Quantity, 12, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Amount, 12, ' ')
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1010, '  __________________________________________________________________'
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END;
+	END IF;
+
+  IF bb_HSGenHeaders.iHSDetailMode = 3 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1000,RPAD( ' ', 2 )
+            ||RPAD(bb_HSGenHeaders.loc_Date, 10, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Activity, 20, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Employee, 19, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Quantity, 16, ' ')
+            ||RPAD(bb_HSGenHeaders.loc_Amount, 12, ' ')
+          FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO bb_HSInvoiceLayout (BillingRunKey, UserID, InvoiceNo, SectionNo, LineSeqNo, PrintLine)
+        SELECT  bb_HSGenHeaders.iBillRunKey, bb_HSGenHeaders.cUserID,
+            InvoiceNo, 1, 1010, '___________________________________________________________________________'
+        FROM temp_tempbb_HSGenHeaders;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END;
+	END IF;
+END bb_HSGenHeaders;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

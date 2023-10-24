@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>RPT_FINANCIAL_GROUPING_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."RPT_FINANCIAL_GROUPING_FCT" (
+        p_record_id NUMBER,
+        p_language VARCHAR2
+) 
+RETURN VARCHAR2
+IS
+    v_value VARCHAR2(2000);
+    v_new_value VARCHAR2(4000);
+    v_seq INTEGER;
+BEGIN
+    v_value := NULL;
+    v_new_value := NULL;
+    DECLARE CURSOR cursor1 IS
+    SELECT mvl.seq, l.name
+    FROM   odf_multi_valued_lookups mvl
+           INNER JOIN fin_attributes fa ON mvl.value = fa.code
+           INNER JOIN cmn_lookups_v l ON fa.code = l.lookup_code
+                                     AND l.lookup_type = 'LOOKUP_FIN_GROUPING_ATTRIBUTES_CAPTIONS'
+    WHERE  mvl.object = 'costplan'
+    AND    mvl.attribute =  'grouping_attributes'
+    AND    fa.planning = 1
+    AND    mvl.pk_id = p_record_id
+    AND    l.language_code = p_language
+    ORDER BY mvl.seq;
+    BEGIN
+        OPEN cursor1;
+        LOOP
+            FETCH cursor1 INTO v_seq, v_value;
+            EXIT WHEN cursor1%NOTFOUND;
+            IF v_new_value IS NOT NULL THEN
+                IF LENGTH(v_new_value || '; ' || v_value) &lt;= 4000 THEN
+                    v_new_value := v_new_value || '; ' || v_value;
+                ELSE
+                    v_new_value := SUBSTR(v_new_value || '; ' || v_value,1,4000);
+                END IF;
+            ELSE
+                v_new_value := v_value;
+            END IF;
+        END LOOP;
+        CLOSE cursor1;
+    END;
+    RETURN v_new_value;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

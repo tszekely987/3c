@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>RPT_INV_HIERARCHY_INS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."RPT_INV_HIERARCHY_INS_FCT" (
+    P_INV_HIER_ID IN NUMBER,
+    P_PARENT_ID IN NUMBER,
+    P_CHILD_ID IN NUMBER,
+    P_IS_PARENT IN NUMBER,
+    P_ALLOC_PCT IN NUMBER,
+    P_LEVEL IN NUMBER,
+    P_SEQUENCE IN VARCHAR2,
+    P_CREATED IN DATE
+)
+RETURN INTEGER IS
+BEGIN
+    BEGIN
+    INSERT INTO RPT_INV_HIERARCHY
+        (
+         INV_HIERARCHIES_ID,
+         PARENT_ID,
+         CHILD_ID,
+         IS_PARENT,
+         ALLOC_PCT,
+         THE_LEVEL,
+         SEQUENCE_STR,
+         CREATED_DATE
+        )
+    VALUES
+        (
+         P_INV_HIER_ID,
+         P_PARENT_ID,
+         P_CHILD_ID,
+         P_IS_PARENT,
+         P_ALLOC_PCT,
+         P_LEVEL,
+         P_SEQUENCE,
+         P_CREATED
+        );
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            ROLLBACK;
+            GOTO OUTPUT;
+        END;
+    END;
+    COMMIT;
+    RETURN 0;
+    &lt;&lt;OUTPUT&gt;&gt;
+    RETURN -1;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

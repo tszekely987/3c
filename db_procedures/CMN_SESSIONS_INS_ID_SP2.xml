@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SESSIONS_INS_ID_SP2</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SESSIONS_INS_ID_SP2" (
+   P_USER_ID        IN        NUMBER DEFAULT -9,
+   P_USER_NAME      IN        VARCHAR2,
+   P_TOKEN          IN        VARCHAR2,
+   P_ID             IN        NUMBER,
+   V_TOKEN          OUT       VARCHAR2,
+   P_AUTH_SOURCE    IN        VARCHAR2
+)
+IS
+   V_USER_ID                  NUMBER;
+BEGIN
+  /* If there is no user id, then get it using the user_name*/
+  IF ( P_USER_ID &lt; 0 )
+  THEN
+    SELECT   ID
+    INTO     V_USER_ID
+    FROM  CMN_SEC_USERS WHERE NLS_UPPER(USER_NAME) = NLS_UPPER(P_USER_NAME);
+  ELSE
+    V_USER_ID := P_USER_ID;
+  END IF;
+    
+  /*Append session id to token. Won't need to append after pvision is gone.*/
+  V_TOKEN := P_ID || '__' || P_TOKEN;
+
+  INSERT INTO CMN_SESSIONS
+             (  ID,
+                USER_ID,
+                TOKEN,
+                CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY )
+    VALUES  ( P_ID,
+              V_USER_ID,
+              V_TOKEN,
+              
+              SYSDATE, V_USER_ID, SYSDATE, V_USER_ID );
+  IF ( P_AUTH_SOURCE is NOT NULL)
+  THEN
+  INSERT INTO CMN_SESSION_ATTRS(  SESSION_ID,
+                AUTH_SOURCE_IDENTIFIER
+                )
+    VALUES ( P_ID,
+    P_AUTH_SOURCE
+            );
+  END IF;                     
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_PROJREVISION_DELETE</code>
+          <table_name>PROJREVISION</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_PROJREVISION_DELETE" 
+AFTER DELETE
+ON PROJREVISION
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  changeordersep    GLOBALPKG.STRING;
+  msg               GLOBALPKG.STRING;
+  retcode           NUMBER;
+  minkey            GLOBALPKG.STRING;
+  maxkey            GLOBALPKG.STRING;
+  UF1_rowid         ROWID;
+  UF1_oval1         pac_mnt_projects.startdate%TYPE;
+  UF1_oval2         pac_mnt_projects.completedate%TYPE;
+  UF1_oval3         pac_mnt_projects.targetedstartdate%TYPE;
+  UF1_oval4         pac_mnt_projects.targetedcompldate%TYPE;
+
+  CURSOR UF1_cursor IS
+    SELECT pac_mnt_projects.ROWID, NVL(projrevision.actualstartdate, pac_mnt_projects.startdate), projrevision.actualcompletiondate, projrevision.currenttargetedstartdate, projrevision.currenttargetedcompldate
+      FROM pac_mnt_projects,projrevision
+     WHERE pac_mnt_projects.COMPANY_CODE = projrevision.COMPANY_CODE
+       AND pac_mnt_projects.PROJECT_CODE = projrevision.PROJECT_CODE
+       AND projrevision.COMPANY_CODE = :OLD.COMPANY_CODE
+       AND projrevision.PROJECT_CODE = :OLD.PROJECT_CODE
+       AND projrevision.projrevisionid = (
+             SELECT MAX(projrevisionid)
+               FROM projrevision
+              WHERE COMPANY_CODE = :OLD.COMPANY_CODE
+                AND PROJECT_CODE = :OLD.PROJECT_CODE
+                AND datesrevision = 1
+                AND approved = 1)
+       FOR UPDATE OF pac_mnt_projects.startdate, pac_mnt_projects.completedate, pac_mnt_projects.targetedstartdate, pac_mnt_projects.targetedcompldate;
+
+  UF2_rowid         ROWID;
+  UF2_oval1         pac_mnt_projects.currentrevision%TYPE;
+
+  CURSOR UF2_cursor IS
+    SELECT pac_mnt_projects.ROWID, projrevision.projrevisionid
+      FROM pac_mnt_projects,projrevision
+     WHERE pac_mnt_projects.COMPANY_CODE = :OLD.COMPANY_CODE
+       AND pac_mnt_projects.MASTER_PROJECT_CODE = :OLD.PROJECT_CODE
+       AND projrevision.projrevisionid = (
+             SELECT MAX(projrevisionid)
+               FROM projrevision
+              WHERE COMPANY_CODE = :OLD.COMPANY_CODE
+                AND PROJECT_CODE = :OLD.PROJECT_CODE
+                AND budgetrevision = 1
+                AND approved = 1 )
+       FOR UPDATE OF pac_mnt_projects.currentrevision;
+
+  tempVar1          GLOBALPKG.STRING :='';
+  tempVar2          GLOBALPKG.STRING :='PROJECT_CODE';
+  tempVar3          NUMBER :=1;
+BEGIN
+	BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE  EXISTS (
+      SELECT  1
+      FROM DUAL );
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  IF StoO_selcnt != 0 THEN
+		RETURN ;
+	END IF;
+
+	BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  *
+        FROM DUAL WHERE :OLD.approved = 1 );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  *
+              FROM ppa_TransControl
+              WHERE ppa_TransControl.COMPANY_CODE = :OLD.COMPANY_CODE
+              AND ppa_TransControl.PROJECT_CODE = :OLD.PROJECT_CODE );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              raise_application_error(-20598, 'Revision cannot be deleted because transactions exist for this PROJECT_CODE.');
+              RETURN;
+            END;
+          END IF;
+        END;
+
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  *
+              FROM ppa_WIP w
+              WHERE w.COMPANY_CODE = :OLD.COMPANY_CODE
+              AND w.PROJECT_CODE = :OLD.PROJECT_CODE );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              raise_application_error(-20599, 'Revision cannot be deleted because transactions exist in WIP for this PROJECT_CODE.');
+              RETURN;
+            END;
+          END IF;
+        END;
+
+        BEGIN
+          BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  *
+            FROM ppa_TransWIPAdjust t
+            WHERE t.COMPANY_CODE = :OLD.COMPANY_CODE
+            AND t.PROJECT_CODE = :OLD.PROJECT_CODE );
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+          END;
+
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              raise_application_error(-20600, 'Revision cannot be deleted because transactions exist in TransWipAdjust for this PROJECT_CODE.');
+              RETURN;
+            END;
+          END IF;
+        END;
+
+/*
+        BEGIN
+          BEGIN
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            StoO_rowcnt := 0;
+
+            SELECT 1 INTO StoO_selcnt
+            FROM DUAL
+            WHERE  EXISTS (
+              SELECT  *
+              FROM ppa_WIPHistory w
+              WHERE w.COMPANY_CODE = :OLD.COMPANY_CODE
+              AND w.PROJECT_CODE = :OLD.PROJECT_CODE );
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+          IF StoO_selcnt != 0 THEN
+            BEGIN
+              raise_application_error(-20601, 'Revision cannot be deleted because transactions exist in WIP history for this PROJECT_CODE.');
+              RETURN;
+            END;
+          END IF;
+        END;
+*/
+      END;
+    END IF;
+	END;
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2, UF1_oval3, UF1_oval4;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE pac_mnt_projects
+         SET pac_mnt_projects.startdate = UF1_oval1,
+             pac_mnt_projects.completedate = UF1_oval2,
+             pac_mnt_projects.targetedstartdate = UF1_oval3,
+             pac_mnt_projects.targetedcompldate = UF1_oval4
+       WHERE ROWID = UF1_rowid;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+  CLOSE UF1_cursor;
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+      RETURN;
+    END;
+  END IF;
+
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE pac_mnt_projects
+         SET pac_mnt_projects.currentrevision = UF2_oval1
+       WHERE ROWID = UF2_rowid;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+      END;
+	END LOOP;
+	CLOSE UF2_cursor;
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+      RETURN;
+    END;
+	END IF;
+  
+END tr_projrevision_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

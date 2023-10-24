@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_RETURN_CREDITMEMO_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_RETURN_CREDITMEMO_SP" 
+(
+  invoiceno   VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg VARCHAR2(255);
+  StoO_sqlstatus  INTEGER;
+  cOrigInvNo  VARCHAR2(16);
+  iApplyTo  NUMBER;
+  UF1_rowid   ROWID;
+  UF1_oval1   ppa_WIP.Status%TYPE;
+
+  CURSOR UF1_cursor IS
+    SELECT ppa_WIP.ROWID, 0 FROM ppa_WIP, temp_invoiceapplysp_return_cre
+
+    WHERE ppa_WIP.TransNo = temp_invoiceapplysp_return_cre.applytonumber
+    FOR UPDATE OF ppa_WIP.Status;
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   ApplyTo
+		INTO PAC_BIL_RETURN_CREDITMEMO_SP.iApplyTo FROM ppa_TransBill
+		WHERE InvoiceNo = PAC_BIL_RETURN_CREDITMEMO_SP.invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   InvoiceNo
+		INTO PAC_BIL_RETURN_CREDITMEMO_SP.cOrigInvNo FROM ppa_Billings
+		WHERE TransNo = PAC_BIL_RETURN_CREDITMEMO_SP.iApplyTo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	/*[SPCONV-ERR(23)]:CREATE TABLE temp_invoiceapplysp_return_cre statement passed to ddl file*/
+
+	DELETE FROM temp_invoiceapplysp_return_cre;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_invoiceapplysp_return_cre(APPLYTONUMBER)
+	SELECT DISTINCT  ApplyTo
+		 FROM ppa_Billings
+		WHERE InvoiceNo = PAC_BIL_RETURN_CREDITMEMO_SP.cOrigInvNo
+		 and TransType  IN ('B', 'AU', 'AD');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	/*[SPCONV-ERR(34)]:BEGIN TRAN statement ignored*/
+	NULL;
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP
+		SET
+		Status = UF1_oval1
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TransBill
+		WHERE InvoiceNo = PAC_BIL_RETURN_CREDITMEMO_SP.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_Billings
+	SET Status = 0
+
+	WHERE InvoiceNo = PAC_BIL_RETURN_CREDITMEMO_SP.cOrigInvNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	IF  SUBSTR(PAC_BIL_RETURN_CREDITMEMO_SP.invoiceno, 1, 5) = 'MATCH' THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE invoiceheader
+		SET status = '9'
+
+		WHERE invoiceno = PAC_BIL_RETURN_CREDITMEMO_SP.cOrigInvNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	ELSE
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE invoiceheader
+		SET status = '0'
+
+		WHERE invoiceno = PAC_BIL_RETURN_CREDITMEMO_SP.cOrigInvNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+	DELETE FROM temp_invoiceapplysp_return_cre;
+
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK WORK;
+	END IF;
+END PAC_BIL_RETURN_CREDITMEMO_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

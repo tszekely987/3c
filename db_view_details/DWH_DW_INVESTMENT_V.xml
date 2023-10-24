@@ -1,0 +1,118 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_DW_INVESTMENT_V">
+    <indexes/>
+    <text_length>20167</text_length>
+    <text>select inv_investments.id odf_pk, INV_INVESTMENTS.ID as investment_key, INV_INVESTMENTS.ID as clarity_investment_key, INV_INVESTMENTS.CODE as investment_id, inv_investments.name as investment_name, INV_INVESTMENTS.ODF_OBJECT_CODE as investment_type_key, ( select  nquery.investment_type from (SELECT a.investment_type_key AS investment_type_key,
+       a.investment_type AS investment_type,
+       a.last_updated_date AS last_updated_date,
+       CASE WHEN a.sort_order = 1 THEN a.sort_order ELSE ROW_NUMBER() OVER(PARTITION BY lang.id ORDER BY a.sort_order, a.investment_type) END AS sort_order,
+       1 AS is_active,
+       LANG.LANGUAGE_CODE AS LANGUAGE_CODE,
+       LANG.ID AS LANGUAGE_ID
+FROM   (SELECT lkp.lookup_code AS investment_type_key, 
+               nls.name AS investment_type,
+               lkp.last_updated_date AS last_updated_date,
+               nls.language_code AS language_code,
+               1 AS sort_order
+        FROM   cmn_lookups lkp
+               INNER JOIN cmn_captions_nls nls ON nls.pk_id = lkp.id
+        WHERE  lkp.lookup_type = 'PMA_INVESTMENT_TYPE'
+        AND    lkp.lookup_code = 'all'
+        UNION  ALL
+        SELECT o.code AS investment_type_key,
+               c.name AS investment_type,
+               c.last_updated_date AS last_updated_date,
+               c.language_code AS language_code,
+               2 AS sort_order
+        FROM   odf_objects o 
+               INNER JOIN cmn_captions_nls c ON c.pk_id = o.ID
+               INNER JOIN odf_object_extensions oe ON oe.object_code = o.code
+        WHERE  o.is_customizable = 1
+        AND    o.is_dw_enabled = 1
+        AND    oe.extension_code = 'inv'
+        AND    c.table_name = 'ODF_OBJECTS') a
+        INNER JOIN cmn_languages lang ON lang.language_code = a.language_code
+WHERE   lang.language_code = lang.language_code
+AND     lang.is_dw_enabled = 1  
+AND     1=1) nquery where nquery.investment_type_key = INV_INVESTMENTS.ODF_OBJECT_CODE and rownum = 1 and nquery.language_code = dataw_context.language_code)dw_investment_type_caption, NVL(MANAGER.ID, 0) as investment_manager_key, 
+       MANAGER.FULL_NAME
+      dw_manager_id_caption, NVL(TGT_MANAGER.ID, 0) as target_manager_key, 
+       TGT_MANAGER.FULL_NAME
+      dw_tgt_mgr_id_caption, inv_investments.PROGRESS as progress_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'INVESTMENT_OBJ_PROGRESS' and rownum = 1 and LOOKUP_ENUM = inv_investments.PROGRESS) as progress_caption, inv_investments.STAGE_CODE as stage_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'INV_STAGE_TYPE' and rownum = 1 and LOOKUP_CODE = inv_investments.STAGE_CODE) as stage_code_caption, inv_investments.CI_PROGRESS as ci_progress_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CI_INV_PROGRESS' and rownum = 1 and LOOKUP_ENUM = inv_investments.CI_PROGRESS) as ci_progress_caption, inv_investments.CI_STAGE as ci_stage_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CI_INV_STAGE' and rownum = 1 and LOOKUP_CODE = inv_investments.CI_STAGE) as ci_stage_caption, (SELECT count(id) FROM cmn_lookups_v WHERE parent_lookup_code = INV_INVESTMENTS.process_code AND is_active = 1 AND language_code = 'en') as stage_count, NVL((SELECT count(ID) FROM cmn_lookups_v WHERE parent_lookup_code = INV_INVESTMENTS.process_code AND language_code = 'en' AND IS_ACTIVE = 1 AND SORT_ORDER &lt;= (select sort_order from cmn_lookups_v WHERE lookup_code = INV_INVESTMENTS.stage_code AND lookup_type='INV_STAGE_TYPE' AND language_code = 'en')),0) as stage_number, inv_investments.STATUS as investment_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'INVESTMENT_OBJ_STATUS' and rownum = 1 and LOOKUP_ENUM = inv_investments.STATUS) as status_caption, inv_investments.STATUS_INDICATOR as status_indicator_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'INVESTMENT_STATUS_INDICATOR' and rownum = 1 and LOOKUP_ENUM = inv_investments.STATUS_INDICATOR) as status_indicator_caption, inv_investments.GOAL_CODE as goal_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'INVESTMENT_GOAL_TYPE' and rownum = 1 and LOOKUP_CODE = inv_investments.GOAL_CODE) as goal_code_caption, inv_investments.ODF_BLUEPRINT_ID as blueprint_key, ( select  nquery.name from (SELECT
+        a.id AS id,
+        a.code AS unique_code,
+        a.name AS name,
+        b.type AS type,
+        b.created_date AS created_date,
+        b.last_updated_date AS last_updated_date
+         FROM ODF_ABSTRACT_BLUEPRINTS a JOIN ODF_BLUEPRINTS b ON a.id = b.id
+         WHERE b.blueprint_mode = 'PUBLISHED'
+         AND (NULL IS NULL OR
+              NLS_UPPER(NULL) =  NLS_UPPER(b.TYPE))
+         AND (NULL IS NULL OR
+              NLS_UPPER(NULL) =  NLS_UPPER(b.CLASSIFIER))
+         AND b.IS_PRIVATE = 0 AND b.BLUEPRINT_LEVEL = 1
+         AND 1=1) nquery where nquery.id = inv_investments.odf_blueprint_id and rownum = 1)odf_blueprint_id_caption, NVL(inv_investments.odf_blueprint_id, (select id from odf_blueprints b where b.type = NLS_UPPER(inv_investments.odf_object_code) and b.is_default = 1)) as active_blueprint_key, ( select  nquery.name from (SELECT
+        a.id AS id,
+        a.code AS unique_code,
+        a.name AS name,
+        b.type AS type,
+        b.created_date AS created_date,
+        b.last_updated_date AS last_updated_date
+         FROM ODF_ABSTRACT_BLUEPRINTS a JOIN ODF_BLUEPRINTS b ON a.id = b.id
+         WHERE b.blueprint_mode = 'PUBLISHED'
+         AND (NULL IS NULL OR
+              NLS_UPPER(NULL) =  NLS_UPPER(b.TYPE))
+         AND (NULL IS NULL OR
+              NLS_UPPER(NULL) =  NLS_UPPER(b.CLASSIFIER))
+         AND b.IS_PRIVATE = 0 AND b.BLUEPRINT_LEVEL = 1
+         AND 1=1) nquery where nquery.id = NVL(inv_investments.odf_blueprint_id, (select id from odf_blueprints b where b.type = NLS_UPPER(inv_investments.odf_object_code) and b.is_default = 1)) and rownum = 1)odf_blp_active_id_caption, (select entity.id from entity where entity.entity = inv_investments.entity_code) as entity_key, 
+       (select entity.shortdesc from entity where entity.entity = inv_investments.entity_code)
+      dw_entity_id_caption, (select locations.id from locations where pac_mnt_projects.locationid = locations.locationid) as location_key, 
+       (select locations.shortdesc from locations where pac_mnt_projects.locationid = locations.locationid)
+      dw_location_id_caption, (select departments.id from departments where pac_mnt_projects.departcode = departments.departcode) as department_key, 
+       (select departments.shortdesc from departments where pac_mnt_projects.departcode = departments.departcode)
+      dw_dept_id_caption, (select srm_companies.id from srm_companies where pac_mnt_projects.company_code = srm_companies.company_id) as company_key, 
+       (select srm_companies.company_name from srm_companies where pac_mnt_projects.company_code = srm_companies.company_id)
+      dw_company_id_caption, inv_investments.chargecodeid as charge_code_key, 
+       (SELECT prChargeCode.prName FROM prChargeCode WHERE prChargeCode.prID = INV_INVESTMENTS.chargeCodeID)
+      chargecodeid_caption, PAC_MNT_PROJECTS.COST_TYPE as cost_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'LOOKUP_FIN_COSTTYPECODE' and rownum = 1 and LOOKUP_CODE = PAC_MNT_PROJECTS.COST_TYPE) as cost_type_caption, PAC_MNT_PROJECTS.STATUS as fin_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'PAC_PROJECT_STATUS' and rownum = 1 and LOOKUP_CODE = PAC_MNT_PROJECTS.STATUS) as npio_status_caption, (select WIPCLASS.id from WIPCLASS where pac_mnt_projects.WIPCLASS = WIPCLASS.WIPCLASS) as wip_class_key, 
+       (select WIPCLASS.shortdesc from WIPCLASS where pac_mnt_projects.WIPCLASS = WIPCLASS.WIPCLASS)
+      dw_wip_cls_id_caption, (select projclass.id from projclass where PAC_MNT_PROJECTS.CLASS = projclass.projclass) as investment_class_key, 
+       (select projclass.shortdesc from projclass where PAC_MNT_PROJECTS.CLASS = projclass.projclass)
+      dw_inv_cls_id_caption, INV_INVESTMENTS.CURRENCY_CODE as home_currency_code, PAC_MNT_PROJECTS.BILLING_CURRENCY_CODE as billing_currency_code, inv_investments.description as description, inv_investments.STATUS_COMMENT as status_comment, NVL(inv_projects.is_template,0) as is_template, CMN_DATE_TRUNC_FCT(CASE WHEN INV_INVESTMENTS.SCHEDULE_START IS NULL
+                                                       THEN (CASE WHEN INV_INVESTMENTS.ODF_OBJECT_CODE IN ('application', 'asset', 'idea', 'other', 'service')
+                                                                  THEN NULL
+                                                                  ELSE NVL(COP_CALC_FINISH_FCT(INV_INVESTMENTS.SCHEDULE_FINISH), SYSDATE) END)
+                                                       ELSE INV_INVESTMENTS.SCHEDULE_START END) as schedule_start, CMN_DATE_TRUNC_FCT(CASE WHEN INV_INVESTMENTS.SCHEDULE_FINISH IS NULL
+                                                       THEN (CASE WHEN INV_INVESTMENTS.ODF_OBJECT_CODE IN ('application', 'asset', 'idea', 'other', 'service')
+                                                                  THEN NULL
+                                                                  ELSE NVL(COP_CALC_FINISH_FCT(INV_INVESTMENTS.SCHEDULE_START), SYSDATE) END)
+                                                       ELSE COP_CALC_FINISH_FCT(INV_INVESTMENTS.SCHEDULE_FINISH) END) as schedule_finish, BASEREC.START_DATE as baseline_start, COP_CALC_FINISH_FCT(BASEREC.FINISH_DATE) as baseline_finish, COP_DAYS_LATE_PCT_FCT(INV_INVESTMENTS.SCHEDULE_FINISH, BASEREC.FINISH_DATE, INV_INVESTMENTS.SCHEDULE_START, INV_INVESTMENTS.SCHEDULE_FINISH, BASEREC.START_DATE, BASEREC.FINISH_DATE, INV_INVESTMENTS.PROGRESS) as days_late_pct, COP_DAYS_LATE_FCT(INV_INVESTMENTS.SCHEDULE_FINISH, BASEREC.FINISH_DATE, INV_INVESTMENTS.PROGRESS) as days_late, CMN_DATE_TRUNC_FCT(FIN_FINANCIALS.PLANNED_CST_START) as planned_cost_start, COP_CALC_FINISH_FCT(FIN_FINANCIALS.PLANNED_CST_FINISH) as planned_cost_finish, COP_CALC_FINISH_FCT(FIN_FINANCIALS.PLANNED_BREAKEVEN) as planned_breakeven, CMN_DATE_TRUNC_FCT(FIN_FINANCIALS.PLANNED_BEN_START) as planned_benefit_start, COP_CALC_FINISH_FCT(FIN_FINANCIALS.PLANNED_BEN_FINISH) as planned_benefit_finish, fin_financials.PLANNED_PAYBACK_PERIOD as planned_payback_period, CMN_DATE_TRUNC_FCT(FIN_FINANCIALS.BUDGET_CST_START) as budgeted_cost_start, COP_CALC_FINISH_FCT(FIN_FINANCIALS.BUDGET_CST_FINISH) as budgeted_cost_finish, COP_CALC_FINISH_FCT(FIN_FINANCIALS.BUDGET_BREAKEVEN) as budgeted_breakeven, CMN_DATE_TRUNC_FCT(FIN_FINANCIALS.BUDGET_REV_START) as budgeted_benefit_start, COP_CALC_FINISH_FCT(FIN_FINANCIALS.BUDGET_REV_FINISH) as budgeted_benefit_finish, fin_financials.BUDGET_PAYBACK_PERIOD as budgeted_payback_period, inv_investments.priority as priority, inv_investments.IS_ACTIVE as is_active, inv_investments.IS_REQUIRED as is_required, inv_investments.is_open_for_te as is_open_for_te, inv_investments.track_mode as track_mode_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'prTrackMode' and rownum = 1 and LOOKUP_ENUM = inv_investments.track_mode) as trackmode_caption, (CASE WHEN INV_INVESTMENTS.ODF_OBJECT_CODE &lt;&gt; 'project' THEN INV_INVESTMENTS.RISK
+        ELSE (inv_projects.RCF_FLEXIBILITY * 1.000000 +
+         inv_projects.RCF_FUNDING * 1.000000 +
+         inv_projects.RCF_HUMAN_INTERFACE * 1.000000 +
+         inv_projects.RCF_IMPLEMENTATION * 1.000000 +
+         inv_projects.RCF_INTERDEPENDENCY * 1.000000 +
+         inv_projects.RCF_OBJECTIVES * 1.000000 +
+         inv_projects.RCF_ORG_CULTURE * 1.000000 +
+         inv_projects.RCF_RESOURCE_AVAIL * 1.000000 +
+         inv_projects.RCF_SPONSORSHIP * 1.000000 +
+         inv_projects.RCF_SUPPORTABILITY * 1.000000 +
+         inv_projects.RCF_TECHNICAL * 1.000000) /
+         (1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000 + 1.000000) END) as risk, IDEAS.ID as originating_idea_key, IDEAS.CODE as originating_idea_id, IDEAS.NAME as originating_idea_name, CREATED.ID as created_by_key, 
+        CREATED.FULL_NAME
+      dwh_created_by_caption, UPDATED.ID as updated_by_key, 
+        UPDATED.FULL_NAME
+      dwh_updated_by_caption, INV_INVESTMENTS.CREATED_DATE as clarity_created_date, (
+        CASE
+        WHEN BASEREC.LAST_UPDATED_DATE IS NULL THEN
+          INV_INVESTMENTS.LAST_UPDATED_DATE
+        ELSE
+          GREATEST(INV_INVESTMENTS.LAST_UPDATED_DATE, BASEREC.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, NVL(PARENT.id,0) as parent_investment_key, 
+        PARENT.name
+      dw_parent_inv_id_caption, odf_ca_inv.obj_align_factor1 as align_corporate_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor1) as obj_align_factor1_caption, odf_ca_inv.obj_align_factor2 as align_business_unit_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor2) as obj_align_factor2_caption, odf_ca_inv.obj_align_factor3 as align_architectural_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor3) as obj_align_factor3_caption, odf_ca_inv.obj_align_factor4 as align_commercial_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor4) as obj_align_factor4_caption, odf_ca_inv.obj_align_factor5 as align_regulatory_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_FACTOR5_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor5) as obj_align_factor5_caption, odf_ca_inv.obj_align_factor6 as align_technology_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_ALIGNMENT_FACTOR6_ENUM' and rownum = 1 and LOOKUP_ENUM = odf_ca_inv.obj_align_factor6) as obj_align_factor6_caption, (CASE WHEN (nvl2((odf_ca_inv.obj_align_factor1*1),1,0)+nvl2((odf_ca_inv.obj_align_factor2*1),1,0)+nvl2((odf_ca_inv.obj_align_factor3*1),1,0)+nvl2((odf_ca_inv.obj_align_factor4*1),1,0)+nvl2((odf_ca_inv.obj_align_factor5*1),1,0)+nvl2((odf_ca_inv.obj_align_factor6*1),1,0))=0 THEN NULL ELSE (nvl((odf_ca_inv.obj_align_factor1*1),0)+nvl((odf_ca_inv.obj_align_factor2*1),0)+nvl((odf_ca_inv.obj_align_factor3*1),0)+nvl((odf_ca_inv.obj_align_factor4*1),0)+nvl((odf_ca_inv.obj_align_factor5*1),0)+nvl((odf_ca_inv.obj_align_factor6*1),0))/(nvl2((odf_ca_inv.obj_align_factor1*1),1,0)+nvl2((odf_ca_inv.obj_align_factor2*1),1,0)+nvl2((odf_ca_inv.obj_align_factor3*1),1,0)+nvl2((odf_ca_inv.obj_align_factor4*1),1,0)+nvl2((odf_ca_inv.obj_align_factor5*1),1,0)+nvl2((odf_ca_inv.obj_align_factor6*1),1,0)) END ) as business_alignment, odf_ca_inv.obj_pfl_category1 as portfolio_cat1_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_PFL_CATEGORY1' and rownum = 1 and LOOKUP_CODE = odf_ca_inv.obj_pfl_category1) as obj_pfl_category1_caption, odf_ca_inv.obj_pfl_category2 as portfolio_cat2_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_PFL_CATEGORY2' and rownum = 1 and LOOKUP_CODE = odf_ca_inv.obj_pfl_category2) as obj_pfl_category2_caption, odf_ca_inv.obj_pfl_category3 as portfolio_cat3_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_PFL_CATEGORY3' and rownum = 1 and LOOKUP_CODE = odf_ca_inv.obj_pfl_category3) as obj_pfl_category3_caption, odf_ca_inv.obj_pfl_category4 as portfolio_cat4_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_PFL_CATEGORY4' and rownum = 1 and LOOKUP_CODE = odf_ca_inv.obj_pfl_category4) as obj_pfl_category4_caption, odf_ca_inv.obj_work_status as work_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'OBJ_INVESTMENT_WORK_STATUS' and rownum = 1 and LOOKUP_CODE = odf_ca_inv.obj_work_status) as obj_work_status_caption, (CASE WHEN (nvl2((inv_investments.RCF_FLEXIBILITY*1),1,0)+nvl2((inv_investments.RCF_FUNDING*1),1,0)+nvl2((inv_investments.RCF_HUMAN_INTERFACE*1),1,0)+nvl2((inv_investments.RCF_IMPLEMENTATION*1),1,0)+nvl2((inv_investments.RCF_INTERDEPENDENCY*1),1,0)+nvl2((inv_investments.RCF_OBJECTIVES*1),1,0)+nvl2((inv_investments.RCF_ORG_CULTURE*1),1,0)+nvl2((inv_investments.RCF_RESOURCE_AVAIL*1),1,0)+nvl2((inv_investments.RCF_SPONSORSHIP*1),1,0)+nvl2((inv_investments.RCF_SUPPORTABILITY*1),1,0)+nvl2((inv_investments.RCF_TECHNICAL*1),1,0))=0 THEN NULL ELSE (nvl((inv_investments.RCF_FLEXIBILITY*1),0)+nvl((inv_investments.RCF_FUNDING*1),0)+nvl((inv_investments.RCF_HUMAN_INTERFACE*1),0)+nvl((inv_investments.RCF_IMPLEMENTATION*1),0)+nvl((inv_investments.RCF_INTERDEPENDENCY*1),0)+nvl((inv_investments.RCF_OBJECTIVES*1),0)+nvl((inv_investments.RCF_ORG_CULTURE*1),0)+nvl((inv_investments.RCF_RESOURCE_AVAIL*1),0)+nvl((inv_investments.RCF_SPONSORSHIP*1),0)+nvl((inv_investments.RCF_SUPPORTABILITY*1),0)+nvl((inv_investments.RCF_TECHNICAL*1),0))/(nvl2((inv_investments.RCF_FLEXIBILITY*1),1,0)+nvl2((inv_investments.RCF_FUNDING*1),1,0)+nvl2((inv_investments.RCF_HUMAN_INTERFACE*1),1,0)+nvl2((inv_investments.RCF_IMPLEMENTATION*1),1,0)+nvl2((inv_investments.RCF_INTERDEPENDENCY*1),1,0)+nvl2((inv_investments.RCF_OBJECTIVES*1),1,0)+nvl2((inv_investments.RCF_ORG_CULTURE*1),1,0)+nvl2((inv_investments.RCF_RESOURCE_AVAIL*1),1,0)+nvl2((inv_investments.RCF_SPONSORSHIP*1),1,0)+nvl2((inv_investments.RCF_SUPPORTABILITY*1),1,0)+nvl2((inv_investments.RCF_TECHNICAL*1),1,0)) END ) as risk_score, DBMS_LOB.SUBSTR(CMN_GET_PLAIN_TEXT_FCT(odf_ca_inv.vsm_lean_bc), 1000, 1) as vsm_lean_bc, dataw_context.language_code, dataw_context.id language_id from inv_investments inv_investments inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN pac_mnt_projects PAC_MNT_PROJECTS ON PAC_MNT_PROJECTS.id=inv_investments.id LEFT OUTER JOIN prj_baseline_details BASEREC ON BASEREC.BASELINE_ID = INV_INVESTMENTS.BASELINE_ID AND BASEREC.OBJECT_TYPE = UPPER(INV_INVESTMENTS.ODF_OBJECT_CODE) LEFT OUTER JOIN inv_investments IDEAS ON IDEAS.ID = INV_INVESTMENTS.IDEA_ID LEFT OUTER JOIN srm_resources MANAGER ON INV_INVESTMENTS.MANAGER_ID = MANAGER.USER_ID LEFT OUTER JOIN srm_resources TGT_MANAGER ON INV_INVESTMENTS.TARGET_MANAGER_ID = TGT_MANAGER.USER_ID LEFT OUTER JOIN inv_investments PARENT ON INV_INVESTMENTS.PARENT_ID = PARENT.ID JOIN odf_ca_inv odf_ca_inv ON odf_ca_inv.id=inv_investments.id join odf_object_instance_mapping oim1 on inv_investments.id = oim1.primary_object_instance_id  and oim1.primary_object_instance_code=inv_investments.odf_object_code join fin_financials fin_financials on oim1.secondary_object_instance_id = fin_financials.id and oim1.secondary_object_instance_code='financials' JOIN odf_ca_financials odf_ca_financials ON odf_ca_financials.id=FIN_FINANCIALS.id LEFT OUTER JOIN inv_projects inv_projects ON INV_INVESTMENTS.ID = INV_PROJECTS.PRID JOIN srm_resources CREATED ON CREATED.user_id=inv_investments.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=inv_investments.last_updated_by  where 1 = 1AND INV_INVESTMENTS.ODF_OBJECT_CODE IN (SELECT object_code FROM dwh_cfg_object_type) and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

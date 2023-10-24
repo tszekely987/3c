@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_POPULATE_OBS_DIM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_POPULATE_OBS_DIM_SP" 
+AS
+   CURSOR C_OBS_TYPES
+   IS
+      SELECT   ID,
+               NAME
+      FROM     PRJ_OBS_TYPES
+      WHERE    ID IN (SELECT   OBS_TYPE_ID
+                      FROM     NBI_CFG_OBS_ASSIGNMENTS);
+
+   CURSOR C_TOP_UNITS
+   IS
+      SELECT   U.TYPE_ID,
+               U.ID UNIT_ID,
+               U.NAME,
+               U.DEPTH,
+               NBI_OBS_UNIT_ISLEAF_FCT (U.ID) IS_LEAF,
+               T.NAME TYPE_NAME
+      FROM     PRJ_OBS_UNITS U,
+               PRJ_OBS_TYPES T
+      WHERE    U.PARENT_ID IS NULL
+      AND      T.ID = U.TYPE_ID
+       ORDER BY U.TYPE_ID,
+                T.ID;
+
+   V_UNIT_VALUES                 NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE;
+   V_UNIT_IDS                    NBI_UTILS_PKG.NBI_NUMBER_TAB_TYPE;
+   V_STMT                        VARCHAR2 (200);
+BEGIN
+
+   FOR I IN 1 .. 10
+   LOOP
+      V_UNIT_VALUES (I) := NULL;
+      V_UNIT_IDS (I) := NULL;
+   END LOOP;
+   
+   V_STMT := 'Inserting top level OBS dimension entries (ALL)';
+
+   FOR C_OBS_TYPE_REC IN C_OBS_TYPES
+   LOOP
+      INSERT INTO NBI_DIM_OBS
+                  (
+                     OBS_TYPE_ID,
+                     OBS_TYPE_NAME,
+                     OBS_UNIT_ID,
+                     IS_LEAF,
+                     PATH,
+                     LEVEL0_NAME,
+                     LEVEL0_UNIT_ID,
+                     HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+                  )
+         SELECT   C_OBS_TYPE_REC.ID,
+                  C_OBS_TYPE_REC.NAME,
+                  0,
+                  0,
+                  'ALL',
+                  'ALL',
+                  0,
+                  0,
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+         FROM     DUAL
+         WHERE    NOT EXISTS (SELECT   'obs ALL entry exists'
+                              FROM     NBI_DIM_OBS
+                              WHERE    OBS_TYPE_ID = C_OBS_TYPE_REC.ID
+                              AND      OBS_UNIT_ID = 0);
+   END LOOP;
+
+   V_STMT := 'Insert first level OBS dimension unit';
+
+   FOR C_TOP_UNIT_REC IN C_TOP_UNITS
+   LOOP
+      INSERT INTO NBI_DIM_OBS
+                  (
+                     OBS_TYPE_ID,
+                     OBS_TYPE_NAME,
+                     OBS_UNIT_ID,
+                     IS_LEAF,
+                     PATH,
+                     LEVEL0_NAME,
+                     LEVEL1_NAME,
+                     LEVEL0_UNIT_ID,
+                     LEVEL1_UNIT_ID,
+                     HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+                  )
+         SELECT   C_TOP_UNIT_REC.TYPE_ID,
+                  C_TOP_UNIT_REC.TYPE_NAME,
+                  C_TOP_UNIT_REC.UNIT_ID,
+                  C_TOP_UNIT_REC.IS_LEAF,
+                  'ALL/' || C_TOP_UNIT_REC.NAME,
+                  'ALL',
+                  C_TOP_UNIT_REC.NAME,
+                  0,
+                  C_TOP_UNIT_REC.UNIT_ID,
+                  C_TOP_UNIT_REC.DEPTH,
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+         FROM     DUAL
+         WHERE    NOT EXISTS (SELECT   'obs ALL entry exists'
+                              FROM     NBI_DIM_OBS
+                              WHERE    OBS_TYPE_ID = C_TOP_UNIT_REC.TYPE_ID
+                              AND      OBS_UNIT_ID = C_TOP_UNIT_REC.UNIT_ID);
+
+      /* Populate unit_tab with current LEVELx_NAMEs */
+      V_UNIT_VALUES (1) := C_TOP_UNIT_REC.NAME;
+      V_UNIT_IDS (1) := C_TOP_UNIT_REC.UNIT_ID;
+      V_STMT := 'Calling NBI_POPULATE_OBS_RECURSIVE_SP';
+      NBI_POPULATE_OBS_RECURSIVE_SP (C_TOP_UNIT_REC.UNIT_ID, V_UNIT_VALUES, V_UNIT_IDS);
+   END LOOP;
+
+   /* Delete all those OBS entries from NBI_DIM_OBS that don't exist in PRJ_OBS_UNITS any longer and
+      they don't exist in NBI_PM_PROJECT_TIME_FACTS either */
+/*   V_STMT := 'Deleting  OBS dimension entries';
+
+   DELETE
+     FROM NBI_DIM_OBS
+    WHERE OBS_UNIT_ID NOT IN (SELECT   ID
+                              FROM     PRJ_OBS_UNITS)
+ AND      OBS_UNIT_ID &lt;&gt; 0
+ AND      OBS_UNIT_ID NOT IN (SELECT   OBS1_UNIT_ID
+                              FROM     NBI_PM_PROJECT_TIME_FACTS
+                              UNION
+                              SELECT   OBS2_UNIT_ID
+                              FROM     NBI_PM_PROJECT_TIME_FACTS
+                              UNION
+                              SELECT   OBS3_UNIT_ID
+                              FROM     NBI_PM_PROJECT_TIME_FACTS
+                              UNION
+                              SELECT   OBS4_UNIT_ID
+                              FROM     NBI_PM_PROJECT_TIME_FACTS
+                              UNION
+                              SELECT   OBS5_UNIT_ID
+                              FROM     NBI_PM_PROJECT_TIME_FACTS);
+
+   COMMIT;
+   V_STMT := 'Populating NBI_DIM_OBS_FLAT';
+*/
+   NBI_DIM_OBS_FLAT_SP;
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_POPULATE_OBS_DIM_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

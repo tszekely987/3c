@@ -1,0 +1,79 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CLB_SEARCH_CONTENTS_INSTACTS_V">
+    <indexes/>
+    <text_length>3231</text_length>
+    <text>(
+SELECT CONTENT.ID                                       ,
+       CONTENT.OBJECT_TYPE_ID OBJECT_TYPE_ID            ,
+       CONTENT.FEATURE FEATURE                          ,
+       CONTENT.FEATURE_TYPE FEATURE_TYPE                ,
+       CONTENT.OBJECT_ID OBJECT_ID                      ,
+       CONTENT.NAME NAME                                ,
+       CONTENT.OWNER_ID OWNER_ID                        ,
+       USR.FIRST_NAME OWNER_FIRST_NAME                  ,
+       USR.LAST_NAME OWNER_LAST_NAME                    ,
+       CONTENT.PROJECT_ID PROJECT_ID                    ,
+       INVESTMENT.NAME PROJECT                             ,
+       CONTENT.CREATED_DATE CREATED_DATE                ,
+       CONTENT.LAST_UPDATED_DATE LAST_UPDATED_DATE      ,
+       P.USER_ID USER_ID                              ,
+       CONTENT.SEC_OBJECT_TYPE_ID SEC_OBJECT_TYPE_ID    ,
+       CONTENT.SEC_OBJECT_ID SEC_OBJECT_ID		,
+       APV.PATH_NAME || '/' || APV.NAME	LOCATION
+FROM   INV_INVESTMENTS INVESTMENT                            ,
+       CMN_SEC_USERS USR                     ,
+       CLB_SEARCH_CONTENTS CONTENT , 
+       CLB_DMS_FOLDERS          APV                 , 
+	CMN_SEC_ASSGND_OBJ_PERM_V0 P
+WHERE  CONTENT.FEATURE='Activities' AND
+       APV.ID = CONTENT.SEC_OBJECT_ID  AND
+       P.OBJECT_ID = 200	AND
+       P.PERMISSION_VALUE = 1	AND
+       P.OBJECT_INSTANCE_ID = APV.ID	AND
+       CONTENT.OWNER_ID = USR.ID AND
+       CONTENT.PROJECT_ID = INVESTMENT.ID(+)
+UNION
+SELECT CONTENT.ID                                       ,
+       CONTENT.OBJECT_TYPE_ID OBJECT_TYPE_ID            ,
+       CONTENT.FEATURE FEATURE                          ,
+       CONTENT.FEATURE_TYPE FEATURE_TYPE                ,
+       CONTENT.OBJECT_ID OBJECT_ID                      ,
+       CONTENT.NAME NAME                                ,
+       CONTENT.OWNER_ID OWNER_ID                        ,
+       USR.FIRST_NAME OWNER_FIRST_NAME                  ,
+       USR.LAST_NAME OWNER_LAST_NAME                    ,
+       CONTENT.PROJECT_ID PROJECT_ID                    ,
+       INVESTMENT.NAME PROJECT                             ,
+       CONTENT.CREATED_DATE CREATED_DATE                ,
+       CONTENT.LAST_UPDATED_DATE LAST_UPDATED_DATE      ,
+       P.USER_ID USER_ID                              ,
+       CONTENT.SEC_OBJECT_TYPE_ID SEC_OBJECT_TYPE_ID    ,
+       CONTENT.SEC_OBJECT_ID SEC_OBJECT_ID		,
+       APV.PATH_NAME || '/' || APV.NAME	LOCATION
+FROM   INV_INVESTMENTS INVESTMENT                            ,
+       CMN_SEC_USERS USR                     ,
+       CLB_SEARCH_CONTENTS CONTENT , 
+       CLB_DMS_FOLDERS          APV                 , 
+	   CLB_DMS_FOLDERS          PF					,
+	   CLB_DMS_FLAT_HIERARCHY	FH					,
+	CMN_SEC_ASSGND_OBJ_PERM_V0 P
+WHERE  CONTENT.FEATURE='Activities' AND
+       APV.ID = CONTENT.SEC_OBJECT_ID  AND
+	   APV.ALLOW_NON_PARTICIPANTS = 1  AND
+	   APV.ID = FH.CHILD_ID		  AND
+	   PF.ID  = FH.ANCESTOR_ID	  AND
+       P.OBJECT_ID = 663	AND
+       P.PERMISSION_VALUE = 1	AND
+	   P.PERMISSION_CODE = 'ProjectViewDOCM'  AND
+       P.OBJECT_INSTANCE_ID = INVESTMENT.ID	AND
+	   PF.ASSOC_OBJ_ID = INVESTMENT.ID			AND
+       CONTENT.OWNER_ID = USR.ID AND
+       CONTENT.PROJECT_ID = INVESTMENT.ID(+)
+)
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

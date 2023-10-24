@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="userlistbylicensetype" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            <nls languageCode="en" name="User List by License Type"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:USER_LIST:countTab.user_id:User_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:u.last_name:Last_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:u.user_name:User_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:r.unique_name:id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:u.first_name:First_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:l.name:Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_LIST:u.last_logged_in_date:Last_Logged@
+FROM   (SELECT  max(licence_priority) max_priority, 
+                    user_id
+        FROM     cmn_lic_users_v
+        GROUP BY user_id) countTab, 
+       cmn_lookups_v l, 
+       cmn_sec_users u,SRM_RESOURCES r
+WHERE  l.sort_order = countTab.max_priority 
+AND    l.lookup_type = 'CMN_LIC_RIGHT_TYPE'
+AND    u.id = countTab.user_id
+AND    u.user_status_id = 200
+AND    u.is_hidden = 0
+AND    u.id = r.user_id
+AND    l.language_code = @WHERE:PARAM:LANGUAGE@
+AND    l.lookup_code = @where:param:xml:string:/data/license_type/@value@
+AND      EXISTS (select  1
+         FROM    cmn_sec_chk_user_r_v0
+         WHERE  object_id = 1
+         AND  permission_code = 'AdminAccess'
+         AND  user_id = @WHERE:PARAM:USER_ID@)
+AND    @FILTER@]]></nsql>
+            <attribute id="user_id" required="false"/>
+            <attribute id="last_name" required="false"/>
+            <attribute id="user_name" required="false"/>
+            <attribute id="id" required="false"/>
+            <attribute id="first_name" required="false"/>
+            <attribute id="name" lookup="CMN_DYN_LIC_LOOKUP" required="false"/>
+            <attribute id="last_logged" required="false"/>
+            <links>
+              <link action="userbyrights" code="user_id">
+                
+                
+                
+                
+                <nls languageCode="en" name="User Id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="user_id" dataSource="data" paramCode="user_id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

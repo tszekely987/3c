@@ -1,0 +1,81 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_I_TRANSACTION_V">
+    <indexes/>
+    <text_length>4870</text_length>
+    <text>SELECT CAST (ft.transno AS INTEGER) transaction_key,
+       ft.transno clarity_transaction_key,
+       CAST (NVL (i.id, 0) AS INTEGER) investment_key,
+       i.code investment_id,
+       i.name investment_name,
+       CAST (NVL (t.prID, 0) AS INTEGER) task_key,
+       t.prExternalID task_id,
+       t.prName task_name,
+       CAST (NVL (r.id, 0) AS INTEGER) resource_key,
+       NVL (r.unique_name, 'X') resource_id,
+       r.full_name resource_name,
+       tc.transtype transaction_type_key,
+       NVL((SELECT CAST (id AS INTEGER) FROM entity WHERE  entity = ft.entity),0) entity_key,
+      (SELECT shortdesc FROM entity WHERE entity = ft.entity) entity,
+      (SELECT CAST (id AS INTEGER) FROM wipclass WHERE wipclass = ft.wipclass) wip_class_key,
+      (SELECT shortdesc FROM wipclass WHERE wipclass = ft.wipclass) wip_class,
+      (SELECT CAST (id AS INTEGER) FROM projclass WHERE projclass = ft.projectclass) investment_class_key,
+      (SELECT shortdesc FROM projclass WHERE projclass = ft.projectclass) investment_class,
+       NVL((SELECT CAST (id AS INTEGER) FROM srm_companies WHERE company_id = ft.company_code),0) company_key,
+      (SELECT company_name FROM srm_companies WHERE company_id = ft.company_code) company_name,
+       NVL((SELECT CAST (prID AS INTEGER) FROM prChargeCode WHERE prExternalID = ft.charge_code),0) charge_code_key,
+      (SELECT prName FROM prChargeCode WHERE prExternalID = ft.charge_code) charge_code,
+       NVL(ft.cost_type,'0') cost_type_key,
+       NVL((SELECT prID FROM prTypeCode WHERE prExternalID = ft.input_type),0) input_type_code_key,
+      (SELECT prName FROM prTypeCode WHERE prExternalID = ft.input_type) input_type_code,
+       NVL(ft.user_lov1,'0') user_value1_key,
+       NVL(ft.user_lov2,'0') user_value2_key,
+       NVL((SELECT CAST (id AS INTEGER) FROM pac_fos_resource_class WHERE resource_class = ft.resource_class),0) resource_class_key,
+       NVL((SELECT description FROM pac_fos_resource_class WHERE resource_class = ft.resource_class),'X') resource_class,
+       NVL (rr.id, 0) role_key,
+       rr.full_name role_name,
+       CAST(tc.id AS INTEGER) transaction_class_key,
+       NVL(tc.shortdesc,'X') transaction_class,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = ft.emplyhomelocation),0) resource_location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = ft.emplyhomelocation) resource_location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = ft.emplyhomedepart),0) resource_department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = ft.emplyhomedepart) resource_department,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = ft.project_location),0) investment_location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = ft.project_location) investment_location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = ft.project_department),0) investment_department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = ft.project_department) investment_department,
+       NVL(ft.batchno, 0) batch_number,
+       ft.status transaction_status_flag,
+       ft.invoiceno invoice_number,
+       ft.notes,
+       ft.externalbatchid external_batch_id,
+       NVL (ft.externaltransno, 0) external_transaction_id,
+       ft.voucherno voucher_number,
+       ft.pono po_number,
+       CAST (NVL (v.id, 0) AS INTEGER) vendor_key,
+       v.vendor_code vendor_id,
+       v.address_name vendor_name,
+       NVL((SELECT CAST (id AS INTEGER) FROM srm_resources WHERE unique_name = ft.incurred_by),0) incurred_by_key,
+      (SELECT full_name FROM srm_resources WHERE unique_name = ft.incurred_by) incurred_by,
+       NVL (ft.document_type, 0) document_type_key,
+       ft.workint_source,
+       NVL (ft.xog_exported, 0) xog_exported,
+       ft.xog_exported_date xog_exported_date,
+       ft.entrydate clarity_created_date,
+       ft.lastupdatedate last_updated_date,
+       NVL(ft.chargeable,0) chargeable,
+	   ft.transaction_date,
+	   ft.quantity,
+       NVL((SELECT CAST (id AS INTEGER) FROM locations WHERE locationid = ft.locationid),0) location_key,
+      (SELECT shortdesc FROM locations WHERE locationid = ft.locationid) location,
+       NVL((SELECT CAST (id AS INTEGER) FROM departments WHERE departcode = ft.departcode),0) department_key,
+      (SELECT shortdesc FROM departments WHERE departcode = ft.departcode) department
+FROM   dwh_tmp_fin_transaction ft
+       INNER JOIN transclass tc ON ft.transclass = tc.transclass
+       INNER JOIN srm_resources r ON ft.resource_id = r.id
+       LEFT OUTER JOIN srm_resources rr ON ft.role_code = rr.unique_name
+       INNER JOIN inv_investments i ON ft.investment_id = i.id
+       LEFT OUTER JOIN prTask t ON ft.task_id = t.prID
+       LEFT OUTER JOIN apmaster v ON ft.vendor_code = v.vendor_code
+WHERE  1=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

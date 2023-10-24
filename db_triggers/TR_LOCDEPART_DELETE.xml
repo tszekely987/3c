@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_LOCDEPART_DELETE</code>
+          <table_name>LOCATIONDEPT</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_LOCDEPART_DELETE" 
+AFTER DELETE
+ON LOCATIONDEPT
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  departcode        GLOBALPKG.STRING;
+  locationid        GLOBALPKG.STRING;
+  iValid            INTEGER := 1;
+  msg               GLOBALPKG.STRING;
+  v_Description     GLOBALPKG.STRING;
+  v_Locations       GLOBALPKG.STRING;
+  retcode          NUMBER;  
+  temp_rc1         Ppa_Matrixfieldvalueexistspkg.rct1;
+BEGIN
+	BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE  EXISTS (
+      SELECT  1
+      FROM CLNTSUPP
+      WHERE CLNTSUPP.locationid = :OLD.locationid
+      AND CLNTSUPP.departcode = :OLD.departcode );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_selcnt != 0 THEN
+      RAISE_APPLICATION_ERROR(-20160, 'Cannot delete because they are being used in the clntsupp table.');
+      RETURN ;
+  END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM PAC_MNT_RESOURCES E
+        WHERE E.locationid = :OLD.locationid
+        AND E.departcode = :OLD.departcode);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20161, 'Cannot delete because they are being used in the resources.');
+        RETURN ;
+    END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM pac_mnt_projects P
+        WHERE P.locationid = :OLD.locationid
+        AND P.departcode = :OLD.departcode);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20162, 'Cannot delete because they are being used in a PROJECT_CODE or a changeorder.');
+    END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM PPA_TRANSWIPADJUST TRANSWIPADJUST
+        WHERE TRANSWIPADJUST.LocationID = :OLD.locationid
+        AND TRANSWIPADJUST.DepartCode = :OLD.departcode);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20163, 'Cannot delete because they are being used in the transwipadjust table.');
+        RETURN;
+    END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM PPA_TRANSCONTROL
+        WHERE PPA_TRANSCONTROL.LocationID = :OLD.locationid
+        AND PPA_TRANSCONTROL.DepartCode = :OLD.departcode );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20164, 'Cannot delete because they are being used in the ppa_TransControl table.');
+        RETURN;
+    END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM PPA_WIP
+        WHERE PPA_WIP.LocationID = :OLD.locationid
+        AND PPA_WIP.DepartCode = :OLD.departcode );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20165, 'Cannot delete because they are being used in the wip table.');
+        RETURN;
+    END IF;
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  *
+        FROM NAMEOPTIONS
+        WHERE defaultlocation = :OLD.locationid
+        AND defaultdepartment = :OLD.departcode );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+        RAISE_APPLICATION_ERROR(-20166, 'Cannot delete because they are being used as defaults in Quick Setup.');
+        RETURN;
+    END IF;
+	
+	BEGIN
+    Ppa_Matrixfieldvalueexists('locationid', :OLD.locationid, retcode, 1, temp_Rc1);
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+   END;
+
+   IF retcode = 1 THEN
+      RAISE_APPLICATION_ERROR(-20848, 'Cannot delete because it is being used in a rate matrix.');
+      RETURN;
+   END IF;
+   
+   	BEGIN
+    Ppa_Matrixfieldvalueexists('departcode', :OLD.departcode, retcode, 1, temp_Rc1);
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+   END;
+
+   IF retcode = 1 THEN
+      RAISE_APPLICATION_ERROR(-20115, 'Cannot delete because it is being used in a rate matrix.');
+      RETURN;
+   END IF;
+END tr_locdepart_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

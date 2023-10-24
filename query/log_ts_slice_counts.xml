@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_ts_slice_counts" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            
+            
+            
+            
+            <nls languageCode="en" name="Time Slice Counts"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:SLICE_COUNT:Q.RUN_KEY:RUN_KEY@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.JOB_RUN_ID:JOB_RUN_ID@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.ID:ID@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.REQUEST_NAME:REQUEST_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.TABLE_NAME:TABLE_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.SLICE_COUNT:SLICE_COUNT@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.PREVIOUS_SLICE_COUNT:PREVIOUS_SLICE_COUNT@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.LOG_NUM:LOG_NUM@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.SLICE_COUNT - @NVL@(Q.PREVIOUS_SLICE_COUNT,0):DIFF_COUNT@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:SLICE_COUNT:Q.CREATED_DATE:CREATED_DATE@
+					FROM ( select @DBUSER@.CMN_TO_CHAR_FCT(s.job_run_id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(r.id) run_key,
+							  	  s.job_run_id,
+							  	  r.id, r.request_name,
+							  	  r.table_name, @NVL@(slice_count,0) slice_count,
+							  	  lag(slice_count) over (partition by s.slice_request_id order by s.slice_request_id, s.created_date) as previous_slice_count,
+							  	  s.log_num, s.created_date
+    					     from prj_blb_slicerequests r, temp_ts_slice_counts s
+   						    where r.id = s.slice_request_id) q
+   					WHERE 1 = 1
+					AND @FILTER@]]></nsql>
+            <attribute id="run_key" required="false"/>
+            <attribute id="job_run_id" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Job Run Id"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="id" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Request ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="request_name" lookup="LOG_TS_REQUEST_NAME" required="false">
+              
+              
+              
+              
+              
+              <nls languageCode="en" name="Request Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="table_name" lookup="LOG_TS_TABLE_NAME" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Table Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="slice_count" required="false">
+              
+              
+              
+              
+              
+              <nls languageCode="en" name="Slice Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="previous_slice_count" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Previous Slice Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="log_num" required="false">
+              
+              <nls languageCode="en" name="Log Num"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="diff_count" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls languageCode="en" name="diff_count"/>
+            </attribute>
+            <attribute id="created_date" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Created Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

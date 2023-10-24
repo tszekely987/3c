@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_OBJECTS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_OBJECTS_INS_SP" (
+   P_OBJECT_CODE          IN   VARCHAR2,
+   P_OBJECT_NAME          IN   VARCHAR2,
+   P_OBJECT_DESCRIPTION   IN   VARCHAR2,
+   P_OBJECT_TYPE          IN   VARCHAR2,
+   P_COMPONENT_CODE       IN   VARCHAR2,
+   P_IS_SYSTEM            IN   NUMBER,
+   P_IS_ACTIVE            IN   NUMBER,
+   P_CREATED_BY           IN   NUMBER DEFAULT 1
+)
+IS
+   V_ID                          NUMBER;
+   V_ACTUAL_ID                   NUMBER;
+BEGIN
+   SELECT   CMN_SEC_OBJECTS_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   INSERT INTO CMN_SEC_OBJECTS
+               (
+                  ID,
+                  OBJECT_CODE,
+                  OBJECT_TYPE_ID,
+                  OBJECT_TYPE_CODE,
+                  COMPONENT_ID,
+                  COMPONENT_CODE,
+                  IS_ACTIVE,
+                  IS_SYSTEM,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               P_OBJECT_CODE,
+               L.ID,
+               L.LOOKUP_CODE,
+               C.ID,
+               C.COMPONENT_CODE,
+               P_IS_ACTIVE,
+               P_IS_SYSTEM,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     CMN_LOOKUPS L,
+               CMN_COMPONENTS C
+      WHERE    L.LOOKUP_TYPE = 'SEC_OBJECT_TYPE'
+      AND      L.LOOKUP_CODE = P_OBJECT_TYPE
+      AND      C.COMPONENT_CODE = P_COMPONENT_CODE
+      AND      NOT EXISTS (SELECT   'OBJECT EXISTS ALREADY'
+                           FROM     CMN_SEC_OBJECTS
+                           WHERE    OBJECT_CODE = P_OBJECT_CODE
+                               AND  C.ID =  COMPONENT_ID
+                               AND  L.ID = OBJECT_TYPE_ID );
+
+      SELECT  O.ID
+      INTO    V_ACTUAL_ID
+      FROM    CMN_SEC_OBJECTS O, CMN_LOOKUPS L,CMN_COMPONENTS C 
+      WHERE   O.OBJECT_CODE = P_OBJECT_CODE
+      AND     C.ID =  O.COMPONENT_ID
+      AND     L.ID =  O.OBJECT_TYPE_ID
+      AND     L.LOOKUP_TYPE = 'SEC_OBJECT_TYPE'
+      AND     L.LOOKUP_CODE = P_OBJECT_TYPE
+      AND     C.COMPONENT_CODE = P_COMPONENT_CODE;
+
+      --
+      --  Only add the captions if this was added
+      --
+      IF ( V_ID = V_ACTUAL_ID ) THEN
+        CMN_CAPTIONS_NLS_INS_SP (
+          'CMN_SEC_OBJECTS',
+          V_ID,
+          P_OBJECT_NAME,
+          P_OBJECT_DESCRIPTION,
+          P_CREATED_BY,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL
+        );
+      END IF;
+   -- Re-initialize global security object cache
+   CMN_SECURITY_PKG.G_OBJECT_CNT := 0;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

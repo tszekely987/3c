@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_DELETE_SP" (
+iMatrixKey 	NUMBER,
+userId      VARCHAR2)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+temp_num  number := 0;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	BEGIN
+   		select 1 into PAC_MNT_MATRIX_DELETE_SP.temp_num from dual where	exists
+		(select 1 from ppa_MatrixCheckout where MatrixKey=PAC_MNT_MATRIX_DELETE_SP.iMatrixKey and RESOURCE_CODE != PAC_MNT_MATRIX_DELETE_SP.userId);
+		IF PAC_MNT_MATRIX_DELETE_SP.temp_num = 1 THEN
+		   RETURN;
+		END IF;
+		EXCEPTION
+		WHEN OTHERS THEN
+				NULL;
+	  END;
+	SAVEPOINT Tran1;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_MatrixValues
+		WHERE MatrixKey = PAC_MNT_MATRIX_DELETE_SP.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20214, 'Error Removing Matrix Data');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_MatrixColDef
+		WHERE MatrixKey = PAC_MNT_MATRIX_DELETE_SP.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20215, 'Error Removing Matrix Columns');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_LocMatrixAssignments
+		WHERE MatrixKey = PAC_MNT_MATRIX_DELETE_SP.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		raise_application_error(-20216, 'Error Removing Matrix Location');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  ppa_Matrix
+		WHERE MatrixKey = PAC_MNT_MATRIX_DELETE_SP.iMatrixKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+	BEGIN
+		ROLLBACK TO SAVEPOINT Tran1;
+		IF StoO_error = -20431 THEN
+			raise_application_error(-20431, 'You cannot delete a matrix when it is used by a PROJECT_CODE.');
+		ELSE
+			raise_application_error(-20217, 'Error Removing Matrix Entry');
+		END IF;
+		RETURN ;
+	END;
+	END IF;
+END PAC_MNT_MATRIX_DELETE_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

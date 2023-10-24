@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_GET_CONVERTED_AMT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_GET_CONVERTED_AMT_SP" 
+(
+  fromDate               IN DATE,
+  toDate                 IN DATE DEFAULT NULL,
+  fromCurrency           IN VARCHAR2,
+  toCurrency             IN VARCHAR2,
+  exchangeRateType       IN VARCHAR2,
+  amount                 IN NUMBER,
+  convertedAmt          OUT NUMBER  -- PMD does not support INOUT param, hence separate param for OUT and IN
+)
+AS
+  calculationMethod         VARCHAR2(30);
+  toIsEuCurrency            NUMBER;
+  toEuroConvRate            NUMBER(32,6);
+  fromIsEuCurrency          NUMBER;
+  fromEuroConvRate          NUMBER(32,6);
+  currencyPrecision         NUMBER;
+  exchangeRate              NUMBER(32,6);
+  retainPrecisionMode       INTEGER := 1; -- retain precision change
+
+BEGIN
+  /* There is a function called CMN_GET_ONLYCONVERTED_VAL_FCT which also converts the amount. However,
+   * there are three major differnces
+   * 1. When the exchange rate is not found function assumes exchange rate as and returns same amount. In
+   *    this case, the caller has no way to know whether the exchange rate was 1 or was missing, hence fails
+   *    the call saying that exchnage rate is missing. 
+   *    The procedure returns the NULL if the excahnge rate is not found so that caller can decide what whether
+   *    to fail the the conversion or continue. In all other cases, it returns the amount converted using the
+   *    actual conversion rate
+   * 2. Function calls many other functions and also creates 7-8 temp tables, whereas this procedure
+   *    uses just simple queries to get the job done
+   * 3. The signature of the procedure takes one more parameter called 'toDate' (not currently in use though), 
+   *    whereas function always used fromDate for toDate too.
+   */
+
+   /* If from and to currencuncies are same then no need to convert; just return the amount as is */
+   IF (fromCurrency = toCurrency OR amount IS NULL)  THEN
+       convertedAmt := amount; 
+       RETURN;
+   END IF;
+
+   /* This query gets the corresponding record from exchange rate table where the rate is available for given from and to currencies */
+   BEGIN
+     SELECT rate, UPPER(calculation_method) INTO exchangeRate, calculationMethod
+     FROM   CMN_EXCHANGE_RATES
+     WHERE  from_currency_code  = fromCurrency
+        AND to_currency_code = toCurrency
+        AND rate_type = exchangeRateType
+        AND TRUNC(fromDate) &gt;= TRUNC(from_date)
+        AND (to_date IS NULL OR (TRUNC(fromDate) &lt;= TRUNC(to_date)) );
+
+     EXCEPTION
+       WHEN NO_DATA_FOUND THEN --TOO_MANY_ROWS OR OTHERS 
+          exchangeRate := NULL;
+   END;
+
+   /* if exchange rate is not found, return converted amount as NULL */
+   convertedAmt := NULL;
+   IF (exchangeRate IS NULL) THEN
+      RETURN;
+   END IF;
+
+   /* read precision mode; if not defined then retain precision */
+   BEGIN
+     SELECT ov.value  INTO retainPrecisionMode
+     FROM CMN_OPTIONS o, CMN_OPTION_VALUES ov
+     WHERE o.id = ov.option_id AND o.option_code = 'CMN_RETAIN_CURRENCY_PRECISION';
+     
+     EXCEPTION
+       WHEN OTHERS THEN --TOO_MANY_ROWS OR NO_DATA_FOUND OR 
+          retainPrecisionMode := 1;
+   END;
+
+   /* Read from and to EURO currencies conversion rates and details that are needed for conversion */
+   BEGIN
+     SELECT is_eu_currency, eur_conv_rate INTO fromIsEuCurrency, fromEuroConvRate
+     FROM CMN_CURRENCIES WHERE currency_code= fromCurrency;
+
+     SELECT is_eu_currency, eur_conv_rate, currency_precision INTO toIsEuCurrency, toEuroConvRate, currencyPrecision
+     FROM CMN_CURRENCIES WHERE currency_code= toCurrency;
+   END;
+
+   /* if euro, then do triangulation and then convert */
+   IF (fromIsEuCurrency = 1 OR toIsEuCurrency = 1) THEN
+   BEGIN
+     IF (fromIsEuCurrency = 1 AND toIsEuCurrency = 0) THEN
+     BEGIN
+        /* Compute the Euro Amount (amount / fromEuroConvRate) and convert*/
+        IF (calculationMethod = 'MULTIPLY') THEN
+           convertedAmt := (amount / fromEuroConvRate) * exchangeRate;
+        ELSE
+           convertedAmt := (amount / fromEuroConvRate) / exchangeRate;
+        END IF;
+     END;
+     ELSIF (fromIsEuCurrency = 0 AND toIsEuCurrency = 1) THEN
+     BEGIN
+        /* retrieve precision for fromCurrency */ 
+        SELECT currency_precision INTO currencyPrecision FROM CMN_CURRENCIES WHERE currency_code = fromCurrency;
+
+        /* Compute the Euro Amount (amount * / exchangeRate) first and convert */
+        IF (calculationMethod = 'MULTIPLY') THEN
+           convertedAmt := (amount * exchangeRate) * toEuroConvRate;
+        ELSE
+           convertedAmt := (amount / exchangeRate) * toEuroConvRate;
+        END IF;
+     END;
+     ELSE
+     BEGIN
+        /* Compute the Euro Amount (amount / fromEuroConvRate) and convert*/
+        convertedAmt := (amount / fromEuroConvRate) * toEuroConvRate;
+     END;
+     END IF;
+   END;
+   /* If non euro, no need to do traingulation; just do conversion */
+   ELSE
+   BEGIN
+     IF (calculationMethod = 'MULTIPLY') THEN
+        convertedAmt := amount * exchangeRate;
+     ELSE
+        convertedAmt := amount / exchangeRate;
+     END IF;
+   END;
+   END IF;
+
+   /* apply precision if necessary */
+   IF ( retainPrecisionMode = 1) THEN
+     convertedAmt :=  round(convertedAmt, currencyPrecision);
+   END IF;
+END CMN_GET_CONVERTED_AMT_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

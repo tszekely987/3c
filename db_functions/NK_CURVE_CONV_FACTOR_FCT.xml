@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_CURVE_CONV_FACTOR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_CURVE_CONV_FACTOR_FCT" (p_unit_of_work VARCHAR, p_curve NK_CURVE DEFAULT NULL, p_avail_curve NK_CURVE DEFAULT NULL)
+RETURN NUMBER
+IS
+  V_RETURN NUMBER := 1.0;
+  V_START PLS_INTEGER; V_FINISH PLS_INTEGER; V_FINISH_TOD PLS_INTEGER;
+
+BEGIN
+
+  IF( p_unit_of_work IS NOT NULL ) THEN
+    IF( INSTR( upper( p_unit_of_work ), 'HOURS', 1 ) &gt; 0 ) THEN
+      V_RETURN := 3600;
+    ELSIF( INSTR( upper( p_unit_of_work ), 'DAYS', 1 ) &gt; 0 ) THEN
+      SELECT C.HOURS_PER_DAY * 3600.0 INTO V_RETURN FROM PRCalendar c, PRSITE s WHERE c.prID = s.prCalendarID AND s.prCalendarID IS NOT NULL;
+    ELSIF( INSTR( upper( p_unit_of_work ), 'FTE', 1 ) &gt; 0 OR INSTR( upper( p_unit_of_work ), 'PCT', 1 ) &gt; 0 ) THEN
+
+      IF(p_curve IS NOT NULL AND p_curve.segments IS NOT NULL AND p_curve.segments.count &gt; 0) THEN
+        -- get the curve start/finish date
+        V_START := p_curve.segments(1).segment_start;
+        V_FINISH := p_curve.segments(p_curve.segments.count).segment_finish;
+        V_FINISH_TOD := p_curve.segments(p_curve.segments.count).finish_tod;
+
+        IF(V_START IS NULL) THEN
+          V_START := 2;
+        END IF;
+
+        IF(V_FINISH IS NULL) THEN
+          V_FINISH := 65535;
+        END IF;
+
+        IF(V_FINISH_TOD IS NOT NULL AND V_FINISH_TOD &gt; 0) THEN
+          V_FINISH := V_FINISH + 1;
+        END IF;
+
+        IF(INSTR( upper( p_unit_of_work ), 'FTE', 1 ) &gt; 0) THEN
+          SELECT nk_sum_julian_fct( odf_nk_calendar, v_start, v_finish) into v_return from prcalendar where prid = (select prcalendarid from prsite);
+        ELSE
+          IF(p_avail_curve is not null) THEN
+            -- get pct avail by using the availability curve passed into the function
+            SELECT nk_sum_julian_fct( p_avail_curve, v_start, v_finish)/100.0 into v_return from dual;
+          ELSE
+             -- get pct avail by using the site calendar
+             SELECT nk_sum_julian_fct( odf_nk_calendar, v_start, v_finish)/100.0 into v_return from prcalendar where prid = (select prcalendarid from prsite);
+          END IF;
+        END IF;
+
+        IF( v_return is null or v_return = 0 ) THEN
+          v_return := 1;
+        END IF;
+
+      ELSE
+        V_RETURN := 1;
+      END IF;
+    END IF;
+  END IF;
+  return v_return;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

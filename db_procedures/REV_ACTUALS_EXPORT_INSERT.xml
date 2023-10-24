@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_ACTUALS_EXPORT_INSERT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_ACTUALS_EXPORT_INSERT" (
+  adjustGroupNo   NUMBER,
+  errorFlag 	IN OUT NUMBER
+)
+AS
+  adjustmentType   	   		PPA_TRANSWIPADJUST.ADJTYPE%TYPE;
+  originalTaskID			PPA_TRANSWIPADJUST.TASK_ID%TYPE;
+  adjustedTaskID			PPA_TRANSWIPADJUST.TASK_ID%TYPE;
+  originalResourceID		PAC_MNT_RESOURCES.ID%TYPE;
+  adjustedResourceID		PAC_MNT_RESOURCES.ID%TYPE;
+  originalTransactionDate	PPA_TRANSWIPADJUST.TRANSDATE%TYPE;
+  adjustedTransactionDate	PPA_TRANSWIPADJUST.TRANSDATE%TYPE;
+  originalQuantity			PPA_TRANSWIPADJUST.QUANTITY%TYPE;
+  adjustedQuantity			PPA_TRANSWIPADJUST.QUANTITY%TYPE;
+  originalTransNo     		PPA_TRANSWIPADJUST.APPLYTO%TYPE;
+  newTransNo     		  	PPA_TRANSWIPADJUST.TRANSNO%TYPE;
+  originalAmount	  		PPA_TRANSWIPADJUST_VALUES.AMOUNT%TYPE;
+  newAmount	  				PPA_TRANSWIPADJUST_VALUES.AMOUNT%TYPE;
+  originalTotalCost 		PPA_TRANSWIPADJUST_VALUES.TOTALCOST%TYPE;
+  newTotalCost	    		PPA_TRANSWIPADJUST_VALUES.TOTALCOST%TYPE;
+  originalApplyTo			PPA_TRANSWIPADJUST.TRANSNO%TYPE;
+  IS_NULL_EXCEPTION EXCEPTION;
+BEGIN
+	 errorFlag := 0;
+	 BEGIN
+	 	  	-- select the original transasction information
+			SELECT
+	           		  A.TASK_ID,
+					  R.ID,
+                      A.APPLYTO, -- get the old transno of ppa_wip
+					  A.TRANSDATE,
+					  A.Quantity,
+					  A.ADJTYPE,
+					  A.TransNo
+				INTO
+					  originalTaskID,
+					  originalResourceID,
+					  originalApplyTo,
+					  originalTransactionDate,
+					  originalQuantity,
+					  adjustmentType,
+					  originalTransNo
+					 FROM PPA_TRANSWIPADJUST A, PAC_MNT_RESOURCES R
+					 WHERE
+             A.AdjustGroupNo = Rev_Actuals_Export_Insert.adjustgroupno
+        				 AND A.TransType = 'A'
+					 AND A.RESOURCE_CODE = R.RESOURCE_CODE;
+
+			 IF ( adjustmentType != 'R' ) THEN
+			 	 -- if the adjustmentType is not reverse then select the adjusted transasction information
+				 SELECT
+		           		  A.TASK_ID,
+						  R.ID,
+						  A.TRANSDATE,
+						  A.Quantity,
+						  A.TransNo
+					INTO
+						  adjustedTaskID,
+						  adjustedResourceID,
+						  adjustedTransactionDate,
+						  adjustedQuantity,
+						  newTransNo
+						 FROM PPA_TRANSWIPADJUST A, PAC_MNT_RESOURCES R
+						 WHERE
+               A.AdjustGroupNo = Rev_Actuals_Export_Insert.adjustgroupno
+	        				 AND A.TransType  IN ('L', 'M', 'Q', 'X')
+						 AND A.RESOURCE_CODE = R.RESOURCE_CODE;
+			END IF;
+
+			SELECT AMOUNT, CONVERT_TO_PROJ_CURR(transno, 'PPA_TRANSWIPADJUST')
+				   INTO originalAmount, originalTotalCost
+				   FROM PPA_TRANSWIPADJUST_VALUES
+				   where transno= originalTransNo
+				   AND CURRENCY_TYPE='HOME';
+				   IF originalTotalCost IS NULL THEN
+				     RAISE IS_NULL_EXCEPTION;
+				   END IF;
+
+                        BEGIN
+			SELECT AMOUNT, CONVERT_TO_PROJ_CURR(transno, 'PPA_TRANSWIPADJUST')
+				   INTO newAmount, newTotalCost
+				   FROM PPA_TRANSWIPADJUST_VALUES
+				   where transno= newTransNo
+				   AND CURRENCY_TYPE='HOME';
+                                   -- CLRT-52534: code added to handle "no data found" exception so that the 
+                                   -- code does not exit here &amp; executes for reversed transactions. 
+                                   -- Consequently, Actuals under Assignments will get updated for reversed transactions too. 
+                                   EXCEPTION 
+                                     WHEN NO_DATA_FOUND THEN 
+                                       errorFlag := 0; 
+                        END;
+				   IF originalTotalCost IS NULL THEN
+				     RAISE IS_NULL_EXCEPTION;
+				   END IF;
+
+			-- If the transaction is of reverse type then insert a record into the PAC_IMP_ACTUALS_EXPORT
+			-- table with quantity*-1
+			-- If the trasnsaction is not of reverse type then
+			--  a) If the task, resource or transaction date is not modified then insert 1 record
+			--	   with quantity = original quantity - adjsuted quantity
+			--  a) If the task, resource or transaction date is modified then
+			--	   insert 2 records, one with the orginal transaction information and quantity*-1
+			--	   second one with the adjusted transaction information
+
+			IF( adjustmentType = 'R' ) THEN
+				INSERT INTO PAC_IMP_ACTUALS_EXPORT(
+		           		   ID,
+						   TASK_ID,
+						   RESOURCE_ID,
+						   TRANSNO,
+						   TRANSACTION_DATE,
+						   QUANTITY,
+						   AMOUNT,
+						   TOT_COST_PRJ_CURR
+		      			)
+		      		SELECT
+		           		  PAC_IMP_ACTUALS_EXPORT_S1.NEXTVAL,
+						  originalTaskID,
+						  originalResourceID,
+              					  originalApplyTo, -- Fix for Bug# 84650 replaced transNo with ApplyTo
+						  originalTransactionDate,
+						  originalQuantity * -1,
+						  originalAmount * -1,
+						  originalTotalCost * -1
+						 FROM DUAL;
+			ELSIF ( originalTaskID = adjustedTaskID AND
+			      	originalResourceID = adjustedResourceID AND
+					originalTransactionDate = adjustedTransactionDate
+			   	  ) THEN
+				  	-- since task/resource/transactiondate is not modified
+					-- insert 1 record with the quantity = originalQuanity - adjsutedQuantity
+					INSERT INTO PAC_IMP_ACTUALS_EXPORT(
+		           		   ID,
+						   TASK_ID,
+						   RESOURCE_ID,
+						   TRANSNO,
+						   TRANSACTION_DATE,
+						   QUANTITY,
+						   AMOUNT,
+						   TOT_COST_PRJ_CURR
+		      			)
+		      		SELECT
+		           		  PAC_IMP_ACTUALS_EXPORT_S1.NEXTVAL,
+						  originalTaskID,
+						  originalResourceID,
+              			  S_54_1_PPA_WIP.CURRVAL, -- put the new transno of ppa_wip
+              			  originalTransactionDate,
+						  adjustedQuantity - originalQuantity,
+						  newAmount - originalAmount,
+						  newTotalCost - originalTotalCost 
+             FROM DUAL;
+      ELSE
+                    -- Since task/resource/transactiondate is modified,
+                    -- insert 2 records, one to nullify the old information
+                    -- and the new one with the adjusted information
+                    INSERT INTO PAC_IMP_ACTUALS_EXPORT(
+                              ID,
+                           TASK_ID,
+                           RESOURCE_ID,
+                           TRANSNO,
+                           TRANSACTION_DATE,
+                           QUANTITY,
+                           AMOUNT,
+                           TOT_COST_PRJ_CURR
+                          )
+                      SELECT
+                             PAC_IMP_ACTUALS_EXPORT_S1.NEXTVAL,
+                          originalTaskID,
+                          originalResourceID,
+                            originalTransNo, -- put the old transno of ppa_wip
+                            originalTransactionDate,
+                          originalQuantity * -1,
+                          originalAmount * -1,
+                          originalTotalCost * -1
+                         FROM DUAL;
+
+                    INSERT INTO PAC_IMP_ACTUALS_EXPORT(
+                              ID,
+                           TASK_ID,
+                           RESOURCE_ID,
+                           TRANSNO,
+                           TRANSACTION_DATE,
+                           QUANTITY,
+                           AMOUNT,
+                           TOT_COST_PRJ_CURR
+                          )
+                      SELECT
+                             PAC_IMP_ACTUALS_EXPORT_S1.NEXTVAL,
+                          adjustedTaskID,
+                          adjustedResourceID,
+                            S_54_1_PPA_WIP.CURRVAL, -- put the new transno of ppa_wip
+                            adjustedTransactionDate,
+                          adjustedQuantity,
+                          newAmount,
+                          newTotalCost
+                         FROM DUAL;
+            END IF;
+
+            EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                        errorFlag := 0;
+              WHEN IS_NULL_EXCEPTION THEN
+                errorFlag := -20100;
+                        RETURN;
+                    WHEN OTHERS THEN
+                        -- If there is any exception, then set the errorFlag and let
+                        -- the parent procedure (SP_ADJWIPAPPROVELINEITEM) handle the exception
+                        errorFlag := SQLCODE;
+                        RETURN;
+        END;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

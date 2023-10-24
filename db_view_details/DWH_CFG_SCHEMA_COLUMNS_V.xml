@@ -1,0 +1,21 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_CFG_SCHEMA_COLUMNS_V">
+    <indexes/>
+    <text_length>962</text_length>
+    <text>SELECT t.object_name,
+       t.object_type,
+       c.column_name,
+       CASE WHEN c.data_type = 'DATE' OR c.data_type = 'CLOB' OR c.data_type ='ROWID' THEN c.data_type
+            WHEN c.data_type = 'VARCHAR2' OR c.data_type = 'CHAR' THEN c.data_type || '(' || c.data_length || ')'
+            WHEN c.data_type = 'NUMBER' AND c.data_precision IS NULL AND c.data_scale IS NULL THEN c.data_type 
+            WHEN c.data_type = 'NUMBER' THEN c.data_type || '(' || c.data_precision || ',' || c.data_scale || ')'
+            ELSE c.data_type END column_length,
+       CASE WHEN c.nullable = 'Y' THEN 'Yes' ELSE 'No' END allow_nulls,
+       t.object_comments table_comments,
+       cc.comments column_comments 
+FROM   dwh_cfg_schema_objects_v t
+       INNER JOIN user_tab_columns c ON t.object_name = c.table_name
+       LEFT OUTER JOIN user_col_comments cc ON c.table_name = cc.table_name
+                                           AND c.column_name = cc.column_name</text>
+  </QueryResult>
+</ClarityDBViewQuery>

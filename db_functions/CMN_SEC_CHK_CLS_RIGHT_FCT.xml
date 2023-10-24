@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_CHK_CLS_RIGHT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_SEC_CHK_CLS_RIGHT_FCT" (
+   P_USER_ID IN NUMBER,
+   P_COMPONENT_CODE IN VARCHAR2,
+   P_OBJECT_CODE IN VARCHAR2,
+   P_OBJECT_TYPE IN VARCHAR2,
+   P_PERMISSION_CODE IN VARCHAR2,
+   P_OBJECT_INSTANCE_ID IN NUMBER DEFAULT NULL
+)
+   RETURN NUMBER
+IS
+   X_COUNT                       INTEGER := 0;
+   V_OBJECT_ID                   INTEGER := 0;
+   V_VERSION                     VARCHAR2(30);
+BEGIN
+
+   IF P_OBJECT_CODE &lt;&gt; 'NONE'
+   THEN
+      V_OBJECT_ID := CMN_SECURITY_PKG.GET_OBJECT_ID_FCT(P_OBJECT_TYPE, P_OBJECT_CODE, P_COMPONENT_CODE);
+   ELSE
+      V_OBJECT_ID := -999;
+   END IF;
+
+   IF V_OBJECT_ID &lt;&gt; -9
+   THEN
+      -- check/ALL uses P_OBJECT_INSTANCE_ID = 0
+      -- check/ANY uses P_OBJECT_INSTANCE_ID = -1
+      -- note security/authorizations uses inst id = 0, not null
+      -- hence, NULL/0 are the same case -- check/ALL -- so drop thru to
+      -- CMN_SEC_ASSGND_OBJ_PERM_R_V0 usage
+
+      IF    P_OBJECT_INSTANCE_ID IS NOT NULL
+        AND P_OBJECT_INSTANCE_ID != 0
+      THEN
+         IF P_OBJECT_INSTANCE_ID = -1-- 'any' permission check
+         THEN
+            IF V_OBJECT_ID = -999-- check rights w/o object_code
+            THEN
+              SELECT  COUNT (1)
+              INTO    X_COUNT
+              FROM    CMN_SEC_CHK_USER_V0
+              WHERE   USER_ID = P_USER_ID
+              AND     PERMISSION_CODE = P_PERMISSION_CODE
+              AND      ROWNUM = 1;
+            ELSE-- check rights with object_code
+              SELECT   COUNT (1)
+              INTO     X_COUNT
+              FROM     CMN_SEC_CHK_USER_V0
+              WHERE    USER_ID = P_USER_ID
+              AND      OBJECT_ID = V_OBJECT_ID
+              AND      PERMISSION_CODE = P_PERMISSION_CODE
+              AND      ROWNUM = 1;
+            END IF;
+         ELSE-- object instance specific check
+            IF V_OBJECT_ID = -999-- check rights w/o object_code
+            THEN
+              SELECT   COUNT (1)
+              INTO     X_COUNT
+              FROM     CMN_SEC_CHK_USER_INST_V0
+              WHERE    USER_ID = P_USER_ID
+              AND      PERMISSION_CODE = P_PERMISSION_CODE
+              AND      OBJECT_INSTANCE_ID = P_OBJECT_INSTANCE_ID
+              AND      ROWNUM = 1;
+            ELSE-- check rights with object_code
+              SELECT   COUNT (1)
+              INTO     X_COUNT
+              FROM     CMN_SEC_CHK_USER_INST_V0
+              WHERE    USER_ID = P_USER_ID
+              AND      OBJECT_ID = V_OBJECT_ID
+              AND      PERMISSION_CODE = P_PERMISSION_CODE
+              AND      OBJECT_INSTANCE_ID = P_OBJECT_INSTANCE_ID
+              AND      ROWNUM = 1;
+            END IF;
+         END IF;
+      END IF;
+
+      IF X_COUNT = 0
+      THEN
+        IF V_OBJECT_ID = -999-- check rights w/o object_id
+        THEN
+          SELECT   COUNT (1)
+          INTO     X_COUNT
+          FROM     CMN_SEC_ASSGND_OBJ_PERM_R_V0
+          WHERE    USER_ID = P_USER_ID
+          AND      PERMISSION_CODE = P_PERMISSION_CODE
+          AND      ROWNUM = 1;
+        ELSE-- check rights with object_id
+          SELECT   COUNT (1)
+          INTO     X_COUNT
+          FROM     CMN_SEC_CHK_USER_R_V0
+          WHERE    USER_ID = P_USER_ID
+          AND      OBJECT_ID = V_OBJECT_ID
+          AND      PERMISSION_CODE = P_PERMISSION_CODE
+          AND      ROWNUM = 1;
+        END IF;
+      END IF;
+   END IF;
+
+   IF X_COUNT &gt; 0
+   THEN
+      RETURN 1;
+   END IF;
+
+   RETURN 0;
+END CMN_SEC_CHK_CLS_RIGHT_FCT;
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

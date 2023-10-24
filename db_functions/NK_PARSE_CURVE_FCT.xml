@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_PARSE_CURVE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_PARSE_CURVE_FCT" ( P_CURVE IN BLOB )
+RETURN NK_CURVE
+IS
+  foo number;
+  idx number; v_idx integer := 0; b_idx number := 1; v_idx2 integer := 0; v_workday smallint; e_idx integer; e_idx2 integer; v_i integer; o_idx integer := 0;
+  s_cnt integer; s_idx integer; s_start integer; s_start_tod integer; s_finish integer; s_finish_tod integer; s_rate float;
+  v_pattern integer; v_temp_sum integer;
+  v_shift_size integer; v_shift_index integer; v_shift_start integer; v_shift_finish integer; v_shift_total number; v_shift_cnt integer;
+  v_excp_start integer; v_excp_finish integer; v_excp_size integer;  v_excp_cnt integer; v_excp_idx integer; v_cache_idx integer := 1; v_pp_idx integer := 1;
+  v_version integer; v_cal_depth integer := 1; v_cal_max_depth integer := 0; v_add_excp integer := 0;
+
+  curve varchar2(32000);
+  V_SEGMENT NK_SEGMENT; V_REF_SEGMENT NK_SEGMENT;
+  V_CACHE_CAL_SEGMENTS NK_SEGMENTS;
+  V_CACHED_SEGMENT NK_SEGMENT;
+  V_OUTPUT_CURVE NK_CURVE;
+  V_EXCEPTION NK_EXCEPTION; V_TEMP_EXCP NK_EXCEPTION; V_TEMP_EXCP2 NK_EXCEPTION;
+  V_TEMP_EXCPS NK_EXCEPTIONS;
+  V_CURVE BLOB := P_CURVE;
+  V_SHIFTS NK_SHIFTS; V_TEMP_SHIFTS NK_SHIFTS; V_SHIFT NK_SHIFT;
+  V_CURVE_START INTEGER := null;
+  V_CURVE_FINISH INTEGER;
+BEGIN
+
+  idx := 1; b_idx := 1;
+
+  V_OUTPUT_CURVE := NK_CURVE(2,0,0,null);
+  IF( P_CURVE IS NULL ) THEN
+    RETURN V_OUTPUT_CURVE;
+  END IF;
+
+  V_OUTPUT_CURVE.SEGMENTS := NK_SEGMENTS();
+  V_CACHE_CAL_SEGMENTS := NK_SEGMENTS();
+
+  -- version
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- version number
+  CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, v_version );
+  -- type
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- object id (103)
+  CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+  -- skip the begin {
+  --idx:=idx+2;
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  s_idx := 1;
+  o_idx := 1;
+  -- read the number of segments
+  CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, s_cnt );
+  WHILE( s_idx &lt;= s_cnt ) LOOP
+    V_SEGMENT := NK_SEGMENT(0,0,0,0,0,0,null,null,null);
+    -- read the julian start
+    CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, s_start );
+    V_SEGMENT.SEGMENT_START := s_start;
+    -- read the time of day start
+    CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, s_start_tod );
+    V_SEGMENT.START_TOD := s_start_tod;
+    -- read the julian finish
+    CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, s_finish );
+    V_SEGMENT.SEGMENT_FINISH := s_finish;
+    -- read the time of day finish
+    CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, s_finish_tod );
+    V_SEGMENT.FINISH_TOD := s_finish_tod;
+    -- read the rate ...
+    CRV_SQL_CURVE_PKG.READ_DOUBLE(v_curve, b_idx, curve, idx, s_rate );
+    V_SEGMENT.RATE := s_rate;
+    -- read a byte 63 // workweek?  NkSegmentList.restoreFrom() or the calendar  -- 58 is an object
+    CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+    IF( foo = 58 or foo = 64 ) THEN
+      IF( foo = 58 ) THEN -- create a calendar object
+
+        /*
+          Step 1 find the lowest ancestor calendar in the hierarchy
+        */
+        v_cal_depth := 0;
+        WHILE( foo = 58 ) LOOP
+          v_cal_depth := v_cal_depth + 1;
+
+          -- logic to create a new object 102 = calendar 103 = curve and 104 = fiscal curve
+          CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+          IF( foo = 102 ) THEN
+            -- read the start byte { 7b
+            CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+            -- read byte for reference  or object @ 64 or : 58  - for parent it is referenct
+            CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+
+          END IF;
+
+        END LOOP; -- end of 58
+        -- should be a reference
+        IF(v_version &lt; 117000000) THEN
+          CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+        ELSE
+          CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, foo );
+        END IF;
+
+        /*
+          Step 2
+          Now process the calendars of each ancestor in reverse order overriding settings from
+          the previous ancestors
+        */
+        V_SHIFTS := NK_SHIFTS();
+        V_SEGMENT.SHIFTS := NK_SHIFTS();
+        V_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+        v_excp_idx := 0;
+        V_SEGMENT.WORK_WEEK_TOTALS := NK_WORK_WEEK_TOTALS(0,0,0,0,0,0,0);
+        v_idx2 := 0;
+        v_cal_max_depth := v_cal_depth;
+        WHILE(v_cal_depth &gt; 0) LOOP
+          -- read the pattern byte (0)  ..
+          CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, v_pattern );
+
+          /*
+            handle shifts
+          */
+          FOR v_day in 1..7 LOOP
+            v_shift_total := 0;
+            IF( (bitand( v_pattern,(1*power(2,v_day-1))))!= 0) THEN
+
+              /*
+                If processing a parent calendar then remove any shifts specified by the calendar at the current depth
+              */
+              IF(v_cal_max_depth &gt; 1 AND v_cal_max_depth != v_cal_depth AND V_SEGMENT.SHIFTS IS NOT NULL AND V_SEGMENT.SHIFTS.COUNT &gt; 0) THEN
+                V_IDX2 := 0;
+                v_temp_shifts := V_SEGMENT.SHIFTS;
+                V_SEGMENT.SHIFTS := NK_SHIFTS();
+                FOR i IN V_TEMP_SHIFTS.FIRST .. V_TEMP_SHIFTS.LAST LOOP
+                  IF(V_TEMP_SHIFTS(i).day_of_week != v_day) THEN
+                    V_IDX2 := V_IDX2 + 1;
+                    V_SEGMENT.SHIFTS.EXTEND(1);
+                    V_SEGMENT.SHIFTS(V_IDX2) := V_TEMP_SHIFTS(i);
+                  END IF;
+                END LOOP;
+              END IF;
+
+              -- store the day in an array
+              -- get the NkShiftList
+              -- get the size
+
+              /*
+                Now process the shifts for this calendar
+              */
+              CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, v_shift_size);
+              v_shift_cnt := 1;
+              V_IDX2 := V_SEGMENT.SHIFTS.COUNT();
+              WHILE( v_shift_cnt &lt;= v_shift_size ) LOOP
+                CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, v_shift_start );
+                CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, v_shift_finish );
+                v_shift_total := v_shift_total + (v_shift_finish - v_shift_start);
+                v_shift_cnt := v_shift_cnt + 1;
+                V_IDX2 := V_IDX2 + 1;
+                BEGIN
+                  V_SEGMENT.SHIFTS.EXTEND(1);
+                  V_SEGMENT.SHIFTS(V_IDX2) := NK_SHIFT(v_day,v_shift_start,v_shift_finish);
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    v_i := 1;
+                END;
+              END LOOP;
+            V_SEGMENT.WORK_WEEK_TOTALS(v_day) := v_shift_total;
+            END IF;
+          END LOOP; -- end days
+
+
+          /*
+            note: ACT CURVE SEEMS TO HAVE A CALENDAR ON EACH SEGMENT ... SHOULD THEY BE COMBINED INTO 1 CALENDAR IF IDENTICAL???
+          */
+
+          /*
+            Handle exceptions
+          */
+          CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, v_excp_size );
+          IF( v_excp_size &gt; 0) THEN
+            v_excp_cnt := 1; --v_es_idx := 0; v_excp_idx := 0; v_c_excp_idx := 0;
+            WHILE( v_excp_cnt &lt;= v_excp_size ) LOOP  -- build NkCalendarException
+              -- read start date julian short
+              CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, v_excp_start );
+              -- read finish date julian short
+              CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, v_excp_finish );
+V_SHIFTS := NK_SHIFTS();
+              V_EXCEPTION := NK_EXCEPTION(v_excp_start,v_excp_finish,0, V_SHIFTS);
+              -- READ THE NEXT SHIFT LIST
+              CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, v_shift_size );
+              v_shift_cnt := 1;
+              v_shift_total := 0;
+              WHILE( v_shift_cnt &lt;= v_shift_size ) LOOP
+                CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, v_shift_start );
+                CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, v_shift_finish );
+                v_shift_total := v_shift_total + ((v_shift_finish - v_shift_start));
+-- there is no day of week here since the same shifts will be available for each day
+                V_SHIFT := NK_SHIFT(0,v_shift_start, v_shift_finish);
+                V_EXCEPTION.SHIFTS.extend(1);
+                V_EXCEPTION.SHIFTS(v_shift_cnt) := V_SHIFT;
+                v_shift_cnt := v_shift_cnt + 1;
+              END LOOP;
+              V_EXCEPTION.TOTAL := v_shift_total;
+
+               /*
+                ADD LOGIC HERE TO CONSOLIDATE THE EXCEPTIONS FROM EACH LEVEL
+              */
+              v_add_excp := 1;
+              IF(v_cal_max_depth &gt; 1 AND V_SEGMENT.EXCEPTIONS IS NOT NULL AND V_SEGMENT.EXCEPTIONS.COUNT &gt; 0) THEN
+                BEGIN
+                  FOR i IN V_SEGMENT.EXCEPTIONS.FIRST .. V_SEGMENT.EXCEPTIONS.LAST LOOP
+                    V_TEMP_EXCP := V_SEGMENT.EXCEPTIONS(i);
+                    IF(V_TEMP_EXCP IS NOT NULL) THEN
+                      IF(V_EXCEPTION.START_DATE &gt; V_TEMP_EXCP.START_DATE AND V_EXCEPTION.START_DATE &lt; V_TEMP_EXCP.FINISH_DATE AND V_EXCEPTION.FINISH_DATE &gt;= V_TEMP_EXCP.FINISH_DATE) THEN
+                        V_SEGMENT.EXCEPTIONS(i).FINISH_DATE := V_EXCEPTION.START_DATE;
+                      ELSIF(V_EXCEPTION.START_DATE &lt;= V_TEMP_EXCP.START_DATE AND V_TEMP_EXCP.START_DATE &lt; V_EXCEPTION.FINISH_DATE AND V_EXCEPTION.FINISH_DATE &lt; V_TEMP_EXCP.FINISH_DATE) THEN
+                        V_SEGMENT.EXCEPTIONS(i).START_DATE := V_EXCEPTION.FINISH_DATE;
+                      ELSIF(V_EXCEPTION.START_DATE &lt;= V_TEMP_EXCP.START_DATE AND V_EXCEPTION.FINISH_DATE &gt;= V_TEMP_EXCP.FINISH_DATE) THEN
+                        V_SEGMENT.EXCEPTIONS(i) := V_EXCEPTION;
+                        v_add_excp := 0;
+                        EXIT;
+                      ELSIF(V_EXCEPTION.START_DATE &gt; V_TEMP_EXCP.START_DATE AND V_EXCEPTION.FINISH_DATE &lt; V_TEMP_EXCP.FINISH_DATE) THEN
+                        -- handle case where new exception bisects an existing exception
+                        V_TEMP_EXCP2 := V_TEMP_EXCP;
+                        -- ADJUST THE EXISTING
+                        V_SEGMENT.EXCEPTIONS(i) := NK_EXCEPTION(V_TEMP_EXCP2.START_DATE, V_EXCEPTION.START_DATE, V_TEMP_EXCP2.TOTAL, V_TEMP_EXCP2.SHIFTS);
+                        -- INSERT THE SECOND PORTION
+                        V_TEMP_EXCP := NK_EXCEPTION(V_EXCEPTION.FINISH_DATE, V_TEMP_EXCP2.FINISH_DATE, V_TEMP_EXCP2.TOTAL, V_TEMP_EXCP2.SHIFTS);
+                        v_excp_idx := v_excp_idx + 1;
+                        V_SEGMENT.EXCEPTIONS.EXTEND(1);
+                        V_SEGMENT.EXCEPTIONS(v_excp_idx) := V_TEMP_EXCP;
+                        EXIT;
+                      END IF;
+                    END IF;
+                  END LOOP;
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    V_I := 1;
+                END;
+              END IF;
+
+              /*
+                insert the new exception here
+              */
+              BEGIN
+                IF( v_add_excp = 1 ) THEN
+                  v_excp_idx := v_excp_idx + 1;
+                  V_SEGMENT.EXCEPTIONS.EXTEND(1);
+                  V_SEGMENT.EXCEPTIONS(v_excp_idx) := V_EXCEPTION;
+                END IF;
+              EXCEPTION
+                WHEN OTHERS THEN
+                 V_I := 1;
+              END;
+              v_excp_cnt := v_excp_cnt + 1;
+            END LOOP;
+          END IF; -- end exceptions
+
+          -- read the end byte?  7d
+          CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+          v_cal_depth := v_cal_depth - 1;
+
+        END LOOP; -- end cal depth
+
+        /*
+          post processing when there are parent calendars
+        */
+        IF(v_cal_max_depth &gt; 1 AND V_SEGMENT.SHIFTS IS NOT NULL AND V_SEGMENT.SHIFTS.COUNT &gt; 0) THEN
+          v_temp_shifts := V_SEGMENT.SHIFTS;
+          V_SEGMENT.SHIFTS := NK_SHIFTS();
+          V_SEGMENT.WORK_WEEK_TOTALS := NK_WORK_WEEK_TOTALS(0,0,0,0,0,0,0);
+          V_IDX2 := 0;
+
+          /*
+            Clean up the shifts, ridding nulls and ordering them
+          */
+          FOR ao_rec IN (
+            select * from table(v_temp_shifts) where day_of_week is not null order by day_of_week, start_tod
+          )
+          LOOP
+            V_IDX2 := V_IDX2 + 1;
+            V_SEGMENT.SHIFTS.EXTEND(1);
+            V_SEGMENT.SHIFTS(V_IDX2) := NK_SHIFT(ao_rec.day_of_week, ao_rec.start_tod, ao_rec.finish_tod);
+          END LOOP;
+
+          /*
+            recompute work week totals
+          */
+          FOR ao_rec IN (
+            select day_of_week, sum(finish_tod - start_tod) total from table(V_SEGMENT.SHIFTS) group by day_of_week
+          )
+          LOOP
+            V_SEGMENT.WORK_WEEK_TOTALS(ao_rec.day_of_week) := ao_rec.total;
+          END LOOP;
+
+        END IF;
+
+        /*
+          If a parent calendar clean up the exceptions and re-sort
+        */
+        IF(v_cal_max_depth &gt; 1 and V_SEGMENT.EXCEPTIONS IS NOT NULL AND V_SEGMENT.EXCEPTIONS.COUNT &gt; 1) THEN
+          /*
+            get rid of nulls and sort
+          */
+          V_TEMP_EXCPS := V_SEGMENT.EXCEPTIONS;
+          V_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+          v_excp_idx := 0;
+          FOR ao_rec IN (
+            select * from table(V_TEMP_EXCPS) where start_date is not null order by start_date
+          )
+          LOOP
+            v_excp_idx := v_excp_idx + 1;
+            V_SEGMENT.EXCEPTIONS.EXTEND(1);
+            V_SEGMENT.EXCEPTIONS(v_excp_idx) := NK_EXCEPTION(ao_rec.start_date, ao_rec.finish_date, ao_rec.total, ao_rec.shifts);
+         END LOOP;
+        END IF;
+
+        -- cache the segment for future reference of calendar
+        V_CACHE_CAL_SEGMENTS.extend(1);
+        V_CACHE_CAL_SEGMENTS(v_cache_idx) := V_SEGMENT;
+
+        -- keep the segment off to the side
+        V_CACHED_SEGMENT := V_SEGMENT;
+        v_cache_idx := v_cache_idx + 1;
+
+
+        /*
+          Now copy this segment using the cached one
+        */
+        V_SEGMENT := NK_SEGMENT(0,0,0,0,0,0,null,null,null);
+        V_SEGMENT.SEGMENT_START := V_CACHED_SEGMENT.SEGMENT_START;
+        V_SEGMENT.START_TOD := V_CACHED_SEGMENT.START_TOD;
+        V_SEGMENT.SEGMENT_FINISH := V_CACHED_SEGMENT.SEGMENT_FINISH;
+        V_SEGMENT.FINISH_TOD := V_CACHED_SEGMENT.FINISH_TOD;
+        V_SEGMENT.RATE := V_CACHED_SEGMENT.RATE;
+        V_SEGMENT.WORK_WEEK_TOTALS := V_CACHED_SEGMENT.WORK_WEEK_TOTALS;
+        V_SEGMENT.SHIFTS := V_CACHED_SEGMENT.SHIFTS;
+
+        IF(V_CACHED_SEGMENT.EXCEPTIONS IS NOT NULL AND V_CACHED_SEGMENT.EXCEPTIONS.COUNT &gt; 0) THEN
+          e_idx2 := 1;
+          V_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+          FOR e_idx IN 1 .. V_CACHED_SEGMENT.EXCEPTIONS.COUNT LOOP
+            V_EXCEPTION := V_CACHED_SEGMENT.EXCEPTIONS(e_idx);
+            IF( V_EXCEPTION.START_DATE &lt;= V_SEGMENT.SEGMENT_FINISH AND V_EXCEPTION.FINISH_DATE &gt;= V_SEGMENT.SEGMENT_START) THEN
+              BEGIN
+                V_SEGMENT.EXCEPTIONS.EXTEND(1);
+                V_SEGMENT.EXCEPTIONS(e_idx2) := V_EXCEPTION;
+                e_idx2 := e_idx2 + 1;
+              EXCEPTION
+                WHEN OTHERS THEN
+                  V_I := 1;
+                END;
+            END IF;
+          END LOOP;
+        END IF;
+
+      ELSE -- end of 58 begin of 64 @ reference
+        FOO := 1;
+
+        /*
+          this is where the reference to a calendar is done
+          read the reference to a calendar does it exist?
+        */
+        IF(v_version &lt; 117000000) THEN
+          CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+        ELSE
+          CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, foo );
+        END IF;
+
+        IF( foo &gt; 0 ) THEN
+           V_REF_SEGMENT := V_CACHE_CAL_SEGMENTS(foo-1);
+          /*
+            Since there is a reference to a previous calendar then
+            get it from the appropriate segment
+          */
+          V_SEGMENT.WORK_WEEK_TOTALS := V_REF_SEGMENT.WORK_WEEK_TOTALS;
+          V_SEGMENT.SHIFTS := V_REF_SEGMENT.SHIFTS;
+
+          -- todo: just copy segments that apply to this segment.
+          IF( V_REF_SEGMENT.EXCEPTIONS IS NOT NULL ) THEN
+            V_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+            e_idx2 := 0;
+            FOR e_idx IN 1 .. V_REF_SEGMENT.EXCEPTIONS.COUNT LOOP
+              V_EXCEPTION := V_REF_SEGMENT.EXCEPTIONS(e_idx);
+              -- restrict to just those exceptions in the segment start and finish range
+              IF( V_EXCEPTION.START_DATE &lt;= V_SEGMENT.SEGMENT_FINISH AND V_EXCEPTION.FINISH_DATE &gt;= V_SEGMENT.SEGMENT_START) THEN
+                e_idx2 := e_idx2 + 1;
+                BEGIN
+                  V_SEGMENT.EXCEPTIONS.EXTEND(1);
+                  V_SEGMENT.EXCEPTIONS(e_idx2) := V_EXCEPTION;
+                EXCEPTION
+                  WHEN OTHERS THEN
+                    V_I := 1;
+                END;
+              END IF;
+            END LOOP;
+          END IF;
+
+        ELSE
+          foo := 0;  -- no calendar
+        END IF;
+      END IF; -- 64 @
+
+
+    END IF; -- 58 or 64
+
+    BEGIN
+
+      -- Do not add zero rate segments unless it is the first or last segment
+      IF(V_SEGMENT.RATE &lt;&gt; 0 OR s_idx = 1 OR s_idx = s_cnt) THEN
+        V_OUTPUT_CURVE.SEGMENTS.EXTEND(1);
+        V_OUTPUT_CURVE.SEGMENTS(o_idx) := V_SEGMENT;
+
+        /*
+          set both the segment and curve sums
+        */
+        V_SEGMENT.SEGMENT_SUM := NK_SEGMENT_SUM_JULIAN_FCT(V_SEGMENT);
+        V_OUTPUT_CURVE.SEGMENTS(o_idx).SEGMENT_SUM := V_SEGMENT.SEGMENT_SUM;
+        V_OUTPUT_CURVE.CURVE_SUM := V_OUTPUT_CURVE.CURVE_SUM + V_OUTPUT_CURVE.SEGMENTS(o_idx).SEGMENT_SUM;
+        o_idx := o_idx + 1;
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        V_I := 1;
+    END;
+
+  s_idx := s_idx + 1;
+  END LOOP;
+
+  -- read the end }
+  --    foo := READ_BYTE(SUBSTR(CURVE,idx,2)); idx:=idx+2;
+  -- read reference
+  CRV_SQL_CURVE_PKG.READ_BYTE(v_curve, b_idx, curve, idx, foo );
+  -- read reference object
+  IF(v_version &lt; 117000000) THEN
+    CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+  ELSE
+    CRV_SQL_CURVE_PKG.READ_INT(v_curve, b_idx, curve, idx, foo );
+  END IF;
+  -- default rate?
+  CRV_SQL_CURVE_PKG.READ_DOUBLE(v_curve, b_idx, curve, idx, foo );
+  V_OUTPUT_CURVE.DEFAULT_RATE := foo;
+  -- curve type
+  CRV_SQL_CURVE_PKG.READ_SHORT(v_curve, b_idx, curve, idx, foo );
+  V_OUTPUT_CURVE.CURVE_TYPE := foo;
+
+  /*
+    Go through the
+  */
+  RETURN V_OUTPUT_CURVE;
+
+-- safety check ... if anything goes wrong just return an empty curve
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NK_CURVE(2,0,0,null);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

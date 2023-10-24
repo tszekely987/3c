@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_WAIT_FOR_PARALLEL_JOBS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_WAIT_FOR_PARALLEL_JOBS_SP" (
+   P_JOB_STR   VARCHAR2
+)
+AS
+   TYPE T_REF_CURSOR IS REF CURSOR;
+
+   V_RUNNING_JOBS_COUNT_SQL      VARCHAR2(20000);
+   V_FAILED_JOB_COUNT_SQL        VARCHAR2(20000);
+   V_FAILED_JOB_WHAT_SQL         VARCHAR2(20000);
+   V_FAILED_JOB_WHAT             VARCHAR2(20000);
+   V_FAILED_JOBS_COUNT           NUMBER;
+   V_COUNT_NOT_DONE              NUMBER;
+   V_JOB                         NUMBER;
+   V_STMT                        VARCHAR2(200);
+   C_USER_JOBS                   T_REF_CURSOR;
+BEGIN
+   V_RUNNING_JOBS_COUNT_SQL :=
+      'SELECT COUNT (*) FROM  USER_JOBS WHERE JOB IN ' ||
+      P_JOB_STR ||
+      ' AND BROKEN = ''N'' AND NVL(FAILURES, 0) = 0';
+   V_FAILED_JOB_COUNT_SQL :=
+      'SELECT COUNT (*) FROM  USER_JOBS WHERE JOB IN ' ||
+      P_JOB_STR ||
+      ' AND NVL(FAILURES, 0) &gt; 0';
+   V_FAILED_JOB_WHAT_SQL :=
+      'SELECT WHAT FROM USER_JOBS WHERE JOB = ( SELECT MIN(JOB) FROM USER_JOBS ' ||
+      'WHERE NVL(FAILURES, 0) &gt; 0 AND JOB IN ' ||
+      P_JOB_STR ||
+      ' )';
+
+   LOOP
+      V_STMT := 'EXECUTING V_FAILED_JOB_COUNT_SQL';
+      EXECUTE IMMEDIATE V_FAILED_JOB_COUNT_SQL
+         INTO V_FAILED_JOBS_COUNT;
+
+      IF V_FAILED_JOBS_COUNT &gt; 0
+      THEN
+         V_STMT := 'EXECUTING V_FAILED_JOB_WHAT_SQL';
+         EXECUTE IMMEDIATE V_FAILED_JOB_WHAT_SQL
+            INTO V_FAILED_JOB_WHAT;
+         V_STMT := 'OPENING C_USER_JOBS CURSOR';
+         OPEN C_USER_JOBS FOR
+            'SELECT JOB FROM  USER_JOBS WHERE JOB IN ' || P_JOB_STR;
+         LOOP
+            FETCH C_USER_JOBS INTO V_JOB;
+            EXIT WHEN C_USER_JOBS%NOTFOUND;
+
+            BEGIN
+               V_STMT := 'REMOVING JOB FROM USER_JOBS';
+               DBMS_JOB.REMOVE (V_JOB);
+            EXCEPTION
+               WHEN OTHERS
+               THEN
+                  -- 23421 ERROR CODE IS THROWN WHEN THE JOB NO LONGER EXISTS
+                  IF SQLCODE &lt;&gt; -23421
+                  THEN
+                     RAISE_APPLICATION_ERROR (
+                        -20000,
+                        'Error while removing jobs from USER_JOBS NBI_WAIT_FOR_PARALLEL_JOBS_SP -, WHAT = ' ||
+                        V_FAILED_JOB_WHAT ||
+                        ': ' ||
+                        SQLERRM
+                     );
+                  END IF;
+            END;
+           COMMIT;
+         END LOOP;
+
+         RAISE_APPLICATION_ERROR (
+            -20000,
+            'AT LEAST ONE OF THE JOBS FAILED IN USER_JOBS, WHAT = ' ||
+            V_FAILED_JOB_WHAT
+         );
+      END IF;
+
+      V_STMT := 'EXECUTING V_RUNNING_JOBS_COUNT_SQL';
+      EXECUTE IMMEDIATE V_RUNNING_JOBS_COUNT_SQL
+         INTO V_COUNT_NOT_DONE;
+
+      EXECUTE IMMEDIATE V_FAILED_JOB_COUNT_SQL
+         INTO V_FAILED_JOBS_COUNT;
+
+      --
+      --  Only exit if both counts are zero. If all are complete then the error
+      --  handling above needs to be invoked as necessary
+      --
+      IF V_COUNT_NOT_DONE = 0 and V_FAILED_JOBS_COUNT = 0
+      THEN
+         EXIT;
+      END IF;
+
+      -- Sleep for 15 secs
+      EXECUTE IMMEDIATE 'BEGIN DBMS_LOCK.SLEEP(15); END;';
+   END LOOP;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_WAIT_FOR_PARALLEL_JOBS_SP - ' ||
+         V_STMT ||
+         ': ' ||
+         SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

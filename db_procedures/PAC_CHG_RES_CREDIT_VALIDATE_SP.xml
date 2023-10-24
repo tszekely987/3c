@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_RES_CREDIT_VALIDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_RES_CREDIT_VALIDATE_SP" 
+(
+  P_ID                   NUMBER,
+  P_ENTITY_ID            NUMBER,
+  P_LOCATION_ID          NUMBER,
+  P_DEPARTMENT_ID        NUMBER,
+  P_TRANSACTION_CLASS_ID NUMBER,
+  P_RESOURCE_CLASS_ID    NUMBER --,
+--  P_ERROR_CODE IN OUT    INTEGER
+)
+AS
+  V_SELCNT          INTEGER := 0;
+BEGIN
+--  P_ERROR_CODE := 0;
+
+  -- Check to see if an allocation is already present with this information
+  BEGIN
+    SELECT COUNT(1)
+      INTO V_SELCNT
+      FROM PAC_CHG_RESOURCE_CREDITS
+     WHERE NVL(ENTITY_ID, 0) = NVL(P_ENTITY_ID, 0)
+       AND NVL(LOCATION_ID, 0) = NVL(P_LOCATION_ID, 0)
+       AND NVL(DEPARTMENT_ID, 0) = NVL(P_DEPARTMENT_ID, 0)
+       AND NVL(TRANSACTION_CLASS_ID, 0) = NVL(P_TRANSACTION_CLASS_ID, 0)
+       AND NVL(RESOURCE_CLASS_ID, 0) = NVL(P_RESOURCE_CLASS_ID, 0)
+       AND ID &lt;&gt; NVL(P_ID, 0);
+
+    EXCEPTION
+      WHEN OTHERS THEN
+--        P_ERROR_CODE := 1;
+        RAISE_APPLICATION_ERROR(-20934, 'Error retrieving the allocation count');
+        RETURN;
+  END;
+
+  --error out if any record exists
+  IF V_SELCNT &lt;&gt; 0 THEN
+    RAISE_APPLICATION_ERROR(-20220, 'A row already exists with this information');
+    RETURN;
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SET_INDEX_STATUS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SET_INDEX_STATUS" (P_OBJECT IN VARCHAR2, P_MODE IN VARCHAR2)
+IS
+   CURSOR C_INDEXES
+   IS
+      select INDEX_NAME from user_indexes WHERE table_name = P_OBJECT AND uniqueness = 'NONUNIQUE';
+
+   V_SQL                         VARCHAR2 (100);
+   V_MODE                        VARCHAR2 (20);
+   E_WRONG_MODE                  EXCEPTION;
+   E_WRONG_OBJECT                EXCEPTION;
+BEGIN
+   IF P_MODE NOT IN ('UNUSABLE', 'REBUILD')
+   THEN
+      RAISE E_WRONG_MODE;
+   END IF;
+
+   V_MODE := P_MODE;
+   FOR C_INDX_REC IN C_INDEXES
+      LOOP
+         V_SQL := 'ALTER INDEX ' || C_INDX_REC.INDEX_NAME || ' ' || V_MODE;
+         EXECUTE IMMEDIATE V_SQL;
+      END LOOP;
+
+EXCEPTION
+   WHEN E_WRONG_MODE
+   THEN
+      RAISE_APPLICATION_ERROR (-20001, ' MODE needs to be either UNUSABLE or REBUILD');
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error: ' || SQLERRM);
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

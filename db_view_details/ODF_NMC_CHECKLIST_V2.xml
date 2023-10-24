@@ -1,0 +1,14 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_NMC_CHECKLIST_V2">
+    <indexes/>
+    <text_length>1890</text_length>
+    <text>select   'x' pmd_analytical_partition_by, nmc_checklists.id odf_pk, ( NVL ( ( SELECT USER_ID FROM NMC_PARTICIPANTS WHERE ROLE = 'A_OWNER' AND OBJECT_CODE = 'nmc_checklist' AND OBJECT_INSTANCE_ID = NMC_CHECKLISTS.ID ),
+                NMC_CHECKLISTS.CREATED_BY ) ) as owner, NMC_CHECKLISTS.CODE as code, NMC_CHECKLISTS.due_date as due_date, NMC_CHECKLISTS.completed as completed, (SELECT parent.name from inv_investments parent where parent.id = NMC_CHECKLISTS.parent_pk) as virtual_parent_name, CREATED.FULL_NAME as created_by, UPDATED.FULL_NAME as last_updated_by, NMC_CHECKLISTS.PARENT_PK as virtual_parent_id, NMC_CHECKLISTS.PARENT_CODE as virtual_parent_code, NMC_CHECKLISTS.NAME as name, (select cap.name
+                from  odf_objects obj, cmn_captions_nls cap
+                where    obj.code = NMC_CHECKLISTS.PARENT_CODE
+                and    obj.id = cap.pk_id
+                and    cap.table_name = 'ODF_OBJECTS'
+                and    cap.language_code = user_context.language_code) as virtual_parent_type, (SELECT obj.api_alias from odf_objects obj where obj.code = NMC_CHECKLISTS.parent_code) as virtual_parent_alias, NMC_CHECKLISTS.CREATED_DATE as created_date, NMC_CHECKLISTS.LAST_UPDATED_DATE as last_updated_date, ( NVL ( ( SELECT ROLE FROM NMC_PARTICIPANTS WHERE OBJECT_CODE = 'nmc_checklist' AND OBJECT_INSTANCE_ID = NMC_CHECKLISTS.ID AND USER_ID = user_context.user_id ),
+                'Z_INV_PARTICIPANT' ) ) as current_user_role , user_context.user_id odf_user_id from nmc_checklists NMC_CHECKLISTS inner join (select u.id user_id, u.user_name, u.locale, l.language_code from cmn_sec_users u, cmn_languages l where u.language_id = l.id) user_context  on user_context.user_id = user_context.user_id  JOIN srm_resources CREATED ON CREATED.user_id=NMC_CHECKLISTS.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=NMC_CHECKLISTS.last_updated_by  where 1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

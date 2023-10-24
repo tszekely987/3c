@@ -1,0 +1,19 @@
+<ClarityDBViewQuery>
+  <QueryResult code="NBI_R_FACTS_V">
+    <indexes/>
+    <text_length>585</text_length>
+    <text>SELECT 
+      S.PRJ_OBJECT_ID RESOURCE_ID,
+      S.SLICE_DATE FACT_DATE,
+      S.SLICE AVAILABLE_HOURS,
+      tmp.ETC_HOURS,
+      tmp.ACTUAL_HOURS,
+      tmp.BASE_HOURS,
+      tmp.ALLOCATED_HOURS
+FROM     PRJ_BLB_SLICES S
+JOIN	 PRJ_BLB_SLICEREQUESTS SR ON (S.SLICE_REQUEST_ID = SR.ID AND SR.REQUEST_NAME = 'DAILYRESOURCEAVAILCURVE')
+JOIN SRM_RESOURCES RES ON S.PRJ_OBJECT_ID = RES.ID
+LEFT OUTER JOIN NBI_R_PRT_FACTS_V tmp ON tmp.RESOURCE_ID= S.PRJ_OBJECT_ID AND tmp.FACT_DATE=S.SLICE_DATE
+WHERE RES.INCLUDE_FLAG=1 -- 1->Indicates  a resource should be included in datamart extraction.</text>
+  </QueryResult>
+</ClarityDBViewQuery>

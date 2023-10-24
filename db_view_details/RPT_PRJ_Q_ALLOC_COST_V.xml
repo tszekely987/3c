@@ -1,0 +1,48 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_Q_ALLOC_COST_V">
+    <indexes/>
+    <text_length>2989</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID, 
+       s.slice_date QUARTER_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 0 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ALLOC_L_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ALLOC_Q_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 0 THEN s.slice ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_L_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_Q_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 0 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) ALLOC_L_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 1 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) ALLOC_Q_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 2 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) ALLOC_M_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE' THEN
+              (CASE WHEN r.resource_type = 3 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) ALLOC_X_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 0 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_L_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 1 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_Q_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 2 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_M_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEHARDALLOC' THEN
+              (CASE WHEN r.resource_type = 3 THEN s.slice * cst.cost_rate ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_X_COST
+FROM   prTeam t
+       INNER JOIN srm_resources r ON t.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON t.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+       LEFT OUTER JOIN nbi_proj_res_rates_and_costs cst ON t.prProjectID = cst.project_id AND
+                       t.prID = cst.team_id AND
+                       cst.task_id = -1 AND
+                       s.slice_date BETWEEN cst.from_date AND cst.to_date
+WHERE (sr.request_name IN ('QUARTERLYRESOURCEALLOCCURVE','QUARTERLYRESOURCEHARDALLOC'))
+GROUP BY t.prProjectID, t.prID, s.slice_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

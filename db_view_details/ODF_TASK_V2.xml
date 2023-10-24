@@ -1,0 +1,119 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_TASK_V2">
+    <indexes/>
+    <text_length>15601</text_length>
+    <text>select   'x' pmd_analytical_partition_by, prtask.prid odf_pk, EVREC.ETC as ev_etc, ( select p.prexternalid
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence = c.wbs_parseq
+        and c.prid = prtask.prid ) as parent_task_id, prtask.prFinish as prfinish, (CASE WHEN NVL(EVREC.ITD_ACWP,0) > 0
+             THEN NVL(EVREC.ITD_BCWP,0) / EVREC.ITD_ACWP
+             ELSE NULL END) as ev_cpi, inv_investments.NAME as project_name, prtask.prIsUnplanned as prisunplanned, prtask.prName as prname, PRJ_EFFORT_FCT(prtask.prid,'task','PCTCMP') as por_pct_expended, (CASE WHEN NVL(EVREC.ITD_BCWS,0) > 0
+             THEN NVL(EVREC.ITD_BCWP,0) / EVREC.ITD_BCWS
+             ELSE NULL END) as ev_spi, BASEREC.DURATION as baseline_duration, odf_ca_task.task_narrative as task_narrative, odf_ca_task.task_url as task_url, odf_ca_task.agl_tsk_est_stypts as agl_tsk_est_stypts, odf_ca_task.agl_tsk_lastsync_dt as agl_tsk_lastsync_dt, EVREC.ITD_BCWS as ev_bcws, EVREC.ITD_BCWP as ev_bcwp, PRJ_GET_TASK_FULL_NAME_FCT( prtask.prid, prtask.prprojectid ) as full_name, UPDATED.FULL_NAME as updated_by, (PRJ_EFFORT_FCT(prtask.prid,'task','TOTAL') / PRJ_HPD_FACTOR_FCT()) as ttl_effort, prprojectid.odf_period_type as odf_period_type, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=8) as constraint_snlt, prtask.prDuration as prduration, prtask.ev_bcwp_ovr as ev_bcwp_ovr, prprojectid.odf_period_start as odf_period_start, (PRJ_EFFORT_FCT(prtask.prid,'task','ACT') / PRJ_HPD_FACTOR_FCT()) as por_practsum, prtask.is_open_te as is_open_te, prtask.is_msp_oneway as is_msp_oneway, ( select p.prid
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence = c.wbs_parseq
+        and c.prid = prtask.prid ) as parenttask, (CASE WHEN PRTASK.PRISTASK = 1 OR PRTASK.PRISMILESTONE = 1 THEN 0
+              ELSE (SELECT COUNT(1) FROM DUAL WHERE EXISTS (SELECT 1 FROM PRSUBPROJECT WHERE PRTASKID = PRTASK.PRID AND PRISIPD = 0))
+         END) as is_proxy, odf_ca_task.agl_tsk_pln_finish as agl_tsk_pln_finish, (PRJ_EFFORT_FCT(prtask.prid,'task','ETC') / PRJ_HPD_FACTOR_FCT()) as prestsum, (select count(oa.src_object_alias) from oba_associations oa
+        where oa.assoc_instance_id = PRTASK.PRID
+        and oa.src_object_alias ='obaTodos'
+        and oa.assoc_object_alias = 'tasks') as todo_count_total, prtask.prStart as prstart, odf_ca_task.agl_tsk_status as agl_tsk_status, BASEREC.COST_SUM as ev_bac, odf_ca_task.agl_tsk_sync as agl_tsk_sync, odf_ca_task.cps_phase_release as cps_phase_release, prtask.prEarlyStart as prearlystart, prtask.prIsCritical as priscritical, prtask.prPriority as prpriority, prtask.prLateStart as prlatestart, odf_ca_task.agl_tsk_pctdon_stc as agl_tsk_pctdon_stc, prtask.prCategory as prcategory, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=3) as constraint_fnet, BASEREC.COST_SUM as baseline_cost, prtask.prEarlyFinish as prearlyfinish, (NVL((SELECT 1 FROM DUAL WHERE EXISTS (SELECT 1 from NMC_CONVERSATIONS TC WHERE TC.RESOURCE_NAME='task' AND TC.RESOURCE_ID = prtask.prid)), 0)) as has_conversations, prtask.prShortName as prshortname, inv_investments.CODE as project_code, (CASE WHEN NVL(EVREC.BAC,0) > 0
+        AND NVL(EVREC.ITD_BCWP,0) > 0
+        AND NVL(EVREC.ITD_ACWP,0) > 0
+        THEN ( (EVREC.BAC - EVREC.ITD_BCWP) *  EVREC.ITD_ACWP ) / ( EVREC.ITD_BCWP )
+        ELSE NULL END) as ev_etc_t, CREATED.FULL_NAME as created_by, PRTASK.PRDURATION as por_prduration, odf_ca_task.agl_tsk_p_story_id as agl_tsk_p_story_id, prtask.prProjectID as odf_parent_id, (PRJ_EFFORT_FCT(prtask.prid,'task','TOTAL') / PRJ_HPD_FACTOR_FCT()) as por_ttl_effort, (select t1.prid FROM ( select p.prid, p.prwbssequence seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid ) t1
+        inner join ( select min(p.prwbssequence) seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid) t2
+        on t1.seq = t2.seq) as phase_task, (PRJ_EFFORT_FCT(prtask.prid,'task','ACT') / PRJ_HPD_FACTOR_FCT()) as practsum, EVREC.ITD_ACWP as ev_acwp, odf_ca_task.odmd_rpting as odmd_rpting, (CASE WHEN BASEREC.FINISH_DATE IS NULL THEN 0 WHEN TRUNC(BASEREC.FINISH_DATE-0.0001) &lt; TRUNC(PRTASK.PRFINISH-0.0001) THEN 1 ELSE 0 END) as is_late_finish, odf_ca_task.agl_tsk_type as agl_tsk_type, odf_ca_task.agl_tsk_pln_start as agl_tsk_pln_start, odf_ca_task.agl_tsk_acp_usrsty as agl_tsk_acp_usrsty, odf_ca_task.agl_tsk_wsjf_score as agl_tsk_wsjf_score, odf_ca_task.agl_tsk_p_type as agl_tsk_p_type, ((CASE WHEN (EVREC.ITD_BCWS*1.00)=0 THEN NULL ELSE ((EVREC.ITD_BCWP*1.00)-(EVREC.ITD_BCWS*1.00))/(EVREC.ITD_BCWS*1.00) END )*(100.0*1.00)) as obj_ev_sv_pct, prtask.prIsTask as pristask, odf_ca_task.agl_tsk_parent_id as agl_tsk_parent_id, prtask.prIsFixed as prisfixed, prtask.prTotalFloat as prtotalfloat, ( select s.prrefprojectid from prsubproject s where s.prtaskid = prtask.prid ) as subproj_id, odf_ca_task.partition_code as partition_code, prtask.prMethodExtID as prmethodextid, prprojectid.entity as odf_entity_code, (NVL(EVREC.ITD_BCWP,0) - NVL(EVREC.ITD_ACWP,0)) as ev_cv, PRTASK.PRSTART as por_prstart, prtask.prWBSSequence as wbs_sort, odf_ca_task.cps_agile_state_pick as cps_agile_state_pick, prtask.prIsKey as priskey, odf_ca_task.agl_tsk_acp_stypts as agl_tsk_acp_stypts, odf_ca_task.agl_tsk_risk_score as agl_tsk_risk_score, (PRJ_EFFORT_FCT(prtask.prid,'task','ETC') / PRJ_HPD_FACTOR_FCT()) as por_prestsum, (SELECT count(1) FROM DUAL WHERE EXISTS (SELECT 1 from PRASSIGNMENT ASGN WHERE ASGN.PRTASKID=PRTASK.PRID)) as has_assignments, PRJ_EFFORT_FCT(prtask.prid,'task','PCTCMP') as pct_expended, odf_ca_task.agl_tsk_story_id as agl_tsk_story_id, (CASE WHEN NVL(EVREC.BAC,0) > 0 AND NVL(EVREC.ITD_BCWP,0) > 0
+        THEN EVREC.BAC - EVREC.ITD_BCWP
+        ELSE NULL END) as ev_etc_at, prtask.prGuidelines as prguidelines, odf_ca_task.agl_tsk_ordinal as agl_tsk_ordinal, (CASE WHEN PRTASK.PRISTASK = 1 THEN 0
+              ELSE (SELECT COUNT(1) FROM DUAL WHERE EXISTS (SELECT 1 from PRTASK hst WHERE hst.PRPROJECTID = PRTASK.PRPROJECTID AND hst.WBS_PARSEQ = PRTASK.PRWBSSEQUENCE))
+         END) as has_subtasks, BASEREC.START_DATE as baseline_start, NVL(prtask.is_open_te,1) as is_open_for_te, (CASE WHEN PRTASK.PRISTASK = 1 OR PRTASK.PRISMILESTONE = 1 THEN 0
+              ELSE (SELECT COUNT(1) FROM DUAL WHERE EXISTS (SELECT 1 FROM PRSUBPROJECT WHERE PRTASKID = PRTASK.PRID AND PRISIPD = 0 AND PRISREADONLY = 1))
+         END) as is_sub_readonly, prtask.ev_calc_method as ev_calc_method, odf_ca_task.agl_tsk_iteration as agl_tsk_iteration, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=6) as constraint_mso, INV_INVESTMENTS.CURRENCY_CODE as currency_code, prtask.prIsLocked as prislocked, prtask.prUID as pruid, odf_ca_task.agl_tsk_act_finish as agl_tsk_act_finish, (select count(oa.src_object_alias) from oba_associations oa
+        join oba_todos ot on oa.src_instance_id = ot.id
+        and oa.src_object_alias ='obaTodos'
+        and oa.assoc_object_alias = 'tasks'
+        where oa.assoc_instance_id = PRTASK.PRID
+        and ot.completed = 1) as todo_count_completed, prtask.prLateFinish as prlatefinish, (SELECT count(1) from NMC_CONVERSATIONS TC WHERE TC.RESOURCE_NAME='tasks' AND TC.RESOURCE_ID = PRTASK.PRID) as conversations_count, odf_ca_task.agl_tsk_pctdon_plest as agl_tsk_pctdon_plest, (select t1.prexternalid FROM ( select p.prexternalid, p.prwbssequence seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid ) t1
+        inner join ( select min(p.prwbssequence) seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid) t2
+        on t1.seq = t2.seq) as phase_task_xid, odf_ca_task.agl_tsk_value_score as agl_tsk_value_score, prtask.prProjectID as prprojectid, (CASE WHEN NVL(EVREC.BAC,0) > 0 AND NVL(EVREC.ITD_BCWP,0) > 0
+        THEN EVREC.ITD_ACWP + (EVREC.BAC - EVREC.ITD_BCWP)
+        ELSE NULL END) as ev_eac_at, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=7) as constraint_snet, odf_ca_task.cps_work_status as cps_work_status, odf_ca_task.agl_tsk_plan_est as agl_tsk_plan_est, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=4) as constraint_fnlt, NVL(EVREC.ITD_BCWP,0) - NVL(EVREC.ITD_BCWS,0) as ev_sv, prtask.task_owner as task_owner, BASEREC.FINISH_DATE as baseline_finish, ((CASE WHEN (EVREC.ITD_BCWP*1.00)=0 THEN NULL ELSE ((EVREC.ITD_BCWP*1.00)-(EVREC.ITD_ACWP*1.00))/(EVREC.ITD_BCWP*1.00) END )*(100.0*1.00)) as obj_ev_cv_pct, ( (BASEREC.USAGE_SUM - (PRJ_EFFORT_FCT(prtask.prid,'task','TOTAL')*3600) )/ 3600) / PRJ_HPD_FACTOR_FCT() as baseline_variance, odf_ca_task.agl_tsk_id as agl_tsk_id, odf_ca_task.agl_tsk_state as agl_tsk_state, prtask.COST_TYPE as cost_type, odf_ca_task.agl_tsk_release as agl_tsk_release, prtask.prChargeCodeID as prchargecodeid, (select t1.prname FROM ( select p.prname, p.prwbssequence seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid ) t1
+        inner join ( select min(p.prwbssequence) seq
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence and p.wbs_nnbseq > c.prwbssequence
+        and p.prwbslevel &lt; c.prwbslevel
+        and p.wbs_parseq = -1
+        and p.pristask = 0
+        and p.prismilestone = 0
+        and c.prid = prtask.prid) t2
+        on t1.seq = t2.seq) as phase_task_name, prtask.prWBSSequence as prwbssequence, PRTASK.PRFINISH as por_prfinish, prprojectid.agl_id as agl_id, prtask.msp_task_type as msp_task_type, prtask.prExternalID as prexternalid, (CASE WHEN BASEREC.FINISH_DATE IS NULL THEN NULL ELSE TRUNC(BASEREC.FINISH_DATE-0.0001) - TRUNC(PRTASK.PRFINISH-0.0001) END) as finish_variance, prtask.PRWDM as prwdm, (EVREC.ITD_ACWP + EVREC.ETC) as ev_eac_t, prtask.prStatus as prstatus, odf_ca_task.agl_tsk_act_start as agl_tsk_act_start, BASEREC.LAST_UPDATED_DATE as baseline_time, ( select s.prreftaskid from prsubproject s where s.prtaskid = prtask.prid ) as subproj_task_id, prtask.prWBSLevel as prwbslevel, inv_investments.MANAGER_ID as proj_manager_id, (CASE WHEN NVL(EVREC.ITD_ACWP,0) > 0
+            AND NVL(EVREC.ITD_BCWP,0) > 0
+             THEN EVREC.ITD_ACWP + ( ( (EVREC.BAC - EVREC.ITD_BCWP) *  EVREC.ITD_ACWP ) / ( EVREC.ITD_BCWP ))
+             ELSE NULL END) as ev_eac, odf_ca_task.agl_tsk_est_usrsty as agl_tsk_est_usrsty, prprojectid.odf_period_end as odf_period_end, inv_investments.TRACK_ASSGN_ONLY as track_assgn_only, ( select sibling from ( select p.prid sibling, p.prprojectid, c.prid child
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence > c.prwbssequence
+        and p.prwbslevel = c.prwbslevel
+        and p.wbs_parseq = c.wbs_parseq
+        order by p.prwbssequence ) q where q.prprojectid = prtask.prprojectid and q.child = prtask.prid and rownum = 1 ) as next_sibling, ( select p.prname
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence = c.wbs_parseq
+        and c.prid = prtask.prid ) as parent_task_name, prtask.prUserText1 as prusertext1, (BASEREC.USAGE_SUM / 3600) / PRJ_HPD_FACTOR_FCT() as baseline_usage, PRTASK.LAST_UPDATED_DATE as last_updated_date, (select count(oa.src_object_alias) from oba_associations oa
+        join oba_todos ot on oa.src_instance_id = ot.id
+        and oa.src_object_alias ='obaTodos'
+        and oa.assoc_object_alias = 'tasks'
+        where oa.assoc_instance_id = PRTASK.PRID
+        and ot.completed = 0) as todo_count_open, EVREC.LAST_UPDATED_DATE as ev_last_calc, odf_ca_task.agl_tsk_ext_id as agl_tsk_ext_id, odf_ca_task.agl_tsk_inv_category as agl_tsk_inv_category, prtask.prPctComplete as prpctcomplete, prtask.prIsMilestone as prismilestone, odf_ca_task.agl_tsk_prelim_est as agl_tsk_prelim_est, ( select sibling from ( select p.prid sibling, p.prprojectid, c.prid child
+        from prtask p, prtask c
+        where p.prprojectid = c.prprojectid
+        and p.prwbssequence &lt; c.prwbssequence
+        and p.prwbslevel = c.prwbslevel
+        and p.wbs_parseq = c.wbs_parseq
+        order by p.prwbssequence desc ) q where q.prprojectid = prtask.prprojectid and q.child = prtask.prid and rownum = 1 ) as previous_sibling, PRTASK.CREATED_DATE as created_date, (SELECT PRTIME FROM PRCONSTRAINT WHERE PRTASKID=PRTASK.PRID AND PRTYPE=5) as constraint_mfo  from prtask prtask JOIN srm_resources CREATED ON CREATED.user_id=prtask.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=prtask.last_updated_by JOIN inv_investments inv_investments ON inv_investments.id=prtask.prprojectid JOIN pac_mnt_projects pac_mnt_projects ON pac_mnt_projects.id=prtask.prprojectid LEFT OUTER JOIN prj_baseline_details BASEREC ON BASEREC.OBJECT_ID = PRTask.PRID AND BASEREC.OBJECT_TYPE='TASK' and BASEREC.IS_CURRENT = 1 LEFT OUTER JOIN prj_ev_history EVREC ON EVREC.OBJECT_ID = PRTask.PRID AND EVREC.OBJECT_TYPE='TASK' and EVREC.PERIOD_NUMBER = 0 JOIN odf_ca_task odf_ca_task ON odf_ca_task.id=prtask.prid JOIN (select odf_inv.odf_pk,odf_inv.entity,odf_inv.odf_period_end,odf_inv.odf_period_start,odf_inv.odf_period_type,odf_project.agl_id from (select   'x' pmd_analytical_partition_by, inv_investments.id odf_pk, odf_ca_inv.odf_period_type as odf_period_type, odf_ca_inv.odf_period_start as odf_period_start, inv_investments.entity_code as entity, odf_ca_inv.odf_period_end as odf_period_end from inv_investments inv_investments JOIN odf_ca_inv odf_ca_inv ON odf_ca_inv.id=inv_investments.id where 1 = 1 ) odf_inv left outer join (select   'x' pmd_analytical_partition_by, inv_investments.id odf_pk, odf_ca_project.agl_id as agl_id from inv_investments inv_investments JOIN pac_mnt_projects PAC_MNT_PROJECTS ON PAC_MNT_PROJECTS.id=inv_investments.id join odf_object_instance_mapping oim1 on inv_investments.id = oim1.primary_object_instance_id  and oim1.primary_object_instance_code='project' join fin_financials fin_financials on oim1.secondary_object_instance_id = fin_financials.id and oim1.secondary_object_instance_code='financials' JOIN odf_ca_financials odf_ca_financials ON odf_ca_financials.id=FIN_FINANCIALS.id JOIN odf_ca_project odf_ca_project ON odf_ca_project.id=inv_investments.id where 1 = 1 ) odf_project on odf_inv.odf_pk = odf_project.odf_pk )  prprojectid ON prprojectid.odf_pk=prtask.prProjectID  where 1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

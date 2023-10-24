@@ -1,0 +1,57 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_D_ASSIGN_FTE_V">
+    <indexes/>
+    <text_length>2621</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.prID ASSIGNMENT_ID,
+       a.team_id TEAM_ID,
+       as_s.slice_date DAILY_START_DATE,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN as_sr.request_name = 'DAILYRESOURCEACTCURVE'
+           THEN as_s.slice ELSE 0 END) / c.fte) * 100 END,0)) ACTUAL_L_PERCENT,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN as_sr.request_name = 'DAILYRESOURCEACTCURVE'
+           THEN as_s.slice ELSE 0 END) / c.fte) END,2)) ACTUAL_L_FTE,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN as_sr.request_name = 'DAILYRESOURCEESTCURVE'
+           THEN as_s.slice ELSE 0 END) / c.fte) * 100 END,0)) ETC_L_PERCENT,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN as_sr.request_name = 'DAILYRESOURCEESTCURVE'
+           THEN as_s.slice ELSE 0 END) / c.fte) END,2)) ETC_L_FTE,
+       0 BASE_L_PERCENT,
+       0 BASE_L_FTE
+FROM   prTask t
+       INNER JOIN prAssignment a ON t.prID = a.prTaskID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_blb_slices as_s ON a.prID = as_s.prj_object_id
+       INNER JOIN prj_blb_slicerequests as_sr ON as_s.slice_request_id = as_sr.id
+       INNER JOIN rpt_calendar c ON as_s.slice_date = c.start_date
+WHERE (as_sr.request_name IN ('DAILYRESOURCEACTCURVE','DAILYRESOURCEESTCURVE'))
+AND   (c.period_type = 'DAILY')
+AND   (r.resource_type = 0)
+GROUP BY t.prProjectID, t.prID, a.prID, a.team_id, as_s.slice_date
+UNION ALL
+SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.prID ASSIGNMENT_ID,
+       a.team_id TEAM_ID,
+       as_s.slice_date DAILY_START_DATE,
+       0 ACTUAL_L_PERCENT,
+       0 ACTUAL_L_FTE,
+       0 ETC_L_PERCENT,
+       0 ETC_L_FTE,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE (as_s.slice / c.fte) * 100 END,0)) BASE_L_PERCENT,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE (as_s.slice / c.fte) END,2)) BASE_L_FTE
+FROM   prTask t
+       INNER JOIN prAssignment a ON t.prID = a.prTaskID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_baseline_details bd ON a.prID = bd.object_id
+       INNER JOIN prj_blb_slices as_s ON bd.id = as_s.prj_object_id
+       INNER JOIN prj_blb_slicerequests as_sr ON as_s.slice_request_id = as_sr.id
+       INNER JOIN rpt_calendar c ON as_s.slice_date = c.start_date
+WHERE (as_sr.request_name = 'DAILYRESOURCEBASECURVE')
+AND   (bd.object_type = 'ASSIGNMENT')
+AND   (bd.is_current = 1)
+AND   (r.resource_type = 0)
+AND   (c.period_type = 'DAILY')
+GROUP BY t.prProjectID, t.prID, a.prID, as_s.slice_date, a.team_id
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

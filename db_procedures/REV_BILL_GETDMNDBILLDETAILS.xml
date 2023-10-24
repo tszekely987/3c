@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_GETDMNDBILLDETAILS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_GETDMNDBILLDETAILS" (
+  cUserID   VARCHAR2 ,
+  iBillSessionKey   NUMBER ,
+  in_cCOMPANY_CODE  VARCHAR2 ,
+  in_cPROJECT_CODE  VARCHAR2 ,
+  in_canapprovebill IN NUMBER,
+  in_cTransType   IN VARCHAR2 ,
+  in_nBillAmount  IN NUMBER ,
+  in_nAdjAmount   IN NUMBER ,
+  in_nAmtRemain   IN NUMBER ,
+  in_nTotAmount	  IN NUMBER ,
+  in_cCategory  IN VARCHAR2 ,
+  in_nRecordType IN NUMBER ,
+  in_nBillFlags IN VARCHAR2 ,
+  in_cLanguage  IN VARCHAR2 ,
+  in_bRefresh   IN NUMBER)
+  AS
+BEGIN
+
+  DELETE FROM PAC_BIL_DETAIL_SUMMARY WHERE BILLINGSESSIONKEY = iBillSessionKey AND COMPANY_CODE = in_cCOMPANY_CODE AND PROJECT_CODE = in_cPROJECT_CODE AND TRANSTYPE = in_cTransType and TOTALAMOUNT = in_nTotAmount;
+
+  INSERT INTO PAC_BIL_DETAIL_SUMMARY (ROW1, BILLINGSESSIONKEY, CANAPPROVEBILL, COMPANY_CODE, PROJECT_CODE, TRANSTYPE, TOTALAMOUNT, AMOUNTREMAINING, BILLAMOUNT,
+  ADJUSTAMOUNT, RECORDTYPE, BILLFLAGS, HASDETAILS, USERID)
+  SELECT 0, iBillSessionKey, in_canapprovebill, in_cCOMPANY_CODE, in_cPROJECT_CODE, in_cTransType, in_nTotAmount, in_nAmtRemain, in_nBillAmount,
+  in_nAdjAmount, in_nRecordType, in_nBillFlags, 0, cUserID FROM DUAL WHERE in_nRecordType IN ( 0, 1);
+
+  COMMIT;
+
+END REV_BILL_GETDMNDBILLDETAILS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

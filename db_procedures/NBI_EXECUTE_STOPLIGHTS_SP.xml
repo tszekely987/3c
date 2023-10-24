@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXECUTE_STOPLIGHTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXECUTE_STOPLIGHTS_SP" (
+P_TABLE_NAME        IN VARCHAR2
+)
+IS
+  V_RED_SQL_QUERY VARCHAR2( 4000 );
+  V_YELLOW_SQL_QUERY VARCHAR2( 4000 );
+  v_table_name      varchar2( 40 );
+  v_column_name    varchar2( 40 );
+  v_stmt            varchar2( 4000 );
+ 
+  v_dummy           number;
+  CURSOR C_STOPLIGHT_QUERIES( C_TABLE_NAME	VARCHAR2 ) IS
+    SELECT CSQ.NBI_TABLE_NAME,
+           CSQ.NBI_COLUMN_NAME,
+           CSQ.REDSQL,
+           CSQ.YELLOWSQL FROM
+      NBI_CFG_STOPLIGHT_QUERIES CSQ
+      WHERE CSQ.NBI_TABLE_NAME = C_TABLE_NAME AND
+            CSQ.STOPLIGHT_NAME IS NOT NULL;
+BEGIN
+    begin
+    -- execute yellow stoplight query first and then the red. 
+    OPEN C_STOPLIGHT_QUERIES( P_TABLE_NAME	);
+    LOOP
+       FETCH C_STOPLIGHT_QUERIES INTO v_table_name, v_column_name, V_RED_SQL_QUERY, V_YELLOW_SQL_QUERY;
+         EXIT WHEN C_STOPLIGHT_QUERIES%NOTFOUND;
+		 IF V_YELLOW_SQL_QUERY IS NOT NULL THEN
+	         v_stmt := 'update ' || v_table_name || ' set ' || v_column_name || ' = 2 where ' || v_yellow_sql_query;
+    	     begin
+            	EXECUTE IMMEDIATE V_stmt;
+         	exception
+            	when no_data_found then
+                	-- it is ok to get this exception here
+                	v_dummy := null;
+         	end;
+		 END IF;
+		 IF V_RED_SQL_QUERY IS NOT NULL THEN
+	         v_stmt := 'update ' || v_table_name || ' set ' || v_column_name || ' = 3 where ' || v_red_sql_query;
+    	     begin
+        	      EXECUTE IMMEDIATE v_stmt;
+	         exception
+    	        when no_data_found then
+        	        -- it is ok to get this exception here
+            	    v_dummy := null;
+	         end;
+		END IF;
+    	END LOOP;
+    CLOSE C_STOPLIGHT_QUERIES;
+    exception
+        when others then
+          RAISE_APPLICATION_ERROR (
+             -20000,
+             'Error in NBI_EXECUTE_STOPLIGHTS_SP - ' || V_STMT || ': ' || SQLERRM
+          );
+    end;
+        
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

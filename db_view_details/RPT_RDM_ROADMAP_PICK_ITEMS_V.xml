@@ -1,0 +1,80 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RDM_ROADMAP_PICK_ITEMS_V">
+    <indexes/>
+    <text_length>3672</text_length>
+    <text>SELECT r.id roadmap_key,
+       ri.id roadmap_item_key,
+       rpd.id picklist_key,
+       'status' picklist_type,
+       ri.status mapped_value_code,
+       l.name mapped_value,
+       rms.map_value mapped_color,
+       l.sort_order,
+       l.language_code
+FROM   rdm_roadmaps r
+       INNER JOIN rdm_roadmap_items ri ON r.id = ri.roadmap_id
+       INNER JOIN rdm_roadmap_picklist_defs rpd ON rpd.roadmap_id = 0
+                                               AND rpd.attribute_code = 'status'
+       LEFT OUTER JOIN rpt_rdm_roadmap_mapping_v rms ON NVL(ri.status,'X') = NVL(rms.value,'X')
+                                                    AND rms.attribute = 'status'
+                                                    AND rms.roadmap_key = 0
+       LEFT OUTER JOIN cmn_lookups_v l ON ri.status = l.lookup_code
+                                      AND l.lookup_type = 'RDM_ROADMAP_ITEM_STATUS'
+UNION ALL                                                
+SELECT r.id roadmap_key,
+       ri.id roadmap_item_key,
+       rpd.id picklist_key,
+       'in_plan' picklist_type,
+       TO_CHAR(ri.in_plan) mapped_value_code,
+       l.name mapped_value,
+       rmip.map_value mapped_color,
+       l.sort_order,
+       l.language_code
+FROM   rdm_roadmaps r
+       INNER JOIN rdm_roadmap_items ri ON r.id = ri.roadmap_id
+       INNER JOIN rdm_roadmap_picklist_defs rpd ON rpd.roadmap_id = 0
+                                               AND rpd.attribute_code = 'in_plan'
+       LEFT OUTER JOIN rpt_rdm_roadmap_mapping_v rmip ON NVL(ri.in_plan,0) = NVL(rmip.value,0)
+                                                     AND rmip.attribute = 'in_plan'
+                                                     AND rmip.roadmap_key = 0
+       LEFT OUTER JOIN cmn_lookups_v l ON ri.in_plan = l.lookup_enum
+                                      AND l.lookup_type = 'RDM_ROADMAP_ITEM_IN_PLAN'
+UNION ALL                                                
+SELECT r.id roadmap_key,
+       ri.id roadmap_item_key,
+       rpd.id picklist_key,
+       'type' picklist_type,
+       ri.type mapped_value_code,
+       l.name mapped_value,
+       rmt.map_value mapped_color,
+       l.sort_order,
+       l.language_code
+FROM   rdm_roadmaps r
+       INNER JOIN rdm_roadmap_items ri ON r.id = ri.roadmap_id
+       INNER JOIN rdm_roadmap_picklist_defs rpd ON rpd.roadmap_id = 0
+                                               AND rpd.attribute_code = 'type'
+       LEFT OUTER JOIN rpt_rdm_roadmap_mapping_v rmt ON NVL(ri.type,'X') = NVL(rmt.value,'X')
+                                                    AND rmt.attribute = 'type'
+                                                    AND rmt.roadmap_key = 0
+       LEFT OUTER JOIN cmn_lookups_v l ON ri.type = l.lookup_code
+                                      AND l.lookup_type = 'RDM_ROADMAP_ITEM_TYPE'
+UNION ALL
+SELECT r.id roadmap_key,
+       ri.id roadmap_item_key,
+       pl.id picklist_key,
+       rv.attribute picklist_type,
+       iv.lookup_code mapped_value_code,
+       l.name mapped_value,
+       rv.map_value mapped_color,
+       l.sort_order,
+       l.language_code
+FROM   rdm_roadmaps r
+       INNER JOIN rdm_roadmap_items ri ON r.id = ri.roadmap_id
+       LEFT OUTER JOIN rdm_roadmap_item_values iv ON ri.id = roadmap_item_id
+       LEFT OUTER JOIN rdm_roadmap_picklist_defs pl ON iv.picklist_def_id = pl.id                                
+       LEFT OUTER JOIN rpt_rdm_roadmap_mapping_v rv ON r.id = rv.roadmap_key
+                                                   AND iv.lookup_code = rv.value
+       LEFT OUTER JOIN cmn_lookups_v l ON iv.lookup_code = l.lookup_code
+                                      AND l.lookup_type = pl.lookup_type</text>
+  </QueryResult>
+</ClarityDBViewQuery>

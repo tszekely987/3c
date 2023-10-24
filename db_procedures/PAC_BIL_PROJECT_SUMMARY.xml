@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_PROJECT_SUMMARY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_PROJECT_SUMMARY" (
+cCOMPANY_CODE	 VARCHAR2 ,
+cPROJECT_CODE 	VARCHAR2 ,
+cLanguageCode VARCHAR2 DEFAULT 'en',
+RC1 	IN OUT PAC_BIL_PROJECT_SUMMARYPkg.RCT1,
+RC2 	IN OUT PAC_BIL_PROJECT_SUMMARYPkg.RCT2,
+RC3 	IN OUT PAC_BIL_PROJECT_SUMMARYPkg.RCT3)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+iCurrRevision   NUMBER;
+dPerBegDate 	DATE;
+PTDSumm     NUMBER(32,6);
+BudgetSumm    NUMBER(32,6);
+BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+currencyPrecisionBilling CMN_CURRENCIES.CURRENCY_PRECISION%type;
+
+BEGIN
+	PAC_BIL_PROJECT_SUMMARY.dPerBegDate :=  TO_DATE(RPAD(TO_CHAR(SYSDATE,'mm/dd/yyyy'),
+	   10, ' '), 'mm/dd/yyyy');
+	PAC_BIL_PROJECT_SUMMARY.dPerBegDate :=  PAC_BIL_PROJECT_SUMMARY.dPerBegDate
+	   + ( TO_NUMBER(TO_CHAR( PAC_BIL_PROJECT_SUMMARY.dPerBegDate, 'DD'))
+	   - 1 ) * ( -1 );
+
+
+	SELECT BILLING_CURRENCY_CODE
+	  INTO BillingCurrencyCode
+	  FROM Pac_Mnt_Projects
+	  WHERE COMPANY_CODE = cCOMPANY_CODE AND
+	  		PROJECT_CODE = cPROJECT_CODE ;
+
+    currencyPrecisionBilling := 0;
+
+	currencyPrecisionBilling := CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( BillingCurrencyCode );
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   currentrevision
+    INTO PAC_BIL_PROJECT_SUMMARY.iCurrRevision
+    FROM pac_mnt_projects
+		WHERE COMPANY_CODE = PAC_BIL_PROJECT_SUMMARY.cCOMPANY_CODE
+		 and PROJECT_CODE = PAC_BIL_PROJECT_SUMMARY.cPROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	/*[SPCONV-ERR(16)]:CREATE TABLE temp_tempPAC_BIL_PROJECT_SUMMARY statement passed to ddl file*/
+	DELETE FROM temp_tempwte_ProjSumActivity;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Unbilled)VALUES (0, 'L', 0, 0, 0, 0);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Unbilled)VALUES (0, 'M', 0, 0, 0, 0);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Unbilled)VALUES (0, 'Q', 0, 0, 0, 0);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Unbilled)VALUES (0, 'X', 0, 0, 0, 0);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	/* ajoy BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Unbilled)SELECT  1, RTRIM(budgetheadertype), Revenue, 0, 0, 0
+		 FROM budgetheader
+		WHERE COMPANY_CODE = PAC_BIL_PROJECT_SUMMARY.cCOMPANY_CODE
+		 and PROJECT_CODE = PAC_BIL_PROJECT_SUMMARY.cPROJECT_CODE
+		 and projrevisionid = PAC_BIL_PROJECT_SUMMARY.iCurrRevision
+		 and Currency_Type = 'BILLING';
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;*/
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (Category, PTD, MTD, Unbilled, Budget, LineType)
+	SELECT  RTRIM(W.TransType), SUM(WV.TotalAmount), SUM(WV.TotalAmount
+		   * ( SIGN(1 + SIGN(TRUNC(W.TransDate - (PAC_BIL_PROJECT_SUMMARY.dPerBegDate))))
+		   )), SUM(WV.AmountRemaining), 0, 2
+		 FROM ppa_WIP W,
+			  PPA_WIP_VALUES WV
+		 WHERE WV.TRANSNO = W.TRANSNO
+         AND WV.CURRENCY_TYPE = 'BILLING'
+		 AND W.COMPANY_CODE = PAC_BIL_PROJECT_SUMMARY.cCOMPANY_CODE
+		 and W.PROJECT_CODE = PAC_BIL_PROJECT_SUMMARY.cPROJECT_CODE
+		 and ( BITAND(W.Status,3) ) = 0
+		GROUP BY W.TransType;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+/* now, aggregate them */
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (Category, Budget, PTD, MTD, Unbilled, LineType)SELECT  Category, SUM(Budget), SUM(PTD), SUM(MTD), SUM(Unbilled),
+		   10
+		 FROM temp_tempwte_ProjSumActivity
+		GROUP BY Category;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempwte_ProjSumActivity
+	SET Budget = NVL(Budget, 0),
+	PTD = NVL(PTD, 0),
+	MTD = NVL(MTD, 0),
+	Variance_ = NVL(Variance_, 0),
+	Unbilled = NVL(Unbilled, 0),
+	PctComplete = NVL(PctComplete, 0)
+	WHERE LineType = 10;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempwte_ProjSumActivity
+	SET Variance_ = Budget - PTD
+	WHERE LineType = 10;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempwte_ProjSumActivity
+	SET SBUDGET = NVL(RTRIM(SUBSTR('1 2 3 4 5 6', ( ( INSTR( 'L M Q X Z ZC', RTRIM(CATEGORY)))), 2)), '6')
+	WHERE LineType = 10;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempwte_ProjSumActivity
+	SET Category = (SELECT LV.NAME
+		   	   		   	   FROM CMN_LOOKUPS_V lv
+						   WHERE lv.LOOKUP_TYPE = 'PAC_TRANSACTION_TYPE' AND
+						   		 lv.LANGUAGE_CODE = RTRIM(PAC_BIL_PROJECT_SUMMARY.cLanguageCode) AND
+								 lv.LOOKUP_CODE = temp_tempwte_ProjSumActivity.Category)
+	WHERE LineType = 10;
+/*	UPDATE temp_tempwte_ProjSumActivity
+	SET Category = NVL(RTRIM(SUBSTR('1Labor      2Material   3Equipment
+	    4Expense    5Contingency', ( ( INSTR( 'LMQXZ', RTRIM(Category))
+	   - 1 ) * 12 ) || 1, 12)), '8Other')
+	WHERE LineType = 10; */
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+/*	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (LineType, Category, Budget, PTD, MTD, Variance_, Unbilled)SELECT  10, '9TOTAL &gt;', SUM(Budget), SUM(PTD), SUM(MTD), SUM(Variance_),
+		   SUM(Unbilled)
+		 FROM temp_tempwte_ProjSumActivity
+		WHERE LineType = 10;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END; */
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempwte_ProjSumActivity
+	SET PctComplete = ROUND(( PTD / Budget ) * 100, currencyPrecisionBilling)
+	WHERE LineType = 10
+	 and NVL(Budget, 0) != 0;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempwte_ProjSumActivity (Category, Budget, PTD, MTD, Unbilled, Variance_, PctComplete, LineType)
+	SELECT  '', SUM(Budget), SUM(PTD), SUM(MTD), SUM(Unbilled), SUM(Budget) - SUM(PTD), 0, 11
+		 FROM temp_tempwte_ProjSumActivity
+		 WHERE Linetype = 10;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	SELECT SUM(PTD) INTO
+	  PTDSumm
+	  FROM temp_tempwte_ProjSumActivity
+	  WHERE LineType = 11 ;
+
+	SELECT SUM(Budget) INTO
+	  BudgetSumm
+	  FROM temp_tempwte_ProjSumActivity
+	  WHERE LineType = 11 ;
+
+	IF BudgetSumm != 0 Then
+      UPDATE temp_tempwte_ProjSumActivity
+	   SET PctComplete = ROUND(( PTDSumm / BudgetSumm ) * 100, currencyPrecisionBilling)
+	   WHERE LineType = 11 ;
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	END IF;
+
+    EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+		NULL;
+	  WHEN OTHERS THEN
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+	END;
+
+	OPEN RC1 FOR
+	SELECT Category,  Budget,  PTD,  MTD,  PctComplete,  Variance_,  Unbilled FROM temp_tempwte_ProjSumActivity
+	WHERE LineType = 10
+	ORDER BY SBUDGET, Category ;
+
+	OPEN RC2 FOR
+	SELECT Budget,  PTD,  MTD,  NVL( PctComplete, 0),  Variance_,  Unbilled FROM temp_tempwte_ProjSumActivity
+	WHERE LineType = 11
+	ORDER BY Category ;
+
+	OPEN RC3 FOR
+	SELECT BILLING_CURRENCY_CODE
+		   FROM PAC_MNT_PROJECTS
+		   WHERE COMPANY_CODE = cCOMPANY_CODE AND
+		   		 PROJECT_CODE = cPROJECT_CODE;
+END PAC_BIL_PROJECT_SUMMARY;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

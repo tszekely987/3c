@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>OLB_SAVETRANS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."OLB_SAVETRANS" (
+  cUserID   VARCHAR2 ,
+  cGroupNo  VARCHAR2,
+  iRetainPrecisionMode		NUMBER DEFAULT 1) -- retain precision change
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iBCount   NUMBER;
+  iACount   NUMBER;
+  iWTransNo   NUMBER;
+  iNextBTransNo   NUMBER;
+  iNextATransNo   NUMBER;
+  iErrCode  NUMBER;
+  sErrMsg   GLOBALPKG.STRING;
+  iBatchNo  NUMBER;
+  ProjectId pac_mnt_projects.ID%TYPE;
+  LaborExchRateType pac_mnt_projects.labor_exchange_rate_type%TYPE;
+  MaterialsExchRateType pac_mnt_projects.materials_exchange_rate_type%TYPE;
+  ExpenseExchRateType pac_mnt_projects.expense_exchange_rate_type%TYPE;
+  EquipmentExchRateType pac_mnt_projects.equipment_exchange_rate_type%TYPE;
+  BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  exrAmount CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exrBillRate CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  Ppa_TransBill_TransNo NUMBER;
+  Ppa_TransBill_Amount NUMBER;
+  Ppa_TransBill_AmountRemaining NUMBER;
+  Ppa_TransBill_BillRate NUMBER;
+  Ppa_TransBill_BillingCurrency GLOBALPKG.STRING;
+  CurrencyType GLOBALPKG.STRING;
+  FromCurrency GLOBALPKG.STRING;
+  ToCurrency GLOBALPKG.STRING;
+  ExchangeRateId NUMBER;
+  ExchangeRate NUMBER;
+  ConvertedAmount NUMBER;
+  ConvertedBillRate NUMBER;
+  ExchangeRateType GLOBALPKG.STRING;
+  cNaturalCurrencyCode GLOBALPKG.STRING;
+  nNaturalAmount   NUMBER;
+  nNaturalBillRate NUMBER;
+  UF1_rowid   ROWID;
+  UF1_oval1   ppa_WIP.Status%TYPE;
+  UF1_oval2   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF1_oval3   ppa_WIP.LastUpdateDate%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT W.ROWID, bitwise.op(Status,'or',8), olb_SaveTrans.cUserID, SYSDATE FROM olb_GenerateInfo G, ppa_WIP W
+    WHERE G.UserID = olb_SaveTrans.cUserID
+    and G.GroupNo = olb_SaveTrans.cGroupNo
+    and ABS(G.BillAmt) + ABS(G.BillUnits) + ABS(G.AdjAmt) != 0 -- added BillUnits != 0 as part of fix for bug 52722
+    and W.TransNo = G.WTransNo
+    FOR UPDATE OF W.Status, W.LASTUPDTDBY_RESOURCE_CODE, W.LastUpdateDate;
+
+  /*CURSOR PPA_TRANSBILL_VALUES_CSR IS
+    SELECT ppa_TransBill.ROWID, ppa_TransBill.TransNo, Project_Code, TA.Amount, BillingDate, ApplyToTransType, TA.BillRate, ApplyTo
+    FROM ppa_TransBill,
+      TEMP_BIL_TRANSBILL_AMOUNTS TA
+    WHERE InvoiceNo = olb_SaveTrans.cGroupNo AND
+          ppa_TransBill.TransNo = TA.TransNo; */
+
+  CURSOR PPA_TRANSBILL_BILL_VALUES_CSR IS
+    SELECT TB.TransNo, TA.Amount, WV.AmountRemaining, WV.CURRENCY_CODE, TA.BillRate
+    FROM ppa_TransBill TB,
+      ppa_WIP_Values WV,
+      TEMP_BIL_TRANSBILL_AMOUNTS TA
+    WHERE TB.InvoiceNo = olb_SaveTrans.cGroupNo AND
+          TB.TransNo = TA.TransNo AND
+        TB.APPLYTO = WV.TransNo AND
+        WV.CURRENCY_TYPE = 'BILLING';
+
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+
+  DELETE FROM TEMP_BIL_TRANSBILL_AMOUNTS;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT   Count(*)
+      INTO olb_SaveTrans.iBCount
+      FROM olb_GenerateInfo
+     WHERE UserID = olb_SaveTrans.cUserID
+       and GroupNo = olb_SaveTrans.cGroupNo
+       and BillAmt != 0 OR BillUnits != 0;  -- added BillUnits != 0 as part of fix for bug 52722
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT Count(*)
+      INTO olb_SaveTrans.iACount
+      FROM olb_GenerateInfo
+     WHERE UserID = olb_SaveTrans.cUserID
+       and GroupNo = olb_SaveTrans.cGroupNo
+       and AdjAmt != 0;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+        VALUES (S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, olb_SaveTrans.cUserID, 'TB', 'Std Bill Worksheet');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+      SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+
+	SAVEPOINT tran1;
+	IF  olb_SaveTrans.iBCount &gt; 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+    INSERT INTO ppa_TransBill (TRANSNO, ApplyTo, SourceModule, TransType, ApplyToTransType, InvoiceNo, BatchNo, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, BillingDate, COMPANY_CODE, PROJECT_CODE, Charge_Code, Input_Type, RESOURCE_CODE, Quantity, Notes, WorkInt, WorkBuf,external_id)
+	     SELECT  S_395_1_PPA_TRANSBILL.nextval, W.TransNo, 6, 'B', W.TransType, olb_SaveTrans.cGroupNo,
+			   olb_SaveTrans.iBatchNo, olb_SaveTrans.cUserID, SYSDATE, olb_SaveTrans.cUserID,
+         SYSDATE, G.BillDate, W.COMPANY_CODE, W.PROJECT_CODE, W.Charge_Code, W.Input_Type,
+			   W.RESOURCE_CODE, G.BillUnits, W.Notes,
+			   W.TransNo, SUBSTR(' M', 1 || SIGN(INSTR( NVL(G.BillFlags, ' '),
+			   'R')), 1),W.external_id
+			 FROM olb_GenerateInfo G, ppa_WIP W
+			WHERE G.UserID = olb_SaveTrans.cUserID
+			 and G.GroupNo = olb_SaveTrans.cGroupNo
+       and (G.BillAmt != 0 OR G.BillUnits != 0) -- added BillUnits != 0 as part of fix for bug 52722
+			 and W.TransNo = G.WTransNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		INSERT INTO TEMP_BIL_TRANSBILL_AMOUNTS (TransNo, Amount, BillRate)
+		  SELECT TB.TransNo,
+		  		 G.BillAmt,
+				 G.BillRate
+		    FROM ppa_TransBill TB,
+				 olb_GenerateInfo G,
+				 ppa_WIP W
+			WHERE G.UserID = olb_SaveTrans.cUserID
+			 and G.GroupNo = olb_SaveTrans.cGroupNo
+       and (G.BillAmt != 0 OR G.BillUnits != 0) -- added BillUnits != 0 as part of fix for bug 52722
+			 and W.TransNo = G.WTransNo
+			 and TB.ApplyTo = W.TransNo
+			 and TB.TransType = 'B'
+			 and TB.ApplyToTransType = W.TransType
+			 and TB.BatchNo = olb_SaveTrans.iBatchNo ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		olb_SaveTrans.iErrCode :=  StoO_error;
+		IF  olb_SaveTrans.iErrCode != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			olb_SaveTrans.sErrMsg :=  'An error occurred while inserting bills
+			   into transbill!';
+			raise_application_error(-20173, StoO_errmsg);
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+	IF  olb_SaveTrans.iACount &gt; 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+    INSERT INTO ppa_TransBill (TRANSNO, ApplyTo, SourceModule, TransType, ApplyToTransType, InvoiceNo, BatchNo, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, BillingDate, COMPANY_CODE, PROJECT_CODE, Charge_Code, Input_Type, RESOURCE_CODE, Quantity, Notes, WorkInt, WorkBuf,external_id)
+	    SELECT  S_395_1_PPA_TRANSBILL.nextval, W.TransNo, 6,
+			   SUBSTR('AUAD', 1 + ( 1 - ROUND( TO_NUMBER(SIGN(G.AdjAmt)),0)), 2), W.TransType, olb_SaveTrans.cGroupNo, olb_SaveTrans.iBatchNo,
+			   olb_SaveTrans.cUserID, SYSDATE, olb_SaveTrans.cUserID, SYSDATE,
+         G.BillDate, W.COMPANY_CODE, W.PROJECT_CODE, W.Charge_Code, W.Input_Type, W.RESOURCE_CODE,
+			   /*G.AdjUnits Bug 49078*/ 1, W.Notes, W.TransNo,
+			   SUBSTR(' M', 1 || SIGN(INSTR( NVL(G.BillFlags, ' '), 'R')), 1),W.external_id
+			 FROM olb_GenerateInfo G, ppa_WIP W
+			WHERE G.UserID = olb_SaveTrans.cUserID
+			 and G.GroupNo = olb_SaveTrans.cGroupNo
+			 and G.AdjAmt != 0
+			 and W.TransNo = G.WTransNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+/* PTR 10344: added abs() to fix */
+
+        BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		INSERT INTO TEMP_BIL_TRANSBILL_AMOUNTS (TransNo, Amount, BillRate)
+		  SELECT TB.TransNo,
+		  		 ABS(G.AdjAmt),
+				 ABS(G.AdjAmt)
+				 /* G.AdjRate  Bug 49078*/
+		    FROM ppa_TransBill TB,
+				 olb_GenerateInfo G,
+				 ppa_WIP W
+			WHERE G.UserID = olb_SaveTrans.cUserID
+			 and G.GroupNo = olb_SaveTrans.cGroupNo
+			 and G.AdjAmt != 0
+			 and W.TransNo = G.WTransNo
+			 and TB.ApplyTo = W.TransNo
+			 and TB.TransType = SUBSTR('AUAD', 1 + ( 1 - ROUND( TO_NUMBER(SIGN(G.AdjAmt)),0)), 2)
+			 and TB.ApplyToTransType = W.TransType
+			 and TB.BatchNo = olb_SaveTrans.iBatchNo ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		olb_SaveTrans.iErrCode :=  StoO_error;
+		IF  olb_SaveTrans.iErrCode != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			olb_SaveTrans.sErrMsg :=  'An error occurred while inserting adjustments
+			   into transbill!';
+			raise_application_error(-20174, 'An error occurred while inserting adjustments into transbill!');
+			RETURN ;
+		END;
+		END IF;
+/* update underbill flag */
+	END;
+	END IF;
+
+	/*** MultiCurrency Changes - Insert into values table ppa_transbill_values. ***/
+	BEGIN
+	  OPEN PPA_TRANSBILL_BILL_VALUES_CSR;
+	    LOOP
+		  FETCH PPA_TRANSBILL_BILL_VALUES_CSR INTO Ppa_TransBill_TransNo,
+										      Ppa_TransBill_Amount,
+											  Ppa_TransBill_AmountRemaining, --Actually the WIP Amount Remaining
+											  Ppa_TransBill_BillingCurrency,
+											  Ppa_TransBill_BillRate ;
+		  EXIT WHEN PPA_TRANSBILL_BILL_VALUES_CSR%NOTFOUND;
+
+	      /* First insert into ppa_TransBill_Values for Billing Currency only */
+	      BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+      INSERT INTO PPA_TRANSBILL_VALUES(
+             ID,
+             TRANSNO ,
+             EXCHANGE_ID ,
+             BILLRATE,
+             AMOUNT ,
+             CURRENCY_TYPE,
+             CURRENCY_CODE,
+             EXCHANGE_RATE )
+		  SELECT PPA_TRANSBILL_VALUES_S1.nextval,
+             TB.TRANSNO,
+             WV.RATE_EXCHANGE_ID,
+             Ppa_TransBill_BillRate,
+             Ppa_TransBill_Amount,
+             WV.CURRENCY_TYPE,
+             WV.CURRENCY_CODE,
+             WV.RATE_EXCHANGE_RATE
+        FROM PPA_WIP_VALUES WV,
+             PPA_TRANSBILL TB
+			 WHERE TB.TransNo = Ppa_TransBill_TransNo AND
+             TB.InvoiceNo = olb_SaveTrans.cGroupNo AND
+             TB.APPLYTO = WV.TRANSNO AND
+             WV.Currency_Code = Ppa_TransBill_BillingCurrency ;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+		  EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+		    NULL;
+ 	      WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+	      END;
+
+	      /* Calculate the amount of all other non-billing currencies via percentages to avoid currency conversion
+		  	 issues */
+	      BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+		  INSERT INTO PPA_TRANSBILL_VALUES( ID,
+		 								  TRANSNO ,
+										  EXCHANGE_ID ,
+										  BILLRATE,
+										  AMOUNT ,
+										  CURRENCY_TYPE,
+										  CURRENCY_CODE,
+										  EXCHANGE_RATE )
+		  SELECT PPA_TRANSBILL_VALUES_S1.nextval,
+			   TB.TRANSNO,
+			   WV.RATE_EXCHANGE_ID,
+			   DECODE( iRetainPrecisionMode, 1, -- retain precision change
+			   		   ROUND( ROUND( WV.AmountRemaining * ( Ppa_TransBill_Amount / Ppa_TransBill_AmountRemaining ), CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( WV.Currency_Code )) / TB.Quantity, CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( WV.Currency_Code )) , 
+					   ( WV.AmountRemaining * ( Ppa_TransBill_Amount / Ppa_TransBill_AmountRemaining ) ) / TB.Quantity),
+			   ROUND( WV.AmountRemaining * ( Ppa_TransBill_Amount / Ppa_TransBill_AmountRemaining ), CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( WV.Currency_Code )),
+			   WV.CURRENCY_TYPE,
+			   WV.CURRENCY_CODE,
+			   WV.RATE_EXCHANGE_RATE
+			 FROM PPA_WIP_VALUES WV,
+				  PPA_TRANSBILL TB
+			 WHERE TB.TransNo = Ppa_TransBill_TransNo AND
+				   TB.InvoiceNo = olb_SaveTrans.cGroupNo AND
+				   TB.APPLYTO = WV.TRANSNO AND
+				   WV.Currency_Code != Ppa_TransBill_BillingCurrency ;
+		  StoO_rowcnt := SQL%ROWCOUNT;
+		  EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+		    NULL;
+ 	      WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+	      END;
+
+	    END LOOP;
+	    CLOSE PPA_TRANSBILL_BILL_VALUES_CSR;
+    END;
+    /*End MultiCurrency Changes, Populate PPA_TransBill_Values */
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2, UF1_oval3;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP W
+		SET
+		Status = UF1_oval1,
+		LASTUPDTDBY_RESOURCE_CODE = UF1_oval2,
+		LastUpdateDate = UF1_oval3
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+	olb_SaveTrans.iErrCode :=  StoO_error;
+	IF  olb_SaveTrans.iErrCode != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		olb_SaveTrans.sErrMsg :=  'An error occurred while updating transactions
+		   as underbill!';
+		raise_application_error(-20175, 'An error occurred while updating transactions as underbill!');
+		RETURN ;
+/* clean up intermediate table */
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM olb_GenerateInfo
+		WHERE UserID = olb_SaveTrans.cUserID
+		 and GroupNo = olb_SaveTrans.cGroupNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	olb_SaveTrans.iErrCode :=  StoO_error;
+	IF  olb_SaveTrans.iErrCode != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		olb_SaveTrans.sErrMsg :=  'An error occurred while deleting records
+		   from olb_GenerateInfo!';
+		raise_application_error(-20176, 'An error occurred while deleting records from olb_GenerateInfo!');
+		RETURN ;
+	END;
+	END IF;
+
+	COMMIT WORK;
+/*
+Modified By : SN
+Modification: select @iBatchNo = @@IDENTITY
+	      Changed To
+	      SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+and Status | 8 Changed to bitwise.op(Status,'or',8)
+*/
+END olb_SaveTrans;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

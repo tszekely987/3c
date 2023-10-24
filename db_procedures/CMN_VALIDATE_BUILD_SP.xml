@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_VALIDATE_BUILD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_VALIDATE_BUILD_SP" 
+IS
+   CURSOR c_seeddata_count
+   IS
+      SELECT table_name
+        FROM user_tables
+        WHERE table_name not like 'XDM_%';
+
+   vsql     VARCHAR2(100);
+   vcount   NUMBER;
+BEGIN
+   DELETE cmn_schema_validation;
+   DELETE cmn_seedata_validation;
+   INSERT INTO cmn_schema_validation
+      SELECT object_type, COUNT (*)
+        FROM user_objects
+        WHERE object_name not like 'XDM_%'
+       GROUP BY object_type;
+
+   FOR c_seeddata_count_rec IN c_seeddata_count
+   LOOP
+      vsql := 'SELECT COUNT(*) FROM ' || c_seeddata_count_rec.table_name;
+      EXECUTE IMMEDIATE vsql
+         INTO vcount;
+      vsql := 'INSERT INTO CMN_SEEDATA_VALIDATION ' ||
+              'VALUES ( ''' ||
+              c_seeddata_count_rec.table_name ||
+              ''', ' ||
+              vcount ||
+              ')';
+      EXECUTE IMMEDIATE vsql;
+   END LOOP;
+   
+   delete cmn_seedata_validation where table_name = 'CMN_SEEDATA_VALIDATION';
+   delete cmn_seedata_validation where table_name = 'CMN_SCHEMA_VALIDATION';
+
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      ROLLBACK;
+      raise_application_error (-20000, 'Error occurred: ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

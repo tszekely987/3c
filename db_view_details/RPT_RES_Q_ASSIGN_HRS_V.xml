@@ -1,0 +1,43 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RES_Q_ASSIGN_HRS_V">
+    <indexes/>
+    <text_length>1622</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID,
+       a.team_id TEAM_ID, 
+       a.prID ASSIGNMENT_ID,
+       s.slice_date QUARTER_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEACTCURVE' THEN s.slice ELSE 0 END,0)) ACTUAL_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'QUARTERLYRESOURCEESTCURVE' THEN s.slice ELSE 0 END,0)) ETC_HOURS,
+       0 BASELINE_HOURS
+FROM   prAssignment a
+       INNER JOIN prTask t ON a.prTaskID = t.prID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON a.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name IN ('QUARTERLYRESOURCEACTCURVE','QUARTERLYRESOURCEESTCURVE'))
+AND   (r.resource_type &lt;= 1)
+GROUP BY t.prProjectID, t.prID, a.team_id, a.prID, s.slice_date
+UNION ALL
+SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.TEAM_ID,
+       a.prID ASSIGNMENT_ID,
+       s.slice_date QUARTER_START_DATE,
+       0 ACTUAL_HOURS,
+       0 ETC_HOURS,
+       SUM(s.slice) BASELINE_HOURS
+FROM   prAssignment a
+       INNER JOIN prTask t ON a.prTaskID = t.prID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_baseline_details bd ON a.prID = bd.object_id
+       INNER JOIN prj_blb_slices s ON bd.id = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name = 'QUARTERLYRESOURCEBASECURVE')
+AND   (bd.object_type = 'ASSIGNMENT')
+AND   (bd.is_current = 1)
+AND   (r.resource_type &lt;= 1)
+GROUP BY t.prProjectID, t.prID, a.team_id, a.prID, s.slice_date
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

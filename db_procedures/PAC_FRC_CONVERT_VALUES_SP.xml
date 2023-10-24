@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_CONVERT_VALUES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_CONVERT_VALUES_SP" 
+(
+  PROJECT_ID         NUMBER,
+  USER_ID            NUMBER
+)
+AS
+  v_ERROR_CODE		INTEGER;
+  V_LANGUAGE_ID     NUMBER;
+  V_CURRENT_ID      NUMBER;
+
+  V_CURRENT_CURRENCY_TYPE VARCHAR2(30);
+  V_CURRENT_CURRENCY_CODE VARCHAR2(30);
+  V_CURRENT_COST     NUMERIC(32,6);
+  V_CURRENT_REVENUE  NUMERIC(32,6);
+  V_CURRENT_ACTUAL_BENEFITS NUMERIC(32,6);
+  V_SYSTEM_CURRENCY  VARCHAR2(30);
+  V_HOME_CURRENCY    VARCHAR2(30);
+  V_BILLING_CURRENCY VARCHAR2(30);
+  V_HOME_COST        NUMERIC(32,6);
+  V_HOME_REVENUE  NUMERIC(32,6);
+  V_HOME_ACTUAL_BENEFITS NUMERIC(32,6);
+  V_BILLING_COST     NUMERIC(32,6);
+  V_BILLING_REVENUE  NUMERIC(32,6);
+  V_BILLING_ACTUAL_BENEFITS NUMERIC(32,6);
+  V_PROJECT_HOME_CURRENCY VARCHAR2(30);
+  V_PROJECT_BILLING_CURRENCY VARCHAR2(30);
+  V_EXCHANGE_RATES   Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  V_EXCHANGE_TYPE    VARCHAR2(30);
+  v_STMT		     Globalpkg.STRING;
+  V_TRANSTYPE        Globalpkg.STRING;
+  V_DETAIL_ID    NUMBER;
+  V_FORECAST_DETAILS_ID NUMBER;
+  V_START_DATE       DATE;
+  V_REVISION_NO      NUMBER;
+  V_FORECAST_TYPE NUMBER;
+  V_DETAIL_TYPE NUMBER;
+
+  StoO_selcnt        INTEGER;
+  StoO_error         INTEGER;
+  StoO_rowcnt        INTEGER;
+  StoO_crowcnt       INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg        VARCHAR2(255);
+  StoO_sqlstatus     INTEGER;
+
+  CURSOR CURRENCY_CURSOR IS
+  SELECT V.ID,
+         D.DETAIL_ID,
+		 D.ID,
+		 P.USE_DETAIL_TYPE
+    FROM PAC_FRC_FORECAST_PROPERTIES P,
+	     PAC_FRC_FORECAST_DETAILS D,
+	     PAC_FRC_FORECAST_VALUES V
+	WHERE P.PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID AND
+		  P.REVISION = Pac_Frc_Convert_Values_Sp.V_REVISION_NO AND
+		  P.FORECAST_TYPE = V_FORECAST_TYPE AND
+	      D.FORECAST_ID = P.ID AND
+		  V.FORECAST_DETAILS_ID = D.ID AND
+		  V.CURRENCY_TYPE= V_CURRENT_CURRENCY_TYPE  ;
+
+BEGIN
+
+  SELECT COUNT(*)
+    INTO StoO_selcnt
+	FROM DUAL
+	WHERE EXISTS (SELECT 1
+	                FROM PAC_FRC_FORECAST_PROPERTIES P
+                    WHERE P.PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID ) ;
+
+  --If no forecasting then no need to go any further
+  IF StoO_selcnt = 0 THEN
+    RETURN;
+  END IF;
+	
+  -- get the forecast home currency
+   v_STMT := 'Unable to obtain currency exchange information';
+   v_ERROR_CODE := -20100;
+
+  SELECT DISTINCT V.CURRENCY_CODE
+    INTO Pac_Frc_Convert_Values_Sp.V_HOME_CURRENCY
+    FROM PAC_FRC_FORECAST_PROPERTIES P,
+	     PAC_FRC_FORECAST_DETAILS D,
+	     PAC_FRC_FORECAST_VALUES V
+	WHERE P.PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID AND
+	      D.FORECAST_ID = P.ID AND
+		  V.FORECAST_DETAILS_ID = D.ID AND
+		  V.CURRENCY_TYPE= 'HOME' ;
+
+  -- get the forecast billing currency
+  SELECT DISTINCT V.CURRENCY_CODE
+    INTO Pac_Frc_Convert_Values_Sp.V_BILLING_CURRENCY
+    FROM PAC_FRC_FORECAST_PROPERTIES P,
+	     PAC_FRC_FORECAST_DETAILS D,
+	     PAC_FRC_FORECAST_VALUES V
+	WHERE P.PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID AND
+	      D.FORECAST_ID = P.ID AND
+		  V.FORECAST_DETAILS_ID = D.ID AND
+		  V.CURRENCY_TYPE= 'BILLING' ;
+
+  --If there are no forecast details no need to convert so RETURN		  
+  IF Pac_Frc_Convert_Values_Sp.V_HOME_CURRENCY IS NULL OR Pac_Frc_Convert_Values_Sp.V_BILLING_CURRENCY IS NULL THEN
+    RETURN;
+  END IF;		  
+		  
+  SELECT E.HOME_CURRENCY_CODE,
+         P.BILLING_CURRENCY_CODE
+    INTO V_PROJECT_HOME_CURRENCY,
+	     V_PROJECT_BILLING_CURRENCY
+    FROM ENTITY E,
+	     LOCATIONS L,
+		 PAC_MNT_PROJECTS P
+	WHERE P.ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID AND
+	      P.LOCATIONID = L.LOCATIONID AND
+		  L.ENTITY = E.ENTITY ;
+		  
+    v_STMT := 'Error determining the currennt revision for this financial plan.';
+    v_ERROR_CODE := -20977;
+  
+  -- Get the current revision for all the forecasting types
+	  DECLARE CURSOR c_revisions IS
+  		 SELECT MAX(REVISION) revision,forecast_type
+		 FROM PAC_FRC_FORECAST_PROPERTIES
+		 WHERE PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID
+		 GROUP BY forecast_type;
+	  BEGIN
+  FOR c_revision IN c_revisions LOOP
+    V_REVISION_NO:= c_revision.revision;
+	V_FORECAST_TYPE:=c_revision.forecast_type;
+  	v_STMT := 'Error retrieving the financial plan properties for this project.';
+    v_ERROR_CODE := -20963;
+
+    SELECT COUNT(*)
+      INTO StoO_selcnt
+	  FROM DUAL
+	  WHERE EXISTS (SELECT 1
+	                FROM INV_PROJECTS P
+                    WHERE P.PRID = Pac_Frc_Convert_Values_Sp.PROJECT_ID ) ;
+
+  IF StoO_selcnt &gt; 0 THEN
+    --we need a start date for the currency conversion
+    SELECT I.SCHEDULE_START
+      INTO Pac_Frc_Convert_Values_Sp.V_START_DATE
+      FROM INV_INVESTMENTS I
+      WHERE I.ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID ;
+  ELSE
+	  SELECT B.START_DATE
+        INTO Pac_Frc_Convert_Values_Sp.V_START_DATE
+        FROM BIZ_COM_PERIODS B,
+		     PAC_FRC_FORECAST_PROPERTIES P
+        WHERE PROJECT_ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID
+          AND REVISION = Pac_Frc_Convert_Values_Sp.V_REVISION_NO 
+		  AND FORECAST_TYPE = V_FORECAST_TYPE
+		  AND B.ID = P.START_PERIOD ;
+  END IF;
+
+  V_CURRENT_CURRENCY_TYPE := 'HOME' ;
+
+  SAVEPOINT TRAN1;
+
+  --If our project home or billing currency is different than the previous forecast currencies then we must convert
+  --them all
+  IF ( Pac_Frc_Convert_Values_Sp.V_HOME_CURRENCY &lt;&gt; Pac_Frc_Convert_Values_Sp.V_PROJECT_HOME_CURRENCY ) OR
+     ( Pac_Frc_Convert_Values_Sp.V_BILLING_CURRENCY &lt;&gt; Pac_Frc_Convert_Values_Sp.V_PROJECT_BILLING_CURRENCY ) THEN
+    BEGIN
+	
+      OPEN CURRENCY_CURSOR;
+        LOOP
+	      FETCH CURRENCY_CURSOR INTO V_CURRENT_ID,
+		                             V_DETAIL_ID,
+									 V_FORECAST_DETAILS_ID,
+									 V_DETAIL_TYPE;
+	      EXIT WHEN CURRENCY_CURSOR%NOTFOUND;
+            BEGIN
+			  v_STMT := 'Unable to obtain currency exchange information';
+              v_ERROR_CODE := -20100;
+
+			  IF V_DETAIL_TYPE = 0 or V_DETAIL_TYPE = 3 THEN
+			  SELECT TRANSTYPE
+			    INTO Pac_Frc_Convert_Values_Sp.V_TRANSTYPE
+				FROM TRANSCLASS
+				WHERE ID = V_DETAIL_ID ;
+			ELSIF V_DETAIL_TYPE = 1 THEN
+			  SELECT DECODE(RESOURCE_TYPE,0,'L',1,'Q',2,'M',3,'X')
+			  INTO Pac_Frc_Convert_Values_Sp.V_TRANSTYPE
+			  FROM SRM_RESOURCES
+			  WHERE ID=V_DETAIL_ID;
+			ELSIF V_DETAIL_TYPE = 2 THEN			    
+			    V_TRANSTYPE := 'L';
+		    END IF;
+			  
+
+              SELECT DECODE(Pac_Frc_Convert_Values_Sp.V_TRANSTYPE,
+                    'L', LABOR_EXCHANGE_RATE_TYPE,
+                    'M', MATERIALS_EXCHANGE_RATE_TYPE,
+                    'Q', EQUIPMENT_EXCHANGE_RATE_TYPE,
+                    'X', EXPENSE_EXCHANGE_RATE_TYPE)
+                INTO Pac_Frc_Convert_Values_Sp.V_EXCHANGE_TYPE
+                FROM PAC_MNT_PROJECTS P
+                WHERE P.ID = Pac_Frc_Convert_Values_Sp.PROJECT_ID ;
+
+			  V_HOME_COST               := NULL ;
+			  V_BILLING_COST            := NULL ;
+			  V_HOME_REVENUE            := NULL ;
+			  V_BILLING_REVENUE         := NULL ;
+			  V_HOME_ACTUAL_BENEFITS    := NULL ;
+			  V_BILLING_ACTUAL_BENEFITS := NULL ;
+
+			  SELECT CURRENCY_CODE,
+			         COST,
+					 REVENUE,
+					 ACTUAL_BENEFITS
+			    INTO V_CURRENT_CURRENCY_CODE,
+				     V_CURRENT_COST,
+					 V_CURRENT_REVENUE,
+					 V_CURRENT_ACTUAL_BENEFITS
+			    FROM  PAC_FRC_FORECAST_VALUES V
+				WHERE V.ID = V_CURRENT_ID ;
+
+              -- get the new billing and home cost
+              IF Pac_Frc_Convert_Values_Sp.V_CURRENT_COST IS NOT NULL THEN
+                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES :=
+                  Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+                                Pac_Frc_Convert_Values_Sp.PROJECT_ID,
+                                Pac_Frc_Convert_Values_Sp.V_START_DATE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_CURRENCY_CODE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_COST,
+                                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_TYPE);
+                Pac_Frc_Convert_Values_Sp.V_HOME_COST := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(1).convertedAmount;
+                Pac_Frc_Convert_Values_Sp.V_BILLING_COST := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+              END IF;
+
+              -- get the new billing and home revenue
+              IF Pac_Frc_Convert_Values_Sp.V_CURRENT_REVENUE IS NOT NULL THEN
+                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES :=
+                  Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+                                Pac_Frc_Convert_Values_Sp.PROJECT_ID,
+                                Pac_Frc_Convert_Values_Sp.V_START_DATE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_CURRENCY_CODE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_REVENUE,
+                                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_TYPE);
+                  Pac_Frc_Convert_Values_Sp.V_HOME_REVENUE := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(1).convertedAmount;
+                  Pac_Frc_Convert_Values_Sp.V_BILLING_REVENUE := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+              END IF;
+
+              -- get the new billing and home revenue
+              IF Pac_Frc_Convert_Values_Sp.V_CURRENT_ACTUAL_BENEFITS IS NOT NULL THEN
+                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES :=
+                  Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+                                Pac_Frc_Convert_Values_Sp.PROJECT_ID,
+                                Pac_Frc_Convert_Values_Sp.V_START_DATE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_CURRENCY_CODE,
+                                Pac_Frc_Convert_Values_Sp.V_CURRENT_ACTUAL_BENEFITS,
+                                Pac_Frc_Convert_Values_Sp.V_EXCHANGE_TYPE);
+                  Pac_Frc_Convert_Values_Sp.V_HOME_ACTUAL_BENEFITS := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(1).convertedAmount;
+                  Pac_Frc_Convert_Values_Sp.V_BILLING_ACTUAL_BENEFITS := Pac_Frc_Convert_Values_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+              END IF;
+
+			  v_STMT := 'Error updating the cell home currency values';
+              v_ERROR_CODE := -20961;
+
+			  /* Now update the Values table with the newly converted home currency information */
+              UPDATE PAC_FRC_FORECAST_VALUES
+                SET COST = NVL(Pac_Frc_Convert_Values_Sp.V_HOME_COST, PAC_FRC_FORECAST_VALUES.COST),
+                    REVENUE = NVL(Pac_Frc_Convert_Values_Sp.V_HOME_REVENUE, PAC_FRC_FORECAST_VALUES.REVENUE),
+                    ACTUAL_BENEFITS = NVL( Pac_Frc_Convert_Values_Sp.V_HOME_ACTUAL_BENEFITS, PAC_FRC_FORECAST_VALUES.ACTUAL_BENEFITS),
+					CURRENCY_CODE = V_PROJECT_HOME_CURRENCY
+                WHERE FORECAST_DETAILS_ID = Pac_Frc_Convert_Values_Sp.V_FORECAST_DETAILS_ID
+                  AND CURRENCY_TYPE = 'HOME';
+
+			  v_STMT := 'Error updating the cell billing currency values';
+              v_ERROR_CODE := -20962;
+
+			  /* Now update the Values table with the newly converted billing currency information */
+              UPDATE PAC_FRC_FORECAST_VALUES
+                SET COST = NVL(Pac_Frc_Convert_Values_Sp.V_BILLING_COST, PAC_FRC_FORECAST_VALUES.COST),
+                    REVENUE = NVL(Pac_Frc_Convert_Values_Sp.V_BILLING_REVENUE, PAC_FRC_FORECAST_VALUES.REVENUE),
+                    ACTUAL_BENEFITS = NVL( Pac_Frc_Convert_Values_Sp.V_BILLING_ACTUAL_BENEFITS, PAC_FRC_FORECAST_VALUES.ACTUAL_BENEFITS),
+					CURRENCY_CODE = V_PROJECT_BILLING_CURRENCY
+                WHERE FORECAST_DETAILS_ID = Pac_Frc_Convert_Values_Sp.V_FORECAST_DETAILS_ID
+                  AND CURRENCY_TYPE = 'BILLING';
+		    END;
+
+        END LOOP;
+
+      CLOSE CURRENCY_CURSOR;
+	END;
+  END IF;
+  END LOOP;
+  END;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+	  NULL;
+    WHEN OTHERS THEN
+	  IF v_ERROR_CODE IS NULL THEN
+	    v_ERROR_CODE := SQLCODE ;
+		v_STMT := SQLERRM;
+		ROLLBACK TO SAVEPOINT TRAN1;
+        RAISE_APPLICATION_ERROR (-20878, v_STMT);
+      ELSE
+		ROLLBACK TO SAVEPOINT TRAN1;
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  END IF;
+END Pac_Frc_Convert_Values_Sp ;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RPT_PARAMETERS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RPT_PARAMETERS_INS_SP" (
+        P_CREATED_BY            IN      NUMBER  DEFAULT 1,
+        P_IS_ACTIVE             IN      NUMBER,
+        P_PARAM_NAME            IN      VARCHAR2,
+        P_PARAM_DESC            IN      VARCHAR2,
+        P_DATA_TYPE             IN      VARCHAR2,
+        P_PARAM_TYPE            IN      VARCHAR2,
+        P_PARAM_SOURCE          IN      VARCHAR2,
+        P_LANGUAGE_CODE           IN          VARCHAR2
+        )
+AS
+       THE_NEXT_ID_PARAMETER           NUMBER;
+       V_CNT    INTEGER := 0;
+ 
+BEGIN
+ 
+            SELECT   COUNT (*)
+             INTO     V_CNT
+             FROM     CMN_RPT_PARAMETERS,CMN_CAPTIONS_NLS
+             WHERE    CMN_CAPTIONS_NLS.NAME = P_PARAM_NAME
+             AND      CMN_CAPTIONS_NLS.TABLE_NAME = 'CMN_RPT_PARAMETERS'
+             AND      CMN_CAPTIONS_NLS.LANGUAGE_CODE = P_LANGUAGE_CODE;
+ 
+   IF (V_CNT &lt;= 0)
+   THEN
+ 
+        SELECT  CMN_RPT_PARAMETERS_S1.NEXTVAL
+        INTO    THE_NEXT_ID_PARAMETER
+        FROM    DUAL;
+ 
+         INSERT INTO CMN_RPT_PARAMETERS (
+                ID,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY,
+                IS_ACTIVE,
+                DATA_TYPE,
+                PARAM_TYPE,
+                PARAM_SOURCE
+                )
+        SELECT
+                THE_NEXT_ID_PARAMETER,
+                SYSDATE,
+                P_CREATED_BY,
+                SYSDATE,
+                P_CREATED_BY,
+                P_IS_ACTIVE,
+                P_DATA_TYPE,
+                P_PARAM_TYPE,
+                P_PARAM_SOURCE
+        FROM    DUAL
+        WHERE   NOT EXISTS (    SELECT   'PARAMETER ALREADY EXISTS'
+                                FROM     CMN_RPT_PARAMETERS,CMN_CAPTIONS_NLS
+                                WHERE    CMN_CAPTIONS_NLS.NAME = P_PARAM_NAME
+                                AND      CMN_CAPTIONS_NLS.TABLE_NAME = 'CMN_RPT_PARAMETERS'
+                                AND      CMN_CAPTIONS_NLS.LANGUAGE_CODE = P_LANGUAGE_CODE);
+ 
+        CMN_CAPTIONS_NLS_INS_SP ( 'CMN_RPT_PARAMETERS',
+                                                   THE_NEXT_ID_PARAMETER,
+                                                   P_PARAM_NAME,
+                                             P_PARAM_DESC,
+                                                   P_CREATED_BY,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL );
+ 
+   ELSE
+      RAISE_APPLICATION_ERROR (-20953, 'PARAMETER EXISTS');
+   END IF;
+ 
+END CMN_RPT_PARAMETERS_INS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

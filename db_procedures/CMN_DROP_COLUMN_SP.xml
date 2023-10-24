@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_DROP_COLUMN_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_DROP_COLUMN_SP" (P_TABLE_NAME VARCHAR2, P_COLUMN_NAME VARCHAR2)
+AUTHID CURRENT_USER
+AS
+   V_SQL                         VARCHAR2 (32000);
+   V_NO_ACTION_REQUIRED          VARCHAR2 (1);
+BEGIN
+   SELECT   NVL (MAX ('Y'), 'N')
+   INTO     V_NO_ACTION_REQUIRED
+   FROM     DUAL
+   WHERE    NOT EXISTS (SELECT   'COLUMN IS STILL THERE'
+                        FROM     USER_TAB_COLUMNS
+                        WHERE    TABLE_NAME = UPPER (P_TABLE_NAME)
+                        AND      COLUMN_NAME = UPPER (P_COLUMN_NAME));
+
+   IF V_NO_ACTION_REQUIRED = 'Y'
+   THEN
+      NULL;
+   ELSE
+      V_SQL := 'ALTER TABLE ' || P_TABLE_NAME || ' DROP COLUMN ' || P_COLUMN_NAME;
+      EXECUTE IMMEDIATE V_SQL;
+   END IF;-- Action is required
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in CMN_DROP_COLUMN_SP: ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

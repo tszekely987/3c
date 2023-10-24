@@ -1,0 +1,789 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.qry.prjReview" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Program Schedule and Progress" languageCode="en" name="Schedule and Progress"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT
+       @SELECT:DIM:USER_DEF:IMPLIED:STATUSREPORT:i.id:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:i.NAME:project_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:i.schedule_start:schedule_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:@DBUSER@.COP_CALC_FINISH_TIME_FCT(i.schedule_finish):schedule_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:det.start_date:PrBaseStart@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:@DBUSER@.COP_CALC_FINISH_TIME_FCT(det.finish_date):PrBaseFinish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:CASE WHEN i.STATUS IN (1,5,8) THEN 1 ELSE 0 END:Status@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:i.progress:progress@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:@UPPER@(i.odf_object_code):investment_type_upper@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:odf_proj.obj_request_type:Project_Type@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:((@NVL@(i.labor_etcsum,0)/3600)/(SELECT h.hours_per_day FROM prj_hours_per_day_v h)):ETC@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_cst_total,0):planned_cost@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_cst_capital_total,0):planned_cst_capital_total@,   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_cst_operating_total,0):planned_cst_operating_total@,   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_roi,0)*100:planned_roi@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_npv,0):planned_npv@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_irr,0)*100:planned_irr@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(fin.planned_mirr,0)*100 :planned_mirr@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late:Days_Late@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late:Days_Late_sl@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late_pct:Days_Late_pct@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:inv_d.days_late_pct:Days_Late_pct_sl@,            
+       @SELECT:METRIC:USER_DEF:IMPLIED:CASE WHEN i.STATUS IN (1,5,8) THEN 1 ELSE 0 END:Status_Metric@
+FROM   cop_program_v prog
+INNER  JOIN  inv_investments i
+       ON    i.id = prog.project_id
+       AND   @LOWER@(i.odf_object_code) = 'project'
+       AND   i.is_active <> 0
+INNER  JOIN  inv_projects prj 
+       ON    i.id = prj.prid 
+       AND   prj.is_template <> 1
+       AND   prj.is_program <> 1
+INNER  JOIN  odf_ca_project odf_proj
+       ON    i.id = odf_proj.id
+INNER  JOIN  cop_inv_days_late_v inv_d
+       ON    i.id = inv_d.investment_id
+LEFT   OUTER JOIN prj_baseline_details det
+             ON   det.object_id = i.id 
+             AND  det.is_current = 1
+             AND  @LOWER@(det.object_type) = @LOWER@(i.odf_object_code)
+LEFT   OUTER JOIN odf_object_instance_mapping m
+             ON   m.primary_object_instance_id = i.id
+             AND  @LOWER@(m.primary_object_instance_code) = @LOWER@(i.odf_object_code)
+             AND  @LOWER@(m.secondary_object_instance_code) = 'financials'                   
+LEFT   OUTER JOIN fin_financials fin
+             ON   fin.id = m.secondary_object_instance_id
+             AND  @LOWER@(fin.odf_object_code) = @LOWER@(m.primary_object_instance_code)
+LEFT   OUTER JOIN prj_obs_associations assoc
+             ON   i.id = assoc.record_id 
+             AND  assoc.table_name = 'SRM_PROJECTS'
+LEFT   OUTER JOIN prj_obs_units_flat flat
+             ON   assoc.unit_id = flat.unit_id
+             AND  flat.branch_unit_id = @WHERE:PARAM:USER_DEF:INTEGER:OBS@
+WHERE  prog.program_id = @NVL@(@WHERE:PARAM:XML:INTEGER:/data/id/@value@,prog.program_id)  
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:p_ManagerId@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:p_ManagerId@ = i.manager_id)
+AND    (@WHERE:PARAM:USER_DEF:STRING:p_ProjType@ IS NULL   OR @WHERE:PARAM:USER_DEF:STRING:p_ProjType@ = odf_proj.obj_request_type)
+AND    (@WHERE:PARAM:USER_DEF:STRING:p_STATUS@ IS NULL     OR @WHERE:PARAM:USER_DEF:STRING:p_STATUS@ = 
+                                                              CASE WHEN @WHERE:PARAM:USER_DEF:STRING:p_STATUS@ = 'all' THEN 'all'
+                                                                   WHEN i.STATUS IN (1,5,8) THEN 'approved' 
+                                                                   WHEN i.STATUS = 0        THEN 'unapproved'
+                                                              END) 
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:OBS@ = flat.branch_unit_id)
+AND    @WHERE:SECURITY:PROJECT:i.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_start" required="false">
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_finish" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="prbasestart" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Start" languageCode="en" name="Baseline Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="prbasefinish" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Finish" languageCode="en" name="Baseline Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status" required="false">
+              
+              
+              
+              
+              <nls description="Status Internal ID" languageCode="en" name="Status Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="progress" lookup="INVESTMENT_OBJ_PROGRESS" required="false">
+              
+              
+              
+              
+              <nls description="Progress" languageCode="en" name="Progress"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="blue" value="0"/>
+                <mapping mappingCode="mapping-2" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-3" typeCode="grey" value="2"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_type" required="false">
+              
+              
+              
+              
+              <nls description="Project Type" languageCode="en" name="Project Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc" required="false">
+              
+              
+              
+              
+              <nls description="ETC" languageCode="en" name="ETC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cost" required="false">
+              
+              
+              
+              
+              <nls description="Planned Cost" languageCode="en" name="Planned Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_capital_total" required="false">
+              
+              
+              
+              
+              <nls description="Planned Capital Cost" languageCode="en" name="Planned Capital Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_operating_total" required="false">
+              
+              
+              
+              
+              <nls description="Planned Operating Cost" languageCode="en" name="Planned Operating Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_roi" required="false">
+              
+              
+              
+              
+              <nls description="Planned ROI" languageCode="en" name="Planned ROI"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_npv" required="false">
+              
+              
+              
+              
+              <nls description="Planned NPV" languageCode="en" name="Planned NPV"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_irr" required="false">
+              
+              
+              
+              
+              <nls description="Planned IRR" languageCode="en" name="Planned IRR"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_mirr" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Planned MIRR" languageCode="en" name="Planned MIRR"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="days_late" required="false">
+              
+              
+              
+              
+              <nls description="Days Late" languageCode="en" name="Days Late"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="days_late_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="days_late_pct" required="false">
+              
+              <nls description="Days Late %" languageCode="en" name="Days Late %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="days_late_pct_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule %" languageCode="en" name="Schedule %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="status_metric" lookup="COP_PORTLET_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="red" value="0"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="OBS Projects Filter" languageCode="en" name="OBS Projects Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_managerid" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_projtype" lookup="OBJ_IDEA_PROJECT_TYPE" required="false">
+              
+              <nls description="Project Type Filter" languageCode="en" name="Project Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_status" lookup="PMA_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status Filter" languageCode="en" name="Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="Project">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_JOB_LOGS_DELETE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_JOB_LOGS_DELETE_SP" (
+   p_job_run_id			   		in   number,
+   p_job_user_id			   	in   number,
+   p_job_age			   			in   number,
+   p_report_age			   		in   number DEFAULT 0
+)
+is
+begin
+
+	if ( p_job_age &gt;= 0 ) then
+		delete 	from cmn_sch_job_logs
+		where 	job_run_id in (select	id
+													 from 	cmn_sch_job_runs
+													 where 	created_date &lt; ( sysdate - p_job_age )
+													 and		job_id in ( select  j.id
+													 										from 		cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+													 										where		job_definition_id = jd.id
+													 										and			jd.job_type = l.id
+													 										and			l.lookup_code != 'REPORT'
+													 										and			l.lookup_type = 'SCH_JOB_TYPE' ) );
+
+		delete 	from cmn_sch_job_run_params
+		where 	job_run_id in (select	id
+													 from 	cmn_sch_job_runs
+													 where 	created_date &lt; ( sysdate - p_job_age )
+													 and		job_id in ( select  j.id
+													 										from 		cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+													 										where		job_definition_id = jd.id
+													 										and			jd.job_type = l.id
+													 										and			l.lookup_code != 'REPORT'
+													 										and			l.lookup_type = 'SCH_JOB_TYPE' ) );
+
+		delete 	from cmn_sch_job_runs
+		where 	created_date &lt; ( sysdate - p_job_age )
+		and			job_id in ( select  j.id
+												from 		cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+												where		job_definition_id = jd.id
+												and			jd.job_type = l.id
+												and			l.lookup_code != 'REPORT'
+												and			l.lookup_type = 'SCH_JOB_TYPE' );
+
+		delete from cmn_sec_assgnd_obj_perm
+			where object_instance_id in ( SELECT j.id from cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+											where l.lookup_code != 'REPORT'
+											and	l.lookup_type = 'SCH_JOB_TYPE'
+											and jd.job_type = l.id
+											and jd.id = j.job_definition_id
+											and j.status_code in ('CANCELLED', 'COMPLETED', 'ERROR', 'FAILED')
+											and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+											and j.created_date &lt; ( sysdate - p_job_age ))
+			and object_id in ( select id from cmn_sec_objects
+								  where object_code = 'JOB'
+								  and object_type_code = 'JOB');
+
+		delete from cmn_attribute_values
+			where attribute_set_id in ( SELECT vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+										  where vs.business_object_id = cbo.id
+										  and vs.business_object_instance_id = j.id
+										  and cbo.table_name = 'CMN_SCH_JOB_DEFINITIONS'
+										  and cbo.pk_id = jd.id
+										  and jd.job_type = l.id
+										  and jd.id = j.job_definition_id
+										  and	l.lookup_code != 'REPORT'
+										  and	l.lookup_type = 'SCH_JOB_TYPE'
+										  and j.status_code in ('CANCELLED', 'COMPLETED', 'ERROR', 'FAILED')
+										  and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+										  and j.created_date &lt; ( sysdate - p_job_age )
+									  );
+
+		delete from cmn_attribute_value_sets
+			where id in ( SELECT vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+							where vs.business_object_id = cbo.id
+							and vs.business_object_instance_id = j.id
+							and jd.job_type = l.id
+							and jd.id = j.job_definition_id
+							and	l.lookup_code != 'REPORT'
+							and	l.lookup_type = 'SCH_JOB_TYPE'
+							and cbo.table_name = 'CMN_SCH_JOB_DEFINITIONS'
+							and cbo.pk_id = jd.id
+							and j.created_date &lt; ( sysdate - p_job_age )
+							and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+							and j.status_code in ('CANCELLED', 'COMPLETED', 'ERROR', 'FAILED')
+						);
+
+		delete from cmn_sch_jobs j
+			where j.job_definition_id in ( SELECT jd.id from cmn_sch_job_definitions jd, cmn_lookups l
+										  where l.lookup_code != 'REPORT'
+										  and	l.lookup_type = 'SCH_JOB_TYPE'
+										  and jd.job_type = l.id)
+			and j.status_code in ('CANCELLED', 'COMPLETED', 'ERROR', 'FAILED')
+			and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+			and j.created_date &lt; ( sysdate - p_job_age );
+
+	end if;
+
+	if ( p_report_age &gt;= 0 ) then
+		delete 	from cmn_sch_job_logs
+		where 	job_run_id in (select	id
+													 from 	cmn_sch_job_runs
+													 where 	created_date &lt; ( sysdate - p_report_age )
+													 and		job_id in ( select  j.id
+													 										from 		cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+													 										where		job_definition_id = jd.id
+													 										and			jd.job_type = l.id
+													 										and			l.lookup_code = 'REPORT'
+													 										and			l.lookup_type = 'SCH_JOB_TYPE' ) );
+
+		delete 	from cmn_sch_job_runs
+		where 	created_date &lt; ( sysdate - p_report_age )
+		and			job_id in ( select  j.id
+												from 		cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+												where		job_definition_id = jd.id
+												and			jd.job_type = l.id
+												and			l.lookup_code = 'REPORT'
+												and			l.lookup_type = 'SCH_JOB_TYPE' );
+	end if;
+
+	--
+	--	Blow away the immediate report entries
+	--
+
+  delete from cmn_sch_job_logs
+    where job_run_id in ( select r.id from cmn_sch_job_runs r, cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                            where l.lookup_code = 'REPORT'
+                            and	l.lookup_type = 'SCH_JOB_TYPE'
+                            and jd.job_type = l.id
+                            and j.is_visible = 0
+                            and jd.id = j.job_definition_id
+                            and r.job_id = j.id
+                            and j.created_date &lt; ( sysdate - 2 )
+                        );
+
+  delete from cmn_sch_job_runs
+    where job_id in ( select j.id from cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                        where l.lookup_code = 'REPORT'
+                        and	l.lookup_type = 'SCH_JOB_TYPE'
+                        and jd.job_type = l.id
+                        and j.is_visible = 0
+                        and jd.id = j.job_definition_id
+                        and j.created_date &lt; ( sysdate - 2 )
+                    );
+
+  delete from cmn_sec_assgnd_obj_perm
+    where object_instance_id in ( select j.id from cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                                    where l.lookup_code = 'REPORT'
+                                    and	l.lookup_type = 'SCH_JOB_TYPE'
+                                    and jd.job_type = l.id
+                                    and j.is_visible = 0
+                                    and jd.id = j.job_definition_id
+                                    and j.created_date &lt; ( sysdate - 2 ))
+    and object_id in ( select id from cmn_sec_objects
+                          where object_code = 'REPORT'
+                          and object_type_code = 'REPORT');
+
+  delete from cmn_attribute_values
+    where attribute_set_id in ( select vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+                                  where vs.business_object_id = cbo.id
+                                  and vs.business_object_instance_id = j.id
+                                  and cbo.table_name = 'CMN_SCH_JOB_DEFINITIONS'
+                                  and cbo.pk_id = jd.id
+                                  and jd.job_type = l.id
+                                  and jd.id = j.job_definition_id
+                                  and j.is_visible = 0
+                                  and	l.lookup_code = 'REPORT'
+                                  and	l.lookup_type = 'SCH_JOB_TYPE'
+                                  and j.created_date &lt; ( sysdate - 2 )
+                              );
+
+  delete from cmn_attribute_value_sets
+    where id in ( select vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+                    where vs.business_object_id = cbo.id
+                    and vs.business_object_instance_id = j.id
+                    and jd.job_type = l.id
+                    and jd.id = j.job_definition_id
+                    and j.is_visible = 0
+                    and	l.lookup_code = 'REPORT'
+                    and	l.lookup_type = 'SCH_JOB_TYPE'
+                    and cbo.table_name = 'CMN_SCH_JOB_DEFINITIONS'
+                    and cbo.pk_id = jd.id
+                    and j.created_date &lt; ( sysdate - 2 )
+                );
+
+  delete from cmn_sch_jobs
+    where job_definition_id in ( select jd.id from cmn_sch_job_definitions jd, cmn_lookups l
+                                  where l.lookup_code = 'REPORT'
+                                  and	l.lookup_type = 'SCH_JOB_TYPE'
+                                  and jd.job_type = l.id)
+    and is_visible = 0
+    and created_date &lt; ( sysdate - 2 );
+
+end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

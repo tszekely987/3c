@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_MTXGETMARKUPDATA_OUTPUT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_MTXGETMARKUPDATA_OUTPUT" 
+(
+  transtype             VARCHAR2,
+  rule                  VARCHAR2,
+  units                 NUMBER,
+  actualcost            NUMBER,
+  stdcost               NUMBER,
+  rate                  NUMBER,
+  minutes               NUMBER,
+  costplus              NUMBER,
+  factoramount   IN OUT NUMBER,
+  burdenamount   IN OUT NUMBER,
+  overheadamount IN OUT NUMBER,
+  totalamount    IN OUT NUMBER,
+  amount         IN OUT NUMBER
+)
+AS
+  StoO_selcnt           INTEGER;
+  StoO_error            INTEGER;
+  StoO_rowcnt           INTEGER;
+  StoO_crowcnt          INTEGER := 0;
+  StoO_fetchstatus      INTEGER := 0;
+  StoO_errmsg           GLOBALPKG.STRING;
+  StoO_sqlstatus        INTEGER;
+  factortotal           NUMBER(32,6);
+  diff                  NUMBER(32,6);
+  divider               NUMBER(32,6);
+/* If this procedures is changed then proc sp_mtxgetmarkupdata must also
+   be changed */
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+  sp_mtxgetmarkupdata_output.factoramount   := 0;
+  sp_mtxgetmarkupdata_output.burdenamount   := 0;
+  sp_mtxgetmarkupdata_output.overheadamount := 0;
+  sp_mtxgetmarkupdata_output.amount         := 0;
+  sp_mtxgetmarkupdata_output.totalamount    := 0;
+
+/*
+	IF  sp_mtxgetmarkupdata_output.costplus = 0 THEN
+	BEGIN
+		BEGIN
+		sp_getfactoramount(sp_mtxgetmarkupdata_output.transtype,
+		 sp_mtxgetmarkupdata_output.rule,
+		 sp_mtxgetmarkupdata_output.units,
+		 sp_mtxgetmarkupdata_output.actualcost,
+		 sp_mtxgetmarkupdata_output.rate,
+		 sp_mtxgetmarkupdata_output.rate,
+		 sp_mtxgetmarkupdata_output.minutes,
+		 sp_mtxgetmarkupdata_output.factoramount);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		sp_mtxgetmarkupdata_output.amount :=  ROUND(sp_mtxgetmarkupdata_output.units
+		   * sp_mtxgetmarkupdata_output.rate, 2);
+		sp_mtxgetmarkupdata_output.totalamount :=  sp_mtxgetmarkupdata_output.amount
+		   + NVL(sp_mtxgetmarkupdata_output.factoramount, 0);
+	END;
+	ELSE
+*/
+  IF  sp_mtxgetmarkupdata_output.costplus = 0 THEN
+  BEGIN
+    sp_mtxgetmarkupdata_output.amount      := sp_mtxgetmarkupdata_output.units * sp_mtxgetmarkupdata_output.rate;
+    sp_mtxgetmarkupdata_output.totalamount := sp_mtxgetmarkupdata_output.amount +
+                                              NVL(sp_mtxgetmarkupdata_output.factoramount, 0);
+  END;
+  ELSE
+    BEGIN
+      BEGIN
+        sp_mtxapplycostplus(sp_mtxgetmarkupdata_output.rule,
+                            sp_mtxgetmarkupdata_output.units,
+                            sp_mtxgetmarkupdata_output.actualcost,
+                            sp_mtxgetmarkupdata_output.stdcost,
+                            sp_mtxgetmarkupdata_output.rate,
+                            sp_mtxgetmarkupdata_output.minutes,
+                            sp_mtxgetmarkupdata_output.factoramount,
+                            sp_mtxgetmarkupdata_output.burdenamount,
+                            sp_mtxgetmarkupdata_output.overheadamount);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      sp_mtxgetmarkupdata_output.amount      := sp_mtxgetmarkupdata_output.units * sp_mtxgetmarkupdata_output.rate;
+
+      sp_mtxgetmarkupdata_output.totalamount :=  sp_mtxgetmarkupdata_output.amount +
+                                                NVL(sp_mtxgetmarkupdata_output.factoramount, 0) +
+                                                NVL(sp_mtxgetmarkupdata_output.burdenamount, 0) +
+                                                NVL(sp_mtxgetmarkupdata_output.overheadamount, 0);
+
+      sp_mtxgetmarkupdata_output.factortotal :=  sp_mtxgetmarkupdata_output.factoramount +
+                                                NVL(sp_mtxgetmarkupdata_output.burdenamount, 0) +
+                                                NVL(sp_mtxgetmarkupdata_output.overheadamount, 0);
+
+      IF  sp_mtxgetmarkupdata_output.factortotal &lt; 0 AND (ABS(sp_mtxgetmarkupdata_output.factortotal) &gt; ABS(sp_mtxgetmarkupdata_output.amount)) THEN
+        BEGIN
+          sp_mtxgetmarkupdata_output.diff           :=  ABS(sp_mtxgetmarkupdata_output.factortotal) -
+                                                        ABS(sp_mtxgetmarkupdata_output.amount);
+          sp_mtxgetmarkupdata_output.divider        :=  sp_mtxgetmarkupdata_output.diff / 3;
+          sp_mtxgetmarkupdata_output.factoramount   :=  sp_mtxgetmarkupdata_output.factoramount +
+                                                        sp_mtxgetmarkupdata_output.divider;
+          sp_mtxgetmarkupdata_output.burdenamount   :=  sp_mtxgetmarkupdata_output.burdenamount +
+                                                        sp_mtxgetmarkupdata_output.divider;
+          sp_mtxgetmarkupdata_output.overheadamount :=  sp_mtxgetmarkupdata_output.overheadamount +
+                                                        sp_mtxgetmarkupdata_output.divider;
+        END;
+      END IF;
+    END;
+  END IF;
+
+  IF  sp_mtxgetmarkupdata_output.totalamount &lt; 0 THEN
+		sp_mtxgetmarkupdata_output.totalamount :=  0;
+	END IF;
+END sp_mtxgetmarkupdata_output;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

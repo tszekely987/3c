@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_REV_GL_ALLOC_POST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_REV_GL_ALLOC_POST_SP" 
+(
+  P_SESSIONID       NUMBER,
+  P_USER_ID         NUMBER,
+  P_BATCH_ID        NUMERIC,  
+  P_TRANSNO         NUMBER,
+  P_GL_PERIOD	    DATE,
+  P_LANGUAGE_CODE   VARCHAR2
+)
+AS
+  V_DATE            DATE;
+  V_STMT            VARCHAR2(255);
+  V_TRANS_ID        NUMBER;
+  V_TRANSACTION_ID  NUMBER;
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+
+  CURSOR C_TRANS_REC (C_TRANSNO NUMBER) IS
+  SELECT T.ID,
+         DECODE(T.CHARGEBACK_TYPE, 'C', 'D', 'C') CHARGEBACK_TYPE,
+         A.TRANSNO,
+         T.ENTITY_ID,
+         T.ACCOUNT_CODE_ID,
+         T.QUANTITY,
+         T.DATES_ID
+    FROM PAC_CHG_TRANSACTIONS T,
+         PPA_BILLINGS A
+   WHERE A.TRANSNO = P_TRANSNO
+     AND A.TRANSTYPE = 'A'
+     AND T.TRANSNO = A.APPLYTO
+     AND T.TRANS_SOURCE = 'W'
+     AND T.STATUS = 0;
+
+  CURSOR C_TRANS_VALUES_REC (C_ID NUMBER) IS
+   SELECT V.AMOUNT "AMOUNT",
+          V.CURRENCY_TYPE,
+          V.CURRENCY_CODE
+     FROM PAC_CHG_TRANS_VALUES V
+    WHERE V.TRANSACTION_ID = C_ID;
+
+BEGIN
+  V_STMT := 'Initializing variables';
+  V_DATE := SYSDATE;
+
+  V_STMT := 'Populating posting table';
+  
+  -- NOTE: commits are done by the calling procedures, so there is no need to do it here...
+  FOR C_TRANS_DATA IN C_TRANS_REC (P_TRANSNO)
+    LOOP
+      V_TRANSACTION_ID := C_TRANS_DATA.ID;
+
+      V_STMT := 'Getting posting ID';
+      SELECT PAC_CHG_TRANSACTIONS_S1.NEXTVAL
+        INTO V_TRANS_ID
+        FROM DUAL;
+
+      V_STMT := 'Inserting into posting table';
+
+	  INSERT INTO PAC_CHG_TRANSACTIONS
+      (
+        ID,
+     	BATCH_ID,
+        CHARGEBACK_TYPE,
+        SOURCE_ID,
+        DATES_ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        GL_PERIOD,
+        ENTITY_ID,
+        ACCOUNT_CODE_ID,
+        QUANTITY,
+        STATUS,
+        GL_BATCH_ID,
+        GL_POSTED_DATE,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY
+     )
+     SELECT
+      V_TRANS_ID,
+   	  P_BATCH_ID,
+      C_TRANS_DATA.CHARGEBACK_TYPE,
+      V_TRANSACTION_ID,
+      C_TRANS_DATA.DATES_ID,
+      'A',
+      C_TRANS_DATA.TRANSNO,
+      P_GL_PERIOD,
+      C_TRANS_DATA.ENTITY_ID,
+      C_TRANS_DATA.ACCOUNT_CODE_ID,
+      C_TRANS_DATA.QUANTITY,
+      0,
+      NULL,
+      NULL,
+      V_DATE,
+      P_USER_ID,
+      V_DATE,
+      P_USER_ID
+    FROM DUAL;
+
+      V_STMT := 'Populating posting values table';
+      -- NOTE: commits are done by the calling procedures, so there is no need to do it here...
+      FOR C_TRANS_VALUES_DATA IN C_TRANS_VALUES_REC (V_TRANSACTION_ID)
+        LOOP
+          V_STMT := 'Inserting into posting values table';
+          INSERT INTO PAC_CHG_TRANS_VALUES
+          (
+            ID,
+            TRANSACTION_ID,
+            CURRENCY_TYPE,
+            CURRENCY_CODE,
+            AMOUNT,
+            CREATED_DATE,
+            CREATED_BY,
+            LAST_UPDATED_DATE,
+            LAST_UPDATED_BY
+          )
+          SELECT
+            PAC_CHG_TRANS_VALUES_S1.NEXTVAL,
+            V_TRANS_ID,
+            C_TRANS_VALUES_DATA.CURRENCY_TYPE,
+            C_TRANS_VALUES_DATA.CURRENCY_CODE,
+            C_TRANS_VALUES_DATA.AMOUNT,
+            V_DATE,
+            P_USER_ID,
+            V_DATE,
+            P_USER_ID
+          FROM
+            DUAL;
+
+        END LOOP;
+
+      V_STMT := 'Populating posting table';
+  END LOOP;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20780, 'REVERSING GL ALLOCATION FAILED : ' || V_STMT || ': ' || SQLERRM);
+END PAC_CHG_REV_GL_ALLOC_POST_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

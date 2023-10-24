@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CRV_UPSERT_CURVE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CRV_UPSERT_CURVE_SP" (
+
+   P_FIELD_ID              IN   NUMBER,
+   P_OBJECT_ID             IN   NUMBER,
+   P_SCENARIO_ID           IN   NUMBER,
+   P_START                 IN   DATE,
+   P_FINISH                IN   DATE,
+   P_CURVE                 IN   CLOB,
+   P_BLOB_CURVE            IN   BLOB,
+   P_SQLCURVE_ONLY         IN   NUMBER DEFAULT 0
+
+)
+IS
+BEGIN
+
+  merge into crv_sql_curves s
+  using ( select p_field_id field_id, p_object_id object_id, p_scenario_id scenario_id, p_start start_date, p_finish finish_date from dual ) c
+     on ( s.field_id = c.field_id and s.object_id = c.object_id and s.scenario_id = c.scenario_id )
+  when matched then
+   update set s.curve = p_curve, s.blob_curve = p_blob_curve, s.start_date = c.start_date, s.finish_date = c.finish_date
+  when not matched then
+   insert ( field_id, object_id, scenario_id, start_date, finish_date, curve, blob_curve )
+   values ( c.field_id, c.object_id, c.scenario_id, c.start_date, c.finish_date, p_curve, p_blob_curve );
+
+   IF( P_SQLCURVE_ONLY = 1 ) THEN
+    update crv_sql_curves set slice_status = null where object_id = p_object_id and field_id = p_field_id and scenario_id = p_scenario_id;
+   END IF;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

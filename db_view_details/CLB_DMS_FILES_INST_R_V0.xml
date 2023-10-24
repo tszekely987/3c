@@ -1,0 +1,168 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CLB_DMS_FILES_INST_R_V0">
+    <indexes/>
+    <text_length>7760</text_length>
+    <text>select u.first_name       OWNER_FIRST_NAME    ,   
+       u.last_name        OWNER_LAST_NAME     ,   
+       f.name                  NAME                ,   
+       f.description           DESCRIPTION         ,   
+       fo.assoc_obj_id         ASSOC_OBJ_ID        ,   
+       f.owner_id            CREATOR_ID          ,   
+       f.owner_group_id        OWNER_GROUP_ID      ,   
+       f.mime_type             MIME_TYPE           ,   
+       f.file_type             FILE_TYPE           ,   
+       f.lock_owner_id         LOCK_OWNER_ID       ,   
+	  u2.first_name       LOCK_OWNER_FIRST_NAME    ,   
+       u2.last_name        LOCK_OWNER_LAST_NAME     ,   
+	  u2.user_name	   LOCK_OWNER_NAME,   
+       f.lock_time_stamp       LOCK_TIME_STAMP     ,   
+       f.versioning_enabled    VERSIONING_ENABLED  ,   
+       f.num_checkout_days     NUM_CHECKOUT_DAYS   ,   
+       f.parent_folder_id      PARENT_FOLDER_ID    ,   
+       f.created_date          FILE_CREATED_DATE   ,   
+       fo.path_name            PARENT_FOLDER_PATH  ,   
+       fo.folder_type          PARENT_FOLDER_TYPE  ,   
+       f.area_id               AREA_ID             ,   
+       v.is_latest             IS_LATEST           ,   
+       v.version_number        VERSION_NUMBER      ,   
+       v.byte_size             BYTE_SIZE           ,   
+       v.check_in_comment      CHECK_IN_COMMENT    ,   
+       f.id               FILE_ID             ,   
+       v.last_updated_date     MODIFIED_DATE       ,   
+       ug.user_id               USER_ID             ,   
+       pe.permission_value      PERMISSION_VALUE    ,   
+       w.id         WORKFLOW_ID    ,   
+       fo.name                 PARENT_FOLDER_NAME  ,   
+       v.id                    VERSION_ID, 
+       f.status			STATUS   
+from   clb_dms_folders         fo                  ,   
+       clb_dms_versions        v                   ,   
+       clb_dms_files        f                   ,      
+       CLB_DMS_WKF_V0          w                   ,   
+       cmn_sec_users           u,   
+       cmn_sec_users           u2, 
+	  CMN_SEC_PERM_ELEMENTS PE, 
+       CMN_SEC_ASSGND_OBJ_PERM AP, 
+       CMN_SEC_GROUP_FLAT_HIERS H, 
+       CMN_SEC_GROUPS PARENT_GROUP, 
+       CMN_SEC_GROUPS G, 
+       CMN_SEC_USER_GROUPS UG 
+where  v.file_id               = f.id             and          
+       f.parent_folder_id      = fo.id            and    
+       f.owner_id              = u.id    and         
+       u2.id 		(+) = 	f.lock_owner_id	 	and   
+       w.doc_type_id    (+) = f.id and 
+	  UG.GROUP_ID = H.GROUP_ID 
+	  AND      H.GROUP_ID = G.ID 
+	  AND      G.IS_ACTIVE = 1 
+	  AND      AP.PRINCIPAL_ID = H.PARENT_GROUP_ID 
+	  AND      H.PARENT_GROUP_ID = PARENT_GROUP.ID 
+	  AND      PARENT_GROUP.IS_ACTIVE = 1 
+	  AND      AP.PRINCIPAL_TYPE = 'GROUP' 
+	  AND      AP.PERMISSION_ID = PE.PERMISSION_ID	and      
+       ap.object_id               = 100            and   
+       f.id = ap.object_instance_id  
+UNION 
+select u.first_name       OWNER_FIRST_NAME    ,   
+       u.last_name        OWNER_LAST_NAME     ,   
+       f.name                  NAME                ,   
+       f.description           DESCRIPTION         ,   
+       fo.assoc_obj_id         ASSOC_OBJ_ID        ,   
+       f.owner_id            CREATOR_ID          ,   
+       f.owner_group_id        OWNER_GROUP_ID      ,   
+       f.mime_type             MIME_TYPE           ,   
+       f.file_type             FILE_TYPE           ,   
+       f.lock_owner_id         LOCK_OWNER_ID       ,   
+	  u2.first_name       LOCK_OWNER_FIRST_NAME    ,   
+       u2.last_name        LOCK_OWNER_LAST_NAME     ,   
+	  u2.user_name	   LOCK_OWNER_NAME,   
+       f.lock_time_stamp       LOCK_TIME_STAMP     ,   
+       f.versioning_enabled    VERSIONING_ENABLED  ,   
+       f.num_checkout_days     NUM_CHECKOUT_DAYS   ,   
+       f.parent_folder_id      PARENT_FOLDER_ID    ,   
+       f.created_date          FILE_CREATED_DATE   ,   
+       fo.path_name            PARENT_FOLDER_PATH  ,   
+       fo.folder_type          PARENT_FOLDER_TYPE  ,   
+       f.area_id               AREA_ID             ,   
+       v.is_latest             IS_LATEST           ,   
+       v.version_number        VERSION_NUMBER      ,   
+       v.byte_size             BYTE_SIZE           ,   
+       v.check_in_comment      CHECK_IN_COMMENT    ,   
+       f.id               FILE_ID             ,   
+       v.last_updated_date     MODIFIED_DATE       ,   
+       ap.principal_id               USER_ID             ,   
+       pe.permission_value      PERMISSION_VALUE    ,   
+       w.id         WORKFLOW_ID    ,   
+       fo.name                 PARENT_FOLDER_NAME  ,   
+       v.id                    VERSION_ID, 
+       f.status			STATUS   
+from   clb_dms_folders         fo                  ,   
+       clb_dms_versions        v                   ,   
+       clb_dms_files        f                   ,   
+       CLB_DMS_WKF_V0          w                   ,   
+       cmn_sec_users           u,   
+       cmn_sec_users           u2, 
+	  CMN_SEC_PERM_ELEMENTS PE, 
+       CMN_SEC_ASSGND_OBJ_PERM AP  
+where  v.file_id               = f.id             and          
+       f.parent_folder_id      = fo.id            and    
+       f.owner_id              = u.id    and         
+       u2.id 		(+) = 	f.lock_owner_id	 	and   
+       w.doc_type_id    (+) = f.id and  
+	  AP.PRINCIPAL_TYPE = 'USER' AND
+	  AP.PERMISSION_ID = PE.PERMISSION_ID	and	     
+       ap.object_id               = 100            and   
+       f.id = ap.object_instance_id
+UNION
+select u.first_name       OWNER_FIRST_NAME    ,
+       u.last_name        OWNER_LAST_NAME     ,
+       f.name                  NAME                ,
+       f.description           DESCRIPTION         ,
+       fo.assoc_obj_id         ASSOC_OBJ_ID        ,
+       f.owner_id            CREATOR_ID          ,
+       f.owner_group_id        OWNER_GROUP_ID      ,
+       f.mime_type             MIME_TYPE           ,
+       f.file_type             FILE_TYPE           ,
+       f.lock_owner_id         LOCK_OWNER_ID       ,
+	u2.first_name       LOCK_OWNER_FIRST_NAME    ,
+       u2.last_name        LOCK_OWNER_LAST_NAME     ,
+	u2.user_name	   LOCK_OWNER_NAME,
+       f.lock_time_stamp       LOCK_TIME_STAMP     ,
+       f.versioning_enabled    VERSIONING_ENABLED  ,
+       f.num_checkout_days     NUM_CHECKOUT_DAYS   ,
+       f.parent_folder_id      PARENT_FOLDER_ID    ,
+       f.created_date          FILE_CREATED_DATE   ,
+       fo.path_name            PARENT_FOLDER_PATH  ,
+       fo.folder_type          PARENT_FOLDER_TYPE  ,
+       f.area_id               AREA_ID             ,
+       v.is_latest             IS_LATEST           ,
+       v.version_number        VERSION_NUMBER      ,
+       v.byte_size             BYTE_SIZE           ,
+       v.check_in_comment      CHECK_IN_COMMENT    ,
+       f.id               FILE_ID             ,
+       v.last_updated_date     MODIFIED_DATE       ,
+       -1               USER_ID             , /* Dummy - to keep all dms views consistent */
+       1      PERMISSION_VALUE    ,
+       w.id         WORKFLOW_ID    ,
+       fo.name                 PARENT_FOLDER_NAME  ,
+       v.id                    VERSION_ID, 
+       f.status			STATUS
+from   clb_dms_folders         fo                  ,
+       clb_dms_versions        v                   ,
+       clb_dms_files        f                   ,       
+       CLB_DMS_WKF_V0          w                   ,
+       cmn_sec_users           u,
+       cmn_sec_users           u2
+where  v.file_id               = f.id             and
+		f.allow_non_participants = 1	and       
+       f.parent_folder_id      = fo.id            and 
+       f.owner_id              = u.id    and      
+	u2.id 		(+) = 	f.lock_owner_id	 	and
+       w.doc_type_id    (+) = f.id
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

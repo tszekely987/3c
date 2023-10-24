@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_CLEAN_DATAMART_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_CLEAN_DATAMART_SP" 
+AS
+   CURSOR C_TABLES
+   IS
+      SELECT   TABLE_NAME
+      FROM     USER_TABLES
+      WHERE    TABLE_NAME LIKE 'NBI%'
+      AND      TABLE_NAME NOT LIKE 'NBI_CFG%'
+      AND      TABLE_NAME NOT IN ('NBI_FM_PT_FACTS', 'NBI_PM_PT_FACTS', 'NBI_RT_FACTS')
+      AND      TABLE_NAME NOT IN ('NBI_DIM_FISCAL_TIME', 'NBI_DIM_CALENDAR_TIME')
+      AND      TABLE_NAME NOT LIKE 'NBI%MATRIX%'
+      AND      TABLE_NAME &lt;&gt; 'NBI_PROJ_RES_RATES_AND_COSTS';
+BEGIN
+   FOR C_REC IN C_TABLES
+   LOOP
+      DBMS_OUTPUT.PUT_LINE ('TRUNCATE TABLE ' || C_REC.TABLE_NAME);
+      EXECUTE IMMEDIATE 'TRUNCATE TABLE ' || C_REC.TABLE_NAME;
+   END LOOP;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_CLEAN_DATAMART_SP: ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_DEFAULT_ALLOC_RATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_DEFAULT_ALLOC_RATE_FCT" ( P_CURVE IN BLOB )
+RETURN NUMBER
+AS
+  default_rate number;
+  idx number; b_idx number := 1;
+  V_CURVE BLOB := P_CURVE;
+curve varchar2(32000);
+
+BEGIN
+
+  IF( P_CURVE IS NULL ) THEN
+    RETURN 0.0;
+  END IF;
+
+  b_idx := length(v_curve) - 10;
+
+  -- default rate?
+  CRV_SQL_CURVE_PKG.READ_DOUBLE(v_curve, b_idx, curve, idx, default_rate );
+
+  RETURN default_rate;
+  -- safety check ... if anything goes wrong just return an empty curve
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN 0.0;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

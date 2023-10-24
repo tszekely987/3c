@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PREPARE_PROJ_DATA_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PREPARE_PROJ_DATA_SP" 
+(
+  P_INCREMENTAL_ONLY NUMBER
+)
+AS
+  V_STMT            VARCHAR2 (200);
+  LAST_SUCCESSFUL_JOB_RUN_DATE DATE;
+  TRANS_ENTRY_DEFAULT_CHANGED NUMBER;
+  V_INCREMENTAL_ONLY NUMBER;
+BEGIN
+    V_INCREMENTAL_ONLY := P_INCREMENTAL_ONLY;
+
+    /* If incremental only, get the last successful job run date*/
+    IF V_INCREMENTAL_ONLY=1 THEN
+    BEGIN
+    --get the last successful job run date
+    	SELECT MAX(JR.START_DATE) INTO LAST_SUCCESSFUL_JOB_RUN_DATE
+          FROM CMN_SCH_JOBS J, CMN_SCH_JOB_DEFINITIONS JD, CMN_SCH_JOB_RUNS JR
+          WHERE J.JOB_DEFINITION_ID = JD.ID
+          AND JD.JOB_CODE = 'Rate_Matrix_Extraction'
+          AND J.ID = JR.JOB_ID
+          AND JR.STATUS_CODE = 'COMPLETED';
+      EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+              LAST_SUCCESSFUL_JOB_RUN_DATE := NULL;
+    END;
+    END IF;
+
+    IF (V_INCREMENTAL_ONLY=1 AND LAST_SUCCESSFUL_JOB_RUN_DATE IS NULL) THEN
+      BEGIN
+        V_INCREMENTAL_ONLY:=0;
+      END;
+      END IF;
+
+-- Clean up the tables before start in one place for full vs inc.
+    V_STMT := 'TRUNCATE TABLE NBI_PROJ_RES_RATES_AND_COSTSCP';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_PROJ_RES_RATES_AND_COSTSCP';
+    COMMIT;
+
+    V_STMT := 'TRUNCATE TABLE TEMP_NBI_GET_RATES_AND_COSTS';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_NBI_GET_RATES_AND_COSTS';
+    COMMIT;
+
+    V_STMT := 'TRUNCATE TABLE TEMP_NBI_SLICE_DATA';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_NBI_SLICE_DATA';
+    COMMIT;
+
+    V_STMT := 'TRUNCATE TABLE TEMP_NBI_PROJ_RESOURCES';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_NBI_PROJ_RESOURCES';
+    COMMIT;
+
+    V_STMT := 'TRUNCATE TABLE TEMP_NBI_MATRIX_DATA';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_NBI_MATRIX_DATA';
+    COMMIT;
+
+    V_STMT := 'TRUNCATE TABLE TEMP_NBI_PROJ_DATES';
+	EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_NBI_PROJ_DATES';
+	COMMIT;
+
+    IF V_INCREMENTAL_ONLY=0 THEN
+    BEGIN
+
+    V_STMT := 'TRUNCATE TABLE NBI_PRJ_MATRIX_DATES';
+    EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_PRJ_MATRIX_DATES';
+    COMMIT;
+
+
+ /* Populate the slice max and min date for projects to be used by NBI_PRJ_MATRIX_DATES_SP */
+    V_STMT := 'INSERT INTO TEMP_NBI_SLICE_DATA';
+      INSERT  /*+ APPEND */ INTO TEMP_NBI_SLICE_DATA (PROJECT_ID, MIN_SLICE_DATE, MAX_SLICE_DATE)
+      SELECT  T.PRPROJECTID, MIN (S.SLICE_DATE),
+                          MAX (S.SLICE_DATE)
+      FROM     INV_INVESTMENTS INV,
+			   PRJ_BLB_SLICES S,
+               PRASSIGNMENT A,
+               PRTASK T,
+               PRJ_BLB_SLICEREQUESTS SR
+      WHERE    INV.ID = T.PRPROJECTID AND INV.IS_ACTIVE = 1
+	  AND	   T.PRID = A.PRTASKID
+      AND      SR.REQUEST_NAME IN ('DAILYRESOURCEACTCURVE', 'DAILYRESOURCEBASECURVE', 'DAILYRESOURCEESTCURVE')
+      AND      S.SLICE_REQUEST_ID = SR.ID
+      AND      S.PRJ_OBJECT_ID = A.PRID
+      GROUP BY  T.PRPROJECTID;
+	  COMMIT;
+   END;
+   END IF;
+   IF V_INCREMENTAL_ONLY=1 THEN
+    BEGIN
+	V_STMT:='DROP INDEX TEMP_INCREMENTAL_ONLY_PROJECTS_N1';
+
+	CMN_DROP_INDEX_SP('TEMP_INC_ONLY_PROJECTS_N1');
+
+    /*check if the transaction entry default matrices association has changed*/
+    V_STMT:='SELECT count(1) INTO TRANS_ENTRY_DEFAULT_CHANGED FROM NAMEOPTIONS WHERE LASTUPDATE &gt; LAST_SUCCESSFUL_JOB_RUN_DATE AND LASTUPDATE &lt; SYSDATE';
+          SELECT count(1) INTO TRANS_ENTRY_DEFAULT_CHANGED FROM NAMEOPTIONS WHERE LASTUPDATE &gt; LAST_SUCCESSFUL_JOB_RUN_DATE AND LASTUPDATE &lt; SYSDATE;
+
+    /* DATA PREPARATION - delete from the temp table that holds the list of investments to process*/
+     V_STMT := 'DELETE FROM TEMP_INCREMENTAL_ONLY_PROJECTS';
+     EXECUTE IMMEDIATE 'TRUNCATE TABLE TEMP_INCREMENTAL_ONLY_PROJECTS';
+	 COMMIT;
+
+     /***********************************************************************/
+    /* fetch all investments which have changed */
+    V_STMT := 'fetch all investments which have changed';
+      insert  /*+ APPEND */ into temp_incremental_only_projects
+      select inv.id from inv_investments inv, pac_mnt_projects pac
+      where inv.id=pac.id
+      and inv.is_active=1
+      and inv.last_updated_date &gt; LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose tasks have changed
+    V_STMT := 'fetch all investments whose tasks have changed';
+	*/
+      select inv.id from inv_investments inv, prtask task
+      where inv.id=task.prprojectid
+      and inv.is_active=1
+      and task.last_updated_date &gt; LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose team has changed
+    V_STMT := 'fetch all investments whose team changed';
+	*/
+      select inv.id from inv_investments inv, prteam team
+      where inv.id=team.prprojectid
+      and inv.is_active=1
+      and team.last_updated_date &gt; LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose assignments have changed
+      V_STMT := 'fetch all investments whose assignments have changed';
+	*/
+      select inv.id from inv_investments inv, prassignment assign, prteam team
+      where inv.id=team.prprojectid
+      and team.prid=assign.team_id
+      and inv.is_active=1
+      and assign.last_updated_date &gt; LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose assigned resources have changed
+       V_STMT := 'fetch all investments whose assigned resources have changed';
+	*/
+      select inv.id from inv_investments inv, srm_resources res, prteam team
+      where inv.id=team.prprojectid
+      and team.prresourceid=res.id
+      and inv.is_active=1
+      and res.last_updated_date &gt; LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose assigned matrices have changed (through the financial subpage)
+     V_STMT := 'fetch all investments whose assigned matrices have changed (through the financial subpage)';
+	*/
+      select inv.id from inv_investments inv,pac_mnt_projects pac, ppa_matrix matrix
+		  where
+		  inv.id=pac.id
+		  and inv.is_active=1
+		  and
+		  (
+		  pac.transratesourcelabor=matrix.matrixkey
+		  or pac.transcostsourcelabor=matrix.matrixkey
+		  or pac.transratesourceequipment=matrix.matrixkey
+		  or pac.transcostsourceequipment=matrix.matrixkey
+  		or pac.transratesourcematerials=matrix.matrixkey
+  		or pac.transcostsourcematerials=matrix.matrixkey
+		  or pac.transratesourceexpenses=matrix.matrixkey
+  		or pac.transcostsourceexpenses=matrix.matrixkey
+		  )
+		  and matrix.last_updated_date&gt;  LAST_SUCCESSFUL_JOB_RUN_DATE
+	UNION
+    /* fetch all investments whose entity has changed
+    V_STMT := 'fetch all investments whose entity has changed';
+	*/
+      select inv.id from inv_investments inv,pac_mnt_projects pac, entity ent, prj_obs_types obs
+		  where
+		  inv.id=pac.id
+		  and inv.is_active=1
+		  and inv.ENTITY_CODE=ent.entity
+		  and
+	  	  (
+	   	   	 ent.GEO_CHART_OBS_TYPE_ID=obs.ID
+		   	 or
+		  	 ent.ORG_CHART_OBS_TYPE_ID=obs.ID
+		  )
+		  and
+		  (
+		  pac.transratesourcelabor IS NULL
+		  or pac.transcostsourcelabor IS NULL
+		  or pac.transratesourceequipment IS NULL
+		  or pac.transcostsourceequipment IS NULL
+  		  or pac.transratesourcematerials IS NULL
+  		  or pac.transcostsourcematerials IS NULL
+		  or pac.transratesourceexpenses IS NULL
+  		  or pac.transcostsourceexpenses IS NULL
+		  )
+		  and obs.LAST_UPDATED_DATE&gt;LAST_SUCCESSFUL_JOB_RUN_DATE
+		UNION
+      /* fetch all investments whose assigned matrices have changed (through the entity)
+      V_STMT := 'fetch all investments whose assigned matrices have changed (through the entity)';
+	  */
+		  select inv.id from inv_investments inv,pac_mnt_projects pac, entity ent, ppa_matrix matrix
+		  where
+		  inv.id=pac.id
+		  and inv.is_active=1
+		  and inv.ENTITY_CODE=ent.entity
+		  and
+		  (
+			  (pac.transratesourcelabor IS NULL and ent.TRANS_RATE_SOURCE_LABOR = matrix.matrixkey)
+			  or (pac.transcostsourcelabor IS NULL and ent.TRANS_COST_SOURCE_LABOR = matrix.matrixkey)
+			  or (pac.transratesourceequipment IS NULL and ent.TRANS_RATE_SOURCE_EQUIPMENT = matrix.matrixkey)
+	  		  or (pac.transratesourcematerials IS NULL and  ent.TRANS_RATE_SOURCE_MATERIALS = matrix.matrixkey)
+			  or (pac.transratesourceexpenses IS NULL and ent.TRANS_RATE_SOURCE_EXPENSE = matrix.matrixkey)
+
+		  )
+		  and matrix.LAST_UPDATED_DATE&gt;LAST_SUCCESSFUL_JOB_RUN_DATE
+		UNION
+/**********************************************************************/
+		  /* fetch all investments who do not have matrices assigned through the financial subpage or through the entity
+		  and the transaction entry defaults matrices have changed
+		  V_STMT := 'fetch all investments who do not have matrices assigned through the financial subpage or through the entity
+		  and the transaction entry defaults matrices have changed';
+	  */
+      select pac.id from pac_mnt_projects pac, entity e, inv_investments inv, ppa_matrix matrix, nameoptions nmopts
+            where
+            pac.id=inv.id
+            and inv.is_active=1
+            and inv.ENTITY_CODE=e.ENTITY
+            and
+            (
+			 	nmopts.TRANSCOSTSRCEQUIP= matrix.matrixkey
+				or
+				nmopts.TRANSCOSTSRCEXPENSE=matrix.matrixkey
+				or
+				nmopts.TRANSCOSTSRCLBR=matrix.matrixkey
+				or
+				nmopts.TRANSCOSTSRCMTL=matrix.matrixkey
+				or
+				nmopts.TRANSRATESRCEQUIP=matrix.matrixkey
+				or
+				nmopts.TRANSRATESRCEXPENSE=matrix.matrixkey
+				or
+				nmopts.TRANSRATESRCLBR=matrix.matrixkey
+				or
+				nmopts.TRANSRATESRCMTL=matrix.matrixkey
+			)
+			and
+            (
+ 		          (pac.transratesourcelabor IS NULL and e.TRANS_RATE_SOURCE_LABOR IS NULL)
+		          or
+		          (pac.transcostsourcelabor IS NULL and e.TRANS_COST_SOURCE_LABOR IS NULL)
+		          or
+              (pac.transratesourceequipment IS NULL and e.TRANS_RATE_SOURCE_EQUIPMENT IS NULL)
+              or
+              (pac.transcostsourceequipment IS NULL)
+                or
+              (pac.transratesourcematerials IS NULL and e.TRANS_RATE_SOURCE_MATERIALS IS NULL)
+                or
+              (pac.transcostsourcematerials IS NULL)
+              or
+              (pac.transratesourceexpenses IS NULL and e.TRANS_RATE_SOURCE_EXPENSE IS NULL)
+            )
+			and matrix.LAST_UPDATED_DATE&gt;LAST_SUCCESSFUL_JOB_RUN_DATE;
+            COMMIT;
+/**********************************************************************/
+/**********************************************************************/
+     IF TRANS_ENTRY_DEFAULT_CHANGED &gt; 0 THEN
+		  BEGIN
+      /* fetch all investments who do not have matrices assigned through the financial subpage or through the entity
+		  and the transaction entry defaults settings have changed*/
+		  V_STMT := 'fetch all investments who do not have matrices assigned through the financial subpage or through the entity
+		  and the transaction entry defaults settings have changed';
+       insert  /*+ APPEND */ into TEMP_INCREMENTAL_ONLY_PROJECTS
+            select pac.id from pac_mnt_projects pac, entity e, inv_investments inv
+            where
+            pac.id=inv.id
+            and inv.is_active=1
+            and inv.ENTITY_CODE=e.ENTITY
+            and
+			(
+ 		          (pac.transratesourcelabor IS NULL and e.TRANS_RATE_SOURCE_LABOR IS NULL)
+		          or
+		          (pac.transcostsourcelabor IS NULL and e.TRANS_COST_SOURCE_LABOR IS NULL)
+		          or
+              (pac.transratesourceequipment IS NULL and e.TRANS_RATE_SOURCE_EQUIPMENT IS NULL)
+              or
+              (pac.transcostsourceequipment IS NULL)
+                or
+              (pac.transratesourcematerials IS NULL and e.TRANS_RATE_SOURCE_MATERIALS IS NULL)
+                or
+              (pac.transcostsourcematerials IS NULL)
+              or
+              (pac.transratesourceexpenses IS NULL and e.TRANS_RATE_SOURCE_EXPENSE IS NULL)
+            )
+			AND inv.id NOT IN ( SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS);
+		  END;
+          END IF;
+      COMMIT;
+      V_STMT := 'DELETE FROM NBI_PRJ_MATRIX_DATES WHERE PROJECT_ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)';
+      EXECUTE IMMEDIATE 'DELETE FROM NBI_PRJ_MATRIX_DATES WHERE PROJECT_ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)';
+      COMMIT;
+-- create the index now
+	V_STMT := 'CREATE UNIQUE INDEX TEMP_INC_ONLY_PROJECTS_N1';
+	EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_INC_ONLY_PROJECTS_N1 ON TEMP_INCREMENTAL_ONLY_PROJECTS(ID)';
+    COMMIT;
+
+       /* Populate the slice max and min date for projects to be used by NBI_PRJ_MATRIX_DATES_SP */
+    V_STMT := 'INSERT INTO TEMP_NBI_SLICE_DATA';
+      INSERT  /*+ APPEND */ INTO TEMP_NBI_SLICE_DATA (PROJECT_ID, MIN_SLICE_DATE, MAX_SLICE_DATE)
+      SELECT     T.PRPROJECTID, MIN (S.SLICE_DATE),
+                          MAX (S.SLICE_DATE)
+      FROM     inv_investments INV,
+			   PRJ_BLB_SLICES S,
+               PRASSIGNMENT A,
+               PRTASK T,
+               PRJ_BLB_SLICEREQUESTS SR,
+			   TEMP_INCREMENTAL_ONLY_PROJECTS TMP
+      WHERE    INV.ID = T.PRPROJECTID AND INV.IS_ACTIVE = 1
+	  AND	   T.PRID = A.PRTASKID
+      AND      SR.REQUEST_NAME IN ('DAILYRESOURCEACTCURVE', 'DAILYRESOURCEBASECURVE', 'DAILYRESOURCEESTCURVE')
+      AND      S.SLICE_REQUEST_ID = SR.ID
+      AND      S.PRJ_OBJECT_ID = A.PRID
+	  AND	   T.PRPROJECTID= TMP.ID
+      GROUP BY  T.PRPROJECTID;
+	COMMIT;
+    END;
+    END IF;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_PREPARE_PROJ_DATA_SP - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_FEATURE_TOGGLE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_FEATURE_TOGGLE_SP" (
+	P_FEATURE_CODE  VARCHAR2,
+	P_FEATURE_TOGGLE  NUMBER
+	)
+	IS
+	F_ID NUMBER;
+	BEGIN
+	
+		-- Do the toggle value validation
+		IF NOT (P_FEATURE_TOGGLE = 0 OR P_FEATURE_TOGGLE =1)
+		THEN
+			RAISE_APPLICATION_ERROR (-20006, 'Invalid feature toggle value, valid values are [0,1]');
+		END IF;
+	
+		-- check for feature existance
+		SELECT ID INTO F_ID
+		FROM CMN_FEATURES 
+		WHERE CODE = P_FEATURE_CODE ;
+
+		IF F_ID IS NOT NULL
+		THEN
+			--Update toggle
+			UPDATE CMN_FEATURES SET ENABLED = P_FEATURE_TOGGLE, LAST_UPDATED_DATE = SYSDATE WHERE ID = F_ID;
+		END IF;
+    
+		EXCEPTION
+		-- when feature not exist raise error
+		WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR (-20006, 'No Feature exists to toggle with the code: ' || P_FEATURE_CODE);
+    
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

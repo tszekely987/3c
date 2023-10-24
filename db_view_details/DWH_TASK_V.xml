@@ -1,0 +1,32 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_TASK_V">
+    <indexes/>
+    <text_length>6194</text_length>
+    <text>select prtask.prid odf_pk, NVL(PRTASK.PRID, 0) as task_key, NVL(PRTASK.PRID, 0) as clarity_task_key, NVL(PRTASK.prProjectID, 0) as investment_key, prtask.prExternalID as task_id, prtask.prName as task_name, CMN_DATE_TRUNC_FCT(PRTASK.prStart) as start_date, COP_CALC_FINISH_FCT(PRTASK.prFinish) as finish_date, CMN_DATE_TRUNC_FCT(BASEREC.START_DATE) as base_start_date, COP_CALC_FINISH_FCT(BASEREC.FINISH_DATE) as base_finish_date, prtask.prCategory as category, prtask.prPriority as priority, prtask.prIsKey as is_key, prtask.prIsTask as is_task, prtask.prIsMilestone as is_milestone, NVL(PRTASK.PRWBSLEVEL, 0) as wbs_level, prtask.prWBSSequence as wbs_sequence, prtask.prStatus as task_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'prTaskStatus' and rownum = 1 and LOOKUP_ENUM = prtask.prStatus) as prstatus_caption, NVL(PRTASK.prpctcomplete*100, 0) as pct_complete, 0 as pct_expended, prtask.prChargeCodeID as charge_code_key, 
+       (SELECT prname FROM prchargecode WHERE prid = prtask.prchargecodeid)
+      prchargecodeid_caption, prtask.prIsFixed as fixed_duration, prtask.prIsCritical as is_critical, prtask.is_open_te as is_open_for_te, PRTASK.CREATED_DATE as clarity_created_date, (
+        CASE
+        WHEN BASEREC.LAST_UPDATED_DATE IS NULL
+          THEN PRTASK.LAST_UPDATED_DATE
+        ELSE
+          GREATEST(PRTASK.LAST_UPDATED_DATE, BASEREC.LAST_UPDATED_DATE)
+        END
+      ) as clarity_updated_date, prtask.COST_TYPE as cost_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'LOOKUP_FIN_COSTTYPECODE' and rownum = 1 and LOOKUP_CODE = prtask.COST_TYPE) as cost_type_caption, (CASE WHEN (SELECT count(*) FROM PRSUBPROJECT WHERE PRSUBPROJECT.PRTASKID = PRTASK.PRID) > 0 THEN 1 ELSE 0 END) as is_subproject, prtask.prShortName as short_name, prtask.prUserText1 as pr_usertext1, prtask.prGuidelines as guidelines, (CASE WHEN PRTASK.prIsMilestone = 1 THEN 'MILESTONE'
+      WHEN PRTASK.prIsTask = 1 THEN 'TASK'
+      WHEN (SELECT COUNT(*) FROM PRSUBPROJECT WHERE PRSUBPROJECT.prTaskID = PRTASK.prID) > 0 THEN 'SUBPROJECT'
+      WHEN PRTASK.prWBSLevel = 1 THEN 'LEVEL1'
+      WHEN PRTASK.prWBSLevel = 2 THEN 'LEVEL2'
+      WHEN PRTASK.prWBSLevel = 3 THEN 'LEVEL3'
+      WHEN PRTASK.prWBSLevel = 4 THEN 'LEVEL4'
+      WHEN PRTASK.prWBSLevel = 5 THEN 'LEVEL5' END) as wbs_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'DWH_PRJ_WBS_LEVELS' and rownum = 1 and LOOKUP_CODE = (CASE WHEN PRTASK.prIsMilestone = 1 THEN 'MILESTONE'
+      WHEN PRTASK.prIsTask = 1 THEN 'TASK'
+      WHEN (SELECT COUNT(*) FROM PRSUBPROJECT WHERE PRSUBPROJECT.prTaskID = PRTASK.prID) > 0 THEN 'SUBPROJECT'
+      WHEN PRTASK.prWBSLevel = 1 THEN 'LEVEL1'
+      WHEN PRTASK.prWBSLevel = 2 THEN 'LEVEL2'
+      WHEN PRTASK.prWBSLevel = 3 THEN 'LEVEL3'
+      WHEN PRTASK.prWBSLevel = 4 THEN 'LEVEL4'
+      WHEN PRTASK.prWBSLevel = 5 THEN 'LEVEL5' END)) as dwh_wbs_type_key_caption, COP_DAYS_LATE_FCT(PRTASK.prFinish, BASEREC.FINISH_DATE, PRTASK.prStatus) as days_late, NVL(TASKOWNER.ID,0) as task_owner_key, 
+        TASKOWNER.FULL_NAME
+      task_owner_caption, odf_ca_task.agl_tsk_acp_stypts as agl_accepted_story_points, odf_ca_task.agl_tsk_acp_usrsty as agl_accepted_user_stories, odf_ca_task.agl_tsk_act_finish as agl_actual_finish, odf_ca_task.agl_tsk_act_start as agl_actual_start, odf_ca_task.agl_tsk_est_stypts as agl_estimated_story_points, odf_ca_task.agl_tsk_est_usrsty as agl_estimated_user_stories, odf_ca_task.agl_tsk_id as agl_task_port_item_type_id, odf_ca_task.agl_tsk_inv_category as agl_investment_category, odf_ca_task.agl_tsk_iteration as agl_iteration, to_number(null) as agl_milestones_key, odf_ca_task.agl_tsk_p_story_id as agl_task_parent_story_id, odf_ca_task.agl_tsk_p_type as agl_task_parent_port_item_type, odf_ca_task.agl_tsk_parent_id as agl_task_parent_port_item_id, odf_ca_task.agl_tsk_pctdon_plest as agl_done_by_plan_estimate_pct, odf_ca_task.agl_tsk_pctdon_stc as agl_done_by_story_count_pct, odf_ca_task.agl_tsk_plan_est as agl_plan_estimate, odf_ca_task.agl_tsk_pln_finish as agl_planned_finish, odf_ca_task.agl_tsk_pln_start as agl_planned_start, odf_ca_task.agl_tsk_prelim_est as agl_preliminary_estimate, odf_ca_task.agl_tsk_release as agl_release, odf_ca_task.agl_tsk_risk_score as agl_risk_score, odf_ca_task.agl_tsk_state as agl_state, odf_ca_task.agl_tsk_story_id as agl_task_story_id, odf_ca_task.agl_tsk_type as agl_task_port_item_type, odf_ca_task.agl_tsk_value_score as agl_value_score, odf_ca_task.agl_tsk_wsjf_score as agl_wsjf_score, odf_ca_task.cps_agile_state_pick as cps_agile_state_pick_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CPS_AGILE_STATE_PICKLIST' and rownum = 1 and LOOKUP_CODE = odf_ca_task.cps_agile_state_pick) as cps_agile_state_pick_caption, odf_ca_task.cps_phase_release as cps_phase_release_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CPS_PHASE_RELEASE' and rownum = 1 and LOOKUP_CODE = odf_ca_task.cps_phase_release) as cps_phase_release_caption, odf_ca_task.cps_work_status as cps_work_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CPS_TASK_WORK_STATUS' and rownum = 1 and LOOKUP_CODE = odf_ca_task.cps_work_status) as cps_work_status_caption, odf_ca_task.odmd_rpting as odmd_rpting, dataw_context.language_code, dataw_context.id language_id from prtask prtask inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN odf_ca_task odf_ca_task ON odf_ca_task.id=prtask.prid LEFT OUTER JOIN prj_baseline_details BASEREC ON BASEREC.OBJECT_ID = PRTask.PRID AND BASEREC.OBJECT_TYPE='TASK' and BASEREC.IS_CURRENT = 1 LEFT OUTER JOIN srm_resources TASKOWNER ON PRTASK.task_owner = TASKOWNER.ID LEFT OUTER JOIN inv_investments INVESTMENTS ON PRTASK.PRPROJECTID = INVESTMENTS.ID  where 1 = 1 AND INVESTMENTS.ODF_OBJECT_CODE IN (SELECT ODF_OBJECTS.CODE FROM ODF_OBJECTS WHERE ODF_OBJECTS.IS_DW_ENABLED = 1) and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

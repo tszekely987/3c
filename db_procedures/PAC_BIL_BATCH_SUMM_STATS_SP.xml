@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_BATCH_SUMM_STATS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_BATCH_SUMM_STATS_SP" 
+(
+  iBillRunKey   NUMBER,
+  iPrintRunKey  NUMBER
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iBInvCount  INTEGER;
+  iBTranCount   INTEGER;
+  nBAmount  NUMBER(32,6);
+  iMInvCount  INTEGER;
+  iMTranCount   INTEGER;
+  nMAmount  NUMBER(32,6);
+  iInvCount   INTEGER;
+  nInvAmount  NUMBER(32,6);
+  Type_   INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	Pac_Bil_Batch_Summ_Stats_Sp.Type_ :=  1;
+	DELETE FROM TEMP_TEMPSUMMPAC_BIL_BATCH_SUM;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO TEMP_TEMPSUMMPAC_BIL_BATCH_SUM
+	(INVOICENO,ACTIONTYPE,NUMTRANS,TOTAMOUNT)
+	SELECT  InvoiceNo, ActionType, SUM(TranCount), SUM(Amount)
+		 FROM BB_BILLTRACKING
+		WHERE BillingRunKey = Pac_Bil_Batch_Summ_Stats_Sp.iBillRunKey
+		GROUP BY InvoiceNo, ActionType;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(*),  SUM(NumTrans),  SUM(TotAmount)
+		INTO Pac_Bil_Batch_Summ_Stats_Sp.iBInvCount, Pac_Bil_Batch_Summ_Stats_Sp.iBTranCount, Pac_Bil_Batch_Summ_Stats_Sp.nBAmount
+		FROM TEMP_TEMPSUMMPAC_BIL_BATCH_SUM
+		WHERE ActionType = 'B';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(*),  SUM(NumTrans),  SUM(TotAmount)
+		INTO Pac_Bil_Batch_Summ_Stats_Sp.iMInvCount, Pac_Bil_Batch_Summ_Stats_Sp.iMTranCount, Pac_Bil_Batch_Summ_Stats_Sp.nMAmount
+		FROM TEMP_TEMPSUMMPAC_BIL_BATCH_SUM
+		WHERE ActionType = 'M';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	/*[SPCONV-ERR(62)]:DROP TABLE temp_tempSummPAC_BIL_BATCH_SUM statement ignored*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(*),
+		  SUM(IV.invoiceamount + NVL(IV.admincharge, 0) + NVL(IV.taxamount,
+		   0))
+		INTO Pac_Bil_Batch_Summ_Stats_Sp.iInvCount,
+		 Pac_Bil_Batch_Summ_Stats_Sp.nInvAmount FROM BB_HSINVOICELIST L, INVOICEHEADER I, INVOICEHEADER_VALUES IV
+		WHERE L.BillingRunKey = Pac_Bil_Batch_Summ_Stats_Sp.iPrintRunKey
+		 AND I.INVOICENO = IV.INVOICENO
+		 AND IV.CURRENCY_TYPE = 'BILLING'
+		 AND I.invoiceno = L.InvoiceNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO TEMP_TEMPPAC_BIL_BATCH_STATS_S
+	(TYPE_,
+BINVCOUNT,
+BTRANCOUNT,
+BAMOUNT,
+MINVCOUNT,
+MTRANCOUNT,
+MAMOUNT,
+INVCOUNT,
+INVAMOUNT,
+GRPINVNUMBER,
+COMPANY_CODE,
+PROJECT_CODE,
+TRANCOUNT,
+AMOUNT)
+	SELECT  Pac_Bil_Batch_Summ_Stats_Sp.Type_, NVL(Pac_Bil_Batch_Summ_Stats_Sp.iBInvCount,
+		   0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.iBTranCount, 0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.nBAmount,
+		   0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.iMInvCount, 0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.iMTranCount,
+		   0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.nMAmount, 0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.iInvCount,
+		   0), NVL(Pac_Bil_Batch_Summ_Stats_Sp.nInvAmount, 0), '', '', '',
+		   0, 0
+		FROM DUAL
+		;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END Pac_Bil_Batch_Summ_Stats_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,122 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_X_INV_I_SUM_FACTS_V">
+    <indexes/>
+    <text_length>8308</text_length>
+    <text>SELECT i.id investment_key,
+       NVL (CASE WHEN f.is_sys_val_for_tcc = 1 THEN
+                (SELECT CASE WHEN NVL(total_cost_of_capital,0) &lt; 10000000000000 THEN NVL(total_cost_of_capital,0) ELSE 0 END FROM prsite)
+            ELSE CASE WHEN NVL(f.total_cost_of_capital,0) &lt; 10000000000000 THEN NVL(f.total_cost_of_capital,0) ELSE 0 END END * 100,0) cost_of_capital_rate,
+       NVL (CASE WHEN f.is_sys_val_for_rr = 1 THEN
+                (SELECT CASE WHEN NVL(reinvestment_rate,0) &lt; 10000000000000 THEN NVL(reinvestment_rate,0) ELSE 0 END FROM prsite)
+            ELSE CASE WHEN NVL(f.reinvestment_rate,0) &lt; 10000000000000 THEN NVL(f.reinvestment_rate,0) ELSE 0 END END * 100,0) reinvestment_rate,
+       NVL (f.initial_investment, 0) initial_investment,
+       CASE WHEN (SELECT COUNT (1)
+                  FROM   fin_plans p
+				         INNER JOIN dwh_cfg_object_type o ON p.object_code = o.object_code AND o.is_investment = 1
+                  WHERE  p.object_id = i.id
+                  AND    p.is_plan_of_record = 1
+                  AND    p.plan_type_code IN ('BUDGET', 'FORECAST')) > 0 THEN 1 ELSE 0 END plans_exist,
+       NVL (f.budget_cst_total, 0) bdgt_cost,
+       NVL (f.budget_cst_capital_total, 0) bdgt_cap_cost,
+       NVL (f.budget_cst_operating_total, 0) bdgt_oper_cost,
+       TRUNC (NVL (f.budget_cst_start, NVL(i.schedule_start,SYSDATE))) bdgt_cost_start,
+       cop_calc_finish_fct (NVL (f.budget_cst_finish, NVL(i.schedule_finish,SYSDATE))) bdgt_cost_finish,
+       NVL (f.budget_rev_total, 0) bdgt_benefit,
+       TRUNC (NVL (f.budget_rev_start, NVL(i.schedule_start,SYSDATE))) bdgt_benefit_start,
+       cop_calc_finish_fct (NVL (f.budget_rev_finish, NVL(i.schedule_finish,SYSDATE))) bdgt_benefit_finish,
+       NVL (f.planned_cst_total, 0) plan_cost,
+       NVL (f.planned_cst_capital_total, 0) plan_cap_cost,
+       NVL (f.planned_cst_operating_total, 0) plan_oper_cost,
+       TRUNC (NVL (f.planned_cst_start, NVL(i.schedule_start,SYSDATE))) plan_cost_start,
+       cop_calc_finish_fct (NVL (f.planned_cst_finish, NVL(i.schedule_finish,SYSDATE))) plan_cost_finish,
+       NVL (f.planned_ben_total, 0) plan_benefit,
+       TRUNC (NVL (f.planned_ben_start, NVL(i.schedule_start,SYSDATE))) plan_benefit_start,
+       cop_calc_finish_fct (NVL (f.planned_ben_finish, NVL(i.schedule_finish,SYSDATE))) plan_benefit_finish,
+       NVL (f.budget_npv, 0) bdgt_npv,
+       NVL (f.budget_roi, 0) * 100 bdgt_roi,
+       NVL (f.budget_irr, 0) * 100 bdgt_irr,
+       NVL (f.budget_mirr, 0) * 100 bdgt_mirr,
+       NVL (f.planned_npv, 0) plan_npv,
+       NVL (f.planned_roi, 0) * 100 plan_roi,
+       NVL (f.planned_irr, 0) * 100 plan_irr,
+       NVL (f.planned_mirr, 0) * 100 plan_mirr,
+       NVL (ev.itd_bcwp, 0) ev_earned_value,
+       NVL (ev.itd_bcws, 0) ev_planned_value,
+       NVL (ev.itd_bcwp, 0) - NVL (ev.itd_acwp, 0) ev_cost_var,
+       NVL (ev.itd_bcwp, 0) - NVL (ev.itd_bcws, 0) ev_schedule_var,
+       CASE WHEN NVL (ev.itd_bcwp, 0) &lt;&gt; 0 THEN
+                ((ev.itd_bcwp - NVL (ev.itd_acwp, 0)) / ev.itd_bcwp) * 100
+            ELSE 0 END ev_cost_var_pct,
+       CASE WHEN NVL (ev.itd_bcws, 0) &lt;&gt; 0 THEN
+                ((ev.itd_bcwp - NVL (ev.itd_bcws, 0)) / ev.itd_bcws) * 100
+            ELSE 0 END ev_schedule_var_pct,
+       CASE WHEN NVL (ev.itd_acwp, 0) &lt;&gt; 0 THEN
+                (NVL (ev.itd_bcwp, 0) / ev.itd_acwp) * 100
+            ELSE 0 END ev_cpi,
+       CASE WHEN NVL (ev.itd_bcws, 0) &lt;&gt; 0 THEN
+                (NVL (ev.itd_bcwp, 0) / ev.itd_bcws) * 100
+            ELSE 0 END ev_spi,
+       NVL (ric.issue_count, 0) issue_count,
+       NVL (ric.issue_high_priority_count, 0) issue_high_priority_count,
+       NVL (ric.issue_med_priority_count, 0) issue_med_priority_count,
+       NVL (ric.issue_low_priority_count, 0) issue_low_priority_count,
+       NVL (ric.risk_count, 0) risk_count,
+       NVL (ric.risk_high_priority_count, 0) risk_high_priority_count,
+       NVL (ric.risk_med_priority_count, 0) risk_med_priority_count,
+       NVL (ric.risk_low_priority_count, 0) risk_low_priority_count,
+       NVL (ric.cr_count, 0) cr_count,
+       NVL (ric.cr_high_priority_count, 0) cr_high_priority_count,
+       NVL (ric.cr_med_priority_count, 0) cr_med_priority_count,
+       NVL (ric.cr_low_priority_count, 0) cr_low_priority_count,
+       NVL (p.percent_complete,0) * 100 pct_complete,
+	   NVL (b.usage_sum/3600, 0) base_investment_total_hours,
+	   NVL (b.cost_sum, 0) base_investment_total_cost,
+	   NVL(ft.actual_labor_cost,0) actual_labor_cost,
+	   NVL(ft.actual_equip_cost,0) actual_equip_cost,
+	   NVL(ft.actual_expense_cost,0) actual_expense_cost,
+	   NVL(ft.actual_material_cost,0) actual_material_cost,
+	   NVL(ft.actual_total_cost,0) actual_total_cost,
+	   NVL(ft.actual_cap_cost,0) actual_cap_cost,
+	   NVL(ft.actual_oper_cost,0) actual_oper_cost,
+	   NVL(todo.todo_open_count,0) todo_open_count,
+	   NVL(todo.todo_completed_count,0) todo_completed_count,
+	   NVL(todo.todo_total_count,0) todo_total_count,
+       GREATEST (NVL(ev.last_updated_date, TO_DATE('01/01/1900','MM/DD/YYYY')),
+                 NVL(ric.clarity_updated_date,TO_DATE('01/01/1900','MM/DD/YYYY')),
+                 NVL(f.last_updated_date,TO_DATE('01/01/1900','MM/DD/YYYY')),
+				 NVL(ft.last_updated_date,TO_DATE('01/01/1900','MM/DD/YYYY')),
+				 NVL(todo.last_updated_date,TO_DATE('01/01/1900','MM/DD/YYYY'))) clarity_updated_date
+FROM   inv_investments i
+       LEFT OUTER JOIN inv_projects p ON i.id = p.prID
+	   LEFT OUTER JOIN prj_baseline_details b ON i.id = b.object_id
+	                                         AND b.is_current = 1
+											 AND b.object_type = 'PROJECT'
+       INNER JOIN odf_object_instance_mapping om ON i.id = om.primary_object_instance_id
+                                                AND om.secondary_object_instance_code = 'financials'
+	   INNER JOIN dwh_cfg_object_type o ON om.primary_object_instance_code = o.object_code										 
+       INNER JOIN fin_financials f ON om.secondary_object_instance_id = f.id
+       LEFT OUTER JOIN prj_ev_history ev ON i.id = ev.object_id
+                                        AND ev.object_type = 'PROJECT'
+                                        AND period_number = 0
+	   LEFT OUTER JOIN dwh_x_inv_todo_facts_v todo ON i.id = todo.investment_key
+       LEFT OUTER JOIN (SELECT i1.id investment_key,
+                               SUM(CASE WHEN rim.type_code = 'ISSUE' THEN 1 ELSE 0 END) issue_count,
+                               SUM(CASE WHEN rim.type_code = 'ISSUE' AND rim.priority_code = 'HIGH' THEN 1 ELSE 0 END) issue_high_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'ISSUE' AND rim.priority_code = 'MEDIUM' THEN 1 ELSE 0 END) issue_med_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'ISSUE' AND rim.priority_code = 'LOW' THEN 1 ELSE 0 END) issue_low_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'RISK' THEN 1 ELSE 0 END) risk_count,
+                               SUM(CASE WHEN rim.type_code = 'RISK' AND rim.priority_code = 'HIGH' THEN 1 ELSE 0 END) risk_high_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'RISK' AND rim.priority_code = 'MEDIUM' THEN 1 ELSE 0 END) risk_med_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'RISK' AND rim.priority_code = 'LOW' THEN 1 ELSE 0 END) risk_low_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'CHANGE' THEN 1 ELSE 0 END) cr_count,
+                               SUM(CASE WHEN rim.type_code = 'CHANGE' AND rim.priority_code = 'HIGH' THEN 1 ELSE 0 END) cr_high_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'CHANGE' AND rim.priority_code = 'MEDIUM' THEN 1 ELSE 0 END) cr_med_priority_count,
+                               SUM(CASE WHEN rim.type_code = 'CHANGE' AND rim.priority_code = 'LOW' THEN 1 ELSE 0 END) cr_low_priority_count,
+                               MAX(rim.last_updated_date) clarity_updated_date
+                        FROM   inv_investments i1
+                               INNER JOIN rim_risks_and_issues rim ON i1.id = rim.pk_id
+                        GROUP BY i1.id) ric ON i.id = ric.investment_key
+		LEFT OUTER JOIN dwh_x_trans_i_total_facts_v ft ON i.id = ft.investment_key
+WHERE  NVL(p.is_template, 0) = 0</text>
+  </QueryResult>
+</ClarityDBViewQuery>

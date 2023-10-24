@@ -1,0 +1,23 @@
+<ClarityDBViewQuery>
+  <QueryResult code="AGL_HIERARCHY_ROLLUP_MLST_V">
+    <indexes/>
+    <text_length>1203</text_length>
+    <text>SELECT h.parent_id investment_id,
+           MIN(odf_t.agl_tsk_pln_start) agl_pln_start,
+           MAX(odf_t.agl_tsk_pln_finish) agl_pln_finish,
+           MIN(odf_t.agl_tsk_act_start) agl_act_start,
+           MAX(odf_t.agl_tsk_act_finish) agl_act_finish,
+           SUM(NVL(odf_t.agl_tsk_acp_stypts,0)) agl_acp_stypts,
+           SUM(NVL(odf_t.agl_tsk_acp_usrsty,0)) agl_acp_usrsty,
+           SUM(NVL(odf_t.agl_tsk_est_stypts,0)) agl_est_stypts,
+           SUM(NVL(odf_t.agl_tsk_est_usrsty,0)) agl_est_usrsty,
+           CASE WHEN SUM(NVL(odf_t.agl_tsk_est_usrsty,0)) = 0 THEN 0 ELSE (SUM(NVL(odf_t.agl_tsk_acp_usrsty,0)) / SUM(NVL(odf_t.agl_tsk_est_usrsty,0)) * 100) END agl_pctdon_stc,
+           CASE WHEN SUM(NVL(odf_t.agl_tsk_est_stypts,0)) = 0 THEN 0 ELSE (SUM(NVL(odf_t.agl_tsk_acp_stypts,0)) / SUM(NVL(odf_t.agl_tsk_est_stypts,0)) * 100) END agl_pctdon_plest
+    FROM   inv_flat_hierarchies h
+           INNER JOIN prtask t ON h.child_id = t.prprojectid
+           INNER JOIN odf_ca_task odf_t ON odf_t.id = t.prid 
+    WHERE  odf_t.agl_tsk_id IS NOT NULL
+    AND    t.prid IN (SELECT m.pk_id FROM odf_multi_valued_lookups m WHERE m.attribute = 'agl_tsk_milestones')
+    GROUP BY h.parent_id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

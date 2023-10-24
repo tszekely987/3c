@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_CLNTSUPP_DELETE</code>
+          <table_name>CLNTSUPP</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_CLNTSUPP_DELETE" 
+AFTER DELETE
+ON CLNTSUPP
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER := 1;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  message          GLOBALPKG.STRING;
+  retcode          NUMBER;
+  l_COMPANY_CODE   GLOBALPKG.STRING;
+  minkey           GLOBALPKG.STRING;
+  maxkey           GLOBALPKG.STRING;
+  tempVar1         GLOBALPKG.STRING := 'company_code';
+  tempVar2         NUMBER := 1;
+  temp_RC1         Ppa_Matrixfieldvalueexistspkg.RCT1;
+BEGIN
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT :OLD.COMPANY_CODE
+      INTO l_COMPANY_CODE
+      FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE EXISTS (
+      SELECT 1
+        FROM PAC_MNT_PROJECTS
+       WHERE PAC_MNT_PROJECTS.COMPANY_CODE = l_COMPANY_CODE
+         AND status != 'C' );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_selcnt != 0 THEN
+    BEGIN
+      RAISE_APPLICATION_ERROR(-20460, 'This COMPANY_CODE cannot be deleted because it has open PROJECT_CODE(s).');
+      RETURN;
+    END;
+	END IF;
+
+  BEGIN
+    BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE EXISTS (
+      SELECT 1
+      FROM INVOICEHEADER
+      WHERE INVOICEHEADER.COMPANY_CODE = l_COMPANY_CODE
+      AND INVOICEHEADER.arposted = 0 );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20461, 'This COMPANY_CODE cannot be deleted because it has unposted invoice(s) in invoiceheader.');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+  BEGIN
+    BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE EXISTS (
+      SELECT 1
+      FROM PPA_TRANSCONTROL
+      WHERE PPA_TRANSCONTROL.COMPANY_CODE = l_COMPANY_CODE );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20463, 'This COMPANY_CODE cannot be deleted because it has transactions existing in the transaction entry table.');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+  BEGIN
+    BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE EXISTS (
+      SELECT 1
+      FROM PPA_WIP
+      WHERE PPA_WIP.COMPANY_CODE = l_COMPANY_CODE );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20464, 'Transactions currently exist for this COMPANY_CODE in ppa_WIP.');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+  BEGIN
+    BEGIN
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+    FROM DUAL
+    WHERE EXISTS (
+      SELECT 1
+      FROM PPA_TRANSWIPADJUST TRANSWIPADJUST
+      WHERE TRANSWIPADJUST.COMPANY_CODE = l_COMPANY_CODE );
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20465, 'Transactions currently exist for this COMPANY_CODE.');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT 1
+        FROM BILLINGSCHEDULE
+        WHERE COMPANY_CODE = l_COMPANY_CODE );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20466, 'COMPANY_CODE exists in billingschedule.');
+        RETURN ;
+      END;
+    END IF;
+	END;
+
+  BEGIN
+    Ppa_Matrixfieldvalueexists(tempVar1, l_COMPANY_CODE, retcode, tempVar2, temp_RC1);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+  END;
+
+  IF retcode = 1 THEN
+		BEGIN
+      message := 'Cannot delete ' || RTRIM(l_COMPANY_CODE) || ' because it is being used in a rate matrix.';
+			RAISE_APPLICATION_ERROR(-20467, 'Cannot delete COMPANY_CODE because it is being used in a rate matrix.');
+      RETURN;
+		END;
+  END IF;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    DELETE PAC_MNT_PROJECTS
+    WHERE PAC_MNT_PROJECTS.COMPANY_CODE = l_COMPANY_CODE;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    DELETE CLNTRESPONS
+     WHERE CLNTRESPONS.COMPANY_CODE = l_COMPANY_CODE;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    DELETE INVOICEHEADER
+     WHERE INVOICEHEADER.COMPANY_CODE = l_COMPANY_CODE;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+END tr_clntsupp_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

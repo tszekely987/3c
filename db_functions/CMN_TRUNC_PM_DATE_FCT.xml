@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_TRUNC_PM_DATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_TRUNC_PM_DATE_FCT" 
+  (p_indate date)
+  return  date is
+   str varchar(40);
+   datestr varchar2(8);
+   part1 varchar2(2);
+   part2 varchar2(2);
+   part3 varchar2(2);
+   numval integer;
+   result date;
+  
+begin
+   if p_indate is not null then
+     begin
+        result := p_indate;
+        select to_char(p_indate, 'HH24:MI:SS') into datestr from dual;
+        select substr(datestr, 0, 2) into part1 from dual;
+        select substr(datestr, 4, 2) into part2 from dual;
+        select substr(datestr, 7, 2) into part3 from dual;
+        numval := to_number(part1 || part2 || part3);
+        if (numval = 0) then
+          select p_indate-1 into result from dual;
+        end if;
+      end;
+    end if;
+    return trunc(result);
+end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

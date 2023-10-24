@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_xog_avg_resp_by_day" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="XOG avg response by day"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:LOGS:A.LOG_HOUR:LOG_HOUR@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:A.AVG_RESP:AVG_RESPONSE@
+FROM
+( SELECT Z.LOG_HOUR - @DBUSER@.LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 LOG_HOUR,
+         Z.AVG_RESP
+  FROM (SELECT LOG_HOUR,
+         ROUND(avg(AVG_SOAP_RESP)/1000,4) AVG_RESP
+        FROM LOG_SUMMARY
+        WHERE LOG_DATE=CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ AS DATE)
+        AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+        AND (@WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT)
+        GROUP BY LOG_HOUR
+        ) Z
+) A
+WHERE @FILTER@]]></nsql>
+            <attribute id="log_hour" required="false"/>
+            <attribute id="avg_response" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

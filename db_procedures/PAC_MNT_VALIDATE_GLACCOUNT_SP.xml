@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_GLACCOUNT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_GLACCOUNT_SP" 
+(
+  ID              NUMBER,
+  ENTITY_IN       VARCHAR2,
+  ACCOUNT_CODE_IN VARCHAR2
+)
+AS
+  ENTITY_ID       NUMBER;
+  ENTITY          VARCHAR2(60);
+  ACCOUNT_CODE    VARCHAR2(255);
+  var_select      INTEGER;
+BEGIN
+  PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY       := TRIM(PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY_IN);
+  PAC_MNT_VALIDATE_GLACCOUNT_SP.ACCOUNT_CODE := TRIM(PAC_MNT_VALIDATE_GLACCOUNT_SP.ACCOUNT_CODE_IN);
+
+  IF PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY = '*' THEN
+    PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY := NULL;
+  END IF;
+
+  IF PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY IS NOT NULL THEN
+    BEGIN
+      SELECT ID
+        INTO ENTITY_ID
+        FROM entity
+       WHERE entity = PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY;
+
+      EXCEPTION
+        WHEN OTHERS THEN
+          var_select := 0;
+    END;
+
+    IF NVL(ENTITY_ID, 0) = 0 OR var_select = 0 then
+      raise_application_error(-20121, 'The Entity code is invalid!');
+    END IF;
+  END IF;
+
+  BEGIN
+    SELECT COUNT(1)
+      INTO var_select
+      FROM PAC_CHG_GL_ACCOUNTS
+     WHERE NVL(ENTITY_ID, 0) = NVL(PAC_MNT_VALIDATE_GLACCOUNT_SP.ENTITY_ID, 0)
+       AND ACCOUNT_CODE = PAC_MNT_VALIDATE_GLACCOUNT_SP.ACCOUNT_CODE
+       AND ID != NVL(PAC_MNT_VALIDATE_GLACCOUNT_SP.ID, ID);
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        var_select := 0;
+      WHEN OTHERS THEN
+        var_select := 0;
+  END;
+
+  IF var_select != 0 then
+    raise_application_error(-20122, 'This GL Account Code is already defined for this entity.');
+  END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

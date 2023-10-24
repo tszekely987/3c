@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.2.1567"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_imm_reports_by_day" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Immediate Reports by Day"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[select /*+ index(LOG_DETAILS LOG_DETAILS_N8) */ @SELECT:DIM:USER_DEF:IMPLIED:LOG:Z.ID:LOGID@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:RD.NAME:report_name@, 
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:Z.START_TIME:start_time@, 
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:Z.FINISH_TIME:finish_time@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:CASE WHEN Z.ELAPSED_TIME > 600000 THEN 'Exceeded 10 minute UI timeout' ELSE '' END:status_comment@, 
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:CASE RD.source WHEN 'customer' THEN 'Customer' WHEN 'niku.com' THEN 'Stock' ELSE 'Add-in' END:sourcestr@,
+@SELECT:METRIC:USER_DEF:IMPLIED:ROUND(Z.ELAPSED_TIME/1000,4):ELAPSED_TIME@, 
+@SELECT:METRIC:USER_DEF:IMPLIED:ROUND(Z.ELAPSED_TIME/1000,4):INDICATOR@, 
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:RD.JOB_DEFINITION_ID:JOB_ID@, 
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:LOG:U.USER_NAME:USER_NAME@
+from LOG_DETAILS Z
+INNER JOIN LOG_REPORTDEFS RD ON (Z.REPORT_ID = RD.JOB_DEFINITION_ID)
+INNER JOIN LOG_SESSIONS SESS ON (Z.SESSION_COOKIE = SESS.TOKEN)
+INNER JOIN CMN_SEC_USERS U ON (SESS.USER_ID = U.ID)
+WHERE RD.ENVIRONMENT = @WHERE:PARAM:USER_DEF:STRING:environment@
+AND RD.LANGUAGE_CODE = @WHERE:PARAM:LANGUAGE@
+AND (CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ AS DATE) IS NULL OR Z.LOG_DATE = CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ AS DATE))
+AND Z.ENVIRONMENT = @WHERE:PARAM:USER_DEF:STRING:environment@
+AND (@WHERE:PARAM:USER_DEF:STRING:host_name@ IS NULL OR Z.HOST_NAME = @WHERE:PARAM:USER_DEF:STRING:host_name@)
+AND @FILTER@]]></nsql>
+            <attribute id="logid" required="false"/>
+            <attribute id="report_name" required="false"/>
+            <attribute id="start_time" required="false"/>
+            <attribute id="finish_time" required="false"/>
+            <attribute id="status_comment" required="false"/>
+            <attribute id="sourcestr" required="false"/>
+            <attribute id="job_id" lookup="LOG_REPORT_DEFS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="job_id"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="user_name" required="false"/>
+            <attribute id="elapsed_time" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="elapsed_time"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="indicator" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="indicator"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="FlagGreen" type="image">
+                <mapping hi="99999" lo="600" mappingCode="mapping-1" typeCode="FlagRed"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_environment" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              <nls languageCode="en" name="param_environment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_host_name" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_host_name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

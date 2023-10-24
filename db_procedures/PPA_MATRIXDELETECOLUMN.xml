@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXDELETECOLUMN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_MATRIXDELETECOLUMN" 
+(
+  iMatrixKey       NUMBER ,
+  iColumnNo        NUMBER ,
+  RC1       IN OUT PPA_MATRIXDELETECOLUMNPkg.RCT1,
+  userId           NUMBER DEFAULT 1)
+  AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  iNewColCount      NUMBER(10,0);
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT Count(*)
+      INTO ppa_MatrixDeleteColumn.iNewColCount
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  ppa_MatrixDeleteColumn.iNewColCount :=  NVL(ppa_MatrixDeleteColumn.iNewColCount, 0) - 1;
+
+  IF ppa_MatrixDeleteColumn.iNewColCount &lt; 0 THEN
+    RETURN;
+	END IF;
+
+	SAVEPOINT Tran1;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    DELETE FROM ppa_MatrixColDef
+     WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey
+       and ColumnNo = ppa_MatrixDeleteColumn.iColumnNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      ROLLBACK TO SAVEPOINT Tran1;
+      raise_application_error(-20280, 'Error Removing Column Definition');
+      RETURN;
+    END;
+	END IF;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE ppa_MatrixColDef
+       SET ColumnNo = ColumnNo - 1,
+           LAST_UPDATED_DATE = SYSDATE,
+           last_updated_by = userId
+     WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey
+       and ColumnNo &gt; ppa_MatrixDeleteColumn.iColumnNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      ROLLBACK TO SAVEPOINT Tran1;
+      raise_application_error(-20281, 'Error Renumbering Remaining Columns');
+      RETURN ;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 1 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+          SET Value1 = Value2,
+              Value2 = Value3,
+              Value3 = Value4,
+              Value4 = Value5,
+              Value5 = Value6,
+              Value6 = Value7,
+              Value7 = Value8,
+              Value8 = Value9,
+              Value9 = Value10,
+              LAST_UPDATED_DATE = SYSDATE,
+              last_updated_by = userId
+        WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20282, 'Error Transferring Matrix Data (1)');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 2 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+          SET Value2 = Value3,
+              Value3 = Value4,
+              Value4 = Value5,
+              Value5 = Value6,
+              Value6 = Value7,
+              Value7 = Value8,
+              Value8 = Value9,
+              Value9 = Value10,
+              LAST_UPDATED_DATE = SYSDATE,
+              last_updated_by = userId
+        WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20283, 'Error Transferring Matrix Data (2)');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 3 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+           SET Value3 = Value4,
+               Value4 = Value5,
+               Value5 = Value6,
+               Value6 = Value7,
+               Value7 = Value8,
+               Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20284, 'Error Transferring Matrix Data (3)');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 4 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+           SET Value4 = Value5,
+               Value5 = Value6,
+               Value6 = Value7,
+               Value7 = Value8,
+               Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20285, 'Error Transferring Matrix Data (4)');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 5 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+           SET Value5 = Value6,
+               Value6 = Value7,
+               Value7 = Value8,
+               Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20286, 'Error Transferring Matrix Data (5)');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 6 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+               SET Value6 = Value7,
+               Value7 = Value8,
+               Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20287, 'Error Transferring Matrix Data 7 -&gt; 6');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 7 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+               SET Value7 = Value8,
+               Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF  StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20288, 'Error Transferring Matrix Data 8 -&gt; 7');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 8 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+           SET Value8 = Value9,
+               Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20289, 'Error Transferring Matrix Data 9 -&gt; 8');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF ppa_MatrixDeleteColumn.iColumnNo = 9 THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        UPDATE ppa_MatrixValues
+           SET Value9 = Value10,
+               LAST_UPDATED_DATE = SYSDATE,
+               last_updated_by = userId
+         WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK TO SAVEPOINT Tran1;
+          raise_application_error(-20290, 'Error Transferring Matrix Data 10 -&gt; 9');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  /*************************/
+  /* initialize new column */
+  /*************************/
+  IF  ppa_MatrixDeleteColumn.iColumnNo &gt; 8 THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_MatrixValues
+		SET Value10 = NULL,
+    LAST_UPDATED_DATE = SYSDATE,
+    last_updated_by = userId
+		WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF StoO_error = 0 THEN
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_Matrix
+         SET LAST_UPDATED_DATE = SYSDATE,
+             last_updated_by = userId
+      WHERE MatrixKey = ppa_MatrixDeleteColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+        ROLLBACK TO SAVEPOINT Tran1;
+        raise_application_error(-20282, 'Error Transferring Matrix Data (1)');
+        RETURN;
+      END;
+    END IF;
+  END IF;
+
+  IF StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+    BEGIN
+      ROLLBACK TO SAVEPOINT Tran1;
+      raise_application_error(-20291, 'Error Initializing Old Matrix Column');
+      RETURN;
+    END;
+	END IF;
+
+  StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+
+  OPEN RC1 FOR
+  SELECT ppa_MatrixDeleteColumn.iNewColCount
+    FROM DUAL;
+END ppa_MatrixDeleteColumn;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

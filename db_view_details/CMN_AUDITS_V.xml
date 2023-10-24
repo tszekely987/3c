@@ -1,0 +1,76 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CMN_AUDITS_V">
+    <indexes/>
+    <text_length>2154</text_length>
+    <text>SELECT			
+			odf_q.ID,
+			odf_q.VALUE_BEFORE,
+			odf_q.VALUE_AFTER,
+			odf_q.OBJECT_CODE,
+			odf_q.OPERATION_CODE,
+			odf_q.MODIFIED_DATE,
+			odf_q.ATTRIBUTE_CODE,
+			odf_q.CREATED_BY,
+			odf_q.LAST_UPDATED_DATE,
+			odf_q.TSV_BEFORE,
+			odf_q.TSV_AFTER,
+			odf_q.OBJECT_ID
+		FROM
+			(
+				SELECT							
+					cmn_audits.id AS ID,
+					cmn_audits.value_before AS value_before,
+					cmn_audits.value_after AS value_after,
+					cmn_audits.object_code AS object_code,
+					cmn_audits.operation_code AS operation_code,
+					cmn_audits.LAST_UPDATED_DATE AS modified_date,
+					cmn_audits.attribute_code AS attribute_code,
+					cmn_audits.created_by,
+					cmn_audits.LAST_UPDATED_DATE,
+					cmn_audits.object_id,
+					NULL AS tsv_before,
+					NULL AS tsv_after
+				FROM
+					cmn_audits cmn_audits
+				UNION ALL
+				SELECT					
+					cmn_audits_tsv.id AS ID,			
+					NULL AS value_before,
+					NULL AS value_after,			
+					cmn_audits_tsv.object_code AS object_code,
+					cmn_audits_tsv.operation_code AS operation_code,
+					cmn_audits_tsv.LAST_UPDATED_DATE AS modified_date,
+					cmn_audits_tsv.attribute_code AS attribute_code,
+					cmn_audits_tsv.created_by,
+					cmn_audits_tsv.LAST_UPDATED_DATE,
+					cmn_audits_tsv.object_id,
+					(case when cmn_audits_tsv.operation_code = 'D' then cmn_audits_tsv.value else
+					(
+					SELECT
+						VALUE
+					FROM
+						CMN_AUDITS_TSV TI
+					WHERE
+						CREATED_DATE =(
+							SELECT
+								MAX(CREATED_DATE)
+							FROM
+								CMN_AUDITS_TSV TII
+							WHERE
+								TII.CREATED_DATE &lt; CMN_AUDITS_TSV.CREATED_DATE
+								AND TII.OBJECT_CODE = CMN_AUDITS_TSV.OBJECT_CODE
+								AND TII.OBJECT_ID = CMN_AUDITS_TSV.OBJECT_ID
+								AND TII.ATTRIBUTE_CODE = CMN_AUDITS_TSV.ATTRIBUTE_CODE
+						)
+						AND TI.OBJECT_CODE = CMN_AUDITS_TSV.OBJECT_CODE
+						AND TI.OBJECT_ID = CMN_AUDITS_TSV.OBJECT_ID
+						AND TI.ATTRIBUTE_CODE = CMN_AUDITS_TSV.ATTRIBUTE_CODE
+						AND rownum = 1
+					) end ) AS tsv_before,
+					(case when cmn_audits_tsv.operation_code = 'D' then NULL else cmn_audits_tsv.value end) AS tsv_after
+				FROM
+					cmn_audits_tsv cmn_audits_tsv
+				WHERE cmn_audits_tsv.TRANSACTION_ID &lt;&gt; '-999'
+			) odf_q</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_POSTTOWIP_JOB_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_POSTTOWIP_JOB_SP" (
+        in_fromdates            DATE,
+        in_todates              DATE,
+        in_cprojcodelist        VARCHAR2 DEFAULT NULL,
+        in_cresource_codelist   VARCHAR2 DEFAULT NULL,
+        in_voucherlist          VARCHAR2 DEFAULT NULL,
+        in_cobsid               NUMBER DEFAULT NULL,
+        in_sourcemodule         VARCHAR2 DEFAULT NULL,
+        in_labor                INTEGER DEFAULT 1,
+        in_material             INTEGER DEFAULT 1,
+        in_equipment            INTEGER DEFAULT 1,
+        in_expense              INTEGER DEFAULT 1,
+        in_torecalc             VARCHAR2,
+        in_username             VARCHAR2 )
+    AS
+      v_projcodelist      VARCHAR2(4000);
+      v_resourcecodelist  VARCHAR2(4000);
+      v_obsid             NUMBER;
+      v_projects          VARCHAR2(20000);
+      v_resources         VARCHAR2(20000);
+      v_tmp_project       VARCHAR2(100);
+      v_tmp_resource      VARCHAR2(100);
+      v_report_len        INTEGER;
+      v_inoutparam        pac_prc_posttowip_pv_sppkg.rct1;
+      v_run_inv_cursor    NUMBER := 1;
+      v_run_res_cursor    NUMBER := 0;
+
+
+      -- below regular expression logic is to pass through the list of comma separated values and return rows in form of table.
+      CURSOR investments_cursor IS
+        SELECT DISTINCT upper(inv.code) inv_id FROM
+          ppa_transcontrol pt left outer join ppa_transcontrolapinfo info on  (pt.ppa_transcontrolapinfo_id = info.id),
+          prj_obs_associations poa,
+          obs_units_flat_by_mode ofm,
+          inv_investments inv,
+          pac_mnt_projects mp,
+          odf_objects o,
+          (
+            SELECT ID FROM
+              (
+                SELECT to_number(regexp_substr(in_cprojcodelist,'[^,]+', 1, LEVEL)) ID
+                FROM dual
+                CONNECT BY regexp_substr(in_cprojcodelist, '[^,]+', 1, LEVEL) IS NOT NULL
+              )
+          ) investmentinput,
+          SRM_RESOURCES SR,
+          (
+            SELECT ID FROM
+              (
+                SELECT to_number(regexp_substr(in_cresource_codelist,'[^,]+', 1, LEVEL)) ID
+                FROM dual
+                CONNECT BY regexp_substr(in_cresource_codelist, '[^,]+', 1, LEVEL) IS NOT NULL
+              )
+          ) resourceinput,
+          (
+            SELECT ID FROM
+              (
+                SELECT to_number(regexp_substr(in_sourcemodule,'[^,]+', 1, LEVEL)) ID
+                FROM dual
+                CONNECT BY regexp_substr(in_sourcemodule, '[^,]+', 1, LEVEL) IS NOT NULL
+              )
+          ) sourceinput,
+          (
+            select to_number(substr(id, instr(id,';')+1)) id from
+            (
+              SELECT trim(ID) ID FROM
+              (
+                SELECT regexp_substr(in_voucherlist,'[^,]+', 1, LEVEL) ID
+                FROM dual
+                CONNECT BY regexp_substr(in_voucherlist, '[^,]+', 1, LEVEL) IS NOT NULL
+              )
+            )
+          ) voucherinput
+        WHERE
+          1                    = 1
+        AND (poa.table_name     IN ( 'SRM_PROJECTS', 'INV_SERVICE', 'INV_APPLICATION', 'INV_ASSET', 'INV_OTHER', 'INV_PRODUCT', 'INV_IDEA' )
+        	OR (inv.odf_object_code = o.code
+        		AND o.template_extension = 'inv_extension'
+        		AND o.is_custom = 1
+        		AND o.is_obs_enabled = 1 ) )
+        AND ofm.unit_id        = NVL(v_obsid, ofm.unit_id )
+        AND ofm.linked_unit_id = poa.unit_id
+        AND ofm.unit_mode      = 'OBS_UNIT_AND_CHILDREN'
+        AND pt.project_code    = upper(inv.code)
+        AND SR.unique_name     = pt.resource_code
+        AND inv.ID             = poa.record_id
+        AND inv.ID             = mp.ID
+        AND (mp.STATUS         = 'O' OR exists (select 1 from ppa_transcontrol ppp where  ppp.project_code = upper(inv.code)))
+        AND (resourceinput.ID   is null OR SR.id  = resourceinput.ID   )
+        AND (investmentinput.ID is null OR inv.ID = investmentinput.ID )
+        AND (sourceinput.ID     is null OR pt.sourcemodule = sourceinput.ID )
+        AND (voucherinput.ID    is null OR info.id  = voucherinput.ID );
+
+      CURSOR wip_resource_cursor IS
+          SELECT DISTINCT(SR.UNIQUE_NAME) name
+              FROM SRM_RESOURCES SR,
+              (
+                SELECT ID FROM
+                  (
+                    SELECT to_number(regexp_substr(in_cresource_codelist,'[^,]+', 1, LEVEL)) ID
+                    FROM dual
+                    CONNECT BY regexp_substr(in_cresource_codelist, '[^,]+', 1, LEVEL) IS NOT NULL
+                  )
+              ) resourceinput
+              WHERE 1 = 1
+              AND (resourceinput.ID is null OR SR.id = resourceinput.ID   );
+
+        CURSOR select_rows IS
+          SELECT * FROM
+            temp_temp_wippost_pvpac_prc_p ;
+
+      BEGIN -- start procedure
+
+        v_projects    := '';
+        v_resources   := '';
+        v_tmp_project := '';
+        v_tmp_resource:= '';
+
+        IF in_cobsid   = 0 THEN
+          v_obsid      := NULL;
+        ELSE
+          v_obsid := in_cobsid;
+        END IF;
+
+      IF in_cresource_codelist IS NOT NULL THEN
+      BEGIN
+        v_run_inv_cursor := 0;
+        v_run_res_cursor := 1;
+        FOR each_rec IN wip_resource_cursor
+        LOOP
+          BEGIN -- begin loop
+            v_tmp_resource := each_rec.name;
+            v_resources    := v_resources || v_tmp_resource || ';';
+          END; -- end loop
+        END LOOP;
+      END;
+      END IF;
+
+        IF v_resources IS NULL OR v_resources = '' THEN
+          v_resources := NULL;
+        END IF;
+
+      IF in_cprojcodelist IS NOT NULL OR v_obsid IS NOT NULL THEN
+      BEGIN
+        v_run_inv_cursor := 1;
+      END;
+      END IF;
+
+      IF in_cprojcodelist IS NULL AND v_obsid IS NULL THEN
+      BEGIN
+        v_run_inv_cursor := 0;
+        v_projects := NULL;
+      END;
+      END IF;
+
+      IF v_run_inv_cursor = 1 THEN
+      BEGIN
+        FOR each_rec IN investments_cursor
+        LOOP
+          BEGIN -- begin loop
+            v_tmp_project := each_rec.inv_id;
+            v_projects    := v_projects || ':' || v_tmp_project || ';';
+
+          END; -- end loop
+        END LOOP;
+      END;
+      END IF;
+
+
+        IF in_cprojcodelist IS NOT NULL AND (v_projects IS NULL OR v_projects = '') THEN
+          RETURN;
+        END IF;
+
+        IF v_resources IS NOT NULL AND v_run_inv_cursor = 1 AND (v_projects IS NULL OR v_projects = '') THEN
+          RETURN;
+        END IF;
+
+        IF v_obsid IS NOT NULL AND (v_projects IS NULL OR v_projects = '') THEN
+          RETURN;
+        END IF;
+
+        pac_prc_posttowip_pv_sp (in_fromdates, in_todates, NULL, NULL, v_projects, v_resources, NULL, in_labor, in_material, in_equipment,
+          in_expense, 0, NULL, in_username, v_inoutparam );
+
+        -- We dont want to process all the records when both Resources and Investments are passed. Process only Investment records.
+        -- If one resource is part of 2 projects, then because of resource it shows there are 2 transactions
+        -- Even if we give a filter criteria of the Project it ignores. Hence delete the record.
+        IF v_run_inv_cursor = 1 AND v_run_res_cursor = 1 THEN
+          delete from temp_temp_wippost_pvpac_prc_p where levelcode = 'Employees';
+        END IF;
+
+        FOR each_row IN select_rows
+        LOOP
+          BEGIN
+            pac_prc_posttowips_sp (in_username, TO_CHAR(each_row.transdatef, 'YYYY-MM-DD'), TO_CHAR(each_row.transdatet, 'YYYY-MM-DD'),
+            each_row.levelcode, each_row.translevel, NULL, each_row.source_module, each_row.labor, each_row.material, each_row.equipment, each_row.expense
+            , NULL, NULL, in_torecalc, in_sourcemodule, in_voucherlist, v_resources);
+          END;
+        END LOOP;
+
+      END pac_prc_posttowip_job_sp; -- end procedure</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

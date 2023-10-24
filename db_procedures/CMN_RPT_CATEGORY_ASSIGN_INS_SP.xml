@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RPT_CATEGORY_ASSIGN_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RPT_CATEGORY_ASSIGN_INS_SP" (
+        P_CREATED_BY            IN      NUMBER  DEFAULT 1,
+        P_CATEGORY              IN      VARCHAR2,
+        P_REPORT                IN      VARCHAR2,
+        P_LANGUAGE_CODE         IN      VARCHAR2 DEFAULT 'en'
+        )
+AS
+        THE_CATEGORY_ID         NUMBER;
+        THE_REPORT_ID           NUMBER;
+BEGIN
+        SELECT  CMN_RPT_CATEGORIES.ID
+        INTO    THE_CATEGORY_ID
+        FROM    CMN_RPT_CATEGORIES,CMN_CAPTIONS_NLS
+        WHERE   CMN_CAPTIONS_NLS.NAME = P_CATEGORY
+        AND     CMN_CAPTIONS_NLS.PK_ID = CMN_RPT_CATEGORIES.ID
+        AND     CMN_CAPTIONS_NLS.TABLE_NAME = 'CMN_RPT_CATEGORIES'
+        AND     CMN_CAPTIONS_NLS.LANGUAGE_CODE = P_LANGUAGE_CODE;
+
+        SELECT  CMN_RPT_REPORTS.ID
+        INTO    THE_REPORT_ID
+        FROM    CMN_RPT_REPORTS,CMN_CAPTIONS_NLS
+        WHERE   CMN_CAPTIONS_NLS.NAME = P_REPORT
+        AND     CMN_CAPTIONS_NLS.PK_ID = CMN_RPT_REPORTS.ID
+        AND     CMN_CAPTIONS_NLS.TABLE_NAME = 'CMN_RPT_REPORTS'
+        AND     CMN_CAPTIONS_NLS.LANGUAGE_CODE = P_LANGUAGE_CODE;
+
+
+        INSERT INTO CMN_RPT_CATEGORY_ASSIGN (
+                ID,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY,
+                CATEGORY_ID,
+                REPORT_ID
+                )
+        SELECT
+                CMN_RPT_CATEGORY_ASSIGN_S1.NEXTVAL,
+                SYSDATE,
+                P_CREATED_BY,
+                SYSDATE,
+                P_CREATED_BY,
+                THE_CATEGORY_ID,
+                THE_REPORT_ID
+        FROM    DUAL
+        WHERE   NOT EXISTS (    SELECT   'CATEGORY ASSIGNMENT ALREADY EXISTS'
+                                FROM     CMN_RPT_CATEGORY_ASSIGN
+                                WHERE    CATEGORY_ID = THE_CATEGORY_ID AND
+                                         REPORT_ID = THE_REPORT_ID );
+END CMN_RPT_CATEGORY_ASSIGN_INS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

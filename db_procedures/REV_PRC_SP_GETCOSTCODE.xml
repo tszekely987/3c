@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_SP_GETCOSTCODE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_SP_GETCOSTCODE" (
+in_transtype 	IN VARCHAR2 ,
+in_charge_code   IN VARCHAR2 ,
+in_description 	IN VARCHAR2  DEFAULT NULL,
+RC1 			IN OUT Rev_Prc_Sp_Getcostcodepkg.RCT1)
+AS
+TRANSTYPE 		GLOBALPKG.STRING;
+CHARGE_CODE    GLOBALPKG.STRING;
+description 	GLOBALPKG.STRING;
+StoO_selcnt		INTEGER;
+StoO_error 		INTEGER;
+StoO_rowcnt		INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg		GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+
+	Rev_Prc_Sp_Getcostcode.TRANSTYPE := Rev_Prc_Sp_Getcostcode.in_transtype;
+  Rev_Prc_Sp_Getcostcode.CHARGE_CODE := Rev_Prc_Sp_Getcostcode.in_charge_code;
+	Rev_Prc_Sp_Getcostcode.description := Rev_Prc_Sp_Getcostcode.in_description;
+	IF  UPPER(Rev_Prc_Sp_Getcostcode.TRANSTYPE) = 'ALL' THEN
+		Rev_Prc_Sp_Getcostcode.TRANSTYPE :=  NULL;
+	END IF;
+  Rev_Prc_Sp_Getcostcode.CHARGE_CODE :=  RTRIM(Rev_Prc_Sp_Getcostcode.CHARGE_CODE);
+--	   || '%';
+	Rev_Prc_Sp_Getcostcode.description :=  RTRIM(Rev_Prc_Sp_Getcostcode.description);
+--	   || '%';
+	OPEN RC1 FOR
+  SELECT PREXTERNALID, PRNAME
+  FROM PRCHARGECODE
+  WHERE PRISOPEN &lt;&gt; 0
+   AND UPPER( PREXTERNALID ) LIKE UPPER( Rev_Prc_Sp_Getcostcode.CHARGE_CODE ) || '%'
+   AND UPPER( PRNAME ) LIKE UPPER( Rev_Prc_Sp_Getcostcode.description ) || '%'
+	ORDER BY 1 ;
+END Rev_Prc_Sp_Getcostcode;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

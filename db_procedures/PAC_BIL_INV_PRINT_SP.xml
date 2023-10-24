@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_INV_PRINT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_INV_PRINT_SP" 
+(
+  userid           VARCHAR2,
+  in_clntcode      VARCHAR2,
+  in_projid        VARCHAR2,
+  groupingno       VARCHAR2,
+  in_overridedate  DATE DEFAULT NULL,
+  reprint          NUMBER
+)
+AS
+  overridedate      DATE;
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus    INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus      INTEGER;
+  nextinvoicenbr      GLOBALPKG.STRING;
+  transtype         GLOBALPKG.STRING;
+  BILL_TO_COMPANY_CODE          GLOBALPKG.STRING;
+  msg           GLOBALPKG.STRING;
+  invoice_type      GLOBALPKG.STRING;
+  applyto_invoiceno     GLOBALPKG.STRING;
+  overrideinvdate     NUMBER(3,0);
+  v_invno_txt       GLOBALPKG.STRING;
+  v_atf				  NUMBER(1);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	IF  in_overridedate IS NULL THEN
+		overrideinvdate :=  1;  --using biling date
+	ELSE
+		overrideinvdate :=  0;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT invoiceno
+		INTO v_invno_txt FROM invoiceheader
+		WHERE cmsgroupno = groupingno
+		and ROWNUM &lt;2;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT ppa_Billings.TransType
+		INTO transtype FROM ppa_Billings
+		WHERE InvoiceNo = v_invno_txt
+		  and SUBSTR( TransType, 1, 1 ) = 'B' ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	SAVEPOINT TRAN1;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE semaphore2
+	SET value = 0;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF reprint =0 THEN
+	BEGIN
+	sp_updateinvcreditmemono (transtype,in_clntcode,NULL,nextinvoicenbr);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	ELSE
+		nextinvoicenbr := v_invno_txt;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT BILL_TO_COMPANY_CODE
+    INTO PAC_BIL_INV_PRINT_SP.BILL_TO_COMPANY_CODE
+             FROM pac_mnt_projects ps
+		WHERE ps.COMPANY_CODE = in_clntcode
+		 AND ps.PROJECT_CODE = in_projid
+		 and ROWNUM &lt;2;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  overrideinvdate = 0 THEN --using overidate date JG 06/05/01
+		overridedate := TRUNC(in_overridedate); --modify on 6/18/2001
+	ELSE
+		IF  overrideinvdate = 1 THEN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT BillingDate
+				INTO overridedate FROM ppa_Billings
+				WHERE InvoiceNo = v_invno_txt
+				and ROWNUM &lt;2;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END IF;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_Billings
+	SET InvoiceNo = nextinvoicenbr,
+	LASTUPDTDBY_RESOURCE_CODE = userid,
+	LastUpdateDate = SYSDATE,
+	BillingDate = overridedate
+	WHERE InvoiceNo = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_WIP
+	SET InvoiceNo = nextinvoicenbr,
+	LASTUPDTDBY_RESOURCE_CODE = userid,
+	LastUpdateDate = SYSDATE
+	WHERE InvoiceNo = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT invtype
+		INTO invoice_type FROM invoiceheader
+		WHERE invoiceno = v_invno_txt
+		and ROWNUM &lt;2;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  invoice_type = 'C' THEN
+		applyto_invoiceno :=  NULL;
+	ELSE
+		applyto_invoiceno :=  nextinvoicenbr;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE invoiceheader
+	SET invoiceno = nextinvoicenbr,
+		printed = 1,
+		status = '0',
+		BILL_TO_COMPANY_CODE = PAC_BIL_INV_PRINT_SP.BILL_TO_COMPANY_CODE,
+		invoicedate = overridedate,
+		invoiceno_applyto = NVL(applyto_invoiceno, invoiceno_applyto)
+	WHERE invoiceno = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	--- MultiCurrencyChange : update the invoiceno in invoiceheader_values also---
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE invoiceheader_values
+	SET invoiceno = nextinvoicenbr
+	WHERE invoiceno = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	--- MultiCurrencyChange : update the invoiceno in PAC_BIL_INVOICE_TRN_DETAILS ---
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE PAC_BIL_INVOICE_TRN_DETAILS
+	SET Invoice_No = nextinvoicenbr
+	WHERE Invoice_No = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	SELECT atf into v_atf FROM BILLINGSCHEDULE
+	WHERE InvoiceNo = v_invno_txt;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	IF ( v_atf = 0 ) THEN
+	BEGIN
+		 UPDATE billingschedule
+		 	SET InvoiceNo = nextinvoicenbr
+			WHERE InvoiceNo = v_invno_txt;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					 NULL;
+				WHEN OTHERS THEN
+					 StoO_error := SQLCODE;
+					 StoO_errmsg := SQLERRM;
+	END;
+	END IF;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_InvoiceDetails
+	SET InvoiceNo = nextinvoicenbr
+	WHERE InvoiceNo = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	--- MultiCurrencyChange : upadate the invoiceno in ppa_InvoiceDetails_values also---
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_InvoiceDetails_values
+	SET InvoiceNo = nextinvoicenbr
+	WHERE InvoiceNo = v_invno_txt;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	IF  StoO_error = 0 THEN
+	BEGIN
+		COMMIT WORK;
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		/*OPEN RC1 FOR
+		SELECT  nextinvoicenbr,  overridedate
+		FROM DUAL;*/
+	END;
+	ELSE
+		ROLLBACK TO SAVEPOINT TRAN1;
+	END IF;
+END PAC_BIL_INV_PRINT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_ENTITY_DELETE</code>
+          <table_name>ENTITY</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_ENTITY_DELETE" 
+AFTER DELETE
+ON ENTITY
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  l_ENTITY          GLOBALPKG.STRING;
+  l_ENTITY_ID		NUMBER;
+  message           GLOBALPKG.STRING;
+  retcode           NUMBER;
+  integrationid     NUMBER(3,0);
+  tempVar1          GLOBALPKG.STRING := 'entity';
+  tempVar2          NUMBER := 1;
+  tempVar3          GLOBALPKG.STRING := '';
+  tempVar4          GLOBALPKG.STRING := 'entity';
+  tempVar5          NUMBER := 1;
+  Temp_pc           Ppa_Matrixfieldvalueexistspkg.RCT1;
+BEGIN
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT :OLD.ENTITY,:OLD.ID
+      INTO l_ENTITY,l_ENTITY_ID
+      FROM DUAL;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    Ppa_Matrixfieldvalueexists(tempVar1, l_ENTITY, retcode, tempVar2, temp_pc);
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  IF retcode = 1 THEN
+    BEGIN
+      message :=  'Cannot delete ' || RTRIM(l_ENTITY) || ' because it is being used in a rate matrix.';
+      RAISE_APPLICATION_ERROR(-20115,message);
+      RETURN;
+    END;
+  END IF;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT ENTITY
+          FROM LOCATIONS
+          WHERE ENTITY = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20523, 'This entity cannot be deleted because it is being used in locations');
+        RETURN ;
+      END;
+    END IF;
+  END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT ENTITY_ID
+        FROM PAC_CHG_GL_ACCOUNTS
+        WHERE ENTITY_ID = l_ENTITY_ID );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20524, 'This entity cannot be deleted because it is being used in glcontrol');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  /*BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT ENTITY
+        FROM GLEXCEPTION
+        WHERE ENTITY = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20525, 'This entity cannot be deleted because it is being used in glexception');
+        RETURN;
+      END;
+    END IF;
+  END;*/
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT 1
+        FROM PPA_TRANSCONTROL
+        WHERE ENTITY = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20526, 'This entity cannot be deleted because it is being used in ppa_TransControl');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT 1
+        FROM PPA_TRANSWIPADJUST TRANSWIPADJUST
+        WHERE ENTITY = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20527, 'This entity cannot be deleted because it is being used in transwipadjust');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT 1
+        FROM PPA_WIP
+        WHERE ENTITY = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20528, 'This entity cannot be deleted because it is being used in wip');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+/*
+  BEGIN
+  BEGIN
+  StoO_selcnt := 0;
+  StoO_error  := 0;
+  StoO_rowcnt := 0;
+  SELECT 1 INTO StoO_selcnt
+  FROM DUAL
+  WHERE  EXISTS (
+    SELECT  1
+      FROM PPA_WIPHISTORY
+    WHERE ENTITY = l_ENTITY );
+  StoO_rowcnt := SQL%ROWCOUNT;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+    WHEN OTHERS THEN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+  END;
+  IF StoO_selcnt != 0 THEN
+  BEGIN
+    RAISE_APPLICATION_ERROR(-20529, 'This entity cannot be deleted because it is being used in wiphistory');
+    RETURN ;
+  END;
+  END IF;
+  END;
+*/
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT 1
+        FROM NAMEOPTIONS
+        WHERE defaultentity = l_ENTITY );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20530, 'This entity cannot be deleted because it is the default entity specified in Name ');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT ENTITY
+        FROM TAXCODE
+        WHERE ENTITY = l_ENTITY);
+      StoO_rowcnt := SQL%ROWCOUNT;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20913, 'This entity cannot be deleted because it is being used in Tax Code.');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE EXISTS (
+        SELECT ENTITY
+        FROM TAX_METHOD
+        WHERE ENTITY = l_ENTITY);
+      StoO_rowcnt := SQL%ROWCOUNT;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        RAISE_APPLICATION_ERROR(-20914, 'This entity cannot be deleted because it is being used in Tax Method.');
+        RETURN;
+      END;
+    END IF;
+  END;
+
+  IF StoO_error &lt;&gt; 0 THEN
+    RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+  END IF;
+END tr_entity_delete;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>
