@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_VALIDATE_SETTINGS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_VALIDATE_SETTINGS_SP" 
+AS
+   E_NO_RESOURCE_OBS_ASSIGNMENT  EXCEPTION;
+   E_NO_PROJECT_OBS_ASSIGNMENT   EXCEPTION;
+   E_NO_DAILY_CURVE              EXCEPTION;
+   E_NO_FISCAL_PERIODS           EXCEPTION;
+   E_NO_CURRENCY_CODE            EXCEPTION;
+   E_NO_ENTITY_CODE            EXCEPTION;
+   V_PROJECT_OBS_CNT             INTEGER;
+   V_RESOURCE_OBS_CNT            INTEGER;
+   V_LAST_CURVE_DATE             DATE;
+   V_CURRENCY_CODE               VARCHAR2(3);
+   V_ENTITY_CODE                 ENTITY.ENTITY%TYPE;
+   V_STMT                        VARCHAR2(100);
+   V_CNT                         INTEGER;
+BEGIN
+-----------------------------------------------------------------
+-- Validate that data mart configuration has been set up properly
+-----------------------------------------------------------------
+
+   -- Verify project OBS assignments
+   V_STMT := 'Verify project OBS assignment';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT COUNT (*)
+     INTO V_PROJECT_OBS_CNT
+     FROM NBI_CFG_OBS_ASSIGNMENTS
+    WHERE OBJECT_TYPE = 'PROJECT'
+      AND OBS_TYPE_ID IS NOT NULL
+      AND OBS_UNIT_DEFAULT IS NOT NULL;
+   -- Verify resource OBS assignments
+   V_STMT := 'Verify resource OBS assignment';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT COUNT (*)
+     INTO V_RESOURCE_OBS_CNT
+     FROM NBI_CFG_OBS_ASSIGNMENTS
+    WHERE OBJECT_TYPE = 'RESOURCE'
+      AND OBS_TYPE_ID IS NOT NULL
+      AND OBS_UNIT_DEFAULT IS NOT NULL;
+
+   IF (  V_PROJECT_OBS_CNT = 0)
+   THEN
+      RAISE E_NO_PROJECT_OBS_ASSIGNMENT;
+   END IF;
+
+   IF (  V_RESOURCE_OBS_CNT = 0 )
+   THEN
+      RAISE E_NO_RESOURCE_OBS_ASSIGNMENT;
+   END IF;
+
+   V_STMT := 'Verify that daily actual/available/available curves exist';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT MAX (LEAST (TRUNC (SYSDATE) + 365, TRUNC (FROM_DATE) + NUM_PERIODS))
+     INTO V_LAST_CURVE_DATE
+     FROM PRJ_BLB_SLICEREQUESTS
+    WHERE REQUEST_NAME IN ('DAILYRESOURCEACTCURVE',
+                'DAILYRESOURCEBASECURVE',
+                'DAILYRESOURCEESTCURVE',
+                'DAILYRESOURCEAVAILCURVE',
+                'DAILYRESOURCEALLOCCURVE'
+               )
+      AND PERIOD = 0;
+
+   IF V_LAST_CURVE_DATE IS NULL
+   THEN
+      RAISE E_NO_DAILY_CURVE;
+   END IF;
+
+   V_STMT := 'Verify that Datamart entity has been set up';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT NVL (MAX (VALUE), NULL)
+     INTO V_ENTITY_CODE
+     FROM CMN_OPTIONS O,
+          CMN_OPTION_VALUES V
+    WHERE O.OPTION_CODE = 'NBI_ENTITY_CODE'
+      AND V.OPTION_ID = O.ID;
+
+   IF V_ENTITY_CODE IS NULL
+   THEN
+      RAISE E_NO_ENTITY_CODE;
+   END IF;
+
+   V_STMT := 'Verify that fiscal periods have been set up';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT COUNT (*)
+     INTO V_CNT
+     FROM BIZ_COM_PERIODS F, ENTITY E
+    WHERE F.PERIOD_TYPE = 'MONTHLY'
+      AND F.ENTITY_ID = E.ID
+      AND E.ENTITY = V_ENTITY_CODE
+      AND TRUNC (SYSDATE) BETWEEN F.START_DATE AND F.END_DATE;
+
+   IF V_CNT = 0
+   THEN
+      RAISE E_NO_FISCAL_PERIODS;
+   END IF;
+
+   V_STMT := 'Verify currency code is present';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT NVL (MAX (VALUE), NULL)
+     INTO V_CURRENCY_CODE
+     FROM CMN_OPTIONS O,
+          CMN_OPTION_VALUES V
+    WHERE O.OPTION_CODE = 'NBI_CURRENCY_CODE'
+      AND V.OPTION_ID = O.ID;
+
+   IF V_CURRENCY_CODE IS NULL
+   THEN
+      RAISE E_NO_CURRENCY_CODE;
+   END IF;
+EXCEPTION
+   WHEN E_NO_RESOURCE_OBS_ASSIGNMENT
+   THEN
+      RAISE_APPLICATION_ERROR (-20001, 'NBI_CFG_NO_RESOURCE_OBS_ASSIGNMENT - Resource OBS assignments are not setup');
+   WHEN E_NO_DAILY_CURVE
+   THEN
+      RAISE_APPLICATION_ERROR (-20002, 'NBI_CFG_NO_DAILY_CURVE - No daily actual/available/available curves exist');
+   WHEN E_NO_FISCAL_PERIODS
+   THEN
+      RAISE_APPLICATION_ERROR (-20003, 'NBI_CFG_NO_FISCAL_PERIOD - No fiscal periods have been set up');
+   WHEN E_NO_CURRENCY_CODE
+   THEN
+      RAISE_APPLICATION_ERROR (-20004, 'NBI_CFG_NO_CURRENCY_CODE - No valid currency Code');
+   WHEN E_NO_PROJECT_OBS_ASSIGNMENT
+   THEN
+      RAISE_APPLICATION_ERROR (-20005, 'NBI_CFG_NO_PROJECT_OBS_ASSIGNMENT - Project OBS assignments are not setup');
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_EXTRACT_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.qry.staffing" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Staffing" languageCode="en" name="Staffing"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:project:staff.id:project_int_id@,
+       @select:dim_prop:user_def:implied:project:staff.name:project_name@,
+       @select:metric:user_def:implied:SUM(@NVL@(staff.prestsum,0)/3600):etc_hrs@
+FROM   (SELECT DISTINCT 
+               staff.id,
+               staff.name,
+               a.prid,
+               a.prestsum
+        FROM   inv_investments staff
+               INNER JOIN inv_projects prj ON prj.prid = staff.id 
+                                           AND prj.is_template <> 1
+                                           AND prj.is_program <> 1
+               INNER JOIN prtask t ON t.prprojectid = staff.id
+                                   AND t.pristask <> 0
+                                   AND t.prismilestone <> 1
+                                   AND t.prstatus <> 2
+               INNER JOIN prassignment a ON a.prtaskid = t.prid
+               INNER JOIN srm_resources r ON r.id = a.prresourceid 
+                                          AND r.person_type = 0
+                                          AND r.resource_type = 0  /* Labor Roles Only */
+               LEFT OUTER JOIN prj_obs_associations assoc ON staff.id = assoc.record_id
+                                                          AND assoc.table_name = 'SRM_PROJECTS'
+               LEFT OUTER JOIN prj_obs_units_flat flat ON assoc.unit_id = flat.unit_id
+        WHERE  staff.is_active <> 0
+        AND    t.prstart BETWEEN (@NVL@(@WHERE:PARAM:USER_DEF:DATE:as_of_date@,@SYSDATE@) - @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:number_of_days@,45)) 
+                         AND     (@NVL@(@WHERE:PARAM:USER_DEF:DATE:as_of_date@,@SYSDATE@) + @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:number_of_days@,45))
+        AND   (@WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:OBS@ = flat.branch_unit_id)
+        AND    @WHERE:PARAM:USER_DEF:INTEGER:staff.manager_id:MANAGER_ID@
+        AND    @WHERE:SECURITY:PROJECT:staff.id@
+        AND    @FILTER@) staff
+GROUP  BY staff.id, staff.name
+HAVING SUM(@NVL@(staff.prestsum,0)/3600) > 0
+AND    @HAVING_FILTER@]]></nsql>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_hrs" required="false">
+              
+              
+              
+              
+              <nls description="ETC" languageCode="en" name="ETC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_manager_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_as_of_date" required="false">
+              
+              <nls description="As of Date Filter" languageCode="en" name="As of Date Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_number_of_days" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Days Outlook Filter" languageCode="en" name="Days Outlook Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="copStaffingLinkable" code="cop.link.staffingDrillDown">
+                
+                
+                
+                
+                <nls description="Staffing Drill Down Page" languageCode="en" name="Staffing Drill Down Page"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

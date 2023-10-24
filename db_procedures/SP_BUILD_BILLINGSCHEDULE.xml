@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_BUILD_BILLINGSCHEDULE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_BUILD_BILLINGSCHEDULE" (
+  COMPANY_CODE  VARCHAR2 ,
+  PROJECT_CODE  VARCHAR2 )
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  timeincr  NUMBER(3,0);
+  timeincrtype  GLOBALPKG.STRING;
+  billfreq  NUMBER(3,0);
+  billamount  NUMBER(32,6);
+  billdate  DATE;
+  numrows   NUMBER(5,0);
+  rowindex  NUMBER(5,0);
+  MASTER_PROJECT_CODE   GLOBALPKG.STRING;
+  changeorder   GLOBALPKG.STRING;
+  balanceamount   NUMBER(32,6);
+  contractamount  NUMBER(32,6);
+  minkey  GLOBALPKG.STRING;
+  taxcode   GLOBALPKG.STRING;
+  admincode   GLOBALPKG.STRING;
+  
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+     FROM pac_mnt_projects
+		WHERE COMPANY_CODE = sp_build_billingschedule.COMPANY_CODE
+		 AND PROJECT_CODE = sp_build_billingschedule.PROJECT_CODE
+		 AND ( type_  IN ('S', 'I') OR
+		 	   NVL( BILLING_PROJECT_ID, ID ) != ID));
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		RETURN ;
+	END IF;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   billfreq,  billamount,  billdate,  billnbr,  contractamount,  taxcode,  admincode,
+		  MASTER_PROJECT_CODE,  changeorder
+		INTO sp_build_billingschedule.billfreq, sp_build_billingschedule.billamount, sp_build_billingschedule.billdate, sp_build_billingschedule.numrows, sp_build_billingschedule.contractamount, sp_build_billingschedule.taxcode, sp_build_billingschedule.admincode,
+		 sp_build_billingschedule.MASTER_PROJECT_CODE, sp_build_billingschedule.changeorder FROM projcntrts
+		WHERE COMPANY_CODE = sp_build_billingschedule.COMPANY_CODE
+		 AND PROJECT_CODE = sp_build_billingschedule.PROJECT_CODE
+		 AND billfreq IS NOT NULL
+		 AND billamount IS NOT NULL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+		RETURN ;
+	END IF;
+	NULL;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE  billingschedule
+		WHERE ROWID IN
+		(SELECT billingschedule.ROWID FROM billingschedule
+		WHERE billingschedule.COMPANY_CODE = sp_build_billingschedule.COMPANY_CODE
+		 AND billingschedule.PROJECT_CODE = sp_build_billingschedule.PROJECT_CODE);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	IF  sp_build_billingschedule.balanceamount &lt; 0 THEN
+		sp_build_billingschedule.balanceamount :=  0;
+	END IF;
+	sp_build_billingschedule.balanceamount :=  NVL(sp_build_billingschedule.contractamount,
+	   0) - ( sp_build_billingschedule.numrows * sp_build_billingschedule.billamount
+	   );
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO billingschedule (BILLINGSCHEDULEKEY, COMPANY_CODE, MASTER_PROJECT_CODE, changeorder, billdate, billamount, billed, atf, taxoverride, adminoverride, PROJECT_CODE, taxcode, admincode)
+	  VALUES (S_167_1_BILLINGSCHEDULE.nextval, sp_build_billingschedule.COMPANY_CODE, sp_build_billingschedule.MASTER_PROJECT_CODE,
+		   sp_build_billingschedule.changeorder, sp_build_billingschedule.billdate,
+		   sp_build_billingschedule.billamount, 0, 0, 0, 0, sp_build_billingschedule.PROJECT_CODE,
+		   sp_build_billingschedule.taxcode, sp_build_billingschedule.admincode);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK WORK;
+		RETURN ;
+	END;
+	END IF;
+	IF  sp_build_billingschedule.billfreq = 1 THEN
+	BEGIN
+		sp_build_billingschedule.timeincr :=  7;
+		sp_build_billingschedule.timeincrtype :=  'day';
+	END;
+	ELSE
+		IF  sp_build_billingschedule.billfreq = 2 THEN
+		BEGIN
+			sp_build_billingschedule.timeincr :=  1;
+			sp_build_billingschedule.timeincrtype :=  'month';
+		END;
+		ELSE
+			IF  sp_build_billingschedule.billfreq = 3 THEN
+			BEGIN
+				sp_build_billingschedule.timeincr :=  3;
+				sp_build_billingschedule.timeincrtype :=  'month';
+			END;
+			END IF;
+			END IF;
+			END IF;
+		sp_build_billingschedule.rowindex :=  1;
+		&lt;&lt;i_loop1&gt;&gt;
+		WHILE  sp_build_billingschedule.rowindex &lt; sp_build_billingschedule.numrows LOOP
+		BEGIN
+			IF  sp_build_billingschedule.rowindex = ( sp_build_billingschedule.numrows - 1 ) AND   sp_build_billingschedule.balanceamount &gt; 0 THEN
+				sp_build_billingschedule.billamount :=  sp_build_billingschedule.billamount
+				   + sp_build_billingschedule.balanceamount;
+			END IF;
+			IF  sp_build_billingschedule.timeincrtype = 'month' THEN
+			BEGIN
+				sp_build_billingschedule.billdate :=  ADD_MONTHS(sp_build_billingschedule.billdate,
+				   sp_build_billingschedule.timeincr);
+			END;
+			ELSE
+			BEGIN
+				sp_build_billingschedule.billdate :=  sp_build_billingschedule.billdate
+				   + sp_build_billingschedule.timeincr;
+			END;
+			END IF;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO billingschedule (BILLINGSCHEDULEKEY, COMPANY_CODE, MASTER_PROJECT_CODE, changeorder, billdate, billamount, billed, atf, taxoverride, adminoverride, PROJECT_CODE, taxcode, admincode)
+			  VALUES (S_167_1_BILLINGSCHEDULE.nextval, sp_build_billingschedule.COMPANY_CODE, sp_build_billingschedule.MASTER_PROJECT_CODE,
+				   sp_build_billingschedule.changeorder, sp_build_billingschedule.billdate,
+				   sp_build_billingschedule.billamount, 0, 0, 0, 0, sp_build_billingschedule.PROJECT_CODE,
+				   sp_build_billingschedule.taxcode, sp_build_billingschedule.admincode);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK WORK;
+				RETURN ;
+			END;
+			END IF;
+			sp_build_billingschedule.rowindex :=  sp_build_billingschedule.rowindex
+			   + 1;
+		END;
+		END LOOP;
+		COMMIT WORK;
+END sp_build_billingschedule;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

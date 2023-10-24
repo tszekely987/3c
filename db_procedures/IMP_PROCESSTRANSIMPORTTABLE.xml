@@ -1,0 +1,1231 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>IMP_PROCESSTRANSIMPORTTABLE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."IMP_PROCESSTRANSIMPORTTABLE" 
+(
+  cUserID               VARCHAR2,
+  bValidateOnly         NUMBER   DEFAULT 0,
+  bDisableResultSet     NUMBER   DEFAULT 0,
+  bDeleteImportedRows   NUMBER   DEFAULT 0,
+  dFromDate             DATE,
+  dToDate               DATE,
+  bDeleteAllImported    NUMBER   DEFAULT 0,
+  nDocType              NUMBER   DEFAULT 0,
+  nJobID                NUMBER   DEFAULT 0,
+  nHeaderID             NUMBER   DEFAULT 0,
+  bLogStats             INTEGER  DEFAULT 0
+)
+AS
+  StoO_selcnt           INTEGER;
+  StoO_error            INTEGER;
+  StoO_rowcnt           INTEGER;
+  StoO_crowcnt          INTEGER := 0;
+  StoO_fetchstatus      INTEGER := 0;
+  StoO_errmsg           GLOBALPKG.STRING;
+  StoO_sqlstatus        INTEGER;
+
+  cDefCharge_Code          GLOBALPKG.STRING;
+  cDefResource_Code         GLOBALPKG.STRING;
+  dToday                DATE;
+  iBatchNo              NUMBER;
+
+  iTransImportKey       NUMBER;
+  oldTransImportKey     NUMBER;
+  cClient               GLOBALPKG.STRING;
+  cProject              GLOBALPKG.STRING;
+  cCharge_Code          GLOBALPKG.STRING;
+  cInput_Type           GLOBALPKG.STRING;
+  cResource_Code        GLOBALPKG.STRING;
+  cSourceLocation       GLOBALPKG.STRING;
+  cSourceDepartment     GLOBALPKG.STRING;
+  cProjectLocation      GLOBALPKG.STRING;
+  cProjectDepartment    GLOBALPKG.STRING;
+  cRateLocation         GLOBALPKG.STRING;
+  cRateDepartment       GLOBALPKG.STRING;
+  cEntityLocation       GLOBALPKG.STRING;
+  cEntity               GLOBALPKG.STRING;
+  cTransType            GLOBALPKG.STRING;
+  dTransDate            DATE;
+  cTransDate            GLOBALPKG.STRING;
+  cRoleCode             GLOBALPKG.STRING;
+  nChargeable           NUMBER(3);
+  nQuantity             NUMBER(32,6);
+  nAmount               NUMBER(32,6);
+  nRate                 NUMBER(32,6);
+  nCost                 NUMBER(32,6);
+  nStdCost              NUMBER(32,6);
+  cRateCurrencyCode     VARCHAR2(30);
+  cCostCurrencyCode     VARCHAR2(30);
+  nFactorAmt            NUMBER(32,6);
+  nBurdenAmt            NUMBER(32,6);
+  nOverheadAmt          NUMBER(32,6);
+  cCostPlusCode         GLOBALPKG.STRING;
+  iMatrixKey            NUMBER;
+  bRateFound            NUMBER;
+  iTransKey             NUMBER;
+  bUseCostPlus          NUMBER;
+  cProjectType          VARCHAR2(1);
+  cProjectClass         VARCHAR2(10);
+  cWIPClass             VARCHAR2(10);
+  cTransClass           VARCHAR2(10);
+  cClientClass          VARCHAR2(10);
+  cClientLocation       CLNTSUPP.LOCATIONID%TYPE;
+  cClientDepartment     CLNTSUPP.DEPARTCODE%TYPE;
+  cEmplyLocation        PAC_MNT_RESOURCES.LOCATIONID%TYPE;
+  cEmplyDepartment      PAC_MNT_RESOURCES.DEPARTCODE%TYPE;
+  cResource_Class       PAC_MNT_RESOURCES.RESOURCE_CLASS%TYPE;
+  nOrigRate             NUMBER(32,6);
+  nOrigCost             NUMBER(32,6);
+  bCostOverride         NUMBER;
+  v_SourceLocation      GLOBALPKG.STRING;
+  v_SourceDepartment    GLOBALPKG.STRING;
+  v_SourceEntity        GLOBALPKG.STRING;
+  v_EnforceStartDate    INTEGER;
+  cOrigRateCurrencyCode VARCHAR2(30);
+  cOrigCostCurrencyCode VARCHAR2(30);
+  iUserID               NUMBER;
+  bSuccess              NUMBER;
+  nSRM_ID               NUMBER;
+  nCompanyStatus        NUMBER(3);
+  nTimeIncrement        NUMBER;
+  cProjInfo             GLOBALPKG.STRING;
+  cCharge_CodeInfo      GLOBALPKG.STRING;
+  cResourceInfo         GLOBALPKG.STRING;
+  nActive               NUMBER;
+  nRateLocation         NUMBER;
+  cImportStatus         VARCHAR2(1);
+  nTransNo              NUMBER;
+  nZero                 NUMBER;
+  nErrorCode            NUMBER;
+  p_rc                  Ppa_Getratepkg.RCT1;
+  cMsg                  varchar2(255);
+  nPpaTransInfoId		NUMBER:=0;
+  nSourceModule 		NUMBER;
+  vCompanyCode 			GLOBALPKG.STRING;
+  cResourceClass		VARCHAR2(8);
+  cTaskId				NUMBER;
+  nVoucherNo			NUMBER;
+  iRowsProcessed        NUMBER;
+  cStatus				VARCHAR2(1);
+  cFatalStatus			VARCHAR2(2000);
+  validation_error 		EXCEPTION;
+  nValuesErrorCode      NUMBER;
+  vProjectId 			NUMBER;
+  cCostType             VARCHAR2(30);
+
+  CURSOR TRANSACTIONS_CURSOR IS
+     SELECT TRANSIMPORTKEY,TASKID, PROJECT_CODE
+      FROM IMP_TRANSACTIONIMPORT
+     WHERE IMPORTSTATUS = 'N'
+     AND PAC_IMP_HEADER_ID = nHeaderID
+     AND TRANSDATE BETWEEN dFromDate AND dToDate;  -- that are in the date range;
+BEGIN
+  BEGIN -- get the source field information used to populate ppa_transcontrol
+    StoO_rowcnt  := 0;
+    SELECT NVL(RTRIM(SOURCEFIELDLOCATION), 'PL'),
+               NVL(RTRIM(SOURCEFIELDDEPARTMENT), 'PD'),
+               NVL(RTRIM(SOURCEFIELDENTITY), 'PE'),
+               NVL(ENFORCEPROJECTSTARTDATE,0)
+    INTO v_SourceLocation,
+               v_SourceDepartment,
+               v_SourceEntity,
+               v_EnforceStartDate
+    FROM NAMEOPTIONS;
+      StoO_rowcnt := SQL%ROWCOUNT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        cFatalStatus := SUBSTR(SQLCODE || ' - 1=&gt;' || SQLERRM, 0,1999);
+        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+  END; -- END  get the source field information used to populate ppa_transcontrol
+
+  -- get the necessary date information in the proper format
+  dToday    := SYSDATE;
+
+  iRowsProcessed := 0;    -- let's set the row count to 0
+  nZero     := 0;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    SELECT U.ID
+      INTO iUserID
+      FROM CMN_SEC_USERS U,
+         SRM_RESOURCES R
+    WHERE R.UNIQUE_NAME = cUserID
+       AND R.USER_ID = U.ID;
+    StoO_rowcnt := SQL%ROWCOUNT;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+  END;
+  iUserID := NVL(iUserID, 0);
+
+  IF iUserID = 0 AND NVL(RTRIM(cUserID), 'admin') &lt;&gt; 'admin' THEN
+    RAISE_APPLICATION_ERROR(-20877, StoO_errmsg || ' - ' || 'Resource not found in CMN_SEC_USERS ('|| cUserID || ')');
+  END IF;
+  -- get the system-wide default values we will use throughout
+  BEGIN
+    SELECT DEFAULT_VALUE
+    INTO cDefCharge_Code FROM DEFAULT_COSTKEY_VALUES
+    WHERE COSTKEY_LEVEL = 3;
+  END;
+
+  BEGIN
+    SELECT DEFAULT_VALUE
+      INTO cDefResource_Code FROM DEFAULT_COSTKEY_VALUES
+      WHERE COSTKEY_LEVEL = 4;
+  END;
+
+    -- Get the next sequence number for the Header
+  IF nHeaderID != 0  THEN
+    BEGIN
+      SELECT PPA_TRANSCONTROLAPINFO_S1.NEXTVAL
+      INTO nPpaTransInfoId
+      FROM DUAL;
+    EXCEPTION
+      WHEN OTHERS THEN
+        cFatalStatus := SUBSTR(SQLCODE || ' - 3=&gt;' || SQLERRM, 0,1999);
+        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+    END;--Get the next sequence number for the Header
+  ELSE
+    nPpaTransInfoId := NULL;
+  END IF; -- END nHeaderID != 0
+
+  -- Update all pac_mnt_projects that have entry on imp_transactionimport --rb 5/28/06
+  UPDATE pac_mnt_projects
+     SET is_financially_enabled = 1
+   WHERE project_code IN (
+		SELECT p.project_code
+		FROM   pac_mnt_projects p, imp_transactionimport t
+		WHERE  p.project_code = t.project_code
+		AND	   p.is_financially_enabled = 0
+		GROUP BY p.project_code
+		);
+
+  FOR TRANSACTION_REC IN TRANSACTIONS_CURSOR
+    LOOP     -- through the transactions to import
+      BEGIN  -- begin loop
+        BEGIN -- Handle Excetion happned in the Inner Block
+          iRowsProcessed := iRowsProcessed + 1;  -- increment our row count
+          nErrorCode := 0;
+
+          -- Get the company information from project
+          BEGIN
+            SELECT COMPANY_CODE,ID
+            INTO vCompanyCode,vProjectId
+            FROM PAC_MNT_PROJECTS
+            WHERE UPPER(PROJECT_CODE) = UPPER(TRANSACTION_REC.PROJECT_CODE);
+
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                NULL;         -- Transactions don't require a company. CLRT-17382
+            WHEN OTHERS THEN
+              cFatalStatus := SUBSTR(SQLCODE || ' - 7=&gt;2222' || SQLERRM, 0,1999);
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+          END ;
+          --End Get the company information from project
+
+          -- let the games begin
+          BEGIN
+            BEGIN  -- select from imp_transactionimport
+              StoO_error   := 0;
+              SELECT
+                T.SOURCEMODULE,
+                vCompanyCode,
+                UPPER(T.PROJECT_CODE),
+                RTRIM(T.TRANSTYPE),
+                NVL(RTRIM(T.CHARGE_CODE), cDefCharge_Code),
+                T.INPUT_TYPE,
+                NVL(RTRIM(T.RESOURCE_CODE), cDefResource_Code),
+                P.locationid,
+                P.departcode,
+                T.TRANSDATE,
+                RPAD(TO_CHAR(T.TransDate,'mm/dd/yyyy'), 10, ' '),
+                NVL(T.QUANTITY, 1),
+                T.RATE,
+                T.COST,
+                T.COST,
+                T.Chargeable,
+                T.ROLE_CODE,
+                T.RATE_CURRENCY,
+                T.COST_CURRENCY,
+                CS.SRM_ID,
+                NVL(CS.STATUS_TYPE, 0),
+                NVL(P.TIMEINCREMENT,0),
+                RPAD(NVL(RTRIM(P.STATUS), ' '), 1, ' ') || RPAD( NVL(RTRIM(P.TEMPLATE_ONLY), ' '), 1, ' ') || RPAD( NVL(RTRIM(P.APPROVED),' '), 1, ' ') || NVL(RPAD(TO_CHAR(P.STARTDATE,'mm/dd/yyyy'), 10, ' '), '01/01/1900') || NVL(RPAD(TO_CHAR(P.COMPLETEDATE ,'mm/dd/yyyy'), 10, ' '), '12/31/2999'),
+                DECODE(T.TRANSTYPE, 'L', NVL(P.TRANSRATELOCATIONLABOR, 2),
+                                    'M', NVL(P.TRANSRATELOCATIONMATERIALS, 2),
+                                    'Q', NVL(P.TRANSRATELOCATIONEQUIPMENT, 2),
+                                    'X', NVL(P.TRANSRATELOCATIONEXPENSES, 2),
+                                    2),
+                P.TYPE_,
+                RTRIM(P.CLASS),
+                RTRIM(P.WIPCLASS),
+                RTRIM(P.COSTPLUS),
+                CS.CLNTCLASS,
+                DECODE(v_SourceLocation,   'CL', CS.LOCATIONID, 'EL', E.LOCATIONID, P.LOCATIONID),
+                DECODE(v_SourceDepartment, 'CD', CS.DEPARTCODE, 'ED', E.DEPARTCODE, P.DEPARTCODE),
+                DECODE(v_SourceEntity,     'CE', CS.LOCATIONID, 'EE', E.LOCATIONID, P.LOCATIONID),
+                E.LOCATIONID,
+                E.DEPARTCODE,
+                E.RESOURCE_CLASS,
+                CS.LOCATIONID,
+                CS.DEPARTCODE,
+                T.TASKID,
+                T.TRANSCLASS,
+                
+                /* CLRT--28044: added for transaction capitalization. get the cost type from task, or its parent task  
+                         (or grandparent, etc), or investment. No need to worry about TASK_ID being NULL becuase 
+                         it has already been validated above. Hence cost_type will always be derived as in worst
+                         case it will default to investment cost type and that will never be null. */
+                ( SELECT c.cost_type
+                  FROM ( SELECT NVL(pt1.cost_type, NVL(pt2.cost_type, p.COST_TYPE)) as cost_type, pt1.prid prid,
+                                row_number() over (ORDER BY pt2.PRWBSSEQUENCE DESC) row_num 
+                         FROM PAC_MNT_PROJECTS p, PRTASK pt1
+                              LEFT OUTER JOIN PRTASK pt2 ON
+                                   pt2.cost_type IS NOT NULL
+                                   AND pt2.PRPROJECTID = pt1.PRPROJECTID
+                                   AND pt2.PRWBSSEQUENCE &lt;= pt1.PRWBSSEQUENCE
+                                   AND pt2.WBS_NNBSEQ &gt; pt1.PRWBSSEQUENCE 
+                                   AND pt2.PRID &lt;&gt; pt1.PRID
+                         WHERE pt1.prprojectid = p.id
+                               AND pt1.prid =  TRANSACTION_REC.TASKID
+                        ) c 
+                  WHERE c.row_num = 1
+                ) as cost_type
+              INTO
+                nSourceModule,
+                cClient,
+                cProject,
+                cTransType,
+                cCharge_Code,
+                cInput_Type,
+                cResource_Code,
+                cProjectLocation,
+                cProjectDepartment,
+                dTransDate,
+                cTransDate,
+                nQuantity,
+                nRate,
+                nCost,
+                nStdCost,
+                nChargeable,
+                cRoleCode,
+                cRateCurrencyCode,
+                cCostCurrencyCode,
+                nSRM_ID,
+                nCompanyStatus,
+                nTimeIncrement,
+                cProjInfo,
+                nRateLocation,
+                cProjectType,
+                cProjectClass,
+                cWIPClass,
+                bUseCostPlus,
+                cClientClass,
+                cSourceLocation,
+                cSourceDepartment,
+                cEntityLocation,
+                cEmplyLocation,
+                cEmplyDepartment,
+                cResource_Class,
+                cClientLocation,
+                cClientDepartment,
+                cTaskId,
+                cTransClass,
+                cCostType
+              FROM
+                IMP_TRANSACTIONIMPORT T,
+                PAC_MNT_PROJECTS P,
+                CLNTSUPP CS,
+                PAC_MNT_RESOURCES E
+              WHERE T.TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY
+                AND P.PROJECT_CODE  = UPPER(T.PROJECT_CODE)
+                AND CS.COMPANY_CODE (+) = P.COMPANY_CODE
+                AND E.RESOURCE_CODE (+) = T.RESOURCE_CODE;
+              StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                ---:14:15:16:17
+                NULL;
+              WHEN OTHERS THEN
+                cFatalStatus := SUBSTR(SQLCODE || ' - 8=&gt;' || SQLERRM, 0,1999);
+                RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+            END;  -- select from imp_transactionimport
+
+
+               --Validate that the location is set, otherwise, we will be in trouble
+	      IF cSourceLocation IS NULL THEN
+	        nErrorCode := 955;
+	        RAISE validation_error;
+	      END IF;
+
+		  --Bug#93874 fix. start
+		  --Validate that the Department is set, otherwise, This is not Fin Enabled.
+	      --Edited by saga03 Dated Dec 09,2006
+	      IF cSourceDepartment IS NULL THEN
+	     	--TODO change err code.
+	        nErrorCode := 956; -- Department is not set.
+	        RAISE validation_error;
+	      END IF;
+		  -- Bug fix END
+
+            -- Assign 50 to nSourceModule  if it is NULL
+            IF nSourceModule IS NULL THEN
+              nSourceModule := 50;
+              RAISE validation_error;
+            END IF; --  END IIF nSourceModule IS NULL THEN
+            -- Perform the validations
+            IF INSTR('LMQX', cTransType) = 0 THEN
+              nErrorCode := 50;           -- invalid transaction type: must be Labor, Materials, Equipment, or Expense
+              RAISE validation_error;
+              -- Make sure we have a valid Customer Code
+            ELSIF (nSRM_ID IS NULL AND vCompanyCode IS NOT NULL ) THEN
+              nErrorCode := 100;       -- Customer code not found
+              RAISE validation_error;
+            ELSIF (nCompanyStatus != 1 AND vCompanyCode IS NOT NULL ) THEN
+              nErrorCode := 110; -- customer is not active
+              RAISE validation_error;
+            ELSIF SUBSTR(cProjInfo, 1, 1) =  ' ' THEN
+              nErrorCode := 200; -- project not found
+              RAISE validation_error;
+            ELSIF SUBSTR(cProjInfo, 1, 1) = 'H' THEN
+              nErrorCode := 210;  -- project is on hold
+              RAISE validation_error;
+            ELSIF SUBSTR(cProjInfo, 1, 1) = 'C' THEN
+              nErrorCode := 220;  -- project is closed
+              RAISE validation_error;
+            ELSIF SUBSTR(cProjInfo, 2, 1) = '1' THEN
+              nErrorCode := 230;  -- project is a template
+            ELSIF SUBSTR(cProjInfo, 3, 1) = '0' THEN
+              nErrorCode := 240;  -- project is not approved
+              RAISE validation_error;
+            ELSIF nTimeIncrement &gt; 0 AND
+                  ( FLOOR(( ROUND(( nQUANTITY - FLOOR(nQUANTITY) ) * 60, 0) +
+                  ( FLOOR(nQUANTITY) * 60 ) ) / nTimeIncrement) * nTimeIncrement )
+                  != ( ROUND((nQUANTITY - FLOOR(nQUANTITY) ) * 60, 0) + ( FLOOR(nQUANTITY) * 60 )) THEN
+              nErrorCode := 270;  -- labor quantity is not rounded to proper time increments based on project settings
+              RAISE validation_error;
+            ELSE
+              BEGIN
+
+              --Validate Task
+                BEGIN
+                  SELECT PT.PRID INTO cTaskId
+                    FROM PRTASK PT
+                    WHERE PT.PRPROJECTID = vProjectId
+                    AND PT.PRID = TRANSACTION_REC.TASKID;
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    nErrorCode := 307;  -- missing or invalid taskId
+                    RAISE validation_error;
+                  WHEN OTHERS THEN
+                    cFatalStatus := SUBSTR(SQLCODE || ' - 11=&gt;' || SQLERRM, 0,1999);
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                END;
+                --End Validate Task
+
+                --Validate ChargeCode
+                BEGIN
+                  IF cCharge_Code IS NULL THEN
+                    SELECT PC.PREXTERNALID INTO cCharge_Code
+                    FROM
+                              INV_INVESTMENTS INV,
+                              PAC_MNT_PROJECTS MP,
+                              PRCHARGECODE PC,
+                              PRTASK PT
+                    WHERE INV.ID = MP.ID
+              AND NVL(PT.PRCHARGECODEID,INV.CHARGECODEID) = PC.PRID
+              AND PT.PRPROJECTID = INV.ID
+              AND PT.PRID = cTaskId
+                              AND MP.ID = vProjectId
+                              AND PC.PRISOPEN != 0
+							                AND (PC.PRPROJECTID IS NULL OR PC.PRPROJECTID=vProjectId);
+                  ELSE
+                    SELECT 1 INTO StoO_selcnt
+                      FROM DUAL
+                    WHERE  EXISTS (
+                        SELECT  1
+                        FROM PRCHARGECODE
+                        WHERE NLS_UPPER(PREXTERNALID) = NLS_UPPER(cCharge_Code) AND PRISOPEN !=0
+						AND (PRPROJECTID IS NULL OR PRPROJECTID=vProjectId));
+                  END IF; -- END IF  cCharge_Code IS NULL
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    nErrorCode := 300;  -- missing or invalid or inactive charge code
+                    RAISE validation_error;
+                  WHEN OTHERS THEN
+                    cFatalStatus := SUBSTR(SQLCODE || ' - 9=&gt;' || SQLERRM, 0,1999);
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                END;
+                --End Validate ChargeCode
+                --Validate Input Type
+                BEGIN
+                  IF cInput_Type IS NULL THEN
+                    SELECT PT.PREXTERNALID, NVL(nChargeable, ABS(PT.IS_CHARGEABLE)) INTO cInput_Type, nChargeable
+                    FROM
+                      PRJ_RESOURCES PR,
+                      SRM_RESOURCES SR,
+                      PAC_MNT_RESOURCES MR,
+                      PRTYPECODE PT
+                    WHERE SR.ID = MR.ID
+                    AND PR.PRTYPECODEID = PT.PRID
+                    AND PR.PRID = SR.ID
+                    AND MR.RESOURCE_CODE = cResource_Code
+                    AND PT.PRISOPEN != 0;
+                  ELSE
+                    SELECT 1 INTO StoO_selcnt
+                    FROM DUAL
+                    WHERE  EXISTS (
+                    SELECT  1
+                      FROM PRTYPECODE
+                      WHERE NLS_UPPER(PREXTERNALID) = NLS_UPPER(cInput_Type) AND PRISOPEN !=0 );
+                    IF nChargeable IS NULL THEN
+                      SELECT ABS(IS_CHARGEABLE) INTO nChargeable FROM PRTYPECODE
+                      WHERE NLS_UPPER(PREXTERNALID) = NLS_UPPER(cInput_Type) AND PRISOPEN !=0 ;
+                    END IF;
+                  END IF;
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    nErrorCode := 305;  -- missing or invalid or inactive input type
+                    RAISE validation_error;
+                  WHEN OTHERS THEN
+                    cFatalStatus := SUBSTR(SQLCODE || ' - 10=&gt;' || SQLERRM, 0,1999);
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                END;
+                --End Validate Input Type
+
+                IF nErrorCode = 0 THEN
+                  BEGIN
+                    BEGIN
+                      StoO_error   := 0;
+                      StoO_rowcnt  := 0;
+	                 -- If Transaction Class is NOT provided in the IMP_TRANSACTIONIMPORT table and then use
+			         -- the default from the resource.
+			         IF cTransClass IS NULL THEN
+				       BEGIN
+                         SELECT E.TRANSCLASS
+                           INTO cTransClass
+                           FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+                           WHERE E.RESOURCE_CODE = cResource_Code
+                           AND E.ID = R.ID;
+                           StoO_rowcnt := SQL%ROWCOUNT;
+                       EXCEPTION
+                          WHEN NO_DATA_FOUND THEN
+                            NULL;
+                          WHEN OTHERS THEN
+        		            cFatalStatus := SUBSTR(SQLCODE || ' - 12=&gt;' || SQLERRM, 0,1999);
+                            RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+       		           END;
+                      END IF;
+
+                      SELECT R.is_active,
+                           E.RESOURCE_CLASS,
+                           'EE' || RPAD(NVL(TO_CHAR(R.DATE_OF_HIRE,'mm/dd/yyyy'), '01/01/1900'), 10, ' ') || RPAD(NVL(TO_CHAR(R.DATE_OF_TERMINATION,'mm/dd/yyyy'), '12/31/2999'), 10, ' ')
+                      INTO nActive,
+                           cResourceClass,
+                           cResourceInfo
+                      FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+                      WHERE E.RESOURCE_CODE = cResource_Code
+                        AND E.ID = R.ID;
+                      StoO_rowcnt := SQL%ROWCOUNT;
+                    EXCEPTION
+                      WHEN NO_DATA_FOUND THEN
+                        NULL;
+                      WHEN OTHERS THEN
+                        cFatalStatus := SUBSTR(SQLCODE || ' - 12=&gt;' || SQLERRM, 0,1999);
+                        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                    END;
+                    IF RTRIM(cResourceInfo) IS NULL OR StoO_rowcnt = 0 THEN
+                      nErrorCode := 400;      -- invalid resource code
+                      RAISE validation_error;
+                    ELSIF cTransClass IS NULL THEN
+                      nErrorCode := 2099; -- invalid Transaction class
+                      RAISE validation_error;
+                    ELSIF cResourceClass IS NULL THEN
+                      nErrorCode := 4003; -- invalid Resource class
+                      RAISE validation_error;
+                    END IF; -- IF RTRIM(cResourceInfo) IS NULL OR StoO_rowcnt = 0 THEN
+                  END;  -- get resource info
+                END IF; -- IF nErrorCode = 0 THEN
+              END;  -- get charge code info
+            END IF; -- IF INSTR('LMQX', cTransType) = 0 THEN
+
+            IF nErrorCode = 0 THEN
+              BEGIN
+                IF NVL(nRate,0) &lt;&gt; 0 THEN
+                  BEGIN
+                    BEGIN
+                      SELECT IS_ACTIVE
+                        INTO nActive
+                        FROM CMN_CURRENCIES
+                        WHERE CURRENCY_CODE = cRateCurrencyCode;
+                    EXCEPTION
+                      WHEN NO_DATA_FOUND THEN
+                        nActive  := 0;
+                      WHEN OTHERS THEN
+                        cFatalStatus := SUBSTR(SQLCODE || ' - 14=&gt;' || SQLERRM, 0,1999);
+                        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                    END;
+
+                    IF NVL(nActive, 0) &lt;&gt; 1 THEN
+                      nErrorCode := 900;  -- when specifying a rate a valid currency must be provided
+                      RAISE validation_error;
+                    END IF; -- IF NVL(nActive, 0) &lt;&gt; 1 THEN
+                  END;
+                END IF; -- IF NVL(nRate,0) &lt;&gt; 0 THEN
+                IF nErrorCode = 0 THEN
+                  BEGIN
+                    IF NVL(nCost,0) &lt;&gt; 0 THEN
+                      BEGIN
+                        SELECT IS_ACTIVE
+                          INTO nActive
+                          FROM CMN_CURRENCIES
+                        WHERE CURRENCY_CODE = cCostCurrencyCode;
+                        StoO_rowcnt := SQL%ROWCOUNT;
+                      EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                          nActive  := 0;
+                        WHEN OTHERS THEN
+                          RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                      END;
+                      IF NVL(nActive, 0) &lt;&gt; 1 THEN
+                        nErrorCode := 910;  -- when specifying a cost a valid currency must be provided
+                        RAISE validation_error;
+                      END IF;  -- IF NVL(nActive, 0) &lt;&gt; 1 THEN
+                    END IF;  -- IF NVL(nCost,0) &lt;&gt; 0 THEN
+                  END;
+                END IF; -- IF nErrorCode = 0 THEN
+              END;
+            END IF; -- IF nErrorCode = 0 THEN
+            -- the transaction is valid, so get the additional information we need to move it to transcontrol
+            IF nErrorCode = 0 THEN
+              BEGIN
+                -- commenting out the following if condition to fix CLRT-41092 (CLRT-41012)
+                -- make sure we don't divide by 0 when calculating rate, etc.
+                --IF nQuantity = 0 THEN
+                  --nQuantity := 1;
+                --END IF;
+                nOrigRate :=  nRate;
+                nOrigCost :=  nCost;
+                cOrigRateCurrencyCode := cRateCurrencyCode;
+                cOrigCostCurrencyCode := cCostCurrencyCode;
+                IF nCost IS NULL THEN
+                  bCostOverride := 0;
+                ELSE
+                  bCostOverride := 1;
+                END IF;
+                -- get the rate/department location
+                SELECT DECODE(nRateLocation, 1, cClientLocation, 4, cEmplyLocation, cProjectLocation),
+                       DECODE(nRateLocation, 1, cClientDepartment, 4, cEmplyDepartment, cProjectDepartment)
+                INTO cRateLocation,
+                      cRateDepartment
+                FROM DUAL;
+
+                -- ok, let's get the rate for this transaction...
+                BEGIN
+                  Ppa_Getrate_WithRole(
+                    cClient,
+                    cProject,
+                    cCharge_Code,
+                    cInput_Type,
+                    cResource_Code,
+                    cRateLocation,
+                    cRateDepartment,
+                    cTransType,
+                    cTransDate,
+                    nQuantity,
+                    nZero,
+                    nAmount,
+                    nRate,
+                    nCost,
+                    nStdCost,
+                    nFactorAmt,
+                    nBurdenAmt,
+                    nOverheadAmt,
+                    cCostPlusCode,
+                    bRateFound,
+                    nZero,
+                    bCostOverride,
+                    cRateCurrencyCode,
+                    cCostCurrencyCode,
+                    cRoleCode,
+                    cTransClass,
+                    NULL, -- Team_ID, added for same role added twice to team
+                    p_rc,
+					NULL,
+					cCostType
+                  );
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    NULL;
+                  WHEN OTHERS THEN
+                    cFatalStatus := SUBSTR(SQLCODE || ' - 16=&gt;' || SQLERRM, 0,1999);
+                    RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                END;  -- ok, let's get the rate for this transaction...
+
+                IF nOrigRate IS NOT NULL THEN
+                  BEGIN
+                    nRate := nOrigRate;
+                    cRateCurrencyCode := cOrigRateCurrencyCode;
+                    bRateFound := 1;
+                  END;
+                END IF; -- IF nOrigRate IS NOT NULL THEN
+                IF nOrigCost IS NOT NULL THEN
+                  BEGIN
+                    nCost := nOrigCost;
+                    cCostCurrencyCode := cOrigCostCurrencyCode;
+                    bRateFound := 1;
+                  END;
+                END IF; -- IF nOrigCost IS NOT NULL THEN
+                IF bRateFound = 0 THEN
+                  nErrorCode := 800;  -- rate not found
+                  RAISE validation_error;
+                ELSIF ( nOrigCost IS NULL AND nCost IS NULL ) THEN
+                  nErrorCode := 810;
+                  RAISE validation_error;
+                ELSE
+                  BEGIN
+                    IF TRIM(cRateCurrencyCode) IS NULL THEN
+                      SELECT V.VALUE
+                      INTO cRateCurrencyCode
+                      FROM CMN_OPTIONS O, CMN_OPTION_VALUES V
+                      WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY' AND O.ID = V.OPTION_ID;
+                    END IF;
+
+                    IF TRIM(cCostCurrencyCode) IS NULL THEN
+                      SELECT V.VALUE
+                        INTO cCostCurrencyCode
+                        FROM CMN_OPTIONS O, CMN_OPTION_VALUES V
+                      WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY' AND O.ID = V.OPTION_ID;
+                    END IF;
+
+                    nAmount := nQuantity * nRate;      -- rounding handled by exchange rate package
+
+                    BEGIN
+                      StoO_error   := 0;
+                      StoO_rowcnt  := 0;
+
+                      SELECT ENTITY
+                        INTO cEntity
+                        FROM locations
+                      WHERE locationid = cEntityLocation;
+                      StoO_rowcnt := SQL%ROWCOUNT;
+                    EXCEPTION
+                      WHEN NO_DATA_FOUND THEN
+                        StoO_rowcnt := 0;
+                      WHEN OTHERS THEN
+                        StoO_rowcnt := 0;
+                        cFatalStatus := SUBSTR(SQLCODE || ' - 17=&gt;' || SQLERRM, 0,1999);
+                        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+                    END;
+
+                    IF RTRIM(cEntity) IS NULL OR StoO_rowcnt = 0 THEN
+                      nErrorCode := 955; -- invalid entity location
+                      RAISE validation_error;
+                    END IF;
+                  END;
+                END IF; -- If bRateFound = 0 THEN
+              END;
+            END IF; -- the transaction is valid, so get the additional information we need to move it to transcontrol
+
+            nTransNo := NULL;
+            nValuesErrorCode := NULL;
+            SELECT S_62_1_PPA_TRANSCONTROL.NEXTVAL
+                   INTO nTransNo
+                   FROM DUAL;
+            IF nHeaderID !=0  THEN -- If the transaction has master info
+              BEGIN -- Insert into a Temorary table
+                INSERT INTO TEMP_IMP_VALIDATE_TRANSIMPORT (
+                    TRANSNO,
+                    PPA_TRANSCONTROLAPINFO_ID,
+                    SOURCEMODULE,
+                    TRANSTYPE,
+                    BATCHNO,
+                    ENTRY_RESOURCE_CODE,
+                    ENTRYDATE,
+                    LASTUPDTDBY_RESOURCE_CODE,
+                    LASTUPDATEDATE,
+                    EXTERNALBATCHID,
+                    EXTERNALTRANSNO,
+                    LOCATIONID,
+                    DEPARTCODE,
+                    ENTITY,
+                    TRANSDATE,
+                    COMPANY_CODE,
+                    PROJECT_CODE,
+                    CHARGE_CODE,
+                    INPUT_TYPE,
+                    RESOURCE_CODE,
+                    QUANTITY,
+                    COSTRULECODE,
+                    BURDENCODE,
+                    OVERHEADCODE,
+                    CHARGEABLE,
+                    NOTES,
+                    INVOICENO,
+                    EMPLYHOMELOCATION,
+                    EMPLYHOMEDEPART,
+                    PROJECTTYPE,
+                    CLIENTCLASS,
+                    PROJECTCLASS,
+                    RESOURCE_CLASS,
+                    TRANSCLASS,
+                    WIPCLASS,
+                    WORKINT,
+                    WORKBUF,
+                    EXTERNAL_ID,
+                    EXTERNAL_SOURCE_ID,
+                    TASK_ID,
+                    PROJECT_LOCATION,
+                    PROJECT_DEPARTMENT,
+                    ROLE_CODE,
+                    USER_LOV1,
+                    USER_LOV2,
+                    EXPENSE_TYPE,
+                    COST_TYPE
+                  )
+                SELECT
+                    nTransNo,
+                    nPpaTransInfoId,
+                    nSourceModule,
+                    cTransType,
+                    nJobID,
+                    cUserID,
+                    dToday,
+                    cUserID,
+                    dToday,
+                    T.EXTERNALBATCHID,
+                    T.EXTERNALTRANSNO,
+                    cSourceLocation,
+                    SUBSTR(RTRIM(cSourceDepartment),1,60),
+                    cEntity,
+                    dTransdate,
+                    cClient,
+                    cProject,
+                    cCharge_Code,
+                    cInput_Type,
+                    cResource_Code,
+                    nQuantity,
+                    RTRIM(cCostPlusCode),
+                    NULL,           -- burden
+                    NULL,           -- overhead
+                    nChargeable,
+                    T.NOTES,
+                    NULL,
+                    cEmplyLocation,
+                    cEmplyDepartment,
+                    cProjectType,
+                    cClientClass,
+                    cProjectClass,
+                    cResource_Class,
+                    cTransClass,
+                    cWIPClass,
+                    TRANSACTION_REC.TRANSIMPORTKEY,
+                    NULL,
+                    T.EXTERNAL_ID,
+                    T.EXTERNAL_SOURCE_ID,
+                    cTaskId,
+                    cProjectLocation,
+                    cProjectDepartment,
+                    cRoleCode,
+                    T.USER_LOV1,
+                    T.USER_LOV2,
+                    T.EXPENSE_TYPE,
+                    cCostType
+                FROM
+                    IMP_TRANSACTIONIMPORT T
+                WHERE T.TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+
+                -- insert into ppa_transcontrol_values
+                PAC_IMP_INS_TRANSMC_VALUES_SP(TRANSACTION_REC.TRANSIMPORTKEY, nTransNo, cProject,
+                                         dTransdate, cTransType, cRateCurrencyCode, cCostCurrencyCode,
+                                         nQuantity, nRate, nAmount, nRate, nFactorAmt, nBurdenAmt,
+                                         nOverheadAmt, nCost, nStdCost, nValuesErrorCode,nHeaderID);
+
+                IF (nValuesErrorCode IS NOT NULL) THEN
+                  BEGIN
+                    IF nErrorCode IN (3001,3002) THEN
+                      RAISE PAC_GLOBAL_ERRORS.PostToFinancialsAbort;
+                    END IF;
+                    DELETE FROM TEMP_IMP_VALIDATE_TRANSIMPORT WHERE TRANSNO = nTransNo;
+                    DELETE FROM TEMP_IMP_VALIDATE_VALUES WHERE TRANSNO = nTransNo;
+                    nErrorCode := nValuesErrorCode;
+                    RAISE validation_error;
+                  END;
+                END IF;
+
+              EXCEPTION -- insert the data
+                WHEN OTHERS THEN
+                  BEGIN
+                    RAISE PAC_GLOBAL_ERRORS.PostToFinancialsAbort;
+                  END;
+                  --TEMP_IMP_VALIDATE_TRANSIMPORT
+              END; -- END Insert into a Temorary table
+            ELSE -- If no master, i.e. nHeaderID =0
+              BEGIN    -- insert the data into PPA_TRANSCONTROL
+                INSERT INTO PPA_TRANSCONTROL (
+                    TRANSNO,
+                    PPA_TRANSCONTROLAPINFO_ID,
+                    SOURCEMODULE,
+                    TRANSTYPE,
+                    BATCHNO,
+                    ENTRY_RESOURCE_CODE,
+                    ENTRYDATE,
+                    LASTUPDTDBY_RESOURCE_CODE,
+                    LASTUPDATEDATE,
+                    EXTERNALBATCHID,
+                    EXTERNALTRANSNO,
+                    LOCATIONID,
+                    DEPARTCODE,
+                    ENTITY,
+                    TRANSDATE,
+                    COMPANY_CODE,
+                    PROJECT_CODE,
+                    CHARGE_CODE,
+                    INPUT_TYPE,
+                    RESOURCE_CODE,
+                    QUANTITY,
+                    COSTRULECODE,
+                    BURDENCODE,
+                    OVERHEADCODE,
+                    CHARGEABLE,
+                    NOTES,
+                    INVOICENO,
+                    EMPLYHOMELOCATION,
+                    EMPLYHOMEDEPART,
+                    PROJECTTYPE,
+                    CLIENTCLASS,
+                    PROJECTCLASS,
+                    RESOURCE_CLASS,
+                    TRANSCLASS,
+                    WIPCLASS,
+                    WORKINT,
+                    WORKBUF,
+                    EXTERNAL_ID,
+                    EXTERNAL_SOURCE_ID,
+                    TASK_ID,
+                    PROJECT_LOCATION,
+                    PROJECT_DEPARTMENT,
+                    ROLE_CODE,
+                    USER_LOV1,
+                    USER_LOV2,
+                    EXPENSE_TYPE,
+                    COST_TYPE
+                )
+                SELECT
+                    nTransNo,
+                    nPpaTransInfoId,
+                    nSourceModule,
+                    cTransType,
+                    nJobID,
+                    cUserID,
+                    dToday,
+                    cUserID,
+                    dToday,
+                    T.EXTERNALBATCHID,
+                    T.EXTERNALTRANSNO,
+                    cSourceLocation,
+                    SUBSTR(RTRIM(cSourceDepartment),1,60),
+                    cEntity,
+                    dTransdate,
+                    cClient,
+                    cProject,
+                    cCharge_Code,
+                    cInput_Type,
+                    cResource_Code,
+                    nQuantity,
+                    RTRIM(cCostPlusCode),
+                    NULL,           -- burden
+                    NULL,           -- overhead
+                    nChargeable,
+                    T.NOTES,
+                    NULL,
+                    cEmplyLocation,
+                    cEmplyDepartment,
+                    cProjectType,
+                    cClientClass,
+                    cProjectClass,
+                    cResource_Class,
+                    cTransClass,
+                    cWIPClass,
+                    TRANSACTION_REC.TRANSIMPORTKEY,
+                    NULL,
+                    T.EXTERNAL_ID,
+                    T.EXTERNAL_SOURCE_ID,
+                    cTaskId,
+                    cProjectLocation,
+                    cProjectDepartment,
+                    cRoleCode,
+                    T.USER_LOV1,
+                    T.USER_LOV2,
+                    T.EXPENSE_TYPE,
+                    cCostType
+                FROM
+                  IMP_TRANSACTIONIMPORT T
+                WHERE T.TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+
+                -- insert into ppa_transcontrol_values
+                PAC_IMP_INS_TRANSMC_VALUES_SP(TRANSACTION_REC.TRANSIMPORTKEY, nTransNo, cProject,
+                                         dTransdate, cTransType, cRateCurrencyCode, cCostCurrencyCode,
+                                         nQuantity, nRate, nAmount, nRate, nFactorAmt, nBurdenAmt,
+                                         nOverheadAmt, nCost, nStdCost, nValuesErrorCode,nHeaderID);
+
+                IF (nValuesErrorCode IS NOT NULL) THEN
+                  BEGIN
+                    IF nErrorCode IN (3001,3002) THEN
+                      RAISE PAC_GLOBAL_ERRORS.PostToFinancialsAbort;
+                    END IF;
+                    DELETE FROM PPA_TRANSCONTROL WHERE TRANSNO = nTransNo;
+                    DELETE FROM PPA_TRANSCONTROL_VALUES WHERE TRANSNO = nTransNo;
+                    nErrorCode := nValuesErrorCode;
+                    RAISE validation_error;
+                  END;
+                END IF;
+
+              EXCEPTION -- insert the data
+                WHEN validation_error THEN
+                  BEGIN
+                    RAISE validation_error;
+                  END;
+                WHEN OTHERS THEN
+                  BEGIN
+                    RAISE PAC_GLOBAL_ERRORS.PostToFinancialsAbort;
+                  END;
+              END;-- insert the data into PPA_TRANSCONTROL
+            END IF; -- END IF nHeaderID !=0  THEN -- If the transaction has master info
+
+            IF nHeaderID != 0 THEN
+              BEGIN -- If the Transaction has the master information
+                UPDATE IMP_TRANSACTIONIMPORT
+                  SET IMPORTSTATUS = 'V',
+                      ERRORCODE = '0',
+                      ImportDate = dToday,
+                      IMPORTEDBY_RESOURCE_CODE = cUserID,
+                      WorkInt = 0,
+                      WorkBuf = NULL,
+                      JOB_ID = nJobID,
+                      FATALERROR = NULL
+                WHERE TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+              END; -- END -- If the Transaction has the master information
+            ELSE -- No Master Information, So delete
+              DELETE FROM IMP_TRANSACTIONIMPORT
+              WHERE TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+            END IF; -- IF bDeleteImportedRows != 0 THEN
+          END;      -- let the games begin
+
+        EXCEPTION
+          WHEN PAC_GLOBAL_ERRORS.PostToFinancialsAbort THEN
+		    BEGIN
+              cFatalStatus := SUBSTR(SQLCODE || ' - 20=&gt;' || SQLERRM, 0,1999);
+              RAISE_APPLICATION_ERROR( -20669,SQLCODE||' - '|| SQLERRM );
+			  --Error inserting matching rows
+			END;
+		  WHEN validation_error THEN
+            BEGIN -- UPDATE The transaction with Error code
+              cFatalStatus := NULL;
+              UPDATE IMP_TRANSACTIONIMPORT
+              SET IMPORTSTATUS = 'E',
+                 ERRORCODE = nErrorCode,
+                 ImportDate = dToday,
+                 IMPORTEDBY_RESOURCE_CODE = cUserID,
+                 WorkInt = 0,
+                 WorkBuf = NULL,
+                 JOB_ID = nJobID,
+                 FATALERROR = cFatalStatus
+              WHERE TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+            EXCEPTION
+              WHEN OTHERS THEN
+              cFatalStatus := SUBSTR(SQLCODE || ' - 20=&gt;' || SQLERRM, 0,1999);
+              RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ) ;
+            END; -- END UPDATE The transaction with Error code
+          WHEN OTHERS THEN
+            BEGIN -- UPDATE The transaction with Fatal Error codee
+              IF (nErrorCode IS NULL) THEN
+                BEGIN
+                  nErrorCode := 8010; -- Fatal Error while processing detail transaction, Contact your syatem administrator.
+                  cFatalStatus := SUBSTR(SQLCODE || ' - ' || SQLERRM, 0,1999);
+                END;
+              END IF;
+              UPDATE IMP_TRANSACTIONIMPORT
+              SET IMPORTSTATUS = 'E',
+                 ERRORCODE = nErrorCode,
+                 ImportDate = dToday,
+                 IMPORTEDBY_RESOURCE_CODE = cUserID,
+                 WorkInt = 0,
+                 WorkBuf = NULL,
+                 JOB_ID = nJobID,
+                 FATALERROR = cFatalStatus
+              WHERE TRANSIMPORTKEY = TRANSACTION_REC.TRANSIMPORTKEY;
+            EXCEPTION
+              WHEN OTHERS THEN
+                RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM );
+            END; -- END UPDATE The transaction with Fatal Error codee
+        END; -- END Handle Excetion happned in the Inner Block
+      END;        -- begin loop
+  END LOOP;     -- through the transactions to import
+
+  -- if there are no more records...then let's blow this clam bake
+  IF nHeaderID !=0 THEN-- DO it only for the transactions that has header
+    BEGIN --Move to actual tables if all the detail trabnsactions for the master passed the validation check
+      StoO_selcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  EXISTS (
+      SELECT  1
+        FROM IMP_TRANSACTIONIMPORT
+        WHERE PAC_IMP_HEADER_ID = nHeaderID
+        --Removed condition which checks the record existance of 'V' and 'H' as
+        -- It was causing issue CLRT-52830, Need to process 'V' status records fully
+        AND IMPORTSTATUS IN ('E') and NOT EXISTS( SELECT  1
+        FROM IMP_TRANSACTIONIMPORT
+        WHERE PAC_IMP_HEADER_ID = nHeaderID AND IMPORTSTATUS NOT IN ('V', 'H') )
+        AND TRANSDATE BETWEEN dFromDate AND dToDate);
+      IF StoO_selcnt = 1 THEN
+        BEGIN --Update the Header Info with Error code
+          UPDATE PAC_IMP_TRANSIMPORT_HEADER
+          SET ERRORCODE = 309,
+                   IMPORTSTATUS = 'E',
+                   FATALERROR = NULL
+                   WHERE ID = nHeaderID;
+          DELETE FROM TEMP_IMP_VALIDATE_VALUES;
+          DELETE FROM TEMP_IMP_VALIDATE_TRANSIMPORT;
+        EXCEPTION
+          WHEN OTHERS THEN
+            cFatalStatus := SUBSTR(SQLCODE || ' - 5=&gt;' || SQLERRM, 0,1999);
+            RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ) ;
+        END; -- END UPDATE header with Error code
+      END IF; -- END IF StoO_selcnt = 1
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        BEGIN -- Move the transactions from the temporary table to the actual tables
+              --:1:2TBD: It might fails if there are thousands of detail for one header. So we
+              --:3:4need to Loop through and commit after each 1000 transactions.
+              --:5:6Also,Loop through for each detal and handle exception. If any exception happens
+              --:7:8then delete from PPA_TRANSCONTROL and PPA_TRANSCONTROL_VALUES.
+          INSERT INTO PPA_TRANSCONTROLAPINFO (
+                                ID,
+                               VOUCHERNO,
+                               PONO,
+                               VENDOR_CODE,
+                               INCURRED_BY,
+                               DOCUMENT_TYPE)
+          SELECT nPpaTransInfoId,
+                               VOUCHERNO,
+                               PONO,
+                               VENDOR_CODE,
+                               INCURRED_BY,
+                               nDocType
+          FROM PAC_IMP_TRANSIMPORT_HEADER H
+          WHERE H.ID = nHeaderID;
+
+          -- CLRT-37309 if the user id is not updated, the filter will not be able to join to SRM_RESOURCES
+          UPDATE PPA_TRANSCONTROLAPINFO
+          SET CREATED_BY=iUserID,
+              CREATED_DATE=sysdate,
+              LAST_UPDATED_BY=iUserID,
+			        LAST_UPDATED_DATE=sysdate
+          WHERE ID=nPpaTransInfoId;
+
+          INSERT INTO PPA_TRANSCONTROL
+                 (TRANSNO, SOURCEMODULE, TRANSTYPE, BATCHNO, ENTRYDATE,
+                           LASTUPDATEDATE, EXTERNALBATCHID, EXTERNALTRANSNO, LOCATIONID,
+                           DEPARTCODE, ENTITY, TRANSDATE, QUANTITY, COSTRULECODE,
+                           BURDENCODE, OVERHEADCODE, CHARGEABLE, NOTES, INVOICENO, EMPLYHOMELOCATION,
+                           EMPLYHOMEDEPART, PROJECTTYPE, CLIENTCLASS, PROJECTCLASS, TRANSCLASS,
+                           RESOURCE_CLASS, WIPCLASS, WORKINT, WORKBUF, COMPANY_CODE, PROJECT_CODE,
+                           ENTRY_RESOURCE_CODE, LASTUPDTDBY_RESOURCE_CODE, RESOURCE_CODE,
+                           EXTERNAL_ID, EXTERNAL_SOURCE_ID, TASK_ID, PROJECT_LOCATION,
+                           PROJECT_DEPARTMENT, ROLE_CODE, CHARGE_CODE, INPUT_TYPE, PPA_TRANSCONTROLAPINFO_ID, USER_LOV1, USER_LOV2, EXPENSE_TYPE,
+                           COST_TYPE )
+          SELECT  TRANSNO, SOURCEMODULE, TRANSTYPE, BATCHNO, ENTRYDATE,
+                                   LASTUPDATEDATE, EXTERNALBATCHID, EXTERNALTRANSNO, LOCATIONID,
+                                   DEPARTCODE, ENTITY, TRANSDATE, QUANTITY, COSTRULECODE,
+                                   BURDENCODE, OVERHEADCODE, CHARGEABLE, NOTES, INVOICENO, EMPLYHOMELOCATION,
+                                   EMPLYHOMEDEPART, PROJECTTYPE, CLIENTCLASS, PROJECTCLASS, TRANSCLASS,
+                                   RESOURCE_CLASS, WIPCLASS, WORKINT, WORKBUF, COMPANY_CODE, PROJECT_CODE,
+                                   ENTRY_RESOURCE_CODE, LASTUPDTDBY_RESOURCE_CODE, RESOURCE_CODE,
+                                   EXTERNAL_ID, EXTERNAL_SOURCE_ID, TASK_ID, PROJECT_LOCATION,
+                                   PROJECT_DEPARTMENT, ROLE_CODE, CHARGE_CODE, INPUT_TYPE, PPA_TRANSCONTROLAPINFO_ID, USER_LOV1, USER_LOV2, EXPENSE_TYPE,
+                                   COST_TYPE
+          FROM TEMP_IMP_VALIDATE_TRANSIMPORT;
+
+          INSERT INTO PPA_TRANSCONTROL_VALUES
+            (ID, TRANSNO, CURRENCY_TYPE, CURRENCY_CODE, RATE_CURRENCY_CODE,
+                           ACTCOST_CURRENCY_CODE, STDCOST_CURRENCY_CODE,
+                           RATE_EXCHANGE_RATE, RATE_EXCHANGE_ID, COST_EXCHANGE_RATE,
+                           COST_EXCHANGE_ID, NATURAL_BILLRATE, BILLRATE, AMOUNT,
+                           PRICE, FACTORAMOUNT, BURDEN, OVERHEAD, TOTALAMOUNT,
+                           NATURAL_ACTUALCOST, ACTUALCOST, NATURAL_STDCOST, STDCOST,
+                           TOTALCOST, EMPLYACTUALCOST, EMPLYSTDCOST)
+             SELECT ID, TRANSNO, CURRENCY_TYPE, CURRENCY_CODE, RATE_CURRENCY_CODE,
+                                   ACTCOST_CURRENCY_CODE, STDCOST_CURRENCY_CODE,
+                                   RATE_EXCHANGE_RATE, RATE_EXCHANGE_ID, COST_EXCHANGE_RATE,
+                                   COST_EXCHANGE_ID, NATURAL_BILLRATE, BILLRATE, AMOUNT,
+                                   PRICE, FACTORAMOUNT, BURDEN, OVERHEAD, TOTALAMOUNT,
+                                   NATURAL_ACTUALCOST, ACTUALCOST, NATURAL_STDCOST, STDCOST,
+                                   TOTALCOST, EMPLYACTUALCOST, EMPLYSTDCOST
+          FROM TEMP_IMP_VALIDATE_VALUES;
+
+          DELETE FROM TEMP_IMP_VALIDATE_VALUES;
+          DELETE FROM TEMP_IMP_VALIDATE_TRANSIMPORT;
+          DELETE FROM IMP_TRANSACTIONIMPORT
+          WHERE PAC_IMP_HEADER_ID = nHeaderID
+            AND IMPORTSTATUS = 'V'
+            AND TRANSDATE BETWEEN dFromDate AND dToDate;
+
+ --  Added code as part of  CLRT-52830 fix to update header info with error if any transactions are in error state
+          StoO_selcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM IMP_TRANSACTIONIMPORT
+            WHERE PAC_IMP_HEADER_ID = nHeaderID
+            AND IMPORTSTATUS IN ('E')
+            AND TRANSDATE BETWEEN dFromDate AND dToDate);
+
+          IF StoO_selcnt = 1 THEN
+           BEGIN --Update the Header Info with Error code
+            UPDATE PAC_IMP_TRANSIMPORT_HEADER
+            SET ERRORCODE = 309,
+            IMPORTSTATUS = 'E',
+            FATALERROR = NULL
+            WHERE ID = nHeaderID;
+           END;
+          END IF;
+
+          EXCEPTION
+           WHEN NO_DATA_FOUND THEN
+           BEGIN
+          DELETE FROM PAC_IMP_TRANSIMPORT_HEADER
+            WHERE ID = nHeaderID
+            AND ID NOT IN (SELECT PAC_IMP_HEADER_ID FROM IMP_TRANSACTIONIMPORT);
+           END;
+   -- End of CLRT-52830 code
+          COMMIT;
+        END; --END Move the transactions from the temporary table to the actual tables
+      WHEN OTHERS THEN
+        cFatalStatus := SUBSTR(SQLCODE || ' - 6=&gt;' || SQLERRM, 0,1999);
+        RAISE_APPLICATION_ERROR( -20878,SQLCODE||' - '|| SQLERRM ); -- Raise Database Fatal Error
+    END; --END --Move to actual tables if all the detail transactions for the master passed the validation check
+  END IF; --END IF nHeaderID !=0 - DO it only for the transactions that has header
+END Imp_Processtransimporttable;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

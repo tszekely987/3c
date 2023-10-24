@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_TAXMETHOD_INSERT</code>
+          <table_name>TAX_METHOD</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_TAXMETHOD_INSERT" 
+AFTER INSERT OR UPDATE
+ON TAX_METHOD
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER := 1;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  MSG               GLOBALPKG.STRING;
+  TAXTYPE           GLOBALPKG.STRING;
+  FROMDT            DATE;
+  TODATE            DATE;
+  DATECHG           RAW(255);
+BEGIN
+
+    BEGIN
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT :NEW.taxtype, :NEW.from_date, :NEW.to_date
+          INTO TAXTYPE, FROMDT, TODATE
+          FROM DUAL;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      /*  if result from DATEDIFF is negative, FROM_DATE is AFTER TO_DATE  */
+      IF FROMDT &gt; TODATE THEN
+        BEGIN
+          IF  TAXTYPE = 'TAX' THEN
+            raise_application_error(-20641, 'Unable to insert Tax Method because it has incorrect From / To DATE sequencing.');
+          ELSE
+            raise_application_error(-20642, 'Unable to insert Admin Method because it has incorrect From / To DATE sequencing.');
+          END IF;
+
+          RETURN;
+        END;
+      END IF;
+    END;
+
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+      RETURN;
+    END;
+	END IF;
+END tr_taxmethod_insert;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

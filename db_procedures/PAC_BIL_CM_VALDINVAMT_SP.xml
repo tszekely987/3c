@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_CM_VALDINVAMT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_CM_VALDINVAMT_SP" 
+(
+  in_invoiceno      VARCHAR2 ,
+  in_invoiceamount  NUMBER ,
+  returncode IN OUT VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  wipamount   NUMBER(32,6);
+  COMPANY_CODE  GLOBALPKG.STRING;
+  PROJECT_CODE  GLOBALPKG.STRING;
+  totalbillamount   NUMBER(32,6);
+  totalbillamountstring   GLOBALPKG.STRING;
+  RESOURCE_CODE   GLOBALPKG.STRING;
+  invoiceAmount NUMBER(32, 6);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	returncode :=  '';
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MIN(COMPANY_CODE),  MIN(PROJECT_CODE)
+		INTO PAC_BIL_CM_VALDINVAMT_SP.COMPANY_CODE, PROJECT_CODE FROM ppa_Billings
+		WHERE InvoiceNo = in_invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   SUM(BV.Amount)
+		INTO wipamount FROM ppa_Billing_values BV,ppa_billings B
+		WHERE B.InvoiceNo = in_invoiceno
+		 AND B.TransType = 'B'
+		 AND B.TRANSNO = BV.TRANSNO
+		 AND B.Status = 0    /* Line Item Credit Memo */
+		 AND BV.CURRENCY_TYPE = 'BILLING';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_Billings
+		WHERE InvoiceNo = in_invoiceno
+		 AND TransType  IN ('BR', 'BP')
+		 AND ( BITAND(Status,2) ) = 0 );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   SUM(BV.AMOUNT)
+			INTO wipamount FROM ppa_Billings B,ppa_billing_values BV
+			WHERE B.InvoiceNo = in_invoiceno
+			 AND B.TransType  IN ('BP', 'BR')
+			 AND ( BITAND(B.Status,2) ) = 0
+			 AND B.TRANSNO = BV.TRANSNO
+			 AND BV.CURRENCY_TYPE = 'BILLING';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END IF;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_Billings B,ppa_billing_values BV
+		WHERE B.InvoiceNo = in_invoiceno
+		 AND B.TransType  IN ('BR', 'BP')
+		 AND BV.Amount != BV.AmountRemaining
+		 AND ( BITAND(B.Status,2) ) = 0
+		 AND B.TRANSNO = BV.TRANSNO);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		returncode :=  '24000';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		RETURN ;
+	END;
+	END IF;
+	END;
+	IF  SUBSTR(in_invoiceno, 1, 5) != 'MATCH' THEN
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  PROJECT_CODE
+			 FROM ppa_Billings
+			WHERE InvoiceNo = in_invoiceno
+			 AND TransType = 'AY' );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			returncode :=  '24000';
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			RETURN ;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+	--raise_application_error(-20444,'wipamount' || wipamount || 'invoiceamount' || in_invoiceamount);
+	IF  ROUND(NVL(wipamount, 0), 0) != ROUND(in_invoiceamount, 0) THEN
+	BEGIN
+		totalbillamount :=  ROUND(NVL(wipamount, 0), 0);
+		totalbillamountstring :=  RPAD(totalbillamount, 10, ' ');
+		returncode :=  '21000';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+     FROM pac_mnt_projects
+		WHERE status = 'C'
+		 AND COMPANY_CODE = PAC_BIL_CM_VALDINVAMT_SP.COMPANY_CODE
+		 AND EXISTS (
+		SELECT  1
+		 FROM ppa_Billings
+		WHERE InvoiceNo = in_invoiceno
+     AND COMPANY_CODE = pac_mnt_projects.COMPANY_CODE
+     AND PROJECT_CODE = pac_mnt_projects.PROJECT_CODE ) );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		returncode :=  '23000';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM invoiceheader
+		WHERE invoiceno = in_invoiceno
+		 AND status = '1' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		returncode :=  '25000';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM olb_BillingCheckout
+		WHERE COMPANY_CODE = PAC_BIL_CM_VALDINVAMT_SP.COMPANY_CODE );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		returncode := '20421';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		RETURN ;
+	END;
+	END IF;
+	END;
+	IF  StoO_error = 0 THEN
+	BEGIN
+		returncode :=  '22000';
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		RETURN ;
+	END;
+	END IF;
+END PAC_BIL_CM_VALDINVAMT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

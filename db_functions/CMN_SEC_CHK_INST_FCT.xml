@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_CHK_INST_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_SEC_CHK_INST_FCT" ( p_object_instance_id numeric, p_object_id numeric, p_permission_code varchar2) 
+      RETURN cmn_security_pkg.t_security_table
+    pipelined is  
+    
+    cursor c_sec_cursor is
+    SELECT  /*+ index(G CMN_SEC_GROUPS_N1)  index(PARENT_GROUP CMN_SEC_GROUPS_N1) index(AP CMN_SEC_ASSGND_OBJ_PERM_N1*/ -- GROUP RULE
+            UG.USER_ID,
+            AP.OBJECT_ID,
+            AP.OBJECT_INSTANCE_ID,
+            PE.PERMISSION_CODE,
+            PE.PERMISSION_VALUE
+    FROM    CMN_SEC_USER_GROUPS UG,
+            CMN_SEC_GROUP_FLAT_HIERS H,
+            CMN_SEC_GROUPS G,
+            CMN_SEC_ASSGND_OBJ_PERM AP,
+            CMN_SEC_PERM_ELEMENTS PE,
+            CMN_SEC_GROUPS PARENT_GROUP
+    WHERE   UG.GROUP_ID = H.GROUP_ID
+    AND     H.GROUP_ID = G.ID
+    AND     G.IS_ACTIVE = 1
+    AND     AP.PRINCIPAL_ID = H.PARENT_GROUP_ID
+    AND     H.PARENT_GROUP_ID = PARENT_GROUP.ID
+    AND     PARENT_GROUP.IS_ACTIVE = 1
+    AND     AP.PRINCIPAL_TYPE = 'GROUP'
+    AND     AP.PERMISSION_ID = PE.PERMISSION_ID
+    and     AP.OBJECT_INSTANCE_ID = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code
+    UNION
+    SELECT  AP.PRINCIPAL_ID USER_ID,
+            AP.OBJECT_ID,
+            AP.OBJECT_INSTANCE_ID,
+            PE.PERMISSION_CODE,
+            PE.PERMISSION_VALUE
+    FROM    CMN_SEC_PERM_ELEMENTS PE,
+            CMN_SEC_ASSGND_OBJ_PERM AP         
+    WHERE   AP.PRINCIPAL_TYPE = 'USER'
+    AND     AP.PERMISSION_ID = PE.PERMISSION_ID
+    and     AP.OBJECT_INSTANCE_ID = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code
+    UNION -- OBS UNIT RULES for principal is user
+    SELECT  OS.PRINCIPAL_ID USER_ID,
+            RI.OBJECT_ID,
+            OU.INSTANCE_ID OBJECT_INSTANCE_ID,
+            RI.PERMISSION_CODE,
+            RI.PERMISSION_VALUE
+    FROM    CMN_SEC_ASSGND_RIGHT OS,
+            CMN_SEC_RIGHT RI,
+            OBS_UNIT_ENTITIES_V OU  
+    WHERE   OS.PRINCIPAL_TYPE = 'USER'
+    AND     OS.INSTANCE_TYPE = OU.UNIT_MODE
+    AND     OS.INSTANCE_ID = OU.UNIT_ID
+    AND     RI.RIGHT_ID = OS.RIGHT_ID
+    AND     RI.IS_ACTIVE = 1
+    AND     OU.TABLE_NAME = RI.RIGHT_OBS_TYPE
+    and     ou.instance_id = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code
+    UNION -- OBS UNIT RULES for principal is group
+    SELECT  UG.USER_ID USER_ID,
+            RI.OBJECT_ID,
+            OU.INSTANCE_ID OBJECT_INSTANCE_ID,
+            RI.PERMISSION_CODE,
+            RI.PERMISSION_VALUE
+    FROM    CMN_SEC_USER_GROUPS UG,
+            CMN_SEC_ASSGND_RIGHT OS,
+            CMN_SEC_GROUPS G,
+            CMN_SEC_RIGHT RI,
+            OBS_UNIT_ENTITIES_V OU 
+    WHERE   OS.PRINCIPAL_TYPE = 'GROUP'
+    AND     OS.PRINCIPAL_ID = UG.GROUP_ID
+    AND     OS.INSTANCE_TYPE = OU.UNIT_MODE
+    AND     OS.INSTANCE_ID = OU.UNIT_ID
+    AND     G.ID = OS.PRINCIPAL_ID
+    AND     G.IS_ACTIVE = 1
+    AND     RI.IS_ACTIVE = 1
+    AND     OU.TABLE_NAME = RI.RIGHT_OBS_TYPE
+    AND     OS.RIGHT_ID = RI.RIGHT_ID
+    and     ou.instance_id = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code
+    UNION  -- OBS UNIT RULES FOR PRINCIPAL IS OBS, to an instance
+    SELECT  OU.USER_ID USER_ID,
+            RI.OBJECT_ID,
+            OS.INSTANCE_ID OBJECT_INSTANCE_ID,
+            RI.PERMISSION_CODE,
+            RI.PERMISSION_VALUE
+    FROM    CMN_SEC_OBS_USERS_V OU,
+            CMN_SEC_ASSGND_RIGHT OS,
+            CMN_SEC_RIGHT RI
+    WHERE   OS.PRINCIPAL_TYPE = OU.UNIT_MODE
+    AND     OS.PRINCIPAL_ID = OU.UNIT_ID
+    AND     OS.INSTANCE_TYPE = 'INSTANCE'
+    AND     OS.RIGHT_ID = RI.RIGHT_ID
+    AND     RI.IS_ACTIVE = 1
+    and     os.instance_id = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code
+    UNION   -- OBS UNIT RULES FOR PRINCIPAL IS OBS, to whole OBS, the obs_unit_entities_v view is
+            -- used here as it has the tables in the reverse order from the v2 view, this performs
+            -- much better in most cases
+    SELECT  OU1.USER_ID USER_ID,
+            RI.OBJECT_ID,
+            OU2.INSTANCE_ID OBJECT_INSTANCE_ID,
+            RI.PERMISSION_CODE,
+            RI.PERMISSION_VALUE
+    FROM    CMN_SEC_OBS_USERS_V OU1,
+            CMN_SEC_ASSGND_RIGHT OS,
+            CMN_SEC_RIGHT RI,
+            OBS_UNIT_ENTITIES_V OU2         
+    WHERE   OS.PRINCIPAL_TYPE = OU1.UNIT_MODE
+    AND     OS.PRINCIPAL_ID = OU1.UNIT_ID
+    AND     OS.INSTANCE_TYPE = OU2.UNIT_MODE
+    AND     OS.INSTANCE_ID = OU2.UNIT_ID
+    AND     OS.RIGHT_ID = RI.RIGHT_ID
+    AND     RI.IS_ACTIVE = 1
+    AND     OU2.TABLE_NAME = RI.RIGHT_OBS_TYPE
+    and     ou2.instance_id = p_object_instance_id
+    and     object_id = p_object_id
+    and     permission_code= p_permission_code;
+    
+    l_sec_rec cmn_security_pkg.t_security_rec;
+
+    begin
+      FOR c_sec IN c_sec_cursor
+      LOOP
+        l_sec_rec.user_id             := c_sec.user_id;
+        l_sec_rec.object_id           := c_sec.object_id;
+        l_sec_rec.object_instance_id  := c_sec.object_instance_id;
+        l_sec_rec.permission_code     := c_sec.permission_code;
+        l_sec_rec.permission_value    := c_sec.permission_value;
+        pipe row(l_sec_rec);
+      end loop;
+      return;
+    end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

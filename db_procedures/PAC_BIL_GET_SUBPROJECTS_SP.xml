@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GET_SUBPROJECTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GET_SUBPROJECTS_SP" (
+IncludeWIP NUMBER,
+Status IN OUT NUMBER, 			-- 1 worked  0 failed
+HasSubProjects IN OUT NUMBER )  -- 1 true    0 false
+AS
+
+v_InsertedCount NUMBER;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+
+BEGIN
+
+   PAC_BIL_GET_SUBPROJECTS_SP.Status := 1;
+   PAC_BIL_GET_SUBPROJECTS_SP.v_InsertedCount := 1;
+   PAC_BIL_GET_SUBPROJECTS_SP.HasSubProjects  := 0;
+
+  /* It is expected that top level projects will be inserted first. */
+  /* IF calling procedure passes IncludeWIP = 1 then we look at the WIP table */
+
+  /* Now insert Billing Subprojects recursively making sure to grab down to the lowest level. Here we accumulate
+  	 data fro sub projects */
+  IF IncludeWIP = 1 Then
+    WHILE NVL( v_InsertedCount, 0 ) &gt; 0
+	  LOOP
+	    BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+		  INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+			   							 	BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+
+		  SELECT  P.COMPANY_CODE, P.PROJECT_CODE, P.ID, T.MASTER_PROJECT_ID,
+		  		  P.BILLING_PROJECT_ID, SUM(WV.AmountRemaining), P.STATUS
+			FROM PAC_MNT_PROJECTS P,
+				 TEMP_BIL_SUBPROJECTS T,
+				 PPA_WIP W,
+		 	  	 PPA_WIP_VALUES WV
+			WHERE P.BILLING_PROJECT_ID IN ( SELECT PROJECT_ID
+							  				  FROM TEMP_BIL_SUBPROJECTS T2
+											  WHERE T2.PROJECT_ID != P.ID ) and
+						  NOT EXISTS ( SELECT  1
+						  			     FROM TEMP_BIL_SUBPROJECTS T3
+										 WHERE T3.COMPANY_CODE = P.COMPANY_CODE AND
+										 	   T3.PROJECT_CODE = P.PROJECT_CODE ) AND
+				  T.PROJECT_ID = P.BILLING_PROJECT_ID AND
+				  P.Status IN ('O', 'H') AND
+				  P.APPROVED = 1 AND
+				  W.COMPANY_CODE = P.COMPANY_CODE AND
+				  W.PROJECT_CODE = P.PROJECT_CODE AND
+				  WV.TRANSNO = W.TRANSNO AND
+				  WV.CURRENCY_TYPE = 'BILLING' AND
+				  W.Chargeable = 1 AND
+		 		  WV.AmountRemaining != 0 AND
+		 		  W.Status = 0
+			GROUP BY P.COMPANY_CODE,
+				  	 P.PROJECT_CODE,
+					 P.ID,
+					 T.MASTER_PROJECT_ID,
+		  		  	 P.BILLING_PROJECT_ID,
+					 P.STATUS ;
+
+		  StoO_rowcnt := SQL%ROWCOUNT;
+		  v_InsertedCount := StoO_rowcnt ;
+		  EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+			  NULL;
+			WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+			  v_InsertedCount := 0;
+			  PAC_BIL_GET_SUBPROJECTS_SP.Status := 0 ; -- Fail
+	    END;
+	  END LOOP;
+  ELSE
+    WHILE NVL( v_InsertedCount, 0 ) &gt; 0
+	  LOOP
+	    BEGIN
+	      StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+		  /* We don't filter projects by non-closed status and approved since calling proc may need all
+		  	 status and both approved and non */
+		  INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+			   							 	BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+
+		  SELECT  P.COMPANY_CODE, P.PROJECT_CODE, P.ID, T.MASTER_PROJECT_ID,
+		  		  P.BILLING_PROJECT_ID, 0, P.STATUS
+			  FROM PAC_MNT_PROJECTS P,
+				   TEMP_BIL_SUBPROJECTS T
+			  WHERE P.BILLING_PROJECT_ID IN ( SELECT PROJECT_ID
+							  				  FROM TEMP_BIL_SUBPROJECTS T2
+											  WHERE T2.PROJECT_ID != P.ID ) and
+						  NOT EXISTS ( SELECT  1
+						  			     FROM TEMP_BIL_SUBPROJECTS T3
+										 WHERE T3.COMPANY_CODE = P.COMPANY_CODE AND
+										 	   T3.PROJECT_CODE = P.PROJECT_CODE ) AND
+				 							   T.PROJECT_ID = P.BILLING_PROJECT_ID AND
+            	    T.PROJECT_ID = P.BILLING_PROJECT_ID
+		    GROUP BY P.COMPANY_CODE,
+				  	 P.PROJECT_CODE,
+					 P.ID,
+					 T.MASTER_PROJECT_ID,
+		  		  	 P.BILLING_PROJECT_ID,
+					 P.STATUS ;
+
+		  StoO_rowcnt := SQL%ROWCOUNT;
+		  v_InsertedCount := StoO_rowcnt ;
+		  EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+			  NULL;
+			WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+			  v_InsertedCount := 0;
+			  PAC_BIL_GET_SUBPROJECTS_SP.Status := 0 ; -- Fail
+	    END;
+	  END LOOP;
+	END IF;
+
+	BEGIN
+	  StoO_selcnt := 0;
+	  StoO_error  := 0;
+	  StoO_rowcnt := 0;
+	  SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS ( SELECT  1
+				 	      FROM TEMP_BIL_SUBPROJECTS
+						  WHERE MASTER_PROJECT_ID != PROJECT_ID );
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  StoO_rowcnt := 0;
+		  StoO_selcnt := 0;
+    END;
+
+	IF StoO_selcnt != 0 THEN
+	  PAC_BIL_GET_SUBPROJECTS_SP.HasSubProjects := 1;
+	END IF;
+END PAC_BIL_GET_SUBPROJECTS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

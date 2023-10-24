@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PRTF_EVENTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PRTF_EVENTS_SP" 
+IS
+   V_STMT                        VARCHAR2(1000);
+   
+     TYPE NBI_PRTF_EVENTS_ARRAY IS TABLE OF NBI_PRT_FACTS_V%ROWTYPE  INDEX BY BINARY_INTEGER;
+
+  NBI_PRTF_EVENTS_DATA NBI_PRTF_EVENTS_ARRAY;
+
+
+  CURSOR NBI_PRTF_EVENTS_CURSOR IS
+   	  SELECT PROJECT_ID,
+             RESOURCE_ID,
+             TEAM_ID,
+             TASK_ID,
+             PRJ_OBJECT_ID,
+             FACT_DATE,
+             ALLOCATED_QTY,
+             ETC_QTY,
+             ACTUAL_QTY,
+             BASE_QTY
+      FROM   NBI_PRT_FACTS_V V
+      WHERE  NOT EXISTS (SELECT 'RECORD HAS BEEN PREVIOUSLY EXTRACTED'
+                         FROM   NBI_PRT_FACTS F
+                         WHERE  F.PROJECT_ID = V.PROJECT_ID
+                            AND F.TEAM_ID = V.TEAM_ID
+                            AND F.FACT_DATE = V.FACT_DATE
+                            AND F.TASK_ID = V.TASK_ID);
+	
+BEGIN
+   -- Insert facts that have changed into temp facts
+
+   
+   V_STMT := 'INSERTING DELETED RECORDS INTO TEMP_NBI_PRT_FACTS';
+   INSERT  INTO TEMP_NBI_PRT_FACTS
+               (ACTION,
+                PROJECT_ID,
+                RESOURCE_ID,
+                TEAM_ID,
+                TASK_ID,
+                PRJ_OBJECT_ID,
+                FACT_DATE
+               )
+      SELECT 
+             'D' ACTION,
+             NPRTF.PROJECT_ID,
+             NPRTF.RESOURCE_ID,
+             NPRTF.TEAM_ID,
+             NPRTF.TASK_ID,
+             NPRTF.PRJ_OBJECT_ID,
+             NPRTF.FACT_DATE
+      FROM   NBI_PRT_FACTS NPRTF,
+             NBI_EVENTS E
+      WHERE NPRTF.PRJ_OBJECT_ID = E.PRJ_OBJECT_ID
+         AND E.PRJ_OBJECT_TYPE = 'TEAM'
+		 AND E.STATUS = 'PROCESSING'
+         AND NPRTF.TASK_ID = -1
+      UNION ALL
+        SELECT 
+               'D' ACTION,
+               NPRTF.PROJECT_ID,
+               NPRTF.RESOURCE_ID,
+               NPRTF.TEAM_ID,
+               NPRTF.TASK_ID,
+               NPRTF.PRJ_OBJECT_ID,
+               NPRTF.FACT_DATE
+        FROM   NBI_PRT_FACTS NPRTF,
+               NBI_EVENTS E
+        WHERE  NPRTF.PRJ_OBJECT_ID = E.PRJ_OBJECT_ID
+           AND E.PRJ_OBJECT_TYPE = 'ASSIGNMENT'
+		   AND E.STATUS = 'PROCESSING'
+           AND NPRTF.TASK_ID != -1
+      MINUS
+           SELECT 
+                  'D' ACTION,
+                  PROJECT_ID,
+                  RESOURCE_ID,
+                  TEAM_ID,
+                  TASK_ID,
+                  PRJ_OBJECT_ID,
+                  FACT_DATE
+           FROM   NBI_PRT_FACTS_EVENTS_V;
+       
+   /* V_STMT := 'INSERTING UPDATED RECORDS INTO TEMP_NBI_PRT_FACTS';
+   INSERT  INTO TEMP_NBI_PRT_FACTS
+               (ACTION,
+                PROJECT_ID,
+                RESOURCE_ID,
+                TEAM_ID,
+                TASK_ID,
+                PRJ_OBJECT_ID,
+                FACT_DATE,
+                ALLOCATED_QTY,
+                ETC_QTY,
+                ACTUAL_QTY,
+                BASE_QTY
+               )
+      SELECT 'U' ACTION,
+             V.PROJECT_ID,
+             V.RESOURCE_ID,
+             V.TEAM_ID,
+             V.TASK_ID,
+             V.PRJ_OBJECT_ID,
+             V.FACT_DATE,
+             V.ALLOCATED_QTY,
+             V.ETC_QTY,
+             V.ACTUAL_QTY,
+             V.BASE_QTY
+      FROM   NBI_PRT_FACTS_EVENTS_V V,
+             NBI_PRT_FACTS F
+      WHERE  F.PROJECT_ID = V.PROJECT_ID
+         AND F.TEAM_ID = V.TEAM_ID
+         AND F.FACT_DATE = V.FACT_DATE
+         AND F.TASK_ID = V.TASK_ID
+         AND (  NVL (F.ALLOCATED_QTY, -9) &lt;&gt; NVL (V.ALLOCATED_QTY, -9)
+             OR NVL (F.ETC_QTY, -9) &lt;&gt; NVL (V.ETC_QTY, -9)
+             OR NVL (F.ACTUAL_QTY, -9) &lt;&gt; NVL (V.ACTUAL_QTY, -9)
+             OR NVL (F.BASE_QTY, -9) &lt;&gt; NVL (V.BASE_QTY, -9));
+          */
+   -- Update real facts table from temp
+
+   
+   V_STMT := 'DELETING FROM NBI_PRT_FACTS';
+   DELETE
+     FROM NBI_PRT_FACTS
+    WHERE (PROJECT_ID, TEAM_ID, FACT_DATE, TASK_ID) IN
+             (SELECT PROJECT_ID,
+                     TEAM_ID,
+                     FACT_DATE,
+                     TASK_ID
+              FROM   TEMP_NBI_PRT_FACTS
+              WHERE  ACTION = 'D');
+ 
+  /*  V_STMT := 'UPDATING NBI_PRT_FACTS';
+   UPDATE NBI_PRT_FACTS F
+      SET (PROJECT_ID,
+           RESOURCE_ID,
+           TEAM_ID,
+           TASK_ID,
+           PRJ_OBJECT_ID,
+           FACT_DATE,
+           ALLOCATED_QTY,
+           ETC_QTY,
+           ACTUAL_QTY,
+           BASE_QTY) = ( SELECT PROJECT_ID,
+                                RESOURCE_ID,
+                                TEAM_ID,
+                                TASK_ID,
+                                PRJ_OBJECT_ID,
+                                FACT_DATE,
+                                ALLOCATED_QTY,
+                                ETC_QTY,
+                                ACTUAL_QTY,
+                                BASE_QTY
+                         FROM   TEMP_NBI_PRT_FACTS C
+                         WHERE  C.PROJECT_ID = F.PROJECT_ID
+                            AND C.TEAM_ID = F.TEAM_ID
+                            AND C.FACT_DATE = F.FACT_DATE
+                            AND C.TASK_ID = F.TASK_ID
+                            AND C.ACTION = 'U')
+    WHERE (PROJECT_ID, TEAM_ID, FACT_DATE, TASK_ID) IN
+             (SELECT PROJECT_ID,
+                     TEAM_ID,
+                     FACT_DATE,
+                     TASK_ID
+              FROM   TEMP_NBI_PRT_FACTS
+              WHERE  ACTION = 'U');
+ 
+   
+ */
+
+   V_STMT := 'INSERTING INTO NBI_PRT_FACTS';
+   
+	OPEN NBI_PRTF_EVENTS_CURSOR;
+	  LOOP
+		FETCH NBI_PRTF_EVENTS_CURSOR
+		BULK COLLECT INTO NBI_PRTF_EVENTS_DATA LIMIT 25000;
+		FORALL I IN 1..NBI_PRTF_EVENTS_DATA.COUNT		
+		INSERT INTO NBI_PRT_FACTS VALUES NBI_PRTF_EVENTS_DATA(I);
+		EXIT WHEN NBI_PRTF_EVENTS_CURSOR%NOTFOUND;
+	END LOOP;
+	CLOSE NBI_PRTF_EVENTS_CURSOR;
+
+
+   /* INSERT INTO NBI_PRT_FACTS
+               (PROJECT_ID,
+                RESOURCE_ID,
+                TEAM_ID,
+                TASK_ID,
+                PRJ_OBJECT_ID,
+                FACT_DATE,
+                ALLOCATED_QTY,
+                ETC_QTY,
+                ACTUAL_QTY,
+                BASE_QTY
+               )
+      SELECT PROJECT_ID,
+             RESOURCE_ID,
+             TEAM_ID,
+             TASK_ID,
+             PRJ_OBJECT_ID,
+             FACT_DATE,
+             ALLOCATED_QTY,
+             ETC_QTY,
+             ACTUAL_QTY,
+             BASE_QTY
+      FROM   NBI_PRT_FACTS_V V
+      WHERE  NOT EXISTS (SELECT 'RECORD HAS BEEN PREVIOUSLY EXTRACTED'
+                         FROM   NBI_PRT_FACTS F
+                         WHERE  F.PROJECT_ID = V.PROJECT_ID
+                            AND F.TEAM_ID = V.TEAM_ID
+                            AND F.FACT_DATE = V.FACT_DATE
+                            AND F.TASK_ID = V.TASK_ID);
+*/
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_PRTF_EVENTS_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_STATUS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_STATUS_SP" 
+AS
+  V_STATUS VARCHAR2(100);
+  V_STATE VARCHAR2(100);
+  V_PCT_COMPLETE INTEGER;
+  V_PROCESSOR_CNT INTEGER;
+  V_START_TIME DATE;
+  V_END_TIME DATE;
+  V_DURATION NUMBER;
+
+  CURSOR C_LOGS
+  IS
+    SELECT *
+    FROM  nbi_run_logs
+    WHERE info LIKE 'STATE=%'
+    ORDER BY start_date;
+   
+BEGIN
+
+  DBMS_OUTPUT.ENABLE (1000000);
+  
+  -- See if we're running in parallel mode --
+  SELECT NVL(TTL, 0)
+  INTO   V_PROCESSOR_CNT
+  FROM (SELECT TO_NUMBER(SUBSTR(INFO, 15)) TTL
+        FROM   NBI_RUN_LOGS
+        WHERE  INFO LIKE 'TTL_PROCESSES=%');
+  
+  IF V_PROCESSOR_CNT &gt; 0 THEN
+    DBMS_OUTPUT.PUT_LINE('Running in parallel mode, count=' || V_PROCESSOR_CNT);
+  END IF;
+            
+  -- Loop through the state messsages --
+  FOR C_REC IN C_LOGS
+  LOOP
+  
+    V_STATE := SUBSTR(C_REC.info, 7);
+  
+    IF    V_STATE = 'INIT' THEN
+    BEGIN
+      V_STATUS := 'Initializing';
+      V_START_TIME := C_REC.RUN_DATE;
+    END;
+    ELSIF V_STATE = 'NBI_POPULATE_OBS_DIM_SP' THEN V_STATUS := 'Populating OBS Dimensions';
+    ELSIF V_STATE = 'NBI_POPULATE_CAL_DIM_SP' THEN V_STATUS := 'Populating Calendar Dimensions';
+    ELSIF V_STATE = 'NBI_POPULATE_FISCAL_DIM_SP' THEN V_STATUS := 'Populating Fiscal Calendar Dimensions';
+    ELSIF SUBSTR(V_STATE, 1, 29) = 'NBI_RESOURCE_CURRENT_FACTS_SP' THEN
+    BEGIN
+        V_STATUS := 'Extracting Resource Current Facts';
+        IF SUBSTR(V_STATE, 30, 1) = ':' THEN
+           V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 31);
+        END IF;
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 13) = 'REBUILD_INDEX' THEN
+    BEGIN         
+        V_STATUS := 'Rebuild slices index';
+        IF SUBSTR(V_STATE, 14, 1) = ':' THEN
+           V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 15);
+        END IF;
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 7) = 'EVENTS:' THEN
+    BEGIN
+      -- Find overall percent complete
+      SELECT DECODE(total.cnt, 0, 100, ROUND(100 * (1 - not_processed.cnt / total.cnt)))
+      INTO   V_PCT_COMPLETE
+      FROM (SELECT TO_NUMBER(SUBSTR(INFO, 12)) CNT
+            FROM NBI_RUN_LOGS
+            WHERE INFO LIKE 'TTL_EVENTS=%') total
+          ,(SELECT /*+ INDEX (NBI_EVENTS NBI_EVENTS_N1)*/ COUNT(*) CNT
+            FROM NBI_EVENTS
+            WHERE STATUS IS NOT NULL) not_processed;
+      
+      V_STATUS := 'Processing Events(' || SUBSTR(V_STATE, 8) || '): ' || V_PCT_COMPLETE || '% complete';
+
+      IF V_STATE = 'EVENTS:NBI_EXTR_PRTF_SP'
+      THEN
+        SELECT DECODE(processing.cnt, 0, 100, ROUND(100 * processed.cnt / (processing.cnt + processed.cnt)))
+        INTO  V_PCT_COMPLETE
+        FROM  (SELECT /*+ INDEX (NBI_EVENTS NBI_EVENTS_N1)*/ COUNT(*) CNT FROM NBI_EVENTS
+               WHERE  STATUS = 'PRTF_PROCESSED'
+               AND    PRJ_OBJECT_TYPE IN ('TEAM', 'ASSIGNMENT')) processed
+             ,(SELECT /*+ INDEX (NBI_EVENTS NBI_EVENTS_N1)*/ COUNT(*) CNT FROM NBI_EVENTS
+               WHERE  STATUS = 'PROCESSING'
+               AND    PRJ_OBJECT_TYPE IN ('TEAM', 'ASSIGNMENT')) processing;
+                       
+        DBMS_OUTPUT.PUT_LINE(to_char(C_REC.start_date, 'dd Mon HH24:mi:ss') || ' ' || 'PRTF processing block: ' || V_PCT_COMPLETE || '% complete');
+      ELSIF SUBSTR(V_STATE, 1, 11) = 'EVENTS:DONE' THEN
+      BEGIN         
+        IF SUBSTR(V_STATE, 12, 1) = ':' THEN
+           V_STATUS := 'Processing Events completed. Time=' || SUBSTR(V_STATE, 13);
+        END IF;
+      END;
+      END IF;
+      
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 20) = 'DELETE_EXCLUDED_PRTF' THEN
+    BEGIN         
+        V_STATUS := 'Deleting excluded resources from nbi_prt_facts';
+        IF SUBSTR(V_STATE, 21, 1) = ':' THEN
+           V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 22);
+        END IF;
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 18) = 'DELETE_EXCLUDED_RF' THEN
+    BEGIN         
+        V_STATUS := 'Deleting excluded resources from nbi_r_facts';
+        IF SUBSTR(V_STATE, 19, 1) = ':' THEN
+           V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 20);
+        END IF;
+    END;
+    ELSIF V_STATE = 'PURGE_EVENTS' THEN V_STATUS := 'Purging Events';
+    ELSIF SUBSTR(V_STATE, 1, 15) = 'NBI_EXTR_PCF_SP' THEN
+    BEGIN
+      -- Find overall percent complete
+      SELECT DECODE(total.cnt, 0, 100, ROUND(100 * (processed.cnt / total.cnt)))
+      INTO   V_PCT_COMPLETE
+      FROM (SELECT TO_NUMBER(SUBSTR(INFO, 23)) CNT
+            FROM NBI_RUN_LOGS
+            WHERE INFO LIKE 'EXTR_PCF_TTL_PROJECTS=%') total
+          ,(SELECT COUNT(*) CNT
+            FROM NBI_PROJECT_CURRENT_FACTS
+            WHERE LAST_UPDATED &gt; (SELECT RUN_DATE FROM NBI_RUN_LOGS WHERE INFO LIKE 'EXTR_PCF_TTL_PROJECTS=%')) processed;
+      
+      V_STATUS := 'Extracting Project Current Facts (' || V_PCT_COMPLETE || '% complete)';
+
+      IF SUBSTR(V_STATE, 16, 1) = ':' THEN
+         V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 17);
+      END IF;
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 14) = 'ANALYZE_TABLES' THEN
+    BEGIN         
+        V_STATUS := 'Analyzing Tables';
+        IF SUBSTR(V_STATE, 15, 1) = ':' THEN
+           V_STATUS := V_STATUS || '. Time=' || SUBSTR(V_STATE, 16);
+        END IF;
+    END;
+    ELSIF SUBSTR(V_STATE, 1, 5) = 'DONE:' THEN V_STATUS := 'Extraction Completed. Time=' || SUBSTR(V_STATE, 6);
+    ELSIF SUBSTR(V_STATE, 1, 6) = 'ERROR:' THEN V_STATUS := 'Extraction Failed: ' || SUBSTR(V_STATE, 7);
+    ELSE V_STATUS := 'Unknown State: ' || V_STATE;
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE (to_char(C_REC.start_date, 'dd Mon HH24:mi:ss') || ' ' || V_STATUS);
+    
+    IF SUBSTR(V_STATE, 1, 5) = 'DONE:' OR SUBSTR(V_STATE, 1, 6) = 'ERROR:' THEN V_END_TIME := C_REC.START_DATE;
+    ELSE V_END_TIME := SYSDATE;
+    END IF;
+    
+  
+  END LOOP;
+
+  V_DURATION := ROUND ((V_END_TIME - V_START_TIME) * 24 * 60, 2);
+  DBMS_OUTPUT.PUT_LINE ('Elapsed Time: ' || (V_DURATION));
+        
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,115 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CAL_ACTION_ITEMS_OWNED_V">
+    <indexes/>
+    <text_length>5334</text_length>
+    <text>(SELECT aitems.ID,
+           CASE
+              WHEN aitems.multiple_assignee = 0 and exists(select id from cal_action_item_assignees where cal_action_item_id = aitems.ID )
+                 THEN (SELECT nvl(ai_subject,aitems.subject) subject
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE
+                aitems.subject
+           END subject,
+
+           CASE
+              WHEN aitems.multiple_assignee = 0 and exists(select id from cal_action_item_assignees where cal_action_item_id = aitems.ID )
+                 THEN (SELECT nvl(ai_description,aitems.description) description
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE
+                aitems.description
+           END description,
+           aitems.object_type object_type, ai_lookup.NAME object_type_name,
+           ai_lookup.language_code language_code, aitems.object_id object_id,
+           aitems.process_handler_id, aitems.multiple_assignee,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.upcoming_date
+                         FROM cal_action_item_assignees assignees
+                        WHERE assignees.cal_action_item_id =
+                                                           aitems.ID)
+              ELSE aitems.due_date
+           END due_date,
+           aitems.is_recurring, aitems.priority_code priority_code,
+           aitems.CREATED_BY owner_id, user_owner.first_name owner_first_name,
+           user_owner.last_name owner_last_name,
+           user_owner.user_name owner_user_name,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.ID
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE NULL
+           END assignee_id,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.assignee_id
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE NULL
+           END assignee_user_id,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT user_assignee.first_name
+                         FROM cal_action_item_assignees assignees,
+                              cmn_sec_users user_assignee
+                        WHERE cal_action_item_id = aitems.ID
+                          AND user_assignee.ID = assignees.assignee_id)
+              ELSE NULL
+           END assignee_first_name,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT user_assignee.last_name
+                         FROM cal_action_item_assignees assignees,
+                              cmn_sec_users user_assignee
+                        WHERE cal_action_item_id = aitems.ID
+                          AND user_assignee.ID = assignees.assignee_id)
+              ELSE NULL
+           END assignee_last_name,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.status_code
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE (SELECT CASE
+                              WHEN 1 =
+                                     (SELECT COUNT (DISTINCT status_code
+                                                   ) COUNT
+                                        FROM cal_action_item_assignees
+                                       WHERE cal_action_item_id =
+                                                              aitems.ID)
+                                 THEN (SELECT DISTINCT status_code
+                                                  FROM cal_action_item_assignees
+                                                 WHERE cal_action_item_id =
+                                                                     aitems.ID)
+                              ELSE 'GROUP'
+                           END scode
+                      FROM DUAL)
+           END status_code,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.is_proxy
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE 0
+           END is_proxy,
+           CASE
+              WHEN aitems.multiple_assignee = 0
+                 THEN (SELECT assignees.is_escalated
+                         FROM cal_action_item_assignees assignees
+                        WHERE cal_action_item_id = aitems.ID)
+              ELSE 0
+           END is_escalated,
+           aitems.sub_object_id sub_object_id,
+           aitems.sub_object_type sub_object_type,
+           aitems.ai_def_type,
+           aitems.ai_def_id
+      FROM cal_action_items aitems join cmn_lookups_v ai_lookup
+              on  ai_lookup.lookup_code = nvl(aitems.sub_object_type,aitems.object_type)
+              and ai_lookup.lookup_type = 'CAL_OBJECT_TYPE',
+           cmn_sec_users user_owner
+     WHERE user_owner.ID = aitems.CREATED_BY
+       )</text>
+  </QueryResult>
+</ClarityDBViewQuery>

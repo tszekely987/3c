@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="CSK_RPT_RDM_PICKLISTS" displayAttributeName="picklist" hiddenAttributeName="picklist_key" objectCode="" sortAttributeName="roadmap" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Report (Roadmap Picklists)" languageCode="en" name="Report (Roadmap Picklists)"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:P.PICKLIST_KEY:PICKLIST_KEY@,
+       @SELECT:P.ROADMAP_KEY:ROADMAP_KEY@,
+       @SELECT:R.NAME:ROADMAP@,
+       @SELECT:R.CODE:ROADMAP_ID@,
+       @SELECT:P.PICKLIST_NAME:PICKLIST@,
+       @SELECT:P.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+FROM  (SELECT r.id roadmap_key,
+              defs.id picklist_key,
+              nls.name picklist_name,
+              defs.last_updated_date
+       FROM   odf_picklist_defs defs
+              JOIN odf_picklist_def_objects o ON  o.picklist_def_id = defs.id
+                                              AND o.object_code = 'rdm_roadmap_item'
+              JOIN odf_attr_metadata m ON  o.attribute_code = m.attribute_code
+                                       AND m.object_code = 'rdm_roadmap_item'
+              JOIN cmn_captions_nls nls ON  m.id = nls.pk_id
+                                        AND nls.table_name = 'ODF_ATTR_METADATA'
+                                        AND nls.language_code = @WHERE:PARAM:LANGUAGE@
+              JOIN odf_picklist_contexts ctx ON  ctx.id = defs.context_id
+                                             AND ctx.object_code = 'rdm_roadmap_item' AND ctx.name = 'roadmap'
+              JOIN rdm_roadmaps r ON @DBUSER@.cmn_concat_fct(@DBUSER@.cmn_to_char_fct(r.id),'::roadmaps::roadmapItems') = ctx.code
+       UNION
+       SELECT r.id roadmap_key,
+              defs.id picklist_key,
+              nls.name picklist_name,
+              defs.last_updated_date
+       FROM   odf_picklist_defs defs
+              JOIN odf_picklist_def_objects o ON  o.picklist_def_id = defs.id
+                                              AND o.object_code = 'rdm_roadmap_item'
+              JOIN odf_custom_attributes c ON  o.attribute_code = c.internal_name
+                                           AND c.object_name = 'rdm_roadmap_item'
+              JOIN cmn_captions_nls nls ON  c.id = nls.pk_id
+                                        AND nls.table_name = 'ODF_CUSTOM_ATTRIBUTES'
+                                        AND nls.language_code = @WHERE:PARAM:LANGUAGE@
+              JOIN odf_picklist_contexts ctx ON  ctx.id = defs.context_id
+                                             AND ctx.object_code = 'rdm_roadmap_item' AND ctx.name = 'roadmap'
+              JOIN rdm_roadmaps r ON @DBUSER@.cmn_concat_fct(@DBUSER@.cmn_to_char_fct(r.id),'::roadmaps::roadmapItems') = ctx.code
+       UNION
+       SELECT r.id roadmap_key,
+              defs.id picklist_key,
+              nls.name picklist_name,
+              defs.last_updated_date
+       FROM   odf_picklist_defs defs
+              JOIN odf_picklist_def_objects o ON  o.picklist_def_id = defs.id
+                                              AND o.object_code = 'rdm_roadmap_item'
+              JOIN cmn_captions_nls nls ON  o.id = nls.pk_id
+                                        AND nls.table_name = 'ODF_PICKLIST_DEF_OBJECTS'
+                                        AND nls.language_code = @WHERE:PARAM:LANGUAGE@
+              JOIN odf_picklist_contexts ctx ON  ctx.id = defs.context_id
+                                             AND ctx.object_code = 'rdm_roadmap_item' AND ctx.name = 'roadmap'
+              JOIN rdm_roadmaps r ON @DBUSER@.cmn_concat_fct(@DBUSER@.cmn_to_char_fct(r.id),'::roadmaps::roadmapItems') = ctx.code) p 
+       INNER JOIN rdm_roadmaps r ON r.id = p.roadmap_key
+WHERE  @WHERE:SECURITY:RDM_ROADMAP:R.ID@
+AND    @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="roadmap"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="roadmap"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Roadmap Picklists" languageCode="en" name="Roadmap Picklists"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Roadmap Picklists" languageCode="en" name="Roadmap Picklists"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="roadmap" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Roadmap" languageCode="en" name="Roadmap"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="roadmap_id" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Roadmap ID" languageCode="en" name="Roadmap ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="picklist" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Picklist" languageCode="en" name="Picklist"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="picklist_key" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="picklist_key" languageCode="en" name="picklist_key"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="roadmap" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Roadmap" languageCode="en" name="Roadmap"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="picklist" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Picklist" languageCode="en" name="Picklist"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

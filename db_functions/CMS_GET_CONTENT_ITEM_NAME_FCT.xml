@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMS_GET_CONTENT_ITEM_NAME_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMS_GET_CONTENT_ITEM_NAME_FCT" (
+  p_odf_pk     in   number,
+  p_type       in   varchar2,
+  p_table_name      in   varchar2 default null,
+  p_lang_code  in   varchar2 default 'en',
+  p_uniquecode  in   varchar2 default ''
+ )
+ RETURN varchar2
+IS
+  v_i18n_supported integer;
+  v_table_name varchar2(30);
+  v_name_column varchar2(100);
+  v_dynamic_sql varchar2(500);
+  v_name varchar2(300);
+BEGIN
+  BEGIN
+    SELECT i18n_supported, table_name, name_column
+      INTO v_i18n_supported, v_table_name, v_name_column
+      FROM cms_content_types
+     WHERE type = p_type;
+  EXCEPTION
+    WHEN OTHERS
+      THEN
+        v_i18n_supported := 0;
+        v_table_name := '';
+        v_name_column := '';
+  END;
+
+  IF v_i18n_supported = 1 THEN
+    IF p_type = 'PROCESS' THEN
+        SELECT nls.name INTO v_name
+        FROM bpm_def_processes bdp, bpm_def_process_versions bdpv, cmn_captions_nls nls
+        WHERE bdpv.id = p_odf_pk
+        AND bdp.id = bdpv.process_id
+        AND nls.table_name = v_table_name
+        AND nls.language_code = p_lang_code
+        AND nls.pk_id = bdp.id;
+      ELSE
+        SELECT name INTO v_name
+        FROM cmn_captions_nls
+        WHERE pk_id = p_odf_pk
+        AND table_name = v_table_name
+        AND language_code = p_lang_code;
+      END IF;
+  ELSIF p_type = 'VIEW' THEN
+
+    IF p_table_name = 'ODF_CVIEW_RELEASES' OR p_table_name = 'CMN_GRIDS' THEN
+      SELECT
+        CASE WHEN v.view_subtype IS NULL
+          THEN v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type
+          ELSE v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type || ' | ' || v.view_subtype
+        END INTO v_name
+      FROM  ODF_OBJECT_CUSTOM_VIEWS_V v
+      WHERE v.language_code = p_lang_code
+      AND v.table_name in ( 'ODF_CVIEW_RELEASES', 'CMN_GRIDS' )
+      AND v.view_code || '::' || v.object_code = p_uniquecode
+      AND rownum = 1;
+    ELSE
+      SELECT
+        CASE WHEN v.view_subtype IS NULL
+          THEN v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type
+          ELSE v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type || ' | ' || v.view_subtype
+        END INTO v_name
+      FROM  ODF_OBJECT_CUSTOM_VIEWS_V v
+      WHERE v.language_code = p_lang_code
+      AND v.table_name = p_table_name
+      AND v.view_code || '::' || v.object_code = p_uniquecode;
+    END IF;
+  ELSE
+    v_dynamic_sql := 'SELECT ' || v_name_column || ' FROM ' || v_table_name || ' WHERE id = ' || p_odf_pk;
+    EXECUTE IMMEDIATE v_dynamic_sql INTO v_name;
+  END IF;
+
+  RETURN v_name;
+
+EXCEPTION
+  WHEN OTHERS
+    THEN
+      RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

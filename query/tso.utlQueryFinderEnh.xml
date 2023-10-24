@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="tso.utlQueryFinderEnh" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls description="tso.utlQueryFinderEnh" languageCode="en" name="Query Finder Enhanced"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT 
+@SELECT:DIM:USER_DEF:IMPLIED:UTIL:A.dim_id:dim_id@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.rec_id:rec_id@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.the_code:the_code@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.the_name:the_name@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.the_descr:the_descr@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.record_type:record_type@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.is_active:is_active@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.nsql_id:nsql_id@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.int_id:int_id@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.Is_Query:Is_Query@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.isPage:Is_Page@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:CASE WHEN A.isPage = 1 THEN 0 ELSE 1 END:LinkActive@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.nsql_text:nsql_text@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.created_date:created_date@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.Last_Updated_Date:Last_Updated_Date@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:A.thePageLinkUrl:thePageLinkUrl@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:CASE WHEN A.has_children = 1 AND SUBSTR(A.Dim_id,1,1) != '3' THEN dim_id ELSE NULL END:hg_has_children@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:UTIL:CASE WHEN SUBSTR(A.Dim_id,1,1) != '3' THEN 1 ELSE 0 END:hasProperties@
+FROM (
+SELECT
+TO_NUMBER( '1' || TO_CHAR(q.cmn_nsql_queries_id)  )  dim_id,
+q.id rec_id,
+q.query_code the_code,
+z.name the_name,
+z.description the_descr,
+'NSQL' record_type, 
+q.is_active is_active,
+q.cmn_nsql_queries_id nsql_id,
+z.id int_id,
+CASE WHEN @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL THEN 1 ELSE 0 END Is_Query,
+CASE WHEN @WHERE:PARAM:USER_DEF:INTEGER:p_show_qry@ = 1 THEN TO_CHAR(n.nsql_text) ELSE NULL END nsql_text,
+q.created_date,
+'/niku/app?action=npt.queryNSQL&id=' || TO_CHAR(q.id)  || '&'  || 'ns' ||  'ql_id='  || TO_CHAR(q.id)  thePageLinkUrl,
+CASE WHEN (  SELECT COUNT(*)
+                       FROM CMN_PORTLETS p
+                       LEFT OUTER JOIN CMN_CAPTIONS_NLS  pd ON pd.language_code = @WHERE:PARAM:LANGUAGE@  AND pd.table_name = 'CMN_PORTLETS' AND pd.pk_id = p.id
+                       LEFT OUTER JOIN CMN_GRIDS G ON G.Portlet_id = p.id 
+                       LEFT OUTER JOIN CMN_GRAPHS Gr ON Gr.Portlet_id = p.id 
+                       WHERE G.Dal_id = q.cmn_nsql_queries_id OR Gr.Dal_Id = q.cmn_nsql_queries_id ) > 0 THEN 1 ELSE 0 END has_children,
+0 isPage,
+q.last_updated_date
+FROM CMN_GG_NSQL_QUERIES q
+ INNER JOIN CMN_NSQL_QUERIES n ON n.id = q.cmn_nsql_queries_id
+ LEFT OUTER  JOIN CMN_CAPTIONS_NLS z ON z.language_code = @WHERE:PARAM:LANGUAGE@ AND z.pk_id = q.id AND z.TABLE_NAME = 'CMN_GG_NSQL_QUERIES'
+WHERE  
+( @WHERE:PARAM:USER_DEF:STRING:p_text@ IS NOT NULL AND n.nsql_text LIKE '%' || @WHERE:PARAM:USER_DEF:STRING:p_text@ || '%'
+  OR @WHERE:PARAM:USER_DEF:STRING:p_text@ IS NULL )
+AND
+( @WHERE:PARAM:USER_DEF:STRING:p_Ntext@ IS NOT NULL AND UPPER(n.nsql_text) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_Ntext@) || '%'
+  OR @WHERE:PARAM:USER_DEF:STRING:p_Ntext@ IS NULL )
+AND
+( @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NOT NULL AND
+  UPPER(z.name) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_name@) || '%' )
+AND
+( @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NOT NULL AND
+  UPPER(q.query_code) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_code@) || '%' )
+AND
+( @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NOT NULL AND
+  UPPER(z.description) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_descr@) || '%' )
+AND @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL
+UNION ALL
+SELECT 
+TO_NUMBER( '2' || TO_CHAR(p.id) ) dim_id,
+p.id ,
+p.portlet_code,
+pd.name,
+pd.description,
+p.portlet_type_code,
+p.is_active,
+TO_NUMBER(@WHERE:PARAM:USER_DEF:STRING:hg_row_id@) nsql_id,
+p.id,
+0 is_query,
+CASE WHEN @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL AND @WHERE:PARAM:USER_DEF:INTEGER:p_show_qry@ = 1 THEN TO_CHAR(n.nsql_text) ELSE NULL END nsql_text,
+p.created_date,
+CASE WHEN p.portlet_type_code = 'GRID' THEN
+     '/niku/app?action=npt.gridPropertiesEntry&portletType=grid&portletId=' || to_char(p.id) || '&' || 'id=' || to_char(p.id) || '&' || 'obsType=Portlet' 
+     ELSE
+     '/niku/app?action=npt.graphPropertiesEntry&portletType=graph&portletId=' || to_char(p.id) || '&' || 'id=' || to_char(p.id) || '&' || 'obsType=Portlet' 
+     END
+     thePageLinkUrl,
+CASE WHEN ( SELECT COUNT(*) FROM CMN_PAGE_PORTLETS WHERE Portlet_id = p.id ) <> 0 THEN 1 ELSE 0 END has_children,  --NEW
+0 isPage,
+p.last_updated_date
+FROM CMN_PORTLETS p
+ LEFT OUTER JOIN CMN_PORTLET_SERVICES CPSERV ON CPSERV.Portlet_id = p.id --NEW
+ LEFT OUTER JOIN ( SELECT SUBSTR(  @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ , 1, 1) theLevel,
+                          SUBSTR(  @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ , 2, 7)  theRowId
+				    FROM DUAL ) passKey ON 1=1
+ LEFT OUTER JOIN CMN_CAPTIONS_NLS  pd ON pd.language_code = @WHERE:PARAM:LANGUAGE@  AND pd.table_name = 'CMN_PORTLETS' AND pd.pk_id = p.id
+ LEFT OUTER JOIN CMN_GRIDS G ON G.Portlet_id = p.id 
+ LEFT OUTER JOIN CMN_GRAPHS Gr ON Gr.Portlet_id = p.id 
+ LEFT OUTER JOIN CMN_NSQL_QUERIES n ON n.id = TO_NUMBER( passKey.theRowId )
+WHERE 1=1
+ AND G.Dal_id = passKey.theRowId OR Gr.Dal_Id = passKey.theRowId 
+ AND passKey.theLevel = '1'
+UNION ALL
+/* PAGE */
+SELECT
+CPP.page_id dim_id,
+CPSERV.id Rec_Id,  -- IS PortServId,
+CP.Page_Code,
+PageT.name Page_Name,
+CASE WHEN  ParPageT.name IS NULL THEN PageT.name 
+     WHEN ParPageT.name = PageT.name THEN PageT.name
+     ELSE ParPageT.name || ' > ' || PageT.name END the_Desc,
+CASE WHEN CPP.Principal_Type = 'SYSTEM' THEN CPP.Principal_Type ELSE R.Full_Name END TheType,
+CP.Is_Active,
+NULL nsqlid,
+CAPS.Action_Id int_id,  -- ACTION_ID
+0 isQry,
+null nsqltxt,
+CPP.Created_Date,
+NULL urlLink,
+NULL has_children,
+1 isPage,
+CPP.last_updated_date
+from CMN_PORTLETS p
+ LEFT OUTER JOIN ( SELECT SUBSTR(  @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ , 1, 1) theLevel,
+                          SUBSTR(  @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ , 2, 7)  theRowId
+				    FROM DUAL ) passKey ON 1=1
+ LEFT OUTER JOIN CMN_PORTLET_SERVICES CPSERV ON CPSERV.Portlet_id = p.id --NEW
+ INNER JOIN CMN_PAGE_PORTLETS CPP ON CPP.Portlet_id = p.id
+ LEFT OUTER JOIN SRM_RESOURCES R ON R.user_id = CPP.Principal_Id 
+ LEFT OUTER JOIN CMN_ACTION_PORTLET_SERVICES CAPS ON CAPS.PORTLET_SERVICE_ID = CPSERV.id
+ LEFT OUTER JOIN CMN_PAGES CP ON CP.id = CPP.page_id
+ LEFT OUTER JOIN SRM_RESOURCES RP ON RP.user_id = CP.Principal_Id
+ LEFT OUTER JOIN CMN_CAPTIONS_NLS PageT ON PageT.language_code = @WHERE:PARAM:LANGUAGE@ 
+    AND PageT.Table_Name IN (  'CMN_PAGES' )
+    AND PageT.pk_id = CP.id  
+ LEFT OUTER JOIN CMN_PAGES PAR_PAGE ON PAR_PAGE.id = CP.Parent_Page_id
+ LEFT OUTER JOIN CMN_CAPTIONS_NLS ParPageT ON ParPageT.language_code = @WHERE:PARAM:LANGUAGE@ 
+    AND ParPageT.Table_Name IN (  'CMN_PAGES' )
+    AND ParPageT.pk_id = CP.Parent_Page_id
+ LEFT OUTER JOIN CMN_ACTIONS CACT ON CACT.id = CAPS.Action_Id
+where 1=1
+ AND p.id = passKey.theRowId
+ AND passKey.theLevel = '2'
+UNION ALL
+/* PROCESS */
+SELECT
+TO_NUMBER( TO_CHAR(stage.id) || TO_CHAR(step.id) || TO_CHAR(process.id ) ) dim_id,
+process.id rec_id,
+process.Process_code the_code,
+prName.name the_name,
+'STEP:' || stepName.name the_descr,
+'GEL' record_type, 
+CASE WHEN version.INTERNAL_STATUS_CODE='BPM_PIS_VALIDATED' THEN 1 ELSE 0 END is_active,
+NULL nsql_id,
+step.id int_id,
+0 Is_Query,
+'' nsql_text,
+process.created_date,
+'/niku/app?action=bpm.stepProperties&step_id=' || TO_CHAR(step.id)  || '&'  || 'process_version_id=' || TO_CHAR(version.id) || '&'  || 'object_type=admin&ui.page.space=bpm.processDefinitions&ui.page.template=union.adminPage&bpm.returnModuleAction=bpm.processDefinitionsReturn'  thePageLinkUrl,
+0 has_children,
+0 isPage	,
+process.last_updated_date
+FROM cmn_custom_scripts ccs
+LEFT OUTER JOIN ( SELECT @WHERE:PARAM:USER_DEF:STRING:p_Ntext@ Look_For FROM DUAL ) Filters ON 1=1
+LEFT OUTER JOIN bpm_def_step_actions bdsa          on ccs.id = bdsa.script_id and bdsa.type_code = 'BPM_SAT_CUSTOM'
+LEFT OUTER JOIN bpm_def_steps step  on bdsa.step_id = step.id
+LEFT OUTER JOIN bpm_def_stages stage               on stage.id = step.stage_id
+LEFT OUTER JOIN bpm_def_process_versions version   on version.id = stage.process_version_id
+LEFT OUTER JOIN bpm_def_processes process          on process.id = version.process_id
+LEFT OUTER JOIN CMN_CAPTIONS_NLS prName ON prName.Language_code = @WHERE:PARAM:LANGUAGE@
+  AND PRNAME.TABLE_NAME = 'BPM_DEF_PROCESSES'
+  AND PRNAME.pk_id = process.id
+LEFT OUTER JOIN CMN_CAPTIONS_NLS stepName ON stepName.Language_code = @WHERE:PARAM:LANGUAGE@
+  AND stepName.TABLE_NAME = 'BPM_DEF_STEPS'
+  AND stepName.pk_id = step.id  
+WHERE 5=5
+AND @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL
+AND CCS.LANGUAGE_CODE = 'gel'
+AND dbms_lob.instr( UPPER( ccs.script_text )
+            , UPPER( Filters.Look_For ) ) > 0
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NOT NULL AND
+      UPPER(prName.name) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_name@) || '%' )
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NOT NULL AND
+      UPPER(process.Process_code) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_code@) || '%' )
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NOT NULL AND
+      UPPER(stepName.name) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_descr@) || '%' )
+UNION ALL
+/* LOOKUP */
+SELECT DISTINCT
+TO_NUMBER( '999' || TO_CHAR(sqlwrap.lookup_id) ) dim_id,
+sqlwrap.lookup_id rec_id,
+sqlwrap.lookup_type the_code,
+sqlwrap.name the_name,
+sqlwrap.description the_descr,
+'Lookup' record_type, 
+NULL is_active,
+NULL nsql_id,
+sqlwrap.lookup_id int_id,
+0 Is_Query,
+'' nsql_text,
+sqlwrap.CREATED_DATE,
+sqlwrap.url_lookup_query  thePageLinkUrl,
+0 has_children,
+0 isPage,
+sqlwrap.last_updated_date
+from (
+       SELECT DISTINCT
+          lt.id                 AS lookup_id
+        , lt.lookup_type        AS lookup_type
+        , nls.name              AS name
+        , nls.description       AS description
+        , cnq.last_updated_by   AS LAST_UPDATED_BY
+        , cnq.last_updated_date AS LAST_UPDATED_DATE
+		, cnq.created_date      AS CREATED_DATE
+, '/niku/app?action=nmc.editDynamicQueryText&lookup_type=' || lt.lookup_type as url_lookup_query
+        from     cmn_list_of_values clov
+        join cmn_nsql_queries cnq on clov.sql_text_id  = cnq.id
+        join cmn_lookup_types lt  on lt.lookup_type    = clov.lookup_type_code
+        join cmn_captions_nls nls on lt.id             = nls.pk_id 
+                                 and nls.table_name    = 'CMN_LOOKUP_TYPES' 
+                                 and nls.language_code = @WHERE:PARAM:LANGUAGE@
+        where @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL
+		AND 
+              ( 
+               (
+                @WHERE:PARAM:USER_DEF:STRING:p_Ntext@ is not null
+               and
+                lower(cnq.nsql_text) LIKE '%' || lower(@WHERE:PARAM:USER_DEF:STRING:p_Ntext@) || '%'
+               )
+              or
+                @WHERE:PARAM:USER_DEF:STRING:p_Ntext@ is null
+              )
+     ) sqlwrap
+where 5=5
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_name@ IS NOT NULL AND
+      UPPER(sqlwrap.name) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_name@) || '%' )
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_code@ IS NOT NULL AND
+      UPPER(sqlwrap.lookup_type) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_code@) || '%' )
+AND ( @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:p_descr@ IS NOT NULL AND
+      UPPER(sqlwrap.description) LIKE '%' || UPPER(@WHERE:PARAM:USER_DEF:STRING:p_descr@) || '%' )
+) A 
+WHERE 5=5
+AND 4=4
+AND @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false"/>
+            <attribute id="rec_id" required="false"/>
+            <attribute id="the_code" required="false"/>
+            <attribute id="the_name" required="false"/>
+            <attribute id="the_descr" required="false"/>
+            <attribute id="record_type" required="false"/>
+            <attribute id="is_active" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="is_active"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="CalAccepted"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="nsql_id" required="false"/>
+            <attribute id="int_id" required="false"/>
+            <attribute id="is_query" required="false"/>
+            <attribute id="is_page" required="false"/>
+            <attribute id="linkactive" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="linkactive"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="Properties"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="nsql_text" required="false"/>
+            <attribute id="created_date" required="false"/>
+            <attribute id="last_updated_date" required="false"/>
+            <attribute id="thepagelinkurl" required="false"/>
+            <attribute id="hg_has_children" required="false"/>
+            <attribute id="hasproperties" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="hasproperties"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="10" lo="-5" mappingCode="mapping-1" typeCode="Properties"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_p_ntext" required="false"/>
+            <attribute id="param_p_name" required="false"/>
+            <attribute id="param_p_code" required="false"/>
+            <attribute id="param_p_descr" required="false"/>
+            <attribute id="param_p_text" required="false"/>
+            <attribute id="param_hg_row_id" required="false"/>
+            <attribute id="param_p_show_qry" required="false"/>
+            <links>
+              <link action="tsoUrlRedirectClarityPag" code="clarityLink">
+                
+                
+                
+                
+                <nls description="Clarity Page Link" languageCode="en" name="Clarity Page Link"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="thepagelinkurl" dataSource="data" paramCode="url"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="rego_rm_roadmapitem_role_alc" createdBy="admin" endStep="Finish" source="customer" startEvent="update" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls languageCode="en" name="Rego Roadmap - Synch Roadmap Item Role Allocation"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <StartCondition><![CDATA[rdm_roadmap.sync_role_allocation == 1 &&  rdm_roadmap.sync_role_allocation != rdm_roadmap.sync_role_allocation__oldValue]]></StartCondition>
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisRoadmap" objectType="rdm_roadmap" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="script" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Script"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:file="jelly:com.niku.union.gel.FileTagLibrary" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:obj="http://www.niku.com/xog/Object" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:util="jelly:util" xmlns:x="jelly:xml" xmlns:xog="http://www.niku.com/xog" xmlns:xs="http://www.w3.org/2000/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <gel:setDataSource dbId="Niku"/>
+                          <gel:parameter default="false" var="isDebug"/>
+                          <gel:parameter default="admin" var="username"/>
+                          <core:set value="0" var="SuccessRecords"/>
+                          <core:set value="0" var="FailRecords"/>
+                          <core:set value="0" var="IgnoreRecords"/>
+                          <core:set value="0" var="TotalRecords"/>
+                          <sql:query escapeText="false" var="getRoadmap"><![CDATA[
+SELECT 
+RM.ID , 
+RM.NAME,
+RM.CODE
+FROM  RDM_ROADMAPS RM
+WHERE RM.ID = ?
+]]><sql:param value="${gel_objectInstanceId}"/>
+                          </sql:query>
+                          <gel:log>Number of Roadmap to Process: ${getRoadmap.rowCount}</gel:log>
+                          <core:forEach items="${getRoadmap.rows}" var="eachRoadmap">
+                            <core:if test="${isDebug=='true'}">
+                              <gel:log>Roadmap ID:${eachRoadmap.CODE} , Roadmap Name:${eachRoadmap.NAME}</gel:log>
+                            </core:if>
+                            <!--Get the scheduler URL-->
+                            <core:invokeStatic className="com.niku.union.config.ConfigurationManager" method="getInstance" var="config"/>
+                            <core:set value="${config.getProperties().getWebServer().getSchedulerUrl()}" var="envURL"/>
+                            <!--Create the REST client-->
+                            <core:new className="com.ca.ppm.rest.client.RestApiJavaClient" var="javaRestClient">
+                              <core:arg type="java.lang.String" value="${envURL}/ppm"/>
+                              <core:arg type="java.lang.String" value="${username}"/>
+                            </core:new>
+                            <sql:query escapeText="false" var="getRoadmapItems"><![CDATA[
+SELECT * FROM (
+SELECT 
+	RM.ID PARENT_ID, 
+	RMI.ID , 
+	RMI.NAME ,
+	RMI.CODE ,						 
+	ATR_MAP.R_ATTRIBUTE_KEY ,
+	INV.CODE LINKED_INV_CODE ,
+	ROUND(SUM(PT.PRALLOCSUM/3600),2) TOTAL_ALC,
+ROW_NUMBER() OVER (PARTITION BY RMI.ID ORDER BY RMI.ID) ROW_SEQ,
+COUNT(1) OVER (PARTITION BY RMI.ID ORDER BY RMI.ID) TOTAL_RECORDS
+	FROM RDM_ROADMAPS RM
+	INNER JOIN ODF_CA_RDM_ROADMAP OCR ON RM.ID = OCR.ID
+	INNER JOIN RDM_ROADMAP_ITEMS RMI ON  RMI.ROADMAP_ID = RM.ID AND RMI.IN_PLAN=2
+	INNER JOIN ODF_SCENARIOS SCEN ON SCEN.ID = RMI.SCENARIO_ID AND SCEN.IS_PLAN_OF_RECORD=1
+	INNER JOIN ODF_CA_RDM_ROADMAP_ITEM OCRI ON RMI.ID = OCRI.ID
+INNER JOIN ODF_CA_REGO_ROADMAP_ROL_ALC ATR_MAP ON 1=1 AND ATR_MAP.IS_ACTIVE=1
+	INNER JOIN ODF_CUSTOM_ATTRIBUTES CAT ON CAT.API_ALIAS = ATR_MAP.R_ATTRIBUTE_KEY AND CAT.OBJECT_NAME='rdm_roadmap_item' 
+	INNER JOIN INV_INVESTMENTS INV ON INV.ID = RMI.LINKED_INTERNAL_ID
+INNER JOIN PRTEAM PT ON INV.ID = PT.PRPROJECTID AND ATR_MAP.R_ROLE = PT.PRRESOURCEID
+	WHERE RM.ID = ?	
+	GROUP BY RM.ID , 
+	RMI.ID , 
+	RMI.NAME ,
+	RMI.CODE ,						 
+	ATR_MAP.R_ATTRIBUTE_KEY ,
+	INV.CODE
+) TEMP
+ORDER BY 2, 8 ASC
+]]><sql:param value="${eachRoadmap.ID}"/>
+                            </sql:query>
+                            <core:forEach items="${getRoadmapItems.rows}" var="eachRoadmapItems">
+                              <core:if test="${eachRoadmapItems.ROW_SEQ==1}">
+                                <core:new className="org.json.JSONObject" var="RoadmapItemJSON"/>
+                              </core:if>
+                              <core:invoke method="put" on="${RoadmapItemJSON}">
+                                <core:arg value="${eachRoadmapItems.R_ATTRIBUTE_KEY}"/>
+                                <core:arg value="${eachRoadmapItems.TOTAL_ALC}"/>
+                              </core:invoke>
+                              <core:if test="${eachRoadmapItems.ROW_SEQ==eachRoadmapItems.TOTAL_RECORDS}">
+                                <core:catch var="updateRIException">
+                                  <core:invoke method="doPatch" on="${javaRestClient}" var="updateRoadmapItemResponse">
+                                    <core:arg type="java.lang.String" value="/roadmaps/${eachRoadmapItems.PARENT_ID}/roadmapItems/${eachRoadmapItems.ID}"/>
+                                    <core:arg type="java.lang.String" value="${RoadmapItemJSON.toString()}"/>
+                                  </core:invoke>
+                                </core:catch>
+                                <core:choose>
+                                  <core:when test="${!empty(updateRIException) or !updateRoadmapItemResponse.wasSuccessful()}">
+                                    <gel:log level="WARN">Updating Roadmap ID:${eachRoadmap.CODE} - RoadmapItem:(${eachRoadmapItems.CODE}) failed! ${updateRIException} ${updateRIException.getCause()} ${updateRIException.getCause().getCause()} ${updateRoadmapItemResponse}</gel:log>
+                                    <gel:log level="WARN">Payload: ${RoadmapItemJSON}</gel:log>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="INFO">Roadmap ID:${eachRoadmap.CODE} - RoadmapItem:${eachRoadmapItems.CODE} Updated</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                            </core:forEach>
+                          </core:forEach>
+                        </gel:script>
+                      </scriptText>
+                      <scriptParameter isSecure="false" name="isDebug" value="true"/>
+                      <scriptParameter isSecure="false" name="username" value="admin"/>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action code="uncheck" objectMethod="sync_role_allocation" objectName="thisRoadmap" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Uncheck  Synch Role Allocation"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="0"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

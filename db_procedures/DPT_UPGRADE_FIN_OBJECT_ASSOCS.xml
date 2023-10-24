@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DPT_UPGRADE_FIN_OBJECT_ASSOCS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DPT_UPGRADE_FIN_OBJECT_ASSOCS" 
+          (
+		      oldDepartmentCode varchar2,
+              departmentCode varchar2,
+              locationCode varchar2
+          )
+          /*
+              Create OBS associations for all financially enabled investments / resources / companies
+              that do not have an obs association already
+          */
+          as
+          begin
+            declare
+                deptEntityId number;
+                locnEntityId number;
+                deptObsUnitId number;
+                locnObsUnitId number;
+                deptObsTypeId number;
+                locnObsTypeId number;
+                objectId number;
+                objectType varchar2(30);
+                tableName varchar2(30);
+                v_entityCode varchar2(60);
+                nextId number;
+				        v_oldDeptObsId number;
+
+                -- declare a cursor for all investments
+
+                cursor cur_fin_investments is
+                  select p.id, p.odf_object_code, d.obs_unit_id , l.obs_unit_id
+                  from pac_mnt_projects p, locations l, departments d
+                  where l.locationid = p.locationid
+                  and d.departcode = p.departcode
+                  and p.departcode = departmentCode
+                  and p.locationid = locationCode;
+
+                  -- declare a cursor for resources
+
+                cursor cur_fin_resources is
+                  select r.id, 'SRM_RESOURCES', d.obs_unit_id , l.obs_unit_id
+                  from pac_mnt_resources r, locations l, departments d
+                  where l.locationid = r.locationid
+                  and d.departcode = r.departcode
+                  and r.departcode = departmentCode
+                  and r.locationid = locationCode;
+
+            begin
+                begin
+                    select org_chart_obs_type_id, e.entity into deptObsTypeId, v_entityCode
+                    from entity e, departments d
+                    where d.departcode = departmentCode
+                    and d.entity_id = e.id;
+
+                    select geo_chart_obs_type_id into locnObsTypeId
+                    from entity e, locations l
+                    where l.locationid = locationCode
+                    and l.entity = e.entity;
+
+                    select obs_unit_id into v_oldDeptObsId
+                    from departments d
+                    where d.departcode = oldDepartmentCode;
+
+              exception
+                  when no_data_found then
+                  raise_application_error(-20000, 'Unable to find OBS types for given department / location');
+              end;
+
+                  --  Iterate through the financially enabled investments
+                  open cur_fin_investments;
+            loop
+                    fetch cur_fin_investments into objectId, objectType, deptObsUnitId, locnObsUnitId;
+              exit when cur_fin_investments%notfound;
+                        begin
+                              CMN_ID_SP ('PRJ_OBS_ASSOCIATIONS', nextId);
+
+                              select
+                                  case
+									  when objectType = 'application' then 'INV_APPLICATION'
+	                                  when objectType = 'asset' then 'INV_ASSET'
+	                                  when objectType = 'project' then 'SRM_PROJECTS'
+	                    			  when objectType = 'product' then 'INV_PRODUCT'
+	                                  when objectType = 'other' then 'INV_OTHER'
+	                                  when objectType = 'service' then 'INV_SERVICE'
+                    			  end
+                    			  into tableName from dual;
+
+                              -- delete if an association already exists for the previous department
+                              if v_oldDeptObsId is not null then
+                                delete from prj_obs_associations
+                                where record_id = objectId
+                                and table_name = tableName
+                                and unit_id = v_oldDeptObsId;
+                              end if;
+
+                              insert  into prj_obs_associations
+                                      (id, unit_id, table_name, record_id,
+                                      created_date, created_by, last_updated_date, last_updated_by)
+                              select  nextId, deptObsUnitId, tableName, objectId,
+                                      sysdate, 1, sysdate, 1
+                              from    prj_obs_units u
+                              where   id = deptObsUnitId
+                              and     not exists (select  a.id
+                                                  from    prj_obs_associations a, prj_obs_units u2
+                                                  where   a.record_id = objectId
+                                                  and     a.table_name = tableName
+                                                  and     a.unit_id = u2.id
+                                                  and     u.type_id = u2.type_id);
+                                                  
+                             CMN_ID_SP ('PRJ_OBS_ASSOCIATIONS', nextId);
+
+                              insert  into prj_obs_associations
+                                      (id, unit_id, table_name, record_id,
+                                      created_date, created_by, last_updated_date, last_updated_by)
+                              select  nextId, locnObsUnitId, tableName, objectId,
+                                      sysdate, 1, sysdate, 1
+                              from    prj_obs_units u
+                              where   id = locnObsUnitId
+                              and     not exists (select  a.id
+                                                  from    prj_obs_associations a, prj_obs_units u2
+                                                  where   a.record_id = objectId
+                                                  and     a.table_name = tableName
+                                                  and     a.unit_id = u2.id
+                                                  and     u.type_id = u2.type_id);
+                             
+                             
+                     
+                end;
+
+                -- Update the entity_code on the investment
+				UPDATE inv_investments
+				   SET entity_code = v_entityCode
+				 WHERE id = objectId;
+
+            end loop;
+
+                  close cur_fin_investments;
+
+                  open cur_fin_resources;
+            loop
+                    fetch cur_fin_resources into objectId, objectType, deptObsUnitId, locnObsUnitId;
+                    exit when cur_fin_resources%notfound;
+                          begin
+                                CMN_ID_SP( 'PRJ_OBS_ASSOCIATIONS', nextId);
+
+                                tableName := objectType;
+
+                              -- delete if an association already exists for the previous department
+                              if v_oldDeptObsId is not null then
+                                delete from prj_obs_associations
+                                where record_id = objectId
+                                and table_name = tableName
+                                and unit_id = v_oldDeptObsId;
+                              end if;
+
+                                insert  into prj_obs_associations
+                                        (id, unit_id, table_name, record_id,
+                                        created_date, created_by, last_updated_date, last_updated_by)
+                                select  nextId, deptObsUnitId, tableName, objectId,
+                                        sysdate, 1, sysdate, 1
+                                from    prj_obs_units u
+                                where   id = deptObsUnitId
+                                and     not exists (select  a.id
+                                                    from    prj_obs_associations a, prj_obs_units u2
+                                                    where   a.record_id = objectId
+                                                    and     a.table_name = tableName
+                                                    and     a.unit_id = u2.id
+                                                    and     u.type_id = u2.type_id);
+
+                                -- Now the location OBS association
+                                CMN_ID_SP( 'PRJ_OBS_ASSOCIATIONS', nextId);
+
+                                insert  into prj_obs_associations
+                                        (id, unit_id, table_name, record_id,
+                                        created_date, created_by, last_updated_date, last_updated_by)
+                                select  nextId, locnObsUnitId, tableName, objectId,
+                                        sysdate, 1, sysdate, 1
+                                from    prj_obs_units u
+                                where   id = locnObsUnitId
+                                and     not exists (select  a.id
+                                                    from    prj_obs_associations a, prj_obs_units u2
+                                                    where   a.record_id = objectId
+                                                    and     a.table_name = tableName
+                                                    and     a.unit_id = u2.id
+                                                    and     u.type_id = u2.type_id);
+                                
+                          end;
+
+                          -- Update the entity_code on the resource
+						  UPDATE srm_resources
+						     SET entity_code = v_entityCode
+					 	   WHERE id = objectId;
+            end loop;
+                  close cur_fin_resources;
+
+          exception
+            When others then
+            If cur_fin_investments%ISOPEN Then
+               close cur_fin_investments;
+            end if;
+            If cur_fin_resources%ISOPEN Then
+               close cur_fin_resources;
+            end if;
+            raise_application_error(-20000, SQLERRM);
+          end;
+      end DPT_UPGRADE_FIN_OBJECT_ASSOCS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

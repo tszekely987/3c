@@ -1,0 +1,1110 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_VOUCHER_VALIDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_VOUCHER_VALIDATE_SP" 
+(
+  in_TransNo       NUMBER,
+  in_TransDate     DATE ,
+  in_TransClass IN VARCHAR2,
+  in_Project       VARCHAR2,
+  in_taskID        NUMBER,
+  in_Charge_Code   VARCHAR2,
+  in_Input_Type    VARCHAR2,
+  in_Resource_Code VARCHAR2,
+  in_Quantity   IN NUMBER,
+  in_BillRate      NUMBER,
+  in_ActualCost    NUMBER,
+  in_Notes         VARCHAR2,
+  in_roleCode      VARCHAR2 DEFAULT NULL,
+  in_UserId        VARCHAR2 DEFAULT NULL,
+  in_LangaugeId    VARCHAR2,
+  rateCurrencyCode VARCHAR2,
+  costCurrencyCode VARCHAR2,
+  userLov1         VARCHAR2,
+  userLov2         VARCHAR2,
+  expenseType      VARCHAR2,
+  in_chargeable    NUMBER,
+  id               NUMBER,
+  out_TransNo  OUT NUMBER
+)
+AS
+  v_NewTransNo               NUMBER;
+  v_OldTransNo               NUMBER;
+  v_CURRVAL                  NUMBER;
+  v_SOURCEMODULE             NUMBER;
+  v_TRANSTYPE                VARCHAR2(2);
+  v_BATCHNO                  NUMBER;
+  v_ENTRYUSER                Globalpkg.STRING;
+  v_ENTRYDATE                DATE;
+  v_LASTUPDATEUSER           Globalpkg.STRING;
+  v_LASTUPDATEDATE           DATE;
+  v_EXTERNALBATCHID          Globalpkg.STRING;
+  v_EXTERNALTRANSNO          NUMBER;
+  v_LOCATIONID               Globalpkg.STRING;
+  v_DEPARTCODE               Globalpkg.STRING;
+  v_ENTITY                   Globalpkg.STRING;
+  v_TRANSDATE                DATE;
+  v_CLIENT                   Globalpkg.STRING;
+  v_PROJECT                  Globalpkg.STRING;
+  v_CHARGE_CODE              Globalpkg.STRING;
+  v_INPUT_TYPE               Globalpkg.STRING;
+  v_RESOURCE_CODE            Globalpkg.STRING;
+  v_QUANTITY                 NUMBER (32,6);
+  v_BILLRATE                 NUMBER (32,6);
+  v_PRICE                    NUMBER (32,6);
+  v_AMOUNT                   NUMBER (32,6);
+  v_TOTALAMOUNT              NUMBER (32,6);
+  v_ACTUALCOST               NUMBER (32,6);
+  v_TOTALCOST                NUMBER (32,6);
+  v_FACTORAMOUNT             NUMBER (32,6);
+  v_BURDEN                   NUMBER (32,6);
+  v_OVERHEAD                 NUMBER (32,6);
+  v_STDCOST                  NUMBER (32,6);
+  v_COSTRULECODE             Globalpkg.STRING;
+  v_BURDENCODE               Globalpkg.STRING;
+  v_OVERHEADCODE             Globalpkg.STRING;
+  v_CHARGEABLE               INTEGER;
+  v_INVOICENO                Globalpkg.STRING;
+  v_EMPLYHOMELOCATION          Globalpkg.STRING;
+  v_EMPLYHOMEDEPART            Globalpkg.STRING;
+  v_EMPLYACTUALCOST            NUMBER (32,6);
+  v_EMPLYSTDCOST               NUMBER (32,6);
+  v_PROJECTTYPE                Globalpkg.STRING;
+  v_CLIENTCLASS                Globalpkg.STRING;
+  v_PROJECTCLASS               Globalpkg.STRING;
+  --v_COSTCLASS                GLOBALPKG.STRING;
+  v_TRANSCLASS                 Globalpkg.STRING;
+  v_RESOURCE_CLASS             Globalpkg.STRING;
+  v_WIPCLASS                   Globalpkg.STRING;
+  v_WORKINT                    NUMBER;
+  v_WORKBUF                    Globalpkg.STRING;
+  v_SiteRequired               INTEGER;
+  v_costcodeTransType          Globalpkg.STRING;
+  v_ClientLevel                INTEGER := 1;
+  v_ProjectLevel               INTEGER := 2;
+  v_CostLevel                  INTEGER := 3;
+  v_EmplyLevel                 INTEGER := 4;
+  --v_Multiplier               GLOBALPKG.STRING;
+  v_BurdenAmount               NUMBER(32,6);
+  v_OverheadAmount             NUMBER(32,6);
+  v_UnitCost                   NUMBER(32,6);
+  v_ErrorFlag                  NUMBER(32,6);
+  v_DebugErrorMsg              Globalpkg.STRING;
+  P_costkeylevel2              Globalpkg.STRING;
+  P_costkeylevel3              Globalpkg.STRING;
+  P_costkeylevel4              Globalpkg.STRING;
+  P_costkeylevel6              Globalpkg.STRING;
+  P_costkeylevel7              Globalpkg.STRING;
+  p_input_type                 Globalpkg.STRING;
+  v_SourceEntity               Globalpkg.STRING;
+  v_SourceLocation             Globalpkg.STRING;
+  v_SourceDepartment           Globalpkg.STRING;
+  v_locationsource             NUMBER;
+  v_deptsource                 NUMBER;
+  v_budgetlocation             Globalpkg.STRING;
+  v_budgetdepartment           Globalpkg.STRING;
+  v_clientlocation             Globalpkg.STRING;
+  v_clientdept                 Globalpkg.STRING;
+  v_COSTPLUS                   NUMBER;
+  v_costplusrule               Globalpkg.STRING;
+  v_transratesourcelabor       NUMBER;
+  v_transratesourcematerials   NUMBER;
+  v_transratesourceequipment   NUMBER;
+  v_projectratelabor           NUMBER(32, 6);
+  v_projectratematerials       NUMBER(32, 6);
+  v_projectrateequipment       NUMBER(32, 6);
+  v_projlocationid             Globalpkg.STRING;
+  v_projdepartcode             Globalpkg.STRING;
+  v_currentrevision            NUMBER;
+  v_budgeted                   NUMBER;
+  v_budgetlevellabor           NUMBER;
+  v_projectcostlabor           NUMBER(32, 6);
+  v_projectstdcostlabor        NUMBER(32, 6);
+  v_budgetlevelmaterials       NUMBER;
+  v_projectcostmaterials       NUMBER(32, 6);
+  v_projectstdcostmaterials    NUMBER(32, 6);
+  v_budgetlevelequipment       NUMBER;
+  v_projectcostequipment       NUMBER(32, 6);
+  v_projectstdcostequipment    NUMBER(32, 6);
+  v_labor                      NUMBER;
+  v_transratelocationlabor     NUMBER;
+  v_transratelocationmaterials NUMBER;
+  v_transratelocationequipment NUMBER;
+  v_overrideexpenses           NUMBER;
+  v_overrideequipment          NUMBER;
+  v_overridematerials          NUMBER;
+  v_overridelabor              NUMBER;
+  v_override                   NUMBER;
+  v_costoverride               NUMBER;
+  v_transcostsourcelabor       NUMBER;
+  v_transcostsourcematerials   NUMBER;
+  v_transcostsourceequipment   NUMBER;
+  v_transratesourceexpenses    NUMBER;
+  v_transcostsourceexpenses    NUMBER;
+  v_transratelocationexpenses  NUMBER;
+  v_ratesource                 NUMBER;
+  v_costsource                 NUMBER;
+  v_transratelocation          NUMBER;
+  v_rate                       NUMBER(32, 6);
+  --v_mtxrate                  NUMBER(32, 6);
+  --v_mtxstdcost               NUMBER(32, 6);
+  --v_mtxactualcost            NUMBER(32, 6);
+  v_budgetlevel                INTEGER;
+  v_unitpriceoverride          NUMBER(32, 6);
+  v_cTransDate                 Globalpkg.STRING;
+  b_ratefound                  INTEGER;
+  v_apply_to_actualstd_cost    Globalpkg.STRING;
+  v_recordfound                NUMBER;
+  StoO_selcnt                  INTEGER := 0;
+  StoO_error                   INTEGER := 0;
+  StoO_rowcnt                  INTEGER := 0;
+  StoO_crowcnt                 INTEGER := 0;
+  StoO_fetchstatus             INTEGER := 0;
+  StoO_errmsg                  Globalpkg.STRING;
+  StoO_sqlstatus               INTEGER;
+  Temp_Rc                      Ppa_Getratepkg.RCT1;
+  v_rateCurrencyCode           Globalpkg.STRING;
+  v_costCurrencyCode           Globalpkg.STRING;
+  v_stdCurrencyCode            Globalpkg.STRING;
+  --cRateCurrencyCode          GLOBALPKG.STRING;
+
+  L_EXCHANGE_RATE_TYPE         Globalpkg.STRING;
+  v_selectedCurrencyCode       Globalpkg.STRING;
+
+  convFactorAmt                NUMBER(32, 6);
+  convBurdenAmt                NUMBER(32, 6);
+  convOverheadAmt              NUMBER(32, 6);
+
+  vRoleCode                    VARCHAR2(32);
+
+  nOrigRate                    PPA_TRANSCONTROL_VALUES.BILLRATE%TYPE;
+  nOrigCost                    PPA_TRANSCONTROL_VALUES.ACTUALCOST%TYPE;
+  cOrigRateCurrencyCode        PPA_TRANSCONTROL_VALUES.RATE_CURRENCY_CODE%TYPE;
+  cOrigCostCurrencyCode        PPA_TRANSCONTROL_VALUES.ACTCOST_CURRENCY_CODE%TYPE;
+  nRate                        PPA_TRANSCONTROL_VALUES.BILLRATE%TYPE;
+  nCost                        PPA_TRANSCONTROL_VALUES.ACTUALCOST%TYPE;
+  cRateCurrencyCode            PPA_TRANSCONTROL_VALUES.RATE_CURRENCY_CODE%TYPE;
+  cCostCurrencyCode            PPA_TRANSCONTROL_VALUES.ACTCOST_CURRENCY_CODE%TYPE;
+
+  V_PROJECT_ID				   NUMBER;
+  V_costType                    VARCHAR2(30);
+  v_isRole                      NUMBER;
+
+BEGIN
+
+/* Called From:
+   Procedure         :- This procedure is used to validate the paramteres before inserting or updating a voucher.
+   Trigger           :-
+   PMD TransactionId :-
+   WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/26/01
+   Last Modified by: Partha
+   Last Modified date: 09/09/01
+*/
+   Pac_Prc_Voucher_Validate_Sp.cRateCurrencyCode := NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_OldTransNo := Pac_Prc_Voucher_Validate_Sp.in_TransNo;
+   Pac_Prc_Voucher_Validate_Sp.out_TransNo  := Pac_Prc_Voucher_Validate_Sp.in_TransNo;
+   Pac_Prc_Voucher_Validate_Sp.v_BATCHNO            :=  NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_ENTRYUSER          :=  NVL(in_UserId,'admin');
+   Pac_Prc_Voucher_Validate_Sp.v_ENTRYDATE      	:=	SYSDATE;
+   Pac_Prc_Voucher_Validate_Sp.v_LASTUPDATEUSER     :=  NVL(in_UserId,'admin');
+   Pac_Prc_Voucher_Validate_Sp.v_LASTUPDATEDATE     :=  SYSDATE;
+   Pac_Prc_Voucher_Validate_Sp.v_EXTERNALBATCHID    :=  NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_EXTERNALTRANSNO    :=  NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_LOCATIONID         :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_DEPARTCODE         :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_ENTITY             :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_TRANSDATE          :=  in_TransDate;
+   Pac_Prc_Voucher_Validate_Sp.v_PROJECT            :=  TRIM(in_Project);
+   Pac_Prc_Voucher_Validate_Sp.v_CHARGE_CODE           :=  TRIM(in_Charge_Code);
+   Pac_Prc_Voucher_Validate_Sp.v_INPUT_TYPE         :=  TRIM(in_Input_Type);
+   Pac_Prc_Voucher_Validate_Sp.v_RESOURCE_CODE          :=  TRIM(in_Resource_Code);
+   Pac_Prc_Voucher_Validate_Sp.v_QUANTITY           :=  NVL(in_Quantity,0);
+   Pac_Prc_Voucher_Validate_Sp.v_BILLRATE          	:=  NVL(in_BillRate,0);
+   Pac_Prc_Voucher_Validate_Sp.v_AMOUNT             :=  Pac_Prc_Voucher_Validate_Sp.v_QUANTITY * Pac_Prc_Voucher_Validate_Sp.v_BILLRATE;
+   Pac_Prc_Voucher_Validate_Sp.v_TOTALAMOUNT        :=  0;
+   Pac_Prc_Voucher_Validate_Sp.v_ACTUALCOST         :=	NVL(in_ActualCost,0);
+   Pac_Prc_Voucher_Validate_Sp.v_TOTALCOST          :=  0;
+   Pac_Prc_Voucher_Validate_Sp.v_FACTORAMOUNT       :=	0;
+   Pac_Prc_Voucher_Validate_Sp.v_BURDEN             :=	0;
+   Pac_Prc_Voucher_Validate_Sp.v_OVERHEAD           :=	0;
+   Pac_Prc_Voucher_Validate_Sp.v_STDCOST            :=	0;
+   Pac_Prc_Voucher_Validate_Sp.v_COSTRULECODE       :=	NULL;-- we are not modifying its value anywhere
+   Pac_Prc_Voucher_Validate_Sp.v_BURDENCODE         :=	NULL;-- we are not modifying its value anywhere
+   Pac_Prc_Voucher_Validate_Sp.v_OVERHEADCODE       :=	NULL;-- we are not modifying its value anywhere
+   Pac_Prc_Voucher_Validate_Sp.v_INVOICENO          :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_EMPLYHOMELOCATION  :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_EMPLYHOMEDEPART    :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_EMPLYACTUALCOST    :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_EMPLYSTDCOST       :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_PROJECTTYPE        :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_CLIENTCLASS        :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_PROJECTCLASS       :=	NULL;
+   --Pac_Prc_Voucher_Validate_Sp.v_COSTCLASS          :=  NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_TRANSCLASS         :=	Pac_Prc_Voucher_Validate_Sp.in_TransClass;
+   Pac_Prc_Voucher_Validate_Sp.v_RESOURCE_CLASS         :=  NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_WIPCLASS           :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_WORKINT            :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.v_WORKBUF            :=	NULL;
+   Pac_Prc_Voucher_Validate_Sp.vRoleCode      :=  in_roleCode;
+   P_costkeylevel2 := Pac_Prc_Voucher_Validate_Sp.in_Project;
+   P_costkeylevel3 := Pac_Prc_Voucher_Validate_Sp.in_CHARGE_CODE;
+   P_costkeylevel4 := Pac_Prc_Voucher_Validate_Sp.in_RESOURCE_Code;
+   P_costkeylevel6 := NULL;
+   P_costkeylevel7 := NULL;
+   p_input_type := Pac_Prc_Voucher_Validate_Sp.in_Input_Type;
+   Pac_Prc_Voucher_Validate_Sp.v_unitpriceoverride := 0;
+   Pac_Prc_Voucher_Validate_Sp.v_rateCurrencyCode := TRIM(rateCurrencyCode);
+   Pac_Prc_Voucher_Validate_Sp.v_costCurrencyCode := TRIM(costCurrencyCode);
+   Pac_Prc_Voucher_Validate_Sp.v_chargeable := in_chargeable;
+
+   /* Check if the Role code is present in the Transaction*/
+   	BEGIN
+     SELECT prj.prisrole
+     INTO v_isRole
+     FROM srm_resources s,
+       prj_resources prj
+     WHERE s.ID       = prj.prid
+     AND s.unique_name=v_RESOURCE_CODE;
+     IF v_isRole = 1 THEN
+           RAISE_APPLICATION_ERROR( -20901, 'Role is not allowed in Resource ID.' );
+     END IF;
+     END;
+
+ 	/* Get transtype and set the SOURCEMODULE */
+	BEGIN
+
+		SELECT transtype
+		INTO Pac_Prc_Voucher_Validate_Sp.v_TRANSTYPE
+		FROM TRANSCLASS
+		WHERE TRANSCLASS = v_TRANSCLASS;
+	EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction class.' );
+		WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+			RAISE_APPLICATION_ERROR(-20952, 'Internal Server Error : Invalid transaction Class.' );
+	END;
+
+	BEGIN
+		SELECT DECODE(L.LOOKUP_CODE,'VOUCHER_EXPENSE', 52,'VOUCHER_OTHER', 53, 'IMPORTED', 50, 'NIKU_TIME', 51 )
+		INTO Pac_Prc_Voucher_Validate_Sp.v_SourceModule
+		FROM PPA_TRANSCONTROLAPINFO AP, CMN_LOOKUPS L
+		WHERE L.LOOKUP_TYPE = 'PAC_DOCUMENT_TYPE'
+		AND L.ID = AP.DOCUMENT_TYPE
+    AND AP.ID = Pac_Prc_Voucher_Validate_Sp.id;
+	EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20829, 'Unable to retrieve Entry Type.' );
+		WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+			RAISE_APPLICATION_ERROR(-20952, 'Internal Server Error : Invalid transaction Class.' );
+	END;
+
+  /* Validate the transaction class and resource type if the user manually types in transaction class of some other type */
+	BEGIN
+		StoO_selcnt := 0 ;
+		SELECT 1
+		INTO StoO_selcnt
+    FROM SRM_RESOURCES
+    WHERE UNIQUE_NAME = v_RESOURCE_CODE
+		AND RESOURCE_TYPE=(SELECT DECODE( Pac_Prc_Voucher_Validate_Sp.v_TRANSTYPE ,'L',0,'Q',1,'M',2,'X',3) FROM DUAL ) ;
+	EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction class.' );
+		WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+			RAISE_APPLICATION_ERROR(-20952, 'Internal Server Error : Invalid transaction Class.' );
+	END;
+
+  /*  VALIDATE PROJECT_CODE  ======================================== */
+   BEGIN
+		StoO_selcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			FROM PAC_MNT_PROJECTS
+			WHERE project_code = Pac_Prc_Voucher_Validate_Sp.v_PROJECT
+			  AND status = 'O'
+			  AND approved =1 );
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20791, 'Invalid PROJECT_CODE entered.' );
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				RAISE_APPLICATION_ERROR(-20791, 'Validate PROJECT_CODE ' || StoO_error || ' - ' || StoO_errmsg  );
+   END;
+
+  /*  VALIDATE TASK ======================================== */
+	BEGIN
+		StoO_selcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			FROM PRTASK PRT,PAC_MNT_PROJECTS INV
+			WHERE PRID = Pac_Prc_Voucher_Validate_Sp.in_taskID
+			AND PRT.PRPROJECTID = INV.ID
+			AND INV.PROJECT_CODE = Pac_Prc_Voucher_Validate_Sp.v_PROJECT);
+		EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20102, 'Invalid Task Entered.' );
+			WHEN OTHERS THEN
+				RAISE_APPLICATION_ERROR(-20103, 'Internal Server Error : Invalid Task.' );
+
+		IF StoO_selcnt = 0 THEN
+        RAISE_APPLICATION_ERROR( -20102, 'Invalid Task Entered' );
+    END IF;
+	END;
+
+  /* CLRT--28044: added for transaction capitalization. get the cost type from task, or its parent
+             task (or grandparent, etc), or investment. No need to worry about TASK_ID being NULL becuase it has
+             already been validated above. Hence cost_type will always be derived as in worst case it will default
+             to investment cost type and that will never be null. */
+  BEGIN
+         SELECT c.cost_type
+             INTO Pac_Prc_Voucher_Validate_Sp.v_costType
+         FROM ( SELECT NVL(pt1.cost_type, NVL(pt2.cost_type, p.COST_TYPE)) as cost_type,
+                    row_number() over (ORDER BY pt2.PRWBSSEQUENCE DESC) row_num
+             FROM PAC_MNT_PROJECTS p, PRTASK pt1
+                  LEFT OUTER JOIN PRTASK pt2 ON
+                    pt2.cost_type IS NOT NULL
+                    AND pt2.PRPROJECTID = pt1.PRPROJECTID
+                    AND pt2.PRWBSSEQUENCE &lt;= pt1.PRWBSSEQUENCE
+                    AND pt2.WBS_NNBSEQ &gt; pt1.PRWBSSEQUENCE
+                    AND pt2.PRID &lt;&gt; pt1.PRID
+             WHERE pt1.prprojectid = p.id AND
+                   pt1.prid = Pac_Prc_Voucher_Validate_Sp.in_taskID
+           ) c
+         WHERE c.row_num = 1;
+  END;
+
+
+
+  /*   Get company code from the project code ======================================== */
+  BEGIN
+		 SELECT ID,COMPANY_CODE
+		 INTO V_PROJECT_ID,v_Client
+		 FROM PAC_MNT_PROJECTS
+     WHERE PROJECT_CODE = v_PROJECT;
+
+	 EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20791, 'Voucher Entry: Invalid COMPANY_CODE/PROJECT_CODE/RESOURCE_CODE entered.' );
+			WHEN OTHERS THEN
+			    StoO_error := SQLCODE;
+			    StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20792, 'Validate PROJECT_CODE ' || StoO_error || ' - ' || StoO_errmsg  );
+
+  END;
+
+/*  VALIDATE CHARGE_CODE sys_IsValidChargeCode ======================================== */
+	BEGIN
+		 SELECT 1 INTO StoO_selcnt
+		 FROM DUAL
+		 WHERE  EXISTS (
+			SELECT  1
+			FROM PRCHARGECODE
+			WHERE PREXTERNALID = Pac_Prc_Voucher_Validate_Sp.in_Charge_Code
+				  AND PRISOPEN &lt;&gt; 0 AND (PRPROJECTID IS NULL OR PRPROJECTID=V_PROJECT_ID));
+
+		 EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20793, 'Invalid or inactive ChargeCode entered.' );
+			WHEN OTHERS THEN
+			    StoO_error := SQLCODE;
+			    StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20794, 'Validate ChargeCode ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+
+/*  VALIDATE VARIATION sys_IsValidInputType======================================== */
+	BEGIN
+		 StoO_error   				  := 0;
+		 SELECT 1 INTO StoO_selcnt
+		 FROM DUAL
+		 WHERE  EXISTS (
+			SELECT  1
+			FROM PRTYPECODE
+			WHERE PREXTERNALID = NVL(Pac_Prc_Voucher_Validate_Sp.in_Input_Type,PREXTERNALID)
+				  AND PRISOPEN &lt;&gt; 0 );
+		 EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20797, 'Invalid or inactive InputType entered.' );
+			WHEN OTHERS THEN
+			    StoO_error := SQLCODE;
+			    StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20798, 'Validate InputType ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+
+/*
+  BEGIN
+	Sp_Setcostkeylevels(Pac_Prc_Voucher_Validate_Sp.v_ClientLevel,
+	 					Pac_Prc_Voucher_Validate_Sp.v_ProjectLevel,
+						Pac_Prc_Voucher_Validate_Sp.v_CostLevel,
+						Pac_Prc_Voucher_Validate_Sp.v_EmplyLevel);
+
+		EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			    NULL;
+		    WHEN OTHERS THEN
+			    StoO_error := SQLCODE;
+			    StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20803, 'Sp_Setcostkeylevels ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+	IF  Pac_Prc_Voucher_Validate_Sp.v_ProjectLevel = 2 THEN
+*/
+    Pac_Prc_Voucher_Validate_Sp.v_Project :=  Pac_Prc_Voucher_Validate_Sp.P_costkeylevel2;
+--  ELSE
+--    Pac_Prc_Voucher_Validate_Sp.v_Project :=  Pac_Prc_Voucher_Validate_Sp.P_costkeylevel3;
+--  END IF;
+  BEGIN
+	Sp_Ppasetcostemployee(Pac_Prc_Voucher_Validate_Sp.v_CostLevel,
+	 					  Pac_Prc_Voucher_Validate_Sp.v_EmplyLevel,
+						  Pac_Prc_Voucher_Validate_Sp.P_costkeylevel3,
+						  Pac_Prc_Voucher_Validate_Sp.P_costkeylevel4,
+						  Pac_Prc_Voucher_Validate_Sp.P_costkeylevel6,
+						  Pac_Prc_Voucher_Validate_Sp.p_costkeylevel7,
+              			  Pac_Prc_Voucher_Validate_Sp.p_input_type,
+              			  Pac_Prc_Voucher_Validate_Sp.v_RESOURCE_Code,
+              			  Pac_Prc_Voucher_Validate_Sp.v_CHARGE_CODE);
+
+        EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			    NULL;
+		    WHEN OTHERS THEN
+			    StoO_error := SQLCODE;
+			    StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20804, 'Sp_Ppasetcostemployee ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+
+
+  Pac_Prc_Voucher_Validate_Sp.v_CostCodeTransType := Pac_Prc_Voucher_Validate_Sp.v_TransType;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT E.locationid,  E.departcode,  E.actualcost, E.standardcost
+		INTO
+			 Pac_Prc_Voucher_Validate_Sp.v_EmplyHomeLocation, Pac_Prc_Voucher_Validate_Sp.v_EmplyHomeDepart,
+			 Pac_Prc_Voucher_Validate_Sp.v_EmplyActualCost,   Pac_Prc_Voucher_Validate_Sp.v_EmplyStdCost
+    FROM PAC_MNT_RESOURCES E
+    WHERE E.RESOURCE_CODE = Pac_Prc_Voucher_Validate_Sp.in_Resource_Code;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20810, 'v_EmplyHomeLocation ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+		Pac_Prc_Voucher_Validate_Sp.v_ErrorFlag :=  -2;
+		BEGIN
+			 Pac_Prc_Voucher_Errorflag_Sp(v_ErrorFlag);   /* don't use exception block with this proc */
+	 	END;
+	END;
+	END IF;
+	BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		  FROM DUAL
+		 WHERE NOT EXISTS (
+         SELECT 1 FROM PAC_MNT_RESOURCES E, SRM_RESOURCES R
+          WHERE ( Pac_Prc_Voucher_Validate_Sp.in_Resource_Code = E.RESOURCE_CODE
+            AND E.RESOURCE_CODE = R.UNIQUE_NAME
+            AND Pac_Prc_Voucher_Validate_Sp.in_TransDate
+                BETWEEN NVL(R.DATE_OF_HIRE, TO_DATE('01/01/1900', 'mm/dd/yyyy')) AND
+                 NVL(R.DATE_OF_TERMINATION,TO_DATE('01/01/2999', 'mm/dd/yyyy')) ) );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+				 WHEN NO_DATA_FOUND THEN
+				  StoO_rowcnt := 0;
+				  StoO_selcnt := 0;
+				 WHEN OTHERS THEN
+				 	  StoO_rowcnt := 0;
+					  StoO_selcnt := 0;
+					  StoO_error := SQLCODE;
+					  StoO_errmsg := SQLERRM;
+					  RAISE_APPLICATION_ERROR(-20811, 'RESOURCE_CODE DATE checking ' || StoO_error || ' - ' || StoO_errmsg  );
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			 Pac_Prc_Voucher_Validate_Sp.v_errorflag :=  -15;
+			 BEGIN
+		 		Pac_Prc_Voucher_Errorflag_Sp(v_ErrorFlag);   /* don't use exception block with this proc */
+			 END;
+		END;
+		END IF;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT transratesourcelabor, transratesourcematerials, transratesourceequipment,
+		  	   projectratelabor, 	projectratematerials, projectrateequipment,
+			   locationid, departcode, currentrevision, budget, budgetlevellabor,
+			   projectcostlabor, projectstdcostlabor, transratelocationlabor, budgetlevelmaterial,
+			   projectcostmaterials, projectstdcostmaterials, transratelocationmaterials,
+			   budgetlevelequipment, projectcostequipment, projectstdcostequipment,
+			   transratelocationequipment, type_,  transrateoverrideequipment,
+			   transrateoverridematerials, transrateoverridelabor, transcostsourcelabor,
+			   transcostsourcematerials, transcostsourceequipment, COSTPLUS, transratesourceexpenses,
+			   transcostsourceexpenses, transratelocationexpenses, transrateoverrideexpenses
+		INTO Pac_Prc_Voucher_Validate_Sp.v_transratesourcelabor,
+		     Pac_Prc_Voucher_Validate_Sp.v_transratesourcematerials,
+		     Pac_Prc_Voucher_Validate_Sp.v_transratesourceequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectratelabor,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectratematerials,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectrateequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_projlocationid,
+			 Pac_Prc_Voucher_Validate_Sp.v_projdepartcode,
+			 Pac_Prc_Voucher_Validate_Sp.v_currentrevision,
+			 Pac_Prc_Voucher_Validate_Sp.v_budgeted,
+			 Pac_Prc_Voucher_Validate_Sp.v_budgetlevellabor,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectcostlabor,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectstdcostlabor,
+			 Pac_Prc_Voucher_Validate_Sp.v_transratelocationlabor,
+			 Pac_Prc_Voucher_Validate_Sp.v_budgetlevelmaterials,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectcostmaterials,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectstdcostmaterials,
+			 Pac_Prc_Voucher_Validate_Sp.v_transratelocationmaterials,
+			 Pac_Prc_Voucher_Validate_Sp.v_budgetlevelequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectcostequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_projectstdcostequipment,
+		     Pac_Prc_Voucher_Validate_Sp.v_transratelocationequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_projecttype,
+			 Pac_Prc_Voucher_Validate_Sp.v_overrideequipment,
+			 Pac_Prc_Voucher_Validate_Sp.v_overridematerials,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_overridelabor,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transcostsourcelabor,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transcostsourcematerials,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transcostsourceequipment,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_COSTPLUS,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transratesourceexpenses,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transcostsourceexpenses,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_transratelocationexpenses,
+		 	 Pac_Prc_Voucher_Validate_Sp.v_overrideexpenses
+    FROM PAC_MNT_PROJECTS
+		WHERE PROJECT_CODE = Pac_Prc_Voucher_Validate_Sp.in_Project
+     AND (COMPANY_CODE = Pac_Prc_Voucher_Validate_Sp.v_Client OR COMPANY_CODE IS NULL);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20812, 'PROJECT_CODE settings ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+		Pac_Prc_Voucher_Validate_Sp.v_errorflag :=  -3;
+		BEGIN
+			 Pac_Prc_Voucher_Errorflag_Sp(v_ErrorFlag);   /* don't use exception block with this proc */
+		END;
+	END;
+	END IF;
+	BEGIN
+		IF  Pac_Prc_Voucher_Validate_Sp.v_costcodetranstype = 'L' THEN
+		BEGIN
+			Pac_Prc_Voucher_Validate_Sp.v_ratesource :=  Pac_Prc_Voucher_Validate_Sp.v_transratesourcelabor;
+			Pac_Prc_Voucher_Validate_Sp.v_costsource :=  Pac_Prc_Voucher_Validate_Sp.v_transcostsourcelabor;
+			Pac_Prc_Voucher_Validate_Sp.v_transratelocation :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocationlabor;
+			Pac_Prc_Voucher_Validate_Sp.v_rate :=  Pac_Prc_Voucher_Validate_Sp.v_projectratelabor;
+			/* commented since budgeting is changed and this is a reflection of that change*/
+			--Pac_Prc_Voucher_Validate_Sp.v_actualcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectcostlabor;
+			Pac_Prc_Voucher_Validate_Sp.v_stdcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectstdcostlabor;
+			Pac_Prc_Voucher_Validate_Sp.v_budgetlevel :=  Pac_Prc_Voucher_Validate_Sp.v_budgetlevellabor;
+			Pac_Prc_Voucher_Validate_Sp.v_override := 0;
+		END;
+		ELSE
+			IF  Pac_Prc_Voucher_Validate_Sp.v_costcodetranstype = 'M' THEN
+			BEGIN
+				Pac_Prc_Voucher_Validate_Sp.v_ratesource :=  Pac_Prc_Voucher_Validate_Sp.v_transratesourcematerials;
+				Pac_Prc_Voucher_Validate_Sp.v_costsource :=  Pac_Prc_Voucher_Validate_Sp.v_transcostsourcematerials;
+				Pac_Prc_Voucher_Validate_Sp.v_transratelocation :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocationmaterials;
+				Pac_Prc_Voucher_Validate_Sp.v_rate :=  Pac_Prc_Voucher_Validate_Sp.v_projectratematerials;
+				--Pac_Prc_Voucher_Validate_Sp.v_actualcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectcostmaterials;
+				Pac_Prc_Voucher_Validate_Sp.v_stdcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectstdcostmaterials;
+				Pac_Prc_Voucher_Validate_Sp.v_budgetlevel :=  Pac_Prc_Voucher_Validate_Sp.v_budgetlevelmaterials;
+				Pac_Prc_Voucher_Validate_Sp.v_override :=  0;
+			END;
+			ELSE
+				IF  Pac_Prc_Voucher_Validate_Sp.v_costcodetranstype = 'Q' THEN
+				BEGIN
+					Pac_Prc_Voucher_Validate_Sp.v_ratesource :=  Pac_Prc_Voucher_Validate_Sp.v_transratesourceequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_costsource :=  Pac_Prc_Voucher_Validate_Sp.v_transcostsourceequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_transratelocation :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocationequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_rate :=  Pac_Prc_Voucher_Validate_Sp.v_projectrateequipment;
+					--Pac_Prc_Voucher_Validate_Sp.v_actualcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectcostequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_stdcost :=  Pac_Prc_Voucher_Validate_Sp.v_projectstdcostequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_budgetlevel :=  Pac_Prc_Voucher_Validate_Sp.v_budgetlevelequipment;
+					Pac_Prc_Voucher_Validate_Sp.v_override :=  0;
+				END;
+				ELSE
+					IF  Pac_Prc_Voucher_Validate_Sp.v_costcodetranstype = 'X' THEN
+					BEGIN
+						Pac_Prc_Voucher_Validate_Sp.v_ratesource :=  Pac_Prc_Voucher_Validate_Sp.v_transratesourceexpenses;
+						Pac_Prc_Voucher_Validate_Sp.v_costsource :=  Pac_Prc_Voucher_Validate_Sp.v_transcostsourceexpenses;
+						Pac_Prc_Voucher_Validate_Sp.v_transratelocation :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocationexpenses;
+						Pac_Prc_Voucher_Validate_Sp.v_override := 0;
+					END;
+					END IF;
+				END IF;
+			END IF;
+		END IF;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT locationid, departcode
+		  INTO Pac_Prc_Voucher_Validate_Sp.v_clientlocation, Pac_Prc_Voucher_Validate_Sp.v_clientdept
+		  FROM CLNTSUPP
+		 WHERE CLNTSUPP.COMPANY_CODE = Pac_Prc_Voucher_Validate_Sp.v_CLIENT;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20815, 'COMPANY_CODE location/department ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+
+	IF  Pac_Prc_Voucher_Validate_Sp.v_rate IS NULL THEN
+		Pac_Prc_Voucher_Validate_Sp.v_rate :=  0;
+	END IF;
+	IF  Pac_Prc_Voucher_Validate_Sp.v_stdcost IS NULL THEN
+		Pac_Prc_Voucher_Validate_Sp.v_stdcost :=  0;
+	END IF;
+	IF  Pac_Prc_Voucher_Validate_Sp.v_actualcost IS NULL THEN
+		BEGIN
+		Pac_Prc_Voucher_Validate_Sp.v_actualcost :=  0;
+		 END;
+	END IF;
+
+	IF   Pac_Prc_Voucher_Validate_Sp.v_TRANSTYPE != 'WA' THEN
+	BEGIN
+		 Pac_Prc_Voucher_Validate_Sp.v_cTransDate :=  TO_CHAR(Pac_Prc_Voucher_Validate_Sp.v_TRANSDATE,'mm/dd/yyyy');
+		 Pac_Prc_Voucher_Validate_Sp.v_costoverride :=  Pac_Prc_Voucher_Validate_Sp.v_override;
+
+		 BEGIN
+
+            nOrigRate :=  in_BillRate;
+            nOrigCost :=  in_ActualCost;
+            nRate := in_BillRate;
+           nCost := in_ActualCost;
+      cRateCurrencyCode := rateCurrencyCode;
+      cCostCurrencyCode := costCurrencyCode;
+            cOrigRateCurrencyCode := cRateCurrencyCode;
+            cOrigCostCurrencyCode := cCostCurrencyCode;
+
+
+		 Ppa_Getrate_Withrole(
+				 cClient=&gt;Pac_Prc_Voucher_Validate_Sp.v_CLIENT,
+				 cProject=&gt;Pac_Prc_Voucher_Validate_Sp.v_PROJECT,
+         		 cCharge_Code=&gt;Pac_Prc_Voucher_Validate_Sp.v_CHARGE_CODE,
+         		 cInput_Type=&gt;Pac_Prc_Voucher_Validate_Sp.p_input_type,
+         		 cResource_Code=&gt;Pac_Prc_Voucher_Validate_Sp.v_RESOURCE_CODE,
+				 cLocation =&gt;NULL,
+				 cDepartCode =&gt;NULL,
+         		 in_cTransType=&gt;Pac_Prc_Voucher_Validate_Sp.v_transtype,
+				 cTransDate=&gt;Pac_Prc_Voucher_Validate_Sp.v_ctransdate,
+				 nQuantity=&gt;Pac_Prc_Voucher_Validate_Sp.v_QUANTITY,
+				 bAsResultSet=&gt;0,
+				 nAmount=&gt;Pac_Prc_Voucher_Validate_Sp.v_AMOUNT,
+				 nRate=&gt;Pac_Prc_Voucher_Validate_Sp.nRate,
+				 nCost=&gt;Pac_Prc_Voucher_Validate_Sp.nCost,
+				 nStdCost=&gt;Pac_Prc_Voucher_Validate_Sp.v_StdCost,
+				 nFactorAmt=&gt;Pac_Prc_Voucher_Validate_Sp.v_factoramount,
+				 nBurdenAmt=&gt;Pac_Prc_Voucher_Validate_Sp.v_burdenamount,
+				 nOverheadAmt=&gt;Pac_Prc_Voucher_Validate_Sp.v_overheadamount,
+				 cCostPlusCode=&gt;Pac_Prc_Voucher_Validate_Sp.v_costplusrule,
+				 --cCostRuleCode=&gt;Pac_Prc_Voucher_Validate_Sp.v_multiplier,
+				 bRateFound=&gt;Pac_Prc_Voucher_Validate_Sp.b_ratefound,
+				 budgetcall=&gt;0,
+				 bCostOverride=&gt;Pac_Prc_Voucher_Validate_Sp.v_costoverride,
+				 currencyCodeReturned=&gt;cRateCurrencyCode,
+				 costCurrencyCode=&gt;cCostCurrencyCode,
+				 cRoleCode=&gt;Pac_Prc_Voucher_Validate_Sp.vRoleCode,
+				 cTransClass=&gt;in_TransClass,
+				 RC1=&gt;temp_rc,
+				 cCost_type=&gt;Pac_Prc_Voucher_Validate_Sp.v_costType);
+
+				 EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+						RAISE_APPLICATION_ERROR(-20816, 'Ppa_Getrate ' || StoO_error || ' - ' || StoO_errmsg  );
+
+		 END;
+
+
+	IF ( ( b_ratefound &lt;&gt; 1 ) AND ( nOrigRate IS NULL )  ) THEN
+		RAISE_APPLICATION_ERROR( -20242, 'PPA_GETRATE =&gt; Rate Not Found ' );
+        END IF;
+
+
+	IF ( nOrigCost IS NULL AND nCost IS NULL ) THEN
+		RAISE_APPLICATION_ERROR( -20112, 'PPA_GETRATE =&gt; Cost Not Found ' ) ; -- COST NOT FOUND
+        END IF ;
+
+            IF nOrigRate IS NOT NULL THEN
+              BEGIN
+                nRate := nOrigRate;
+                cRateCurrencyCode := cOrigRateCurrencyCode;
+              END;
+            END IF; -- IF nOrigRate IS NOT NULL THEN
+
+            IF nOrigCost IS NOT NULL THEN
+              BEGIN
+                nCost := nOrigCost;
+                cCostCurrencyCode := cOrigCostCurrencyCode;
+              END;
+            END IF; -- IF nOrigCost IS NOT NULL THEN
+
+
+
+	END;
+	END IF;
+
+
+
+
+/*===&gt;&gt;&gt;   get location - department  */
+	BEGIN
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+		SELECT sourcefieldentity,  sourcefieldlocation,  sourcefielddepartment
+		 INTO Pac_Prc_Voucher_Validate_Sp.v_sourceentity,
+		      Pac_Prc_Voucher_Validate_Sp.v_sourcelocation,
+			  Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment
+		 FROM NAMEOPTIONS;
+		 StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20819, 'sourceentity/loc/dept ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+ IF Pac_Prc_Voucher_Validate_Sp.v_sourcelocation = 'CL' THEN
+    Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_clientlocation;
+ ELSE
+    IF Pac_Prc_Voucher_Validate_Sp.v_sourcelocation = 'PL' THEN
+	 	Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_projlocationid;
+	 ELSE
+	    IF Pac_Prc_Voucher_Validate_Sp.v_sourcelocation = 'EL' THEN
+		   Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_emplyhomelocation;
+		ELSE
+		   IF Pac_Prc_Voucher_Validate_Sp.v_sourcelocation = 'CCL' THEN
+			  Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_projlocationid;
+		   ELSE
+		      IF Pac_Prc_Voucher_Validate_Sp.v_sourcelocation = 'RL' THEN
+			  BEGIN
+				 Pac_Prc_Voucher_Validate_Sp.v_locationsource :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocation;
+				 IF Pac_Prc_Voucher_Validate_Sp.v_locationsource = Pac_Prc_Voucher_Validate_Sp.v_clientlevel THEN
+					Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_clientlocation;
+				 ELSE
+					IF Pac_Prc_Voucher_Validate_Sp.v_locationsource = Pac_Prc_Voucher_Validate_Sp.v_emplylevel THEN
+					   Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_emplyhomelocation;
+					ELSE
+					   IF Pac_Prc_Voucher_Validate_Sp.v_locationsource = Pac_Prc_Voucher_Validate_Sp.v_projectlevel OR
+					      Pac_Prc_Voucher_Validate_Sp.v_locationsource = Pac_Prc_Voucher_Validate_Sp.v_costlevel THEN
+					      Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_projlocationid;
+					   ELSE
+					      IF Pac_Prc_Voucher_Validate_Sp.v_locationsource = 101 THEN
+						     Pac_Prc_Voucher_Validate_Sp.v_locationid :=  Pac_Prc_Voucher_Validate_Sp.v_budgetlocation;
+						  END IF;
+					   END IF;
+                   END IF;
+				 END IF;
+			  END;
+   		  END IF;
+      	   END IF;
+		END IF;
+	 END IF;
+  END IF;
+  IF Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment = 'CD' THEN
+     Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_clientdept;
+  ELSE
+  	  IF Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment = 'PD' THEN
+		 Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_projdepartcode;
+	  ELSE
+		 IF Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment = 'ED' THEN
+      Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_EMPLYHOMEDEPART;
+		 ELSE
+			IF Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment = 'CCD' THEN
+			   Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_projdepartcode;
+			ELSE
+			   IF Pac_Prc_Voucher_Validate_Sp.v_sourcedepartment = 'RD' THEN
+			   BEGIN
+				  Pac_Prc_Voucher_Validate_Sp.v_deptsource :=  Pac_Prc_Voucher_Validate_Sp.v_transratelocation;
+				  IF Pac_Prc_Voucher_Validate_Sp.v_deptsource = Pac_Prc_Voucher_Validate_Sp.v_clientlevel THEN
+					 Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_clientdept;
+				  ELSE
+					 IF Pac_Prc_Voucher_Validate_Sp.v_deptsource = Pac_Prc_Voucher_Validate_Sp.v_emplylevel THEN
+             Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_EMPLYHOMEDEPART;
+					 ELSE
+					   IF Pac_Prc_Voucher_Validate_Sp.v_deptsource = Pac_Prc_Voucher_Validate_Sp.v_projectlevel OR
+					      Pac_Prc_Voucher_Validate_Sp.v_deptsource = Pac_Prc_Voucher_Validate_Sp.v_costlevel THEN
+					      Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_projdepartcode;
+					   ELSE
+						  IF Pac_Prc_Voucher_Validate_Sp.v_deptsource = 101 THEN
+					  	  	Pac_Prc_Voucher_Validate_Sp.v_departcode :=  Pac_Prc_Voucher_Validate_Sp.v_budgetdepartment;
+							 END IF;
+					   END IF;
+					 END IF;
+				  END IF;
+			   END;
+			   END IF;
+	        END IF;
+	      END IF;
+	   END IF;
+	END IF;
+/*-----------*/
+   BEGIN
+    Sp_Getclasses_Output(COMPANY_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.v_Client,
+		 					 PROJECT_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.in_Project,
+               				 CHARGE_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.in_Charge_CODE,
+               				 RESOURCE_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.in_Resource_Code,
+		 					 CLNTCLASS=&gt;Pac_Prc_Voucher_Validate_Sp.v_CLIENTCLASS,
+		 					 PROJCLASS=&gt;Pac_Prc_Voucher_Validate_Sp.v_PROJECTCLASS,
+							 -- COSTCLASS=&gt;Pac_Prc_Voucher_Validate_Sp.v_COSTCLASS,
+               	 			 RESOURCE_CLASS=&gt;Pac_Prc_Voucher_Validate_Sp.v_RESOURCE_CLASS,
+		 					 WIPCLASS=&gt;Pac_Prc_Voucher_Validate_Sp.v_WIPCLASS);
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20820, 'Sp_Getclasses_Output ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+	BEGIN
+    Sp_Getentity_Output(COMPANY_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.v_Client,
+		 					PROJECT_CODE=&gt;Pac_Prc_Voucher_Validate_Sp.in_Project,
+              				emplycodeinit=&gt;Pac_Prc_Voucher_Validate_Sp.in_Resource_Code,
+		 					ENTITY=&gt;Pac_Prc_Voucher_Validate_Sp.v_ENTITY);
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR(-20821, 'Sp_Getentity_Output ' || StoO_error || ' - ' || StoO_errmsg  );
+	END;
+	IF StoO_error = 0 THEN
+	   BEGIN
+	   		IF TRIM(v_ENTITY) IS NULL OR TRIM(v_LOCATIONID) IS NULL OR TRIM(v_DEPARTCODE) IS NULL THEN
+			   RAISE_APPLICATION_ERROR(-20822, 'PROJECT_CODE: ' || v_PROJECT || ' LocationId has no valid Entity.' );
+			END IF;
+		END;
+	END IF;
+
+	BEGIN
+		Pac_Prc_Voucher_Validate_Sp.v_TotalCost := NVL(Pac_Prc_Voucher_Validate_Sp.v_ActualCost, 0) *
+												   NVL(Pac_Prc_Voucher_Validate_Sp.v_Quantity, 0);
+		Pac_Prc_Voucher_Validate_Sp.v_AMOUNT :=  Pac_Prc_Voucher_Validate_Sp.v_QUANTITY
+											     * Pac_Prc_Voucher_Validate_Sp.v_BillRate;
+        Pac_Prc_Voucher_Validate_Sp.v_TotalAmount :=  Pac_Prc_Voucher_Validate_Sp.v_AMOUNT
+	  											  + NVL(Pac_Prc_Voucher_Validate_Sp.v_FactorAmount, 0)
+												  + NVL(Pac_Prc_Voucher_Validate_Sp.v_BurdenAmount, 0)
+												  + NVL(Pac_Prc_Voucher_Validate_Sp.v_OverheadAmount, 0);
+	END;
+	SAVEPOINT VoucherEntryModify;
+
+
+	BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+    IF NVL(Pac_Prc_Voucher_Validate_Sp.in_TransNo, 0 ) = 0 THEN
+		BEGIN
+		   SELECT S_62_1_PPA_TRANSCONTROL.NEXTVAL
+		   INTO v_OldTransNo
+		   FROM dual;
+
+		   out_TransNo  := v_OldTransNo;
+
+		 EXCEPTION
+		   WHEN NO_DATA_FOUND THEN
+			   NULL;
+		   WHEN OTHERS THEN
+			   StoO_error := SQLCODE;
+			   StoO_errmsg := SQLERRM;
+			   RAISE_APPLICATION_ERROR(-20786, 'SEQUENCE CURRVAL FOR TRANCONTROLAPINFO : ' || StoO_error || ' - ' || StoO_errmsg  );
+		 END;
+
+		   BEGIN
+		   	   /*checkin start*/
+         Pac_Prc_Voucher_Insertrec_Sp(
+               v_OldTransNo,
+               v_SOURCEMODULE,
+               v_TRANSTYPE,
+               v_BATCHNO,
+               v_ENTRYUSER,
+               v_ENTRYDATE,
+			   v_LASTUPDATEUSER,
+               v_LASTUPDATEDATE,
+               v_EXTERNALBATCHID,
+               v_EXTERNALTRANSNO,
+               v_LOCATIONID,
+               v_DEPARTCODE,
+               v_ENTITY,
+               v_TRANSDATE,
+               v_CLIENT,
+               v_PROJECT,
+         	   v_CHARGE_CODE,
+               v_INPUT_TYPE,
+               v_RESOURCE_CODE,
+               v_QUANTITY, nRate,
+         	   v_AMOUNT,
+               v_FACTORAMOUNT,
+               v_BURDENAMOUNT,
+               v_OVERHEADAMOUNT,
+               v_TOTALAMOUNT,
+               nCost,
+               v_STDCOST,
+               v_TOTALCOST,
+               Pac_Prc_Voucher_Validate_Sp.v_costplusrule,
+               v_BURDENCODE, v_OVERHEADCODE, v_CHARGEABLE, TRIM(in_Notes), v_INVOICENO,
+               v_EMPLYHOMELOCATION,
+               v_EMPLYHOMEDEPART,
+               v_EMPLYACTUALCOST,
+               v_EMPLYSTDCOST,
+         	   v_PROJECTTYPE,
+               v_CLIENTCLASS,
+               v_PROJECTCLASS,
+               v_TRANSCLASS,
+         	   v_RESOURCE_CLASS,
+               v_WIPCLASS,
+               v_WORKINT,
+               v_WORKBUF,
+         	   cRateCurrencyCode,
+               cCostCurrencyCode,
+               v_stdCurrencyCode,
+               Pac_Prc_Voucher_Validate_Sp.vRoleCode,
+               Pac_Prc_Voucher_Validate_Sp.userLov1,
+               Pac_Prc_Voucher_Validate_Sp.userLov2,
+               Pac_Prc_Voucher_Validate_Sp.expenseType,
+               Pac_Prc_Voucher_Validate_Sp.in_taskID,
+               Pac_Prc_Voucher_Validate_Sp.id,
+               v_costType);
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+						IF ( StoO_error = -20801 ) THEN
+						   RAISE_APPLICATION_ERROR(-20801, 'Note is too big'  );
+						ELSIF( StoO_error BETWEEN -20999 and -20000 ) THEN
+						   RAISE_APPLICATION_ERROR(StoO_error, 'Pac_Prc_Voucher_Insertrec_Sp ' || StoO_error || ' - ' || StoO_errmsg  );
+						ELSE
+						   RAISE_APPLICATION_ERROR(-20824, 'Pac_Prc_Voucher_Insertrec_Sp ' || StoO_error || ' - ' || StoO_errmsg  );
+						END IF;
+		   END;
+
+		ELSE
+
+		   BEGIN
+		   /*checkin start*/
+		       Pac_Prc_Voucher_Updaterec_Sp( v_OldTransNo,
+			   v_SOURCEMODULE, v_TRANSTYPE, v_BATCHNO,v_ENTRYUSER ,v_ENTRYDATE,
+			   v_LASTUPDATEUSER, v_LASTUPDATEDATE, v_EXTERNALBATCHID, v_EXTERNALTRANSNO,
+			   v_LOCATIONID, v_DEPARTCODE, v_ENTITY, v_TRANSDATE, v_CLIENT, v_PROJECT,
+         	   v_CHARGE_CODE, v_INPUT_TYPE, v_RESOURCE_CODE, v_QUANTITY, nRate,
+			   v_AMOUNT, v_FACTORAMOUNT, v_BURDENAMOUNT, v_OVERHEADAMOUNT, v_TOTALAMOUNT,
+			   nCost, v_STDCOST, v_TOTALCOST,
+			   Pac_Prc_Voucher_Validate_Sp.v_costplusrule, -- v_COSTRULECODE, : partha
+			   v_BURDENCODE,
+         	   v_OVERHEADCODE, v_CHARGEABLE, TRIM(in_Notes), v_INVOICENO,
+			   v_EMPLYHOMELOCATION, v_EMPLYHOMEDEPART, v_EMPLYACTUALCOST, v_EMPLYSTDCOST,
+         	   v_PROJECTTYPE, v_CLIENTCLASS, v_PROJECTCLASS, v_TRANSCLASS,
+         	   v_RESOURCE_CLASS, v_WIPCLASS, v_WORKINT, v_WORKBUF,
+         	   cRateCurrencyCode, cCostCurrencyCode, v_stdCurrencyCode, Pac_Prc_Voucher_Validate_Sp.vRoleCode,
+               Pac_Prc_Voucher_Validate_Sp.userLov1, Pac_Prc_Voucher_Validate_Sp.userLov2,
+			   Pac_Prc_Voucher_Validate_Sp.expenseType,
+			   Pac_Prc_Voucher_Validate_Sp.in_taskID, -- Added for the bug fix for CLRT-16877
+			   v_costType
+               );
+
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+						IF ( StoO_error = -20801 ) THEN
+						   RAISE_APPLICATION_ERROR(-20801, 'Note is too big'  );
+						ELSIF( StoO_error BETWEEN -20999 and -20000 ) THEN
+						   RAISE_APPLICATION_ERROR(StoO_error, 'Pac_Prc_Voucher_Insertrec_Sp ' || StoO_error || ' - ' || StoO_errmsg  );
+						ELSE
+						   RAISE_APPLICATION_ERROR(-20824, 'Pac_Prc_Voucher_Insertrec_Sp ' || StoO_error || ' - ' || StoO_errmsg  );
+						END IF;
+		   END;
+		   /*checkin end*/
+		END IF;
+
+		IF StoO_error != 0 THEN
+	    BEGIN
+			 ROLLBACK TO SAVEPOINT VoucherEntryModify;
+	   		 RETURN;
+	    END;
+		END IF;
+	END;
+END Pac_Prc_Voucher_Validate_Sp;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PFM_UPSERT_CURVE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PFM_UPSERT_CURVE_SP" (
+
+   P_PORTFOLIO_ID          IN   NUMBER,
+   P_ID                    IN   NUMBER,
+   P_TABLE_NAME            IN   VARCHAR,
+   P_ATTRIBUTE             IN   VARCHAR,
+   P_OBJECT_ID             IN   NUMBER,
+   P_PLAN_ID               IN   NUMBER,
+   P_CURVE                 IN   CLOB
+
+)
+IS
+BEGIN
+
+  merge into pfm_clob_curves s
+  using
+  ( select p_portfolio_id portfolio_id, p_id id, p_table_name table_name, p_attribute attribute, p_object_id object_id, p_plan_id plan_id, p_curve clob_curve from dual ) c
+    on
+  ( s.portfolio_id = c.portfolio_id and s.id = c.id and s.table_name = c.table_name and s.attribute = c.attribute and s.object_id = c.object_id and s.plan_id = c.plan_id )
+  when matched then
+    update set s.clob_curve = c.clob_curve
+    delete where c.clob_curve is null
+  when not matched then
+    insert( portfolio_id, id, table_name, attribute, object_id, plan_id, clob_curve )
+    values( c.portfolio_id, c.id, c.table_name, c.attribute, c.object_id, c.plan_id, c.clob_curve )
+    where c.clob_curve is not null;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

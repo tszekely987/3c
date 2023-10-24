@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.invTimesheetNotesLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Timesheet Notes" languageCode="en" name="Timesheet Notes"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:timenote:tn.prid:note_id@,
+       @select:dim_prop:user_def:implied:timenote:inv.name:investment_name@,
+       @select:dim_prop:user_def:implied:timenote:t.prname:task_name@,  
+       @select:dim_prop:user_def:implied:timenote:r.full_name:resource_name@,       
+       @select:dim_prop:user_def:implied:timenote:tn.prcategory:note_category@,
+       @select:dim_prop:user_def:implied:timenote:tn.prvalue:note_text@,
+       @select:dim_prop:user_def:implied:timenote:u.full_name:created_by@,
+       @select:dim_prop:user_def:implied:timenote:tn.prcreatedtime:created_dt@,
+       @select:dim_prop:user_def:implied:timenote:u2.full_name:last_modified_by@,
+       @select:dim_prop:user_def:implied:timenote:tn.prmodtime:last_modified_dt@,
+       @select:dim_prop:user_def:implied:timenote:tp.prstart:time_period_start@,
+       @select:dim_prop:user_def:implied:timenote:@DBUSER@.cop_calc_finish_time_fct(tp.prfinish):time_period_end@
+FROM   inv_investments inv
+INNER  JOIN prtask t 
+       ON   inv.id = t.prprojectid
+INNER  JOIN prassignment a 
+       ON   t.prid = a.prtaskid
+INNER  JOIN srm_resources r 
+       ON   a.prresourceid = r.id
+INNER  JOIN prtimeentry te 
+       ON   a.prid = te.prassignmentid
+INNER  JOIN prnote tn 
+       ON   te.prid = tn.prrecordid
+       AND  tn.prtablename = 'PRTimeEntry'
+INNER  JOIN srm_resources u    ON   tn.created_by = u.user_id
+INNER  JOIN srm_resources u2
+       ON   tn.updated_by = u2.user_id
+INNER  JOIN prtimesheet ts
+       ON   te.prtimesheetid = ts.prid
+INNER  JOIN prtimeperiod tp
+       ON   ts.prtimeperiodid = tp.prid
+WHERE  inv.is_active <> 0
+AND    tn.prrecordid = @WHERE:PARAM:XML:INTEGER:/data/timeentryid/@value@
+AND    @WHERE:SECURITY:INV:inv.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="note_id" required="false">
+              
+              
+              
+              
+              <nls description="Note Internal ID" languageCode="en" name="Note Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_name" required="false">
+              
+              
+              
+              
+              <nls description="Investment" languageCode="en" name="Investment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_name" required="false">
+              
+              
+              
+              
+              <nls description="Task" languageCode="en" name="Task"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_name" required="false">
+              
+              
+              
+              
+              <nls description="Resource" languageCode="en" name="Resource"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="note_category" required="false">
+              
+              
+              
+              
+              <nls description="Category" languageCode="en" name="Category"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="note_text" required="false">
+              
+              
+              
+              
+              <nls description="Note" languageCode="en" name="Note"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_by" required="false">
+              
+              
+              
+              
+              <nls description="Created By" languageCode="en" name="Created By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_dt" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Created Date" languageCode="en" name="Created Date"/>
+              
+            </attribute>
+            <attribute id="last_modified_by" required="false">
+              
+              
+              
+              
+              <nls description="Modified By" languageCode="en" name="Modified By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_modified_dt" required="false">
+              
+              
+              
+              
+              <nls description="Modified Date" languageCode="en" name="Modified Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="time_period_start" required="false">
+              
+              
+              
+              
+              
+              <nls description="Time Period Start" languageCode="en" name="Time Period Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="time_period_end" required="false">
+              
+              
+              
+              
+              <nls description="Time Period End" languageCode="en" name="Time Period End"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_PORT_TOTAL_ROLE_SUM_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_PORT_TOTAL_ROLE_SUM_FCT" (p_portfolio NUMBER, p_plan NUMBER, p_attr_name VARCHAR, p_start DATE DEFAULT NULL, p_finish DATE DEFAULT NULL )
+   RETURN NUMBER
+IS
+ v_return NUMBER;
+ 
+BEGIN
+
+  v_return := 0;
+
+  FOR ao_rec IN (
+      select port.clob_curve from pfm_clob_curves port, PFM_ROLE_CAPACITY rc
+        where port.object_id = rc.role_id and rc.portfolio_id = port.id and rc.plan_id = port.plan_id
+        and port.attribute = 'ROLE_CAPACITY' and port.table_name = 'PFM_PORTFOLIOS' and port.id = p_portfolio
+        and port.plan_id = p_plan
+  )
+  LOOP
+    IF ( ao_rec.clob_curve IS NOT NULL ) THEN
+      v_return := v_return + PFM_SUM_FCT( ao_rec.clob_curve, p_start, p_finish );
+    END IF;
+  END LOOP;
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

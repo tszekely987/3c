@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_COSTPLUSQBE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_COSTPLUSQBE_SP" (
+costpluscode  VARCHAR2  DEFAULT '',
+description  VARCHAR2  DEFAULT '',
+language  VARCHAR2 ,
+RC1  IN OUT PAC_MNT_COSTPLUSQBE_SPPkg.RCT1)
+
+AS
+StoO_selcnt INTEGER;
+StoO_error  INTEGER;
+StoO_rowcnt INTEGER;
+StoO_crowcnt INTEGER := 0;
+StoO_fetchstatus INTEGER := 0;
+StoO_errmsg GLOBALPKG.STRING;
+StoO_sqlstatus INTEGER;
+var_costpluscode GLOBALPKG.STRING;
+var_desc GLOBALPKG.STRING;
+
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Murali
+   Modified Date :12/18/01
+*/
+
+ IF  ( PAC_MNT_COSTPLUSQBE_SP.costpluscode is NULL) THEN
+  var_costpluscode := '%';
+ ELSE
+  var_costpluscode := RTRIM(PAC_MNT_COSTPLUSQBE_SP.costpluscode);
+ END IF;
+ IF  ( PAC_MNT_COSTPLUSQBE_SP.description is NULL) THEN
+  var_desc  := '%';
+ ELSE
+  var_desc  := RTRIM(PAC_MNT_COSTPLUSQBE_SP.description);
+ END IF;
+
+ OPEN RC1 FOR
+ SELECT A.costpluscode,  A.description,  A.shortdesc,  c.name "applysto",  -1 "seq",  NULL  "flag", a.id FROM CMN_LOOKUPS_V c, costplus A
+ WHERE
+ (A.costpluscode  LIKE var_costpluscode
+  and A.description  LIKE var_desc)
+  and A.applytoactualstdcost = c.lookup_code
+  and c.LOOKUP_TYPE = 'PAC_MNT_COSTTYPE'
+  and c.LANGUAGE_CODE = language
+ ORDER BY A.costpluscode ;
+END PAC_MNT_COSTPLUSQBE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

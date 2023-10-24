@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_COSTRULES_EDITRANGE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_COSTRULES_EDITRANGE_SP" 
+(
+  costplusid  NUMBER ,
+  seq   NUMBER ,
+  RC1   IN OUT PAC_MNT_COSTRULES_EDITRANGEPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  counter   NUMBER;
+  mins  NUMBER;
+  maxs  NUMBER;
+  Loc_seq NUMBER;
+  costpluscode costplus.costpluscode%type;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	/* Get the code from id  as id is being passed */
+	select costpluscode into PAC_MNT_COSTRULES_EDITRANGE_SP.costpluscode from costplus where id = PAC_MNT_COSTRULES_EDITRANGE_SP.costplusid;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		Loc_seq  	:= PAC_MNT_COSTRULES_EDITRANGE_SP.seq;
+		SELECT   COUNT(sequence)
+		INTO PAC_MNT_COSTRULES_EDITRANGE_SP.counter FROM costplusrules
+		WHERE costpluscode = PAC_MNT_COSTRULES_EDITRANGE_SP.costpluscode;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  ( PAC_MNT_COSTRULES_EDITRANGE_SP.counter &lt;= 1) THEN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  'YES' "fromedit",  'YES' "toedit"
+		FROM DUAL;
+	END;
+	ELSE
+		IF  ( PAC_MNT_COSTRULES_EDITRANGE_SP.counter &gt; 1) THEN
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MIN(sequence)
+				INTO PAC_MNT_COSTRULES_EDITRANGE_SP.mins FROM costplusrules
+				WHERE costpluscode = PAC_MNT_COSTRULES_EDITRANGE_SP.costpluscode;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MAX(sequence)
+				INTO PAC_MNT_COSTRULES_EDITRANGE_SP.maxs FROM costplusrules
+				WHERE costpluscode = PAC_MNT_COSTRULES_EDITRANGE_SP.costpluscode;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  ( Loc_seq = -1) THEN
+				  Loc_seq := 1;
+			END IF;
+			IF  ( Loc_seq is NULL or Loc_seq=0) THEN
+				Loc_seq := PAC_MNT_COSTRULES_EDITRANGE_SP.maxs + 1;
+			END IF;
+			IF  ( Loc_seq &gt; PAC_MNT_COSTRULES_EDITRANGE_SP.mins and   Loc_seq &lt; PAC_MNT_COSTRULES_EDITRANGE_SP.maxs) THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				OPEN RC1 FOR
+				SELECT  'NO' "fromedit",  'NO' "toedit"
+				FROM DUAL;
+			ELSE
+				IF  ( Loc_seq &gt;= PAC_MNT_COSTRULES_EDITRANGE_SP.maxs) THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					OPEN RC1 FOR
+					SELECT  'NO' "fromedit",  'YES' "toedit"
+					FROM DUAL;
+				ELSE
+					IF  ( Loc_seq = PAC_MNT_COSTRULES_EDITRANGE_SP.mins) THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error  := 0;
+						OPEN RC1 FOR
+						SELECT  'YES' "fromedit",  'NO' "toedit"
+						FROM DUAL;
+					END IF;
+				END IF;
+			END IF;
+		END;
+		END IF;
+		END IF;
+END PAC_MNT_COSTRULES_EDITRANGE_SP;
+/*
+Modified By Deva
+Reason      Defined local variable Loc_seq NUMBER and initialized it with
+			value PAC_MNT_COSTRULES_EDITRANGE_SP.seq
+			Replaced all occurrences of PAC_MNT_COSTRULES_EDITRANGE_SP.seq with Loc_seq
+*/
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

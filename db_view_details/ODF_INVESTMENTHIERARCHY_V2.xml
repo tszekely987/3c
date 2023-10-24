@@ -1,0 +1,58 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_INVESTMENTHIERARCHY_V2">
+    <indexes/>
+    <text_length>5101</text_length>
+    <text>select   'x' pmd_analytical_partition_by, inv_hierarchies.id odf_pk, (inv_hierarchies.default_alloc_pct*(select (NVL(INV_INVESTMENTS.LABOR_ACTSUM,0) / 3600 /
+        PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.schedule_start is not null
+        and inv_investments.schedule_finish is not null
+        and inv_investments.id = inv_hierarchies.child_id)) as labor_actsum, inv_investments.odf_object_code as odf_object_code, (select inv_investments.ODF_OBJECT_CODE from inv_investments where inv_investments.id =
+        inv_hierarchies.parent_id) as parent_inv_type, (inv_hierarchies.default_alloc_pct *
+        ((SELECT (NVL(INV_INVESTMENTS.LABOR_ETCSUM,0)/3600/ PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.id = inv_hierarchies.child_id) +
+      	(SELECT (NVL(INV_INVESTMENTS.LABOR_ACTSUM,0)/3600/ PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.id = inv_hierarchies.child_id))) as labor_effort, (inv_hierarchies.default_alloc_pct*(select (NVL(INV_INVESTMENTS.LABOR_ETCSUM,0) / 3600 /
+        PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.schedule_start is not null
+        and inv_investments.schedule_finish is not null
+        and inv_investments.id = inv_hierarchies.child_id)) as labor_etcsum, odf_ca_investmenthierarchy.odf_period_end as odf_period_end, odf_ca_investmenthierarchy.odf_period_type as odf_period_type, (select inv_investments.ODF_OBJECT_CODE from inv_investments where inv_investments.id =
+        inv_hierarchies.child_id) as child_inv_type, ( inv_hierarchies.default_alloc_pct * (SELECT NVL(SUM (b.totalcost),0)
+        FROM ppa_wip a, ppa_wip_values b, inv_investments
+        WHERE a.transno = b.transno
+        AND b.currency_type = 'HOME'
+        AND a.status = 0
+        AND a.investment_id = inv_investments.id
+        AND inv_investments.id = inv_hierarchies.child_id
+        GROUP BY a.investment_id)
+        ) as aggr_actual_cost, (inv_hierarchies.default_alloc_pct*(select (NVL(INV_INVESTMENTS.LABOR_EACSUM,0) / 3600 /
+        PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.schedule_start is not null
+        and inv_investments.schedule_finish is not null
+        and inv_investments.id = inv_hierarchies.child_id)) as labor_eacsum, ( SELECT INV_INVESTMENTS.CURRENCY_CODE FROM INV_INVESTMENTS WHERE ID = INV_HIERARCHIES.child_id) as currency_code, (inv_hierarchies.default_alloc_pct * (SELECT (NVL(INV_INVESTMENTS.LABOR_VARIANCESUM,0)/3600/ PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.id = inv_hierarchies.child_id)) as labor_variancesum, odf_ca_investmenthierarchy.odf_period_start as odf_period_start, inv_hierarchies.DEFAULT_ALLOC_PCT as default_alloc_pct, inv_hierarchies.CHILD_ID as child_id, inv_hierarchies.PARENT_ID as parent_id, (case when (select count(*) from INV_HIERARCHIES where INV_HIERARCHIES.parent_id = INV_INVESTMENTS.id) > 0 then
+        INV_INVESTMENTS.id else null end) as hg_has_children, (inv_hierarchies.default_alloc_pct*(select (NVL(LABOR_BASESUM,0) / 3600 / PRJ_HPD_FACTOR_FCT())
+        from inv_investments
+        where inv_investments.id = inv_hierarchies.child_id)) as labor_basesum, odf_ca_investmenthierarchy.partition_code as partition_code, (select NVL(inv_hierarchies.default_alloc_pct
+		                            * (select fin_financials.planned_cst_total
+                                            from fin_financials, odf_object_instance_mapping
+                                            where odf_object_instance_mapping.primary_object_instance_id = inv_hierarchies.child_id
+                                                 and odf_object_instance_mapping.secondary_object_instance_id = fin_financials.id
+                                    		  and odf_object_instance_mapping.primary_object_instance_code = inv.odf_object_code
+                                    		  and odf_object_instance_mapping.secondary_object_instance_code = 'financials'  )
+		               		,0)
+	 	            -
+		            (NVL(inv_hierarchies.default_alloc_pct * (SELECT SUM (b.totalcost) FROM ppa_wip a, ppa_wip_values b
+        														WHERE a.transno = b.transno
+        														AND b.currency_type = 'HOME'
+        														AND a.status = 0
+        														AND a.investment_id = inv.id GROUP BY a.investment_id),0))
+		   from inv_investments inv
+		   where inv.id = inv_hierarchies.child_id) as cost_variance, odf_ca_investmenthierarchy.odf_entity_code as odf_entity_code  from inv_hierarchies inv_hierarchies JOIN odf_ca_inv odf_ca_inv ON odf_ca_inv.id=inv_hierarchies.child_id JOIN inv_investments inv_investments ON inv_investments.id=inv_hierarchies.child_id JOIN srm_resources CREATED ON CREATED.user_id=INV_HIERARCHIES.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=INV_HIERARCHIES.last_updated_by JOIN odf_ca_investmenthierarchy odf_ca_investmenthierarchy ON odf_ca_investmenthierarchy.id=inv_hierarchies.id  where INV_INVESTMENTS.ID = ODF_CA_INV.ID AND INV_INVESTMENTS.IS_CUSTOM = 0</text>
+  </QueryResult>
+</ClarityDBViewQuery>

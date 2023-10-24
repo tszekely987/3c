@@ -1,0 +1,16 @@
+<ClarityDBViewQuery>
+  <QueryResult code="ODF_WORK_PLAN_V2">
+    <indexes/>
+    <text_length>2050</text_length>
+    <text>select   'x' pmd_analytical_partition_by, work_plans.id odf_pk, work_plans.parent as parent, work_plans.PLAN_TYPE as plan_type, work_plans.CODE as code, work_plans.IS_ACTIVE as is_active, odf_ca_work_plan.odf_period_end as odf_period_end, odf_ca_work_plan.odf_period_type as odf_period_type, 'work_plan' as odf_obj_type, CREATED.FULL_NAME as created_by, work_plans.ODF_BLUEPRINT_ID as odf_blueprint_id, odf_ca_work_plan.odf_period_start as odf_period_start, work_plans.fiscal_year as fiscal_year, NVL((SELECT CCN.NAME
+                FROM BIZ_COM_PERIODS BCPN
+                INNER JOIN BIZ_COM_PERIODS BCPC ON BCPN.END_DATE = BCPC.START_DATE
+                INNER JOIN CMN_CAPTIONS_NLS CCN ON CCN.PK_ID = BCPN.ID
+                WHERE CCN.LANGUAGE_CODE =user_context.language_code
+                AND BCPN.PERIOD_TYPE='ANNUALLY'
+                AND BCPC.ID=WORK_PLANS.fiscal_year
+                AND BCPC.ENTITY_ID=BCPN.ENTITY_ID
+                AND CCN.TABLE_NAME = 'BIZ_COM_PERIODS'), 'Base') as prev_fiscal_year, work_plans.NAME as name, UPDATED.FULL_NAME as updated_by, NVL( work_plans.odf_blueprint_id, (select id from odf_blueprints b where b.type = NLS_UPPER('work_plan') and b.is_default = 1  ) ) as odf_blp_active_id, WORK_PLANS.CREATED_DATE as created_date, odf_ca_work_plan.partition_code as partition_code, (CASE WHEN (SELECT COUNT(*) FROM WORK_PLANS WP WHERE WP.PARENT = WORK_PLANS.ID) > 0 THEN
+                0 ELSE 1 END) as is_leaf_plan, WORK_PLANS.LAST_UPDATED_DATE as last_updated_date, odf_ca_work_plan.odf_entity_code as odf_entity_code , user_context.user_id odf_user_id from work_plans work_plans inner join (select u.id user_id, u.user_name, u.locale, l.language_code from cmn_sec_users u, cmn_languages l where u.language_id = l.id) user_context  on user_context.user_id = user_context.user_id  JOIN srm_resources CREATED ON CREATED.user_id=work_plans.created_by JOIN srm_resources UPDATED ON UPDATED.user_id=work_plans.last_updated_by JOIN odf_ca_work_plan odf_ca_work_plan ON odf_ca_work_plan.id=work_plans.id  where 1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

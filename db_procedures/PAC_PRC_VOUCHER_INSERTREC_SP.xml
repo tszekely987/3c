@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_VOUCHER_INSERTREC_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_VOUCHER_INSERTREC_SP" (
+in_TRANSNO            NUMBER ,
+in_SOURCEMODULE       NUMBER ,
+in_TRANSTYPE          VARCHAR2 ,
+in_BATCHNO            NUMBER ,
+in_ENTRYUSER          VARCHAR2 ,
+in_ENTRYDATE          DATE ,
+in_LASTUPDATEUSER     VARCHAR2 ,
+in_LASTUPDATEDATE     DATE ,
+in_EXTERNALBATCHID    VARCHAR2 ,
+in_EXTERNALTRANSNO    NUMBER,
+in_LOCATIONID         VARCHAR2 ,
+in_DEPARTCODE         VARCHAR2 ,
+in_ENTITY             VARCHAR2 ,
+in_TRANSDATE          DATE ,
+in_CLIENT             VARCHAR2 ,
+in_PROJECT            VARCHAR2 ,
+in_CHARGE_CODE        VARCHAR2 ,
+in_INPUT_TYPE         VARCHAR2 ,
+in_RESOURCE_CODE      VARCHAR2 ,
+in_QUANTITY           NUMBER ,
+in_BILLRATE           NUMBER ,
+in_AMOUNT             NUMBER ,
+in_FACTORAMOUNT       NUMBER ,
+in_BURDEN             NUMBER ,
+in_OVERHEAD           NUMBER ,
+in_TOTALAMOUNT        NUMBER ,
+in_ACTUALCOST         NUMBER ,
+in_STDCOST            NUMBER ,
+in_TOTALCOST          NUMBER ,
+in_COSTRULECODE       VARCHAR2 ,
+in_BURDENCODE         VARCHAR2 ,
+in_OVERHEADCODE       VARCHAR2 ,
+in_CHARGEABLE         NUMBER ,
+in_NOTES              VARCHAR2 ,
+in_INVOICENO          VARCHAR2 ,
+in_EMPLYHOMELOCATION  VARCHAR2 ,
+in_EMPLYHOMEDEPART    VARCHAR2 ,
+in_EMPLYACTUALCOST    NUMBER ,
+in_EMPLYSTDCOST       NUMBER ,
+in_PROJECTTYPE        VARCHAR2 ,
+in_CLIENTCLASS        VARCHAR2 ,
+in_PROJECTCLASS       VARCHAR2 ,
+--in_COSTCLASS          VARCHAR2 ,
+in_TRANSCLASS         VARCHAR2 ,
+in_RESOURCE_CLASS      VARCHAR2 ,
+in_WIPCLASS           VARCHAR2 ,
+in_WORKINT            NUMBER ,
+in_WORKBUF            VARCHAR2 ,
+--in_VENDORCODE     VARCHAR2 ,
+--in_VOUCHER        VARCHAR2 ,
+--in_PONO         VARCHAR2,
+/*
+added rate and cost currency code as par multi-currency changes.
+*/
+in_rateCurrencyCode	   VARCHAR2,
+in_costCurrencyCode	   VARCHAR2,
+in_stdcostCurrencyCode VARCHAR2,
+in_ROLE_CODE           VARCHAR2,
+in_USER_LOV1           VARCHAR2,
+in_USER_LOV2           VARCHAR2,
+in_EXPENSE_TYPE        VARCHAR2,
+in_TASK_ID			   NUMBER,
+in_id              	   NUMBER,
+in_COST_TYPE           VARCHAR2
+)
+AS
+v_NewTransNo       NUMBER;
+StoO_selcnt		   INTEGER;
+StoO_error 		   INTEGER;
+StoO_rowcnt		   INTEGER;
+StoO_crowcnt		   INTEGER := 0;
+StoO_fetchstatus	   INTEGER := 0;
+StoO_errmsg		   GLOBALPKG.STRING;
+StoO_sqlstatus		   INTEGER;
+L_PROJECTID 				   GLOBALPKG.STRING;
+L_EXCHANGE_RATE_TYPE		   GLOBALPKG.STRING;
+
+v_rateCurrencyCode    VARCHAR2(30);
+nErrorCode			NUMBER ;
+tempErrorCode		NUMBER ;
+
+BEGIN
+
+/* Called From:
+     Procedure         :- This procedure is called to insert voucher record.
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Partha Chowdhury
+   Modified Date :09/18/01
+*/
+    /* set to a default value */
+
+    v_rateCurrencyCode := TRIM(in_RateCurrencyCode);
+
+	  SAVEPOINT VoucherInsert;
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+
+	  IF Pac_Prc_Voucher_Insertrec_Sp.in_TRANSNO = 0 THEN
+	  BEGIN
+  	  	  ROLLBACK TO SAVEPOINT VoucherInsert;
+		  RAISE_APPLICATION_ERROR(-20784, 'Attempt to INSERT with NON-ZERO TransNo on PPA_TRANSCONTROL table.' );
+	  	  RETURN;
+	  END;
+     END IF;
+
+	    BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* get exchange rate type, if it is 'SPOT' or 'AVERAGE' etc. */
+	       SELECT ID,DECODE(Pac_Prc_Voucher_Insertrec_Sp.in_TRANSTYPE,'L',LABOR_EXCHANGE_RATE_TYPE,
+		   		  												   'M',MATERIALS_EXCHANGE_RATE_TYPE,
+																   'Q',EQUIPMENT_EXCHANGE_RATE_TYPE,
+																   'X',EXPENSE_EXCHANGE_RATE_TYPE)
+		   INTO L_PROJECTID, L_EXCHANGE_RATE_TYPE
+		   FROM PAC_MNT_PROJECTS PROJ
+		   WHERE PROJ.PROJECT_CODE = Pac_Prc_Voucher_Insertrec_Sp.in_PROJECT ;
+
+		   EXCEPTION WHEN OTHERS THEN
+		   		StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	    END ;
+
+		BEGIN
+
+ 		/* Insert a record to ppa_transcontrol table
+		*/
+			BEGIN
+	  	  		 StoO_error   := 0;
+		  		 StoO_rowcnt  := 0;
+
+			/* Removed obsolute amount columns - Sanjay - 10/03/01*/
+	  	  	INSERT INTO PPA_TRANSCONTROL (
+		   		 TransNo,
+		 		 SOURCEMODULE, 			 TRANSTYPE,				 BatchNo,
+		 		 ENTRY_RESOURCE_CODE,				 EntryDate,				 LASTUPDTDBY_RESOURCE_CODE,
+		 		 LastUpdateDate,			 ExternalBatchId,		 ExternalTransNo,
+				 LocationID,				 DepartCode,			 ENTITY,
+				 TransDate,				 COMPANY_CODE,				 PROJECT_CODE,
+         		 CHARGE_CODE,         Input_type,        RESOURCE_CODE,
+				 Quantity,
+				 CostRuleCode,			 BurdenCode,			 OverheadCode,
+         		 Chargeable,       Notes,
+				 InvoiceNo,				 EmplyHomeLocation,		 EmplyHomeDepart,
+				 ProjectType,
+		         ClientClass,      ProjectClass,       --COSTCLASS,
+		         TRANSCLASS,         RESOURCE_CLASS,       WIPCLASS,
+		         PROJECT_LOCATION, PROJECT_DEPARTMENT, ROLE_CODE, TASK_ID,
+                 USER_LOV1,
+                 USER_LOV2,
+                 EXPENSE_TYPE,
+		         PPA_TRANSCONTROLAPINFO_ID, COST_TYPE )
+			SELECT
+				 Pac_Prc_Voucher_Insertrec_Sp.in_TRANSNO "Transno",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_SOURCEMODULE "SourceModule",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_TRANSTYPE "TransType",
+		  		 0 "BatchNo",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_ENTRYUSER  "ENTRY_RESOURCE_CODE",
+		  		 NVL(Pac_Prc_Voucher_Insertrec_Sp.in_ENTRYDATE, SYSDATE) "EntryDate",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_LASTUPDATEUSER  "LASTUPDTDBY_RESOURCE_CODE",
+		  		 SYSDATE "LastUpdateDate",
+				 NULL "ExternalBatchId",
+		  		 NULL "ExternalTransNo",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_LOCATIONID "LocationID",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_DEPARTCODE "DepartCode",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_ENTITY "Entity",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_TRANSDATE  "TransDate",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_CLIENT "COMPANY_CODE",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_PROJECT "PROJECT_CODE",
+		         Pac_Prc_Voucher_Insertrec_Sp.in_CHARGE_CODE "Charge_Code",
+		         Pac_Prc_Voucher_Insertrec_Sp.in_INPUT_TYPE "Input_Type",
+		         Pac_Prc_Voucher_Insertrec_Sp.in_RESOURCE_CODE "RESOURCE_CODE",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_QUANTITY "Quantity",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_COSTRULECODE "CostRuleCode",
+		  		 NULL "BurdenCode",
+		  		 NULL "OverheadCode",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_CHARGEABLE "Chargeable",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_NOTES "Notes",
+		  		 NULL "InvoiceNo",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_EmplyHomeLocation "EmplyHomeLocation",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_EmplyHomeDepart "EmplyHomeDepart",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_PROJECTTYPE "ProjectType",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_CLIENTCLASS "ClientClass",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_PROJECTCLASS "ProjectClass",
+           		 --Pac_Prc_Voucher_Insertrec_Sp.in_COSTCLASS "CostClass",
+		  		 Pac_Prc_Voucher_Insertrec_Sp.in_TRANSCLASS "TransClass",
+				 Pac_Prc_Voucher_Insertrec_Sp.in_RESOURCE_CLASS "Resource_Class",
+           		 Pac_Prc_Voucher_Insertrec_Sp.in_WIPCLASS "WIPClass",
+           		 P.locationid "PROJECT_LOCATION",
+           		 P.departcode "PROJECT_DEPARTMENT",
+           		 Pac_Prc_Voucher_Insertrec_Sp.in_ROLE_CODE "ROLE_CODE",
+				 Pac_Prc_Voucher_Insertrec_Sp.in_TASK_ID "TASK_ID",
+				 Pac_Prc_Voucher_Insertrec_Sp.in_USER_LOV1 "USER_LOV1",
+				 Pac_Prc_Voucher_Insertrec_Sp.in_USER_LOV2 "USER_LOV2",
+				 Pac_Prc_Voucher_Insertrec_Sp.in_EXPENSE_TYPE "EXPENSE_TYPE",
+           		 Pac_Prc_Voucher_Insertrec_Sp.in_id,
+           		 Pac_Prc_Voucher_Insertrec_Sp.in_COST_TYPE
+        FROM PAC_MNT_PROJECTS P
+        WHERE P.PROJECT_CODE = Pac_Prc_Voucher_Insertrec_Sp.in_PROJECT;
+			StoO_rowcnt := SQL%ROWCOUNT;
+
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					ROLLBACK TO SAVEPOINT VoucherInsert;
+				    RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+					RETURN ;
+
+				WHEN OTHERS THEN
+					 ROLLBACK TO SAVEPOINT VoucherInsert;
+	 				 StoO_error := SQLCODE;
+				     StoO_errmsg := SQLERRM;
+				     IF ( StoO_error = -1401 ) THEN
+				       RAISE_APPLICATION_ERROR(-20801, 'Note is too big'  );
+				       RETURN;
+				     ELSE
+	   			       RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+			           RETURN;	
+				     END IF;		   
+				END;
+
+		 BEGIN
+		 	  	nErrorCode := 0 ;
+
+                PAC_IMP_INS_TRANSMC_VALUES_SP(
+												  nTransImportKey=&gt;NULL,
+												  nTRANSNO=&gt;in_TRANSNO,
+												  PROJECT_CODE=&gt;Pac_Prc_Voucher_Insertrec_Sp.in_PROJECT,
+												  TRANSDATE=&gt;Pac_Prc_Voucher_Insertrec_Sp.in_TRANSDATE,
+												  TRANSTYPE=&gt;Pac_Prc_Voucher_Insertrec_Sp.in_TRANSTYPE,
+												  RATE_CURRENCY=&gt;v_rateCurrencyCode,
+												  COST_CURRENCY=&gt;in_costCurrencyCode,
+												  QUANTITY=&gt;Pac_Prc_Voucher_Insertrec_Sp.in_QUANTITY,
+												  RATE=&gt;in_BILLRATE,
+												  AMOUNT=&gt;in_Amount,
+												  PRICE=&gt;1,
+												  FACTORAMOUNT=&gt;in_factorAmount,
+												  BURDEN=&gt;in_Burden,
+												  OVERHEAD=&gt;in_Overhead,
+												  ACTUALCOST=&gt;in_ActualCost,
+												  STDCOST=&gt;in_StdCost,
+												  nErrorCode=&gt;nErrorCode
+
+											);
+
+
+		EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+				     	ROLLBACK TO SAVEPOINT VoucherInsert;
+						RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+						RETURN ;
+				WHEN OTHERS THEN
+					 	ROLLBACK TO SAVEPOINT VoucherInsert;
+						RAISE_APPLICATION_ERROR( SQLCODE , SQLERRM );
+						RETURN ;
+		END ;
+
+			tempErrorCode := nErrorCode ;
+
+            IF nErrorCode != 0 THEN
+			BEGIN
+				 IF nErrorCode = 960 THEN
+				 	tempErrorCode := -20100 ;
+				 ELSIF nErrorCode = 962 THEN
+				 	tempErrorCode := -20098 ;
+				 ELSIF nErrorCode = 963 THEN
+				 	tempErrorCode := -20097 ;
+				 ELSIF nErrorCode = 964 THEN
+				 	tempErrorCode := -20096 ;
+				 ELSIF nErrorCode = 965 THEN
+				 	tempErrorCode := -20095 ;
+				 ELSIF nErrorCode = 966 THEN
+				 	tempErrorCode := -20094 ;
+				 ELSIF nErrorCode = 967 THEN
+				 	tempErrorCode := -20093 ;
+				 ELSIF nErrorCode = 961 THEN
+				 	tempErrorCode := -20099 ;
+				 ELSIF nErrorCode = 968 THEN
+				 	tempErrorCode := -20092 ;
+				 ELSIF nErrorCode = 3001 THEN
+				 	tempErrorCode := -20091 ;
+				END IF ;
+				ROLLBACK TO SAVEPOINT VoucherInsert;
+				RAISE_APPLICATION_ERROR( tempErrorCode, 'Could not insert into PPA_TRANSCONTROL_VALUES table' ) ;
+			END ;
+            END IF;
+
+  END ;
+  
+  -- Mark the investment as has financial transactions 
+  UPDATE pac_mnt_projects
+     SET is_financially_enabled = 1
+   WHERE project_code = in_PROJECT
+     AND is_financially_enabled != 1;
+
+END Pac_Prc_Voucher_Insertrec_Sp;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

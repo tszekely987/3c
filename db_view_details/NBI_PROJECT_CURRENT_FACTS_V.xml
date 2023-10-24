@@ -1,0 +1,343 @@
+<ClarityDBViewQuery>
+  <QueryResult code="NBI_PROJECT_CURRENT_FACTS_V">
+    <indexes/>
+    <text_length>17932</text_length>
+    <text>SELECT tmp.PROJECT_ID,
+    NBI_GET_OBS_ID_FCT ('PROJECT', tmp.PROJECT_ID, 'OBS1_UNIT_ID') OBS1_UNIT_ID,
+    NBI_GET_OBS_ID_FCT ('PROJECT', tmp.PROJECT_ID, 'OBS2_UNIT_ID') OBS2_UNIT_ID,
+    NBI_GET_OBS_ID_FCT ('PROJECT', tmp.PROJECT_ID, 'OBS3_UNIT_ID') OBS3_UNIT_ID,
+    NBI_GET_OBS_ID_FCT ('PROJECT', tmp.PROJECT_ID, 'OBS4_UNIT_ID') OBS4_UNIT_ID,
+    NBI_GET_OBS_ID_FCT ('PROJECT', tmp.PROJECT_ID, 'OBS5_UNIT_ID') OBS5_UNIT_ID,
+    --SYSDATE LAST_UPDATED,
+    tmp.PROJECT_CODE,
+    tmp.PROJECT_NAME,
+    tmp.IS_ACTIVE,
+    fin.BILLING_PROJECT_ID,
+    fin.CONTRACTAMOUNT CONTRACT_AMOUNT, 
+    fin.CONTRACTNBR CONTRACT_NUMBER,
+    fin.CONTRACTDATE CONTRACT_DATE,
+    sponsor.SPONSOR,
+    fm_company_info.CUSTOMER_ID,
+    fm_company_info.CUSTOMER,
+    fm_company_info.CUSTOMER_CODE,
+    fin.CUSTOMER_CLASS,
+    fin.CUSTOMER_CLASS_NAME,
+    opp.REVENUE_CURRENCY_CODE,
+    opp.REVENUE,
+    opp.LABOR_EXCHANGE_RATE_TYPE,
+--    CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+--            SYSDATE,
+--            opp.REVENUE_CURRENCY_CODE,
+--            'EUR',--P_CURRENCY_CODE,
+--            opp.REVENUE,
+--            opp.LABOR_EXCHANGE_RATE_TYPE
+--         ) OPP_REVENUE,
+    opp.OPP_STAGE,
+    opp.OPP_PROBABILITY,
+    opp.OPP_EXPECTED_CLOSE_DATE,
+    opp.OPP_STATUS,
+    opp.OPP_TRACK_ON_PIPELINE,
+    opp.ACCOUNT_EXECUTIVE_ID,
+    opp.AE_LAST_NAME,
+    opp.AE_FIRST_NAME,
+    sponsor.MANAGER_ID,
+    sponsor.MANAGER_LAST_NAME,
+    sponsor.MANAGER_FIRST_NAME,
+    fin.ENTITY,
+    fin.ENTITY_NAME,
+    fin.LOCATION,
+    fin.LOCATION_NAME,
+    fin.DEPARTMENT,
+    fin.DEPARTMENT_NAME,
+    fin.FM_STATUS,
+    fin.PROJECT_CLASS,
+    fin.WIP_CLASS,
+    fin.PROJECT_TYPE,
+    sponsor.IS_APPROVED,
+    --NBI_COMMITMENTS_GOAL_FCT(tmp.PROJECT_ID) GOAL_SCORE,
+	0 GOAL_SCORE,
+--    CASE
+--        WHEN (SELECT NVL (MAX ('Y'), 'N') FROM USER_TAB_COLUMNS WHERE TABLE_NAME = 'XDM_ACT_CORPORATE_GOALS' AND COLUMN_NAME = 'XDM_GOAL_01') ='Y' THEN
+--        (goal.GOAL_VAL1 + goal.GOAL_VAL2 + goal.GOAL_VAL3 + goal.GOAL_VAL4 + goal.GOAL_VAL5 + goal.GOAL_VAL6 + goal.GOAL_VAL7 + goal.GOAL_VAL8 + goal.GOAL_VAL9 + goal.GOAL_VAL10) 
+--        ELSE 0
+--    END  GOAL_SCORE,
+    sponsor.PRIORITY,
+    sponsor.START_DATE,
+    sponsor.BASE_START_DATE,
+    sponsor.FINISH_DATE,    
+    sponsor.BASE_FINISH_DATE,
+    NVL(sponsor.START_VARIANCE,0) START_VARIANCE,
+    NVL(sponsor.FINISH_VARIANCE,0) FINISH_VARIANCE,
+    NVL(forecast.BUDGET_LABOR_UNITS,0) BUDGET_HOURS,
+    NVL(etc_base_act_hours.ACTUAL_HOURS,0) ACTUAL_HOURS,
+    NVL(fin.ACTUAL_WIP_HOURS,0) ACTUAL_WIP_HOURS,
+    NVL(etc_base_act_hours.BASELINE_HOURS,0) BASELINE_HOURS,
+    NVL(etc_base_act_hours.ETC_HOURS,0) ETC_HOURS,
+  --Calculating V_PCT_COMPLETE
+    --(NVL (etc_base_act_hours.ACTUAL_HOURS, 0) * 100) /  
+    --DECODE ((NVL (etc_base_act_hours.ETC_HOURS, 0) + NVL (etc_base_act_hours.ACTUAL_HOURS, 0)), 0, 1,
+    --(NVL (etc_base_act_hours.ETC_HOURS, 0) + NVL (etc_base_act_hours.ACTUAL_HOURS, 0))) PCT_COMPLETE,
+   --(NVL(etc_base_act_hours.ACTUAL_HOURS,0) * 100) /  CASE WHEN (NVL(etc_base_act_hours.ETC_HOURS,0) + NVL(etc_base_act_hours.ACTUAL_HOURS,0)) =0 THEN 1 ELSE (NVL(etc_base_act_hours.ETC_HOURS, 0) + NVL(etc_base_act_hours.ACTUAL_HOURS,0)) END PCT_COMPLETE,
+    --etc_base_act_hours.PCT_COMPLETE,
+     -- Getting labor allocated hours
+     NVL((SELECT SUM (PRALLOCSUM) / 3600
+         FROM PRTEAM TEAM, SRM_RESOURCES RES 
+         WHERE TEAM.PRPROJECTID = tmp.PROJECT_ID AND   TEAM.PRRESOURCEID = RES.ID AND   RES.RESOURCE_TYPE = 0
+    ),0) ALLOCATED_HOURS,
+    --Getting budget related information from NBI_PROJECT_FORECAST forecast
+    NVL(forecast.REV_BUDGET_LABOR,0) REV_BUDGET_LABOR,
+    NVL(forecast.REV_BUDGET_EQUIP,0)  REV_BUDGET_EQUIP,
+    NVL(forecast.REV_BUDGET_EXPENSE,0) REV_BUDGET_EXPENSE,
+    NVL(forecast.REV_BUDGET_MATL,0) REV_BUDGET_MATL,
+    NVL(forecast.REV_BUDGET_LABOR, 0) + NVL(forecast.REV_BUDGET_EQUIP, 0) + NVL(forecast.REV_BUDGET_EXPENSE, 0) +  NVL(forecast.REV_BUDGET_MATL, 0) REV_BUDGET_TOTAL,
+    NVL(forecast.COST_BUDGET_LABOR,0) COST_BUDGET_LABOR,
+    NVL(forecast.COST_BUDGET_EQUIP,0) COST_BUDGET_EQUIP,
+    NVL(forecast.COST_BUDGET_EXPENSE,0) COST_BUDGET_EXPENSE,
+    NVL(forecast.COST_BUDGET_MATL,0) COST_BUDGET_MATL,
+    NVL(forecast.COST_BUDGET_LABOR, 0) + NVL(forecast.COST_BUDGET_EQUIP, 0) + NVL(forecast.COST_BUDGET_EXPENSE, 0) +NVL(forecast.COST_BUDGET_MATL, 0) COST_BUDGET_TOTAL,
+	--Getting act_billing
+    NVL(fin.ACT_BILLING,0) ACT_BILLING,
+    NVL(fin.ACT_WIP_QTY,0) ACT_WIP_QTY,
+    NVL(fin.REV_ACT_LABOR,0) REV_ACT_LABOR,
+    NVL(fin.REV_ACT_EQUIP,0) REV_ACT_EQUIP,
+    NVL(fin.REV_ACT_EXPENSE,0) REV_ACT_EXPENSE ,
+    NVL(fin.REV_ACT_MATL,0) REV_ACT_MATL,
+    NVL(fin.REV_ACT_TOTAL,0) REV_ACT_TOTAL,
+    --NVL (fin.REV_ACT_LABOR, 0) + NVL (fin.REV_ACT_EQUIP, 0) + NVL (fin.REV_ACT_EXPENSE, 0) + NVL (fin.REV_ACT_MATL,0) REV_ACT_TOTAL,
+    NVL(fin.COST_ACT_LABOR,0) COST_ACT_LABOR,
+    NVL(fin.COST_ACT_EQUIP,0) COST_ACT_EQUIP,
+    NVL(fin.COST_ACT_EXPENSE,0) COST_ACT_EXPENSE, 
+    NVL(fin.COST_ACT_MATL,0) COST_ACT_MATL,
+    NVL(fin.COST_ACT_TOTAL,0) COST_ACT_TOTAL,
+    --NVL (fin.COST_ACT_LABOR, 0) + NVL (fin.COST_ACT_EQUIP, 0) + NVL (fin.COST_ACT_EXPENSE, 0) + NVL (fin.COST_ACT_MATL,0) COST_ACT_TOTAL,
+    NVL(fin.COST_ETC_LABOR,0) COST_ETC_LABOR,
+    NVL(fin.COST_ETC_EQUIP,0) COST_ETC_EQUIP,
+    NVL(fin.COST_ETC_EXPENSE,0)  COST_ETC_EXPENSE,
+    NVL(fin.COST_ETC_MATL,0) COST_ETC_MATL,
+    NVL(fin.COST_ETC_TOTAL,0)  COST_ETC_TOTAL,
+    --NVL (fin.COST_ETC_LABOR, 0) + NVL (fin.COST_ETC_EQUIP, 0) + NVL (fin.COST_ETC_EXPENSE, 0) + NVL (fin.COST_ETC_MATL,0) COST_ETC_TOTAL,
+    NVL(fin.COST_BASE_LABOR,0) COST_BASE_LABOR,
+    NVL(fin.COST_BASE_EQUIP,0) COST_BASE_EQUIP,
+    NVL(fin.COST_BASE_EXPENSE,0) COST_BASE_EXPENSE,
+    NVL(fin.COST_BASE_MATL,0) COST_BASE_MATL,
+    NVL(fin.COST_BASE_TOTAL,0) COST_BASE_TOTAL,
+    --NVL (fin.COST_BASE_LABOR, 0) + NVL (fin.COST_BASE_EQUIP, 0) + NVL (fin.COST_BASE_EXPENSE, 0) + NVL (fin.COST_BASE_MATL,0) COST_BASE_TOTAL,
+    NVL(fin.REV_BASE_LABOR ,0) REV_BASE_LABOR,
+    NVL(fin.REV_BASE_EQUIP ,0) REV_BASE_EQUIP,
+    NVL(fin.REV_BASE_EXPENSE ,0)  REV_BASE_EXPENSE,
+    NVL(fin.REV_BASE_MATL,0)  REV_BASE_MATL,
+    NVL(fin.REV_BASE_TOTAL,0)  REV_BASE_TOTAL,
+    --NVL (fin.REBASE_LABOR, 0) + NVL (fin.REBASE_EQUIP, 0) + NVL (fin.REBASE_EXPENSE, 0) + NVL (fin.REBASE_MATL,0) REV_BASE_TOTAL,
+    DECODE (NVL (fin.COST_BASE_TOTAL, 0), 0, 0, ( (NVL (fin.COST_ACT_TOTAL, 0) / NVL (fin.COST_BASE_TOTAL, 0)) * 100)) PCT_PLAN_EXPANDED,
+--    DECODE (
+--               NVL (V_COST_BUDGET_TOTAL, 0),
+--               0, 0,
+--               ( (NVL (V_COST_ACT_TOTAL, 0) / NVL (V_COST_BUDGET_TOTAL, 0)) * 100)
+--            )PCT_BUDGET_EXPANDED
+    DECODE (
+               NVL (NVL (forecast.COST_BUDGET_LABOR, 0) + NVL (forecast.COST_BUDGET_EQUIP, 0) + NVL (forecast.COST_BUDGET_EXPENSE, 0) +NVL (forecast.COST_BUDGET_MATL, 0), 0),
+               0, 0,
+               ( (NVL (fin.COST_ACT_TOTAL, 0) / NVL (NVL (forecast.COST_BUDGET_LABOR, 0) + NVL (forecast.COST_BUDGET_EQUIP, 0) + NVL (forecast.COST_BUDGET_EXPENSE, 0) +NVL (forecast.COST_BUDGET_MATL, 0), 0)) * 100)
+            ) PCT_BUDGET_EXPANDED,
+NVL(etc_base_act_hours.PCT_COMPLETE,0) PCT_COMPLETE,
+--V_EARNED_VALUE := (NVL (V_COST_BASE_TOTAL, 0) * (NVL (V_PCT_COMPLETE, 0) / 100));
+--(NVL (fin.COST_BASE_TOTAL, 0) * (NVL ((NVL (etc_base_act_hours.ACTUAL_HOURS, 0) * 100) /  
+--    DECODE ((NVL (etc_base_act_hours.ETC_HOURS, 0) + NVL (etc_base_act_hours.ACTUAL_HOURS, 0)), 0, 1,
+--    (NVL (etc_base_act_hours.ETC_HOURS, 0) + NVL (etc_base_act_hours.ACTUAL_HOURS, 0))), 0) / 100)) EARNED_VALUE,
+(NVL (fin.COST_BASE_TOTAL, 0) * (NVL (etc_base_act_hours.PCT_COMPLETE, 0) / 100)) EARNED_VALUE,
+NVL(fin.COST_BASE_TOTAL,0) PLANNED_VALUE,
+--V_SCHEDULE_VARIANCE := ( (NVL (V_COST_BASE_TOTAL, 0) * (NVL (V_PCT_COMPLETE, 0) / 100)) - NVL (V_PLANNED_VALUE, 0));
+( (NVL (fin.COST_BASE_TOTAL, 0) * (NVL (etc_base_act_hours.PCT_COMPLETE, 0) / 100)) - NVL (fin.COST_BASE_TOTAL, 0)) SCHEDULE_VARIANCE ,
+--COST_VARIANCE=(NVL (V_COST_BASE_TOTAL, 0) - (NVL (V_COST_ACT_TOTAL, 0) + NVL (V_COST_ETC_TOTAL, 0)))
+(NVL (fin.COST_BASE_TOTAL, 0) - (NVL (fin.COST_ACT_TOTAL, 0) + NVL (fin.COST_ETC_TOTAL, 0))) COST_VARIANCE,
+--CPI_NUMBER
+-- DECODE (
+--               NVL (V_COST_ACT_TOTAL, 0),
+--               0, 0,
+--               ( (NVL (V_COST_BASE_TOTAL, 0) * (NVL (V_PCT_COMPLETE, 0) / 100)) / NVL (V_COST_ACT_TOTAL, 0))
+--            )
+CASE WHEN fin.COST_ACT_TOTAL = 0 THEN 0 ELSE (FIN.COST_BASE_TOTAL * etc_base_act_hours.PCT_COMPLETE /100)/fin.COST_ACT_TOTAL END CPI_NUMBER,
+--SPI_NUMBER
+--DECODE (V_PLANNED_VALUE, 0, 0, ( (V_COST_BASE_TOTAL * (NVL (V_PCT_COMPLETE, 0) / 100)) / V_PLANNED_VALUE))
+--DECODE (V_PLANNED_VALUE, 0, 0, ( (V_COST_BASE_TOTAL * (NVL (V_PCT_COMPLETE, 0) / 100)) / V_PLANNED_VALUE))
+CASE WHEN fin.COST_BASE_TOTAL = 0 THEN 0 ELSE (fin.COST_BASE_TOTAL * etc_base_act_hours.PCT_COMPLETE / 100)/fin.COST_BASE_TOTAL END SPI_NUMBER,
+   -- BUDGET_MARGIN  = NVL (V_REV_BUDGET_TOTAL, 0) - NVL (V_COST_BUDGET_TOTAL, 0)
+ (NVL (forecast.REV_BUDGET_LABOR, 0) + NVL (forecast.REV_BUDGET_EQUIP, 0) + NVL (forecast.REV_BUDGET_EXPENSE, 0) +  NVL (forecast.REV_BUDGET_MATL, 0) -
+  NVL (forecast.COST_BUDGET_LABOR, 0) + NVL (forecast.COST_BUDGET_EQUIP, 0) + NVL (forecast.COST_BUDGET_EXPENSE, 0) +NVL (forecast.COST_BUDGET_MATL, 0)
+ )BUDGET_MARGIN,    
+fin.BUDGET_REV_NUMBER,
+--    CASE
+--        WHEN (SELECT NVL (MAX ('Y'), 'N')
+--                FROM USER_TAB_COLUMNS
+--                WHERE TABLE_NAME = 'XDM_ACT_EST_BENEFITS'
+--                 AND COLUMN_NAME = 'XDM_EST_ROI_DT') = 'Y' THEN
+--                        (
+--                        SELECT   MAX (C.XDM_EST_ROI_DT) 
+--                        FROM    XDM_ACT_EST_BENEFITS C,             
+--                                CLB_DMS_FOLDERS D            
+--                        WHERE                
+--                                 tmp.PROJECT_ID = D.ASSOC_OBJ_ID            
+--                        AND      D.ID = C.PARENT_ID             
+--                        AND      D.FOLDER_TYPE = 'ActivityItemFolder'            
+--                       -- GROUP BY tmp.PROJECT_ID 
+--                        ) 
+--    END ROI_DATE,
+--NBI_COMMITMENTS_ROIDATE_FCT(tmp.PROJECT_ID) ROI_DATE,
+'' ROI_DATE,
+OPEN_CLOSED_TASKS.OPEN_TASKS,    
+OPEN_CLOSED_TASKS.CLOSED_TASKS,
+risk_issues.OPEN_ISSUES,
+risk_issues.CLOSED_ISSUES,
+risk_issues.OPEN_RISKS, 
+risk_issues.CLOSED_RISKS,
+'' CURRENCY_CODE , --P_CURRENCY_CODE   
+    -- SET STOPLIGHT VALUES TO 1 - GREEN. THIS IS THE DEFAULT VALUE.
+    -- NBI_EXECUTE_STOPLIGHT_SP WILL UPDATE TO 2 - YELLOW OR 3 - RED
+    -- BASED ON THE STOPLIGHT CONDITION.
+    1 STOPLIGHT_1 ,
+    1 STOPLIGHT_2 ,
+    1 STOPLIGHT_3 ,
+    1 STOPLIGHT_4 ,
+    1 STOPLIGHT_5 ,
+    1 STOPLIGHT_6 ,
+    1 STOPLIGHT_7 ,
+    1 STOPLIGHT_8 ,
+    1 STOPLIGHT_9 ,
+    1 STOPLIGHT_10 ,
+    1 STOPLIGHT_11 ,
+    1 STOPLIGHT_12 ,
+    1 STOPLIGHT_13 ,
+    1 STOPLIGHT_14 ,
+    1 STOPLIGHT_15 ,
+    -- If its OP Enabled, there will be a project ID associated with it.
+    CASE WHEN opp.project_id IS NOT NULL  THEN 1 ELSE 0
+     END IS_OPP_ENABLED,
+ -- If its OPP Enabled, there will be a project ID associated with it.
+    CASE WHEN fin.project_id IS NOT NULL  THEN 1 ELSE 0
+     END IS_FM_ENABLED,
+	1 IS_MGMT_ENABLED,
+	fin.REV_ETC_LABOR,
+	fin.REV_ETC_EQUIP,
+	fin.REV_ETC_EXPENSE,
+	fin.REV_ETC_MATL,
+	fin.REV_ETC_TOTAL
+FROM
+    (
+   
+    SELECT  I.ID PROJECT_ID,I.CODE PROJECT_CODE,I.NAME PROJECT_NAME,I.IS_ACTIVE IS_ACTIVE,
+            I.PRIORITY,I.SCHEDULE_START,I.SCHEDULE_FINISH
+    FROM INV_INVESTMENTS I
+    LEFT OUTER JOIN INV_PROJECTS PRJ ON I.ID=PRJ.PRID 
+    WHERE    NVL(PRJ.IS_TEMPLATE,0)=0 
+    ) tmp 
+LEFT OUTER JOIN NBI_OPP_ENABLED_V opp ON opp.project_id=tmp.PROJECT_ID
+LEFT OUTER JOIN NBI_PRTF_FM fin ON fin.project_id=tmp.project_id
+-- PLAN_TYPE=50343 => BUDGET
+LEFT OUTER JOIN NBI_PROJECT_FORECAST forecast ON (forecast.project_id = tmp.project_id and forecast.PLAN_TYPE = 50343)
+LEFT OUTER JOIN -- Getting labor etc, base, actual hours --80589
+     (  SELECT  TASK.PRPROJECTID,
+            (SUM(ASSIGN.PRESTSUM)/3600) ETC_HOURS,
+            (SUM(ASSIGN.PRACTSUM)/3600) ACTUAL_HOURS,
+            (SUM(DETAILS.USAGE_SUM)/3600) BASELINE_HOURS,            
+            (((SUM(ASSIGN.PRACTSUM)/3600) * 100) / 
+               (CASE WHEN  (SUM(ASSIGN.PRESTSUM)/3600) + (SUM(ASSIGN.PRACTSUM)/3600) = 0 THEN 1
+                ELSE (SUM(ASSIGN.PRESTSUM)/3600) + (SUM(ASSIGN.PRACTSUM)/3600)
+                END)               
+            ) PCT_COMPLETE          
+  FROM PRTASK TASK,
+       SRM_RESOURCES RES,
+       PRASSIGNMENT ASSIGN
+  LEFT OUTER JOIN PRJ_BASELINE_DETAILS DETAILS ON ASSIGN.PRID = DETAILS.OBJECT_ID
+    AND   DETAILS.OBJECT_TYPE = 'ASSIGNMENT' AND DETAILS.IS_CURRENT = 1
+  WHERE ASSIGN.PRTASKID = TASK.PRID
+ -- AND   TASK.PRPROJECTID = P_PROJECT_ID
+  AND   ASSIGN.PRRESOURCEID = RES.ID
+  AND   RES.RESOURCE_TYPE = 0
+  GROUP BY TASK.PRPROJECTID) etc_base_act_hours ON tmp.PROJECT_ID=etc_base_act_hours.PRPROJECTID
+LEFT OUTER JOIN -- remove redundant inv_investments if possible.
+    (
+    SELECT     P.PRID ,
+               P.PRSPONSOREDBY SPONSOR,
+               U.ID MANAGER_ID,
+               U.LAST_NAME MANAGER_LAST_NAME,
+               U.FIRST_NAME MANAGER_FIRST_NAME,
+               I.PRIORITY PRIORITY,
+               DECODE (I.APPROVEDTIME, NULL, 0, 1) IS_APPROVED,
+               I.SCHEDULE_START START_DATE,
+               I.SCHEDULE_FINISH FINISH_DATE,
+               DETAILS.START_DATE  BASE_START_DATE,
+               DETAILS.FINISH_DATE  BASE_FINISH_DATE,
+               NVL ( (TRUNC (I.SCHEDULE_START) - TRUNC (DETAILS.START_DATE)), 0) START_VARIANCE,
+               NVL ( (TRUNC (I.SCHEDULE_FINISH) - TRUNC (DETAILS.FINISH_DATE)), 0) FINISH_VARIANCE
+      FROM      INV_INVESTMENTS I
+      LEFT OUTER JOIN INV_PROJECTS P ON I.ID = P.PRID  
+      LEFT OUTER JOIN (select a.project_id, b.START_DATE,b.FINISH_DATE from PRJ_Baselines a
+           join PRJ_Baseline_details b on a.id=b.baseline_id
+           where a.is_current=1 and b.object_type='PROJECT' and b.OBJECT_ID= a.project_id) DETAILS on DETAILS.project_id=I.ID
+      LEFT OUTER JOIN CMN_SEC_USERS U ON U.ID = I.MANAGER_ID     
+    ) sponsor ON sponsor.PRID = tmp.PROJECT_ID
+-- Moved to a function NBI_COMMITMENTS_GOAL_FCT
+--LEFT OUTER JOIN
+--(
+--SELECT inv.id,
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (a.name, (INSTR (a.name, '-', 1) + 2))), 0)), 0) GOAL_VAL1, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (b.name, (INSTR (b.name, '-', 1) + 2))), 0)), 0) GOAL_VAL2, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (c.name, (INSTR (c.name, '-', 1) + 2))), 0)), 0) GOAL_VAL3, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (d.name, (INSTR (d.name, '-', 1) + 2))), 0)), 0) GOAL_VAL4 , 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (e.name, (INSTR (e.name, '-', 1) + 2))), 0)), 0) GOAL_VAL5, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (f.name, (INSTR (f.name, '-', 1) + 2))), 0)), 0) GOAL_VAL6, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (g.name, (INSTR (g.name, '-', 1) + 2))), 0)), 0) GOAL_VAL7, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (h.name, (INSTR (h.name, '-', 1) + 2))), 0)), 0) GOAL_VAL8, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (i.name, (INSTR (i.name, '-', 1) + 2))), 0)), 0) GOAL_VAL9, 
+--    NVL( SUM (NVL( TO_NUMBER (SUBSTR (j.name, (INSTR (j.name, '-', 1) + 2))), 0)), 0) GOAL_VAL10 
+--FROM INV_INVESTMENTS inv 
+--JOIN clb_dms_folders r ON (inv.id=r.assoc_obj_id  AND r.folder_type = 'ActivityItemFolder')
+--JOIN xdm_act_corporate_goals x ON x.parent_id = r.id 
+--LEFT OUTER JOIN cmn_lookups_v a ON (x.xdm_goal_01 = a.id  AND a.language_code = 'en')
+--LEFT OUTER JOIN cmn_lookups_v b ON (x.xdm_goal_02 = b.id  AND b.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v c ON (x.xdm_goal_03 = c.id  AND c.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v d ON (x.xdm_goal_04 = d.id  AND d.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v e ON (x.xdm_goal_05 = e.id  AND e.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v f ON (x.xdm_goal_06 = f.id  AND f.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v g ON (x.xdm_goal_07 = g.id  AND g.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v h ON (x.xdm_goal_08 = h.id  AND h.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v i ON (x.xdm_goal_09 = i.id  AND i.language_code = 'en') 
+--LEFT OUTER JOIN cmn_lookups_v j ON (x.xdm_goal_10 = j.id  AND j.language_code = 'en')
+--group by inv.id
+--) goal on goal.id = tmp.PROJECT_ID
+LEFT OUTER JOIN (
+		SELECT  I.ID,
+        SUM(CASE WHEN R.TYPE_CODE='RISK' THEN 
+                    CASE WHEN R.STATUS_CODE ='OPEN' THEN 1 ELSE 0 END END) OPEN_RISKS,
+        SUM(CASE WHEN R.TYPE_CODE='RISK' THEN 
+                    CASE WHEN R.STATUS_CODE ='CLOSED' THEN 1 ELSE 0 END END) CLOSED_RISKS,
+        SUM(CASE WHEN R.TYPE_CODE='ISSUE' THEN 
+                    CASE WHEN R.STATUS_CODE ='OPEN' THEN 1 ELSE 0 END  END) OPEN_ISSUES,
+        SUM(CASE WHEN R.TYPE_CODE='ISSUE' THEN 
+                    CASE WHEN R.STATUS_CODE ='CLOSED' THEN 1 ELSE 0 END  END) CLOSED_ISSUES    
+	 FROM   INV_INVESTMENTS I, RIM_RISKS_AND_ISSUES R
+	 WHERE  
+	 	I.ID = R.PK_ID
+	 AND	R.TYPE_CODE IN('RISK','ISSUE')
+GROUP BY I.ID
+)risk_issues ON risk_issues.id=tmp.PROJECT_ID 
+LEFT OUTER JOIN ( 
+        SELECT   T.PRPROJECTID,
+        COUNT(CASE WHEN T.PRSTATUS = 1 THEN 1 END) OPEN_TASKS,
+        COUNT(CASE WHEN T.PRSTATUS = 0 THEN 1 END) CLOSED_TASKS
+   FROM     PRTASK T
+   JOIN INV_INVESTMENTS IT ON T.PRPROJECTID  = IT.ID
+   WHERE    T.PRSTATUS in (1, 0)
+   GROUP BY T.PRPROJECTID
+) OPEN_CLOSED_TASKS ON OPEN_CLOSED_TASKS.PRPROJECTID = tmp.PROJECT_ID
+LEFT OUTER JOIN ( 
+SELECT   c.ID,
+         MAX(A.ID) CUSTOMER_ID,
+         MAX(A.COMPANY_NAME) CUSTOMER,
+         MAX(A.COMPANY_ID) CUSTOMER_CODE        
+         FROM     SRM_COMPANIES A,
+                  PAC_MNT_PROJECTS C
+         WHERE    C.COMPANY_CODE = A.COMPANY_ID
+GROUP BY c.ID) fm_company_info ON fm_company_info.ID=tmp.PROJECT_ID</text>
+  </QueryResult>
+</ClarityDBViewQuery>

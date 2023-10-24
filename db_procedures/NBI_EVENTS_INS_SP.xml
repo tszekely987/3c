@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EVENTS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EVENTS_INS_SP" (
+   P_PRJ_OBJECT_ID                     NUMBER,
+   P_PRJ_OBJECT_TYPE                   VARCHAR2,
+   P_EVENT_TYPE                        VARCHAR2 DEFAULT 'NONE'
+)
+AS
+BEGIN
+   IF P_PRJ_OBJECT_TYPE NOT IN ('TEAM', 'ASSIGNMENT', 'RESOURCE', 'PROJECT')
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_EVENTS_INS_SP : Object type should be either TEAM, ASSIGNMENT, RESOURCE or PROJECT'
+      );
+   END IF;
+
+   INSERT INTO NBI_EVENTS
+               (ID,
+                PRJ_OBJECT_ID,
+                PRJ_OBJECT_TYPE,
+                STATUS,
+                CREATED_DATE,
+                LAST_UPDATED_DATE
+               )
+      SELECT NBI_EVENTS_S1.NEXTVAL,
+             P_PRJ_OBJECT_ID,
+             P_PRJ_OBJECT_TYPE,
+             'NOT_PROCESSED',
+             SYSDATE,
+             SYSDATE
+      FROM   DUAL
+      WHERE  NOT EXISTS (SELECT 'EXISTS'
+                         FROM   NBI_EVENTS
+                         WHERE  PRJ_OBJECT_ID = P_PRJ_OBJECT_ID
+                            AND PRJ_OBJECT_TYPE = P_PRJ_OBJECT_TYPE
+                            AND NVL (STATUS, -1) = 'NOT_PROCESSED');
+
+   IF P_PRJ_OBJECT_TYPE = 'PROJECT'
+   THEN
+      IF P_EVENT_TYPE NOT IN ('DELETE', 'INSERT')
+      THEN
+         RAISE_APPLICATION_ERROR (
+            -20000,
+            'Error in NBI_EVENTS_INS_SP : P_EVENT_TYPE should be either DELETE or INSERT when P_OBJECT_TYPE is PROJECT'
+         );
+      END IF;
+
+      IF P_EVENT_TYPE = 'DELETE'
+      THEN
+         INSERT INTO NBI_EVENTS
+                     (ID,
+                      PRJ_OBJECT_ID,
+                      PRJ_OBJECT_TYPE,
+                      STATUS,
+                      CREATED_DATE,
+                      LAST_UPDATED_DATE
+                     )
+            SELECT NBI_EVENTS_S1.NEXTVAL,
+                   TEAM.PRRESOURCEID,
+                   'RESOURCE',
+                   'NOT_PROCESSED',
+                   SYSDATE,
+                   SYSDATE
+            FROM   PRTEAM TEAM
+            WHERE  TEAM.PRPROJECTID = P_PRJ_OBJECT_ID
+               AND NOT EXISTS (SELECT 'EXISTS'
+                               FROM   NBI_EVENTS
+                               WHERE  PRJ_OBJECT_ID = TEAM.PRRESOURCEID
+                                  AND PRJ_OBJECT_TYPE = 'RESOURCE'
+                                  AND NVL (STATUS, -1) = 'NOT_PROCESSED');
+      ELSIF P_EVENT_TYPE = 'INSERT'
+      THEN
+         INSERT INTO NBI_EVENTS
+                     (ID,
+                      PRJ_OBJECT_ID,
+                      PRJ_OBJECT_TYPE,
+                      STATUS,
+                      CREATED_DATE,
+                      LAST_UPDATED_DATE
+                     )
+            SELECT NBI_EVENTS_S1.NEXTVAL,
+                   TEAM.PRID,
+                   'TEAM',
+                   'NOT_PROCESSED',
+                   SYSDATE,
+                   SYSDATE
+            FROM   PRTEAM TEAM
+            WHERE  TEAM.PRPROJECTID = P_PRJ_OBJECT_ID
+               AND NOT EXISTS (SELECT 'EXISTS'
+                               FROM   NBI_EVENTS
+                               WHERE  PRJ_OBJECT_ID = TEAM.PRID
+                                  AND PRJ_OBJECT_TYPE = 'TEAM'
+                                  AND NVL (STATUS, -1) = 'NOT_PROCESSED');
+         INSERT INTO NBI_EVENTS
+                     (ID,
+                      PRJ_OBJECT_ID,
+                      PRJ_OBJECT_TYPE,
+                      STATUS,
+                      CREATED_DATE,
+                      LAST_UPDATED_DATE
+                     )
+            SELECT NBI_EVENTS_S1.NEXTVAL,
+                   ASSIGNMENT.PRID,
+                   'ASSIGNMENT',
+                   'NOT_PROCESSED',
+                   SYSDATE,
+                   SYSDATE
+            FROM   PRASSIGNMENT ASSIGNMENT,
+                   PRTASK TASK
+            WHERE  ASSIGNMENT.PRTASKID = TASK.PRID
+               AND TASK.PRPROJECTID = P_PRJ_OBJECT_ID
+               AND NOT EXISTS (SELECT 'EXISTS'
+                               FROM   NBI_EVENTS
+                               WHERE  PRJ_OBJECT_ID = ASSIGNMENT.PRID
+                                  AND PRJ_OBJECT_TYPE = 'ASSIGNMENT'
+                                  AND NVL (STATUS, -1) = 'NOT_PROCESSED');
+      END IF;
+   END IF;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_EVENTS_INS_SP : ' || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

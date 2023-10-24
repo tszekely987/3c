@@ -1,0 +1,92 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_LKP_OBS_UNIT_V">
+    <indexes/>
+    <text_length>5827</text_length>
+    <text>SELECT u.id obs_unit_key,
+       u.name obs_unit,
+       t.obs_type_key,
+       t.obs_type_id,
+       t.obs_type,
+       NVL(u1.id,0) obs_level1_key,
+       u1.name obs_level1,
+       NVL(u2.id,0) obs_level2_key,
+       u2.name obs_level2,
+       NVL(u3.id,0) obs_level3_key,
+       u3.name obs_level3,
+       NVL(u4.id,0) obs_level4_key,
+       u4.name obs_level4,
+       NVL(u5.id,0) obs_level5_key,
+       u5.name obs_level5,
+       NVL(u6.id,0) obs_level6_key,
+       u6.name obs_level6,
+       NVL(u7.id,0) obs_level7_key,
+       u7.name obs_level7,
+       NVL(u8.id,0) obs_level8_key,
+       u8.name obs_level8,
+       NVL(u9.id,0) obs_level9_key,
+       u9.name obs_level9,
+       NVL(u10.id,0) obs_level10_key,
+       u10.name obs_level10,
+       CASE WHEN NVL(u10.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'') || ' | ' || NVL(u9.name,'') || ' | ' || NVL(u10.name,'')
+            WHEN NVL(u9.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'') || ' | ' || NVL(u9.name,'')
+            WHEN NVL(u8.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'')
+            WHEN NVL(u7.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'')
+            WHEN NVL(u6.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'')
+            WHEN NVL(u5.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'')
+            WHEN NVL(u4.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'')
+            WHEN NVL(u3.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'')
+            WHEN NVL(u2.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'')
+            ELSE
+                 NVL(u1.name,'N/A')
+            END obs_path,
+       u.depth hierarchy_level,
+       t.is_investment_obs is_investment_obs,
+       t.is_resource_obs is_resource_obs,
+       GREATEST(t.last_updated_date, u.last_updated_date, u1.last_updated_date, NVL(u2.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')),
+                NVL(u3.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')), NVL(u4.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')),
+                NVL(u5.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')), NVL(u6.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')),
+                NVL(u7.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')), NVL(u8.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')),
+                NVL(u9.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY')), NVL(u10.last_updated_date,TO_DATE('01/01/2000','MM/DD/YYYY'))) last_updated_date
+FROM   prj_obs_units u
+       INNER JOIN
+            (SELECT ot.id obs_type_key,
+                    ot.unique_name obs_type_id,
+                    ot.name obs_type,
+                    CASE WHEN (SELECT COUNT(*) FROM prj_obs_object_types WHERE type_id = ot.id
+                                                                         AND  (table_name LIKE 'INV_%'
+                                                                         OR    table_name IN (SELECT obs_code FROM odf_objects WHERE template_extension = 'inv_extension')
+                                                                         OR    table_name = 'SRM_PROJECTS')) > 0
+                         THEN 1 ELSE 0 END is_investment_obs,
+                    CASE WHEN (SELECT COUNT(*) FROM prj_obs_object_types WHERE type_id = ot.id
+                                                                         AND  table_name = 'SRM_RESOURCES') > 0
+                         THEN 1 ELSE 0 END is_resource_obs,
+                    ot.last_updated_date
+             FROM   prj_obs_types ot
+             WHERE  1=1) t ON u.type_id = t.obs_type_key
+       LEFT OUTER JOIN prj_obs_units u10 ON u.id = u10.id AND u.depth = 10
+       LEFT OUTER JOIN prj_obs_units u9 ON CASE WHEN u.depth = 9 THEN u.id ELSE u10.parent_id END = u9.id
+       LEFT OUTER JOIN prj_obs_units u8 ON CASE WHEN u.depth = 8 THEN u.id ELSE u9.parent_id END = u8.id
+       LEFT OUTER JOIN prj_obs_units u7 ON CASE WHEN u.depth = 7 THEN u.id ELSE u8.parent_id END = u7.id
+       LEFT OUTER JOIN prj_obs_units u6 ON CASE WHEN u.depth = 6 THEN u.id ELSE u7.parent_id END = u6.id
+       LEFT OUTER JOIN prj_obs_units u5 ON CASE WHEN u.depth = 5 THEN u.id ELSE u6.parent_id END = u5.id
+       LEFT OUTER JOIN prj_obs_units u4 ON CASE WHEN u.depth = 4 THEN u.id ELSE u5.parent_id END = u4.id
+       LEFT OUTER JOIN prj_obs_units u3 ON CASE WHEN u.depth = 3 THEN u.id ELSE u4.parent_id END = u3.id
+       LEFT OUTER JOIN prj_obs_units u2 ON CASE WHEN u.depth = 2 THEN u.id ELSE u3.parent_id END = u2.id
+       LEFT OUTER JOIN prj_obs_units u1 ON CASE WHEN u.depth = 1 THEN u.id ELSE u2.parent_id END = u1.id 
+WHERE  u.depth &lt;= 10</text>
+  </QueryResult>
+</ClarityDBViewQuery>

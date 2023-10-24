@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>ODF_VIEW_COPY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."ODF_VIEW_COPY_SP" (
+   p_view_code                    in   varchar2,
+   p_object_code                  in   varchar2,
+   p_src_partition                in   varchar2,
+   p_dest_partition               in   varchar2,
+   p_user                         in   number
+)
+is
+  v_cnt                         integer := 0;
+  v_cnt2                        integer := 0;
+  v_src_view_id                 number;
+  v_dest_view_id                number;
+
+  cursor c_view_attributes (p_view_id in number, p_view_section_id in number)
+  is
+  select  *
+  from    odf_view_attributes
+  where   view_id = p_view_id
+  and     nvl(section_id, -1) = p_view_section_id;
+
+  cursor c_view_attr_params (p_attribute_id in number)
+  is
+  select  *
+  from    odf_view_attr_parameters
+  where   view_attr_id = p_attribute_id;
+
+  cursor c_view_sections (p_view_id in number)
+  is
+  select  *
+  from    odf_view_sections
+  where   view_id = p_view_id
+  order by display_order;
+
+  m_attr          c_view_attributes%ROWTYPE;
+  m_attr_params   c_view_attr_params%ROWTYPE;
+  m_sect          c_view_sections%ROWTYPE;
+
+begin
+
+  --
+  --  This routine only works for a direct copy (eg a user copy of a view), it does not
+  --  work for partitioned views as new attributes can be defined for a partition (or
+  --  may no longer be valid for a partition), if the new attributes are required or
+  --  presence required then they must be added to the relevent views.
+  --
+
+  --
+  --  Ensure we have valid params
+  --
+  select   count (*)
+  into     v_cnt
+  from     odf_views
+  where    code            = p_view_code
+  and      object_code     = p_object_code
+  and      partition_code  = p_src_partition;
+
+  select   count (*)
+  into     v_cnt2
+  from     odf_views
+  where    code            = p_view_code
+  and      object_code     = p_object_code
+  and      partition_code  = p_dest_partition;
+
+  if ( v_cnt &gt; 0 and v_cnt2 = 0 )
+  then
+    select   id
+    into     v_src_view_id
+    from     odf_views
+    where    code            = p_view_code
+    and      object_code     = p_object_code
+    and      view_type       in ('property', 'subObjectList')
+    and      partition_code  = p_src_partition;
+
+    select   odf_views_s1.nextval
+    into     v_dest_view_id
+    from     dual;
+
+    --
+    --  Insert the new view row
+    --
+    insert into odf_views
+    ( id,
+      code, view_type, view_subtype, principal_type, principal_id,
+      object_code, sequence, partition_code, is_secure, is_customized, is_system, link_code,
+      created_date, created_by, last_updated_date, last_updated_by
+    )
+    select  v_dest_view_id,
+            code, view_type, view_subtype, principal_type, principal_id,
+            object_code, sequence, p_dest_partition, is_secure, 0, is_system, link_code,
+            sysdate, p_user, sysdate, p_user
+    from    odf_views
+    where   id = v_src_view_id;
+  
+    --
+    -- insert the display condition
+    -- 
+    insert into odf_filter_expressions
+    (
+      id, object_code, object_instance_id, expression, created_date, created_by, last_updated_date, last_updated_by
+    )
+    select ODF_FILTER_EXPRESSIONS_S1.nextval, object_code,v_dest_view_id, expression,sysdate,p_user,sysdate,p_user
+    from odf_filter_expressions
+    where object_code = 'ODF_VIEW_CONDITION'
+    and object_instance_id = v_src_view_id;
+
+    --
+    --  Loop to get the sections
+    --
+    open c_view_sections (v_src_view_id);
+
+    loop
+    fetch c_view_sections into m_sect;
+      exit when c_view_sections%notfound;
+      begin
+        insert into odf_view_sections
+        (id, view_id,
+          label, display_order, is_collapsed, enable_expr_builder,
+          created_date, created_by, last_updated_date, last_updated_by, code
+        )
+        select  odf_view_sections_s1.nextval, v_dest_view_id,
+                m_sect.label, m_sect.display_order, m_sect.is_collapsed, m_sect.enable_expr_builder,
+                sysdate, p_user, sysdate, p_user, m_sect.code
+        from    dual;
+
+
+        open c_view_attributes (v_src_view_id, m_sect.id);
+
+        loop
+        fetch c_view_attributes into m_attr;
+          exit when c_view_attributes%notfound;
+          begin
+            insert
+            into    odf_view_attributes
+                    (id, view_id,
+                     widget_type, extended_widget_type, label, label_pk_id,
+                     attribute_code, display_order, width, section_id,
+                     hidden, col, image, tip, instruction, link_code,
+                     num_rows, num_cols, is_required, is_presence_required,
+                     is_editable, show_value, is_virtual, enter_once,
+                     min_value, max_value, default_value, is_multi_valued, is_fixed_widget,
+                     alternate_label, decimals, description, dep_entry, dep_exit,
+                     dep_parent_lookup, xpath_expression, is_not_equal_xpath,
+                     custom_widget_name, custom_widget_type,
+                     created_date, created_by, last_updated_date, last_updated_by)
+            select  odf_view_attributes_s1.nextval, v_dest_view_id,
+                    m_attr.widget_type, m_attr.extended_widget_type, m_attr.label, odf_view_attributes_s1.currval,
+                    m_attr.attribute_code, m_attr.display_order, m_attr.width, odf_view_sections_s1.currval,
+                    m_attr.hidden, m_attr.col, m_attr.image, m_attr.tip, m_attr.instruction, m_attr.link_code,
+                    m_attr.num_rows, m_attr.num_cols, m_attr.is_required, m_attr.is_presence_required,
+                    m_attr.is_editable, m_attr.show_value, m_attr.is_virtual, m_attr.enter_once,
+                    m_attr.min_value, m_attr.max_value, m_attr.default_value, m_attr.is_multi_valued, m_attr.is_fixed_widget,
+                    m_attr.alternate_label, m_attr.decimals, m_attr.description, m_attr.dep_entry, m_attr.dep_exit,
+                    m_attr.dep_parent_lookup, m_attr.xpath_expression, m_attr.is_not_equal_xpath,
+                    m_attr.custom_widget_name, m_attr.custom_widget_type,
+                    sysdate, p_user, sysdate, p_user
+            from    dual;
+
+            open c_view_attr_params (m_attr.id);
+
+            loop
+            fetch c_view_attr_params into m_attr_params;
+              exit when c_view_attr_params%notfound;
+              begin
+                insert
+                into    odf_view_attr_parameters
+                        (id, view_attr_id,
+                         name, code, value,
+                         created_date, created_by, last_updated_date, last_updated_by)
+                select  odf_view_attr_parameters_s1.nextval, odf_view_attributes_s1.currval,
+                        m_attr_params.name, m_attr_params.code, m_attr_params.value,
+                        sysdate, p_user, sysdate, p_user
+                from    dual;
+              exception
+                when others then null;
+              end;
+            end loop;
+
+            close c_view_attr_params;
+
+          exception
+            when others then null;
+          end;
+        end loop;
+
+        close c_view_attributes;
+
+      exception
+        when others then null;
+      end;
+    end loop;
+
+    close c_view_sections;
+
+
+    --
+    --  Loop to get the attributes that are not on a section
+    --
+    open c_view_attributes (v_src_view_id, -1);
+
+    loop
+    fetch c_view_attributes into m_attr;
+      exit when c_view_attributes%notfound;
+      begin
+        insert
+        into    odf_view_attributes
+                (id, view_id,
+                 widget_type, extended_widget_type, label, label_pk_id,
+                 attribute_code, display_order, width,
+                 hidden, col, image, tip, instruction, link_code,
+                 num_rows, num_cols, is_required, is_presence_required,
+                 is_editable, show_value, is_virtual, enter_once,
+                 min_value, max_value, default_value, is_multi_valued, is_fixed_widget,
+                 alternate_label, decimals, description, dep_entry, dep_exit,
+                 dep_parent_lookup, xpath_expression, is_not_equal_xpath,
+                 custom_widget_name, custom_widget_type,
+                 created_date, created_by, last_updated_date, last_updated_by)
+        select  odf_view_attributes_s1.nextval, v_dest_view_id,
+                m_attr.widget_type, m_attr.extended_widget_type, m_attr.label, odf_view_attributes_s1.currval,
+                m_attr.attribute_code, m_attr.display_order, m_attr.width,
+                m_attr.hidden, m_attr.col, m_attr.image, m_attr.tip, m_attr.instruction, m_attr.link_code,
+                m_attr.num_rows, m_attr.num_cols, m_attr.is_required, m_attr.is_presence_required,
+                m_attr.is_editable, m_attr.show_value, m_attr.is_virtual, m_attr.enter_once,
+                m_attr.min_value, m_attr.max_value, m_attr.default_value, m_attr.is_multi_valued, m_attr.is_fixed_widget,
+                m_attr.alternate_label, m_attr.decimals, m_attr.description, m_attr.dep_entry, m_attr.dep_exit,
+                m_attr.dep_parent_lookup, m_attr.xpath_expression, m_attr.is_not_equal_xpath,
+                m_attr.custom_widget_name, m_attr.custom_widget_type,
+                sysdate, p_user, sysdate, p_user
+        from    dual;
+
+        open c_view_attr_params (m_attr.id);
+
+        loop
+        fetch c_view_attr_params into m_attr_params;
+          exit when c_view_attr_params%notfound;
+          begin
+            insert
+            into    odf_view_attr_parameters
+                    (id, view_attr_id,
+                     name, code, value,
+                     created_date, created_by, last_updated_date, last_updated_by)
+            select  odf_view_attr_parameters_s1.nextval, odf_view_attributes_s1.currval,
+                    m_attr_params.name, m_attr_params.code, m_attr_params.value,
+                    sysdate, p_user, sysdate, p_user
+            from    dual;
+          exception
+            when others then null;
+          end;
+        end loop;
+
+        close c_view_attr_params;
+
+      exception
+        when others then null;
+      end;
+    end loop;
+
+    close c_view_attributes;
+
+    --
+    --  Use the stored proc to copy the captions
+    --
+    odf_view_captions_copy_sp ( p_view_code, p_object_code, p_src_partition, p_dest_partition );
+
+    commit;
+
+   else
+    if ( v_cnt = 0 )
+    then
+      raise_application_error (-20015, 'VIEW ' || p_view_code || ' in partition ' || p_src_partition || ' DOES NOT EXIST');
+    else
+      raise_application_error (-20016, 'VIEW ' || p_view_code || ' in partition ' || p_dest_partition || ' ALREADY DOES EXISTS');
+    end if;
+   end if;
+
+end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

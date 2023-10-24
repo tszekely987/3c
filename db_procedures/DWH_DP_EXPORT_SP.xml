@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DWH_DP_EXPORT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DWH_DP_EXPORT_SP" 
+(
+    p_dumpfile_name IN VARCHAR2 DEFAULT NULL,
+	p_schema_name IN VARCHAR2, -- schema name
+    p_object_name IN VARCHAR2, -- source tables
+    p_object_type IN VARCHAR2, -- T=Table, MT=Multiple Tables, V=View
+    p_table_filter IN VARCHAR2 DEFAULT NULL, -- table predicate to filter data (where clause)
+    p_remap_table_name IN VARCHAR2 DEFAULT NULL
+)
+IS
+    v_percent_done  NUMBER;          -- Percentage of job complete
+    v_job_state     VARCHAR2(30);    -- To keep track of job state
+    v_job_status    ku$_JobStatus;   -- The job status from get_status
+    v_sts           ku$_Status;      -- The status object returned by get_status
+    v_handle        NUMBER;          -- job handle
+    v_current_time  DATE := SYSDATE; -- consistent timestamp for files, job_name etc.
+    v_start_time    DATE;            -- start time for log file
+    v_logfile_name  VARCHAR2(200);   -- logfile name
+    v_dumpfile_name VARCHAR2(200);   -- logfile name
+    v_default_dir   VARCHAR(30) := 'DATA_PUMP_DIR'; -- directory
+    v_line_no       INTEGER := 0;    -- debug line no
+    v_sqlcode       NUMBER;          -- sqlcode
+    v_compatible    VARCHAR2(40) := 'LATEST';
+    vc_job_mode     CONSTANT VARCHAR2(200) := 'TABLE'; -- Job mode
+    v_count         NUMBER;
+    v_check         NUMBER;
+BEGIN
+    v_logfile_name := 'exp_' || p_dumpfile_name || '.log';
+    v_dumpfile_name := p_dumpfile_name || '.dmp';
+    BEGIN
+    v_handle := DBMS_DATAPUMP.OPEN(operation =&gt; 'EXPORT',
+                                   job_mode =&gt; vc_job_mode,
+                                   job_name =&gt; 'EXPORT_' || vc_job_mode || '_' || TO_CHAR(v_current_time, 'YYYY_MMDD_HH24MISS'),
+                                   version =&gt; v_compatible);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.put_line(SUBSTR('Export failure (dbms_datapump.open)', 1, 255));
+            RAISE;
+    END;
+    DBMS_DATAPUMP.set_parallel(handle =&gt; v_handle,
+                               degree =&gt; 4);
+    DBMS_DATAPUMP.add_file(handle =&gt; v_handle,
+                           filename =&gt; v_logfile_name,
+                           directory =&gt; v_default_dir,
+                           filetype =&gt; DBMS_DATAPUMP.ku$_file_type_log_file,
+						   reusefile =&gt; 1);
+    DBMS_DATAPUMP.add_file(handle =&gt; v_handle,
+                           filename =&gt; v_dumpfile_name,
+                           directory =&gt; v_default_dir,
+                           filetype =&gt; DBMS_DATAPUMP.ku$_file_type_dump_file,
+						   reusefile =&gt; 1);
+    DBMS_DATAPUMP.metadata_filter(handle =&gt; v_handle, 
+                                  name =&gt; 'SCHEMA_EXPR',
+                                  value =&gt; 'IN ( ''' || UPPER(p_schema_name) || ''')');
+    IF p_object_type = 'T' THEN --OR p_object_type = 'V' THEN
+        DBMS_DATAPUMP.metadata_filter(handle =&gt; v_handle,
+                                      name =&gt; 'NAME_EXPR',
+                                      value =&gt; '= ''' || UPPER(p_object_name) || '''');
+    ELSIF p_object_type = 'MT' THEN
+        DBMS_DATAPUMP.metadata_filter(handle =&gt; v_handle,
+                                      name =&gt; 'NAME_EXPR',
+                                      value =&gt; 'IN (''' || UPPER(p_object_name) || ''')');
+    ELSIF p_object_type = 'V' THEN
+        DBMS_DATAPUMP.metadata_filter(handle =&gt; v_handle,
+                                      name =&gt; 'NAME_EXPR',
+                                      value =&gt; 'IN (''XX'')');
+        DBMS_DATAPUMP.metadata_filter(handle =&gt; v_handle,
+                                      name =&gt; 'VIEWS_AS_TABLES',
+                                      value =&gt; UPPER(p_object_name));
+    END IF;
+    IF p_table_filter IS NOT NULL AND p_object_type &lt;&gt; 'MT' THEN                              
+        DBMS_DATAPUMP.data_filter(handle =&gt; v_handle,
+                                  name =&gt; 'SUBQUERY',
+                                  VALUE =&gt; p_table_filter);
+    END IF; 
+    v_start_time := SYSDATE;
+    DBMS_DATAPUMP.log_entry(handle =&gt; v_handle, MESSAGE =&gt; 'Job Start at ' || TO_CHAR(v_start_time, 'DD-Mon-RR HH24:MI:SS'), log_file_only =&gt; 0);
+    DBMS_DATAPUMP.start_job(handle =&gt; v_handle);
+    v_job_state := 'UNDEFINED';
+    WHILE (v_job_state != 'COMPLETED') AND (v_job_state != 'STOPPED') AND (v_job_state != 'NOT RUNNING')
+	LOOP
+        dbms_datapump.get_status(v_handle,
+                                 dbms_datapump.ku$_status_job_error +
+                                 dbms_datapump.ku$_status_job_status +
+                                 dbms_datapump.ku$_status_wip,-1,v_job_state,v_sts);
+        v_job_status := v_sts.job_status;
+    END LOOP;
+    DBMS_DATAPUMP.detach(handle =&gt; v_handle);
+    EXCEPTION
+        WHEN OTHERS THEN
+            BEGIN
+                DBMS_DATAPUMP.detach(handle =&gt; v_handle);
+                EXCEPTION
+                    WHEN OTHERS THEN
+                        NULL;
+            END;
+            DBMS_OUTPUT.put_line(SUBSTR('Value of v_line_no=' || TO_CHAR(v_line_no), 1, 255));
+            RAISE;
+END DWH_DP_EXPORT_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

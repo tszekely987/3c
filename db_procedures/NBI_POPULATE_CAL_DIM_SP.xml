@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_POPULATE_CAL_DIM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_POPULATE_CAL_DIM_SP" (P_NUM_OF_DAYS INTEGER)
+AS
+   V_FIRST_DAY                   DATE;
+   V_NUM_OF_RECS                 INTEGER;
+   V_DAY                         DATE;
+   V_FIRST_DAY_OF_YEAR           DATE;
+   V_EARLIEST_BLOB_DATE          DATE;
+   V_STMT                        VARCHAR2(200);
+   V_MIN_DAY                     DATE;
+   V_NUM_OF_DAYS                 INTEGER;
+BEGIN
+
+-- First day of year is set to Oct-1st because in the
+   SELECT TO_DATE (
+             '01-10-' || TO_CHAR (TO_NUMBER (TO_CHAR (SYSDATE, 'YYYY')) - 1),
+             'DD-MM-YYYY'
+          )
+     INTO
+          V_FIRST_DAY_OF_YEAR
+     FROM DUAL;
+   SELECT MIN (I.FROM_DATE)
+     INTO V_EARLIEST_BLOB_DATE
+     FROM PRJ_BLB_SLICEREQUESTS I
+    WHERE I.IS_SYSTEM = 1;
+   V_STMT := 'Determining if this is the first load ever';
+
+   SELECT LEAST ( V_FIRST_DAY_OF_YEAR, V_EARLIEST_BLOB_DATE)
+     INTO V_FIRST_DAY
+     FROM DUAL;
+   V_FIRST_DAY := V_FIRST_DAY - 7;
+
+   DELETE FROM NBI_DIM_CALENDAR_TIME WHERE YEAR &lt;  EXTRACT(YEAR FROM V_FIRST_DAY);
+
+   UPDATE nbi_dim_calendar_time t
+     SET period_end_date = null
+     WHERE (hierarchy_level = 'YEAR' OR hierarchy_level = 'QUARTER')
+        AND period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY');
+
+   COMMIT;
+
+   -- Make sure we have at least 3 years + 3 months
+   V_NUM_OF_DAYS := (TRUNC (SYSDATE) - V_FIRST_DAY) + GREATEST(P_NUM_OF_DAYS, 1188 );
+
+   V_STMT := 'Create days';
+
+   FOR V_DAY_COUNTER IN 0 .. V_NUM_OF_DAYS + 92   /* Add another 3 months */
+   LOOP
+      V_DAY := V_FIRST_DAY + V_DAY_COUNTER;
+      INSERT INTO NBI_DIM_CALENDAR_TIME
+                  (TIME_KEY,
+                   DAY_KEY,
+                   DAY,
+                   WEEK_KEY,
+                   WEEK,
+                   MONTH_KEY,
+                   MONTH,
+                   QUARTER_KEY,
+                   QUARTER,
+                   YEAR_KEY,
+                   YEAR,
+                   HIERARCHY_LEVEL,
+                   CREATED_DATE,
+                   CREATED_BY,
+                   LAST_UPDATED_DATE,
+                   LAST_UPDATED_BY
+                  )
+         SELECT TO_CHAR (V_DAY, 'YYYY-MM-DD'),
+                TO_CHAR (V_DAY, 'YYYY-MM-DD'),
+                V_DAY,
+                DECODE (
+                   TO_CHAR (V_DAY, 'IW'),
+                   '01', DECODE (
+                            TO_CHAR (V_DAY, 'MM'),
+                            '12', TO_CHAR (V_DAY + 365, 'YYYY'),
+                            TO_CHAR (V_DAY, 'YYYY')
+                         ),
+                   '52', DECODE (
+                            TO_CHAR (V_DAY, 'MM'),
+                            '01', TO_CHAR (V_DAY - 365, 'YYYY'),
+                            TO_CHAR (V_DAY, 'YYYY')
+                         ),
+                   '53', DECODE (
+                            TO_CHAR (V_DAY, 'MM'),
+                            '01', TO_CHAR (V_DAY - 365, 'YYYY'),
+                            TO_CHAR (V_DAY, 'YYYY')
+                         ),
+                   TO_CHAR (V_DAY, 'YYYY')
+                ) ||
+                '-' ||
+                'WEEK' ||
+                LPAD (TO_CHAR (V_DAY, 'IW'), 2, '0'),
+                TO_NUMBER (TO_CHAR (V_DAY, 'IW')),
+                TO_CHAR (V_DAY, 'YYYY-MM'),
+                TO_NUMBER (TO_CHAR (V_DAY, 'MM')),
+                TO_CHAR (V_DAY, 'YYYY') || '-Q' || TO_CHAR (V_DAY, 'Q'),
+                TO_NUMBER (TO_CHAR (V_DAY, 'Q')),
+                TO_NUMBER (TO_CHAR (V_DAY, 'YYYY')),
+                TO_NUMBER (TO_CHAR (V_DAY, 'YYYY')),
+                'DAY',
+                SYSDATE,
+                0,
+                SYSDATE,
+                0
+           FROM DUAL
+          WHERE NOT EXISTS (SELECT 'DAY IS ALREADY THERE'
+                              FROM NBI_DIM_CALENDAR_TIME
+                             WHERE TIME_KEY = TO_CHAR (V_DAY, 'YYYY-MM-DD'));
+   END LOOP;
+
+   V_STMT := 'Create weeks';
+   INSERT INTO NBI_DIM_CALENDAR_TIME
+               (TIME_KEY,
+                DAY_KEY,
+                DAY,
+                WEEK_KEY,
+                WEEK,
+                MONTH_KEY,
+                MONTH,
+                QUARTER_KEY,
+                QUARTER,
+                YEAR_KEY,
+                YEAR,
+                HIERARCHY_LEVEL,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY
+               )
+      SELECT DISTINCT WEEK_KEY,
+                      NULL,
+                      NULL,
+                      WEEK_KEY,
+                      WEEK,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      SUBSTR (WEEK_KEY, 1, 4),
+                      TO_NUMBER (SUBSTR (WEEK_KEY, 1, 4)),
+                      'WEEK',
+                      SYSDATE,
+                      0,
+                      SYSDATE,
+                      0
+        FROM NBI_DIM_CALENDAR_TIME CAL
+       WHERE HIERARCHY_LEVEL = 'DAY'
+         AND NOT EXISTS (SELECT 'WEEK IS ALREADY THERE'
+                           FROM NBI_DIM_CALENDAR_TIME CAL1
+                          WHERE CAL1.TIME_KEY = CAL.WEEK_KEY);
+   V_STMT := 'Create months';
+   INSERT INTO NBI_DIM_CALENDAR_TIME
+               (TIME_KEY,
+                DAY_KEY,
+                DAY,
+                WEEK_KEY,
+                WEEK,
+                MONTH_KEY,
+                MONTH,
+                QUARTER_KEY,
+                QUARTER,
+                YEAR_KEY,
+                YEAR,
+                HIERARCHY_LEVEL,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY
+               )
+      SELECT DISTINCT MONTH_KEY,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      MONTH_KEY,
+                      MONTH,
+                      YEAR || '-Q' || QUARTER,
+                      QUARTER,
+                      YEAR,
+                      YEAR,
+                      'MONTH',
+                      SYSDATE,
+                      0,
+                      SYSDATE,
+                      0
+        FROM NBI_DIM_CALENDAR_TIME CAL
+       WHERE HIERARCHY_LEVEL = 'DAY'
+         AND NOT EXISTS (SELECT 'MONTH IS ALREADY THERE'
+                           FROM NBI_DIM_CALENDAR_TIME CAL1
+                          WHERE CAL1.TIME_KEY = CAL.MONTH_KEY);
+   V_STMT := 'Create quarters';
+   INSERT INTO NBI_DIM_CALENDAR_TIME
+               (TIME_KEY,
+                DAY_KEY,
+                DAY,
+                WEEK_KEY,
+                WEEK,
+                MONTH_KEY,
+                MONTH,
+                QUARTER_KEY,
+                QUARTER,
+                YEAR_KEY,
+                YEAR,
+                HIERARCHY_LEVEL,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY
+               )
+      SELECT DISTINCT QUARTER_KEY,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      QUARTER_KEY,
+                      QUARTER,
+                      YEAR,
+                      YEAR,
+                      'QUARTER',
+                      SYSDATE,
+                      0,
+                      SYSDATE,
+                      0
+        FROM NBI_DIM_CALENDAR_TIME CAL
+       WHERE HIERARCHY_LEVEL = 'DAY'
+         AND NOT EXISTS (SELECT 'QUARTER IS ALREADY THERE'
+                           FROM NBI_DIM_CALENDAR_TIME CAL1
+                          WHERE CAL1.TIME_KEY = CAL.QUARTER_KEY);
+   V_STMT := 'Create years';
+   INSERT INTO NBI_DIM_CALENDAR_TIME
+               (TIME_KEY,
+                DAY_KEY,
+                DAY,
+                WEEK_KEY,
+                WEEK,
+                MONTH_KEY,
+                MONTH,
+                QUARTER_KEY,
+                QUARTER,
+                YEAR_KEY,
+                YEAR,
+                HIERARCHY_LEVEL,
+                CREATED_DATE,
+                CREATED_BY,
+                LAST_UPDATED_DATE,
+                LAST_UPDATED_BY
+               )
+      SELECT DISTINCT YEAR_KEY,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL,
+                      YEAR_KEY,
+                      YEAR,
+                      'YEAR',
+                      SYSDATE,
+                      0,
+                      SYSDATE,
+                      0
+        FROM NBI_DIM_CALENDAR_TIME CAL
+       WHERE HIERARCHY_LEVEL = 'WEEK'
+         AND NOT EXISTS (SELECT 'YEAR IS ALREADY THERE'
+                           FROM NBI_DIM_CALENDAR_TIME CAL1
+                          WHERE CAL1.TIME_KEY = CAL.YEAR_KEY);
+
+   V_STMT := 'Delete partial weeks';
+   DELETE
+     FROM NBI_DIM_CALENDAR_TIME
+    WHERE HIERARCHY_LEVEL IN ('DAY', 'WEEK')
+      AND EXISTS (SELECT COUNT (*)
+                    FROM NBI_DIM_CALENDAR_TIME D
+                   WHERE D.HIERARCHY_LEVEL = 'DAY'
+                     AND D.WEEK_KEY = NBI_DIM_CALENDAR_TIME.WEEK_KEY
+                  HAVING COUNT (*) &lt;&gt; 7);
+
+   COMMIT;
+
+   -- Populate period start and end dates
+
+   UPDATE nbi_dim_calendar_time t
+      SET period_start_date = (SELECT MIN (day)
+                                 FROM nbi_dim_calendar_time t1
+                                WHERE t1.hierarchy_level = 'DAY'
+                                  AND t1.year_key = t.time_key),
+          period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY'
+                                AND t1.year_key = t.time_key)
+    WHERE hierarchy_level = 'YEAR'
+      AND (   period_start_date IS NULL
+           OR period_end_date IS NULL);
+
+   UPDATE nbi_dim_calendar_time t
+      SET period_start_date = (SELECT MIN (day)
+                                 FROM nbi_dim_calendar_time t1
+                                WHERE t1.hierarchy_level = 'DAY'
+                                  AND t1.quarter_key = t.time_key),
+          period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY'
+                                AND t1.quarter_key = t.time_key)
+    WHERE hierarchy_level = 'QUARTER'
+      AND (   period_start_date IS NULL
+           OR period_end_date IS NULL);
+
+   UPDATE nbi_dim_calendar_time t
+      SET period_start_date = (SELECT MIN (day)
+                                 FROM nbi_dim_calendar_time t1
+                                WHERE t1.hierarchy_level = 'DAY'
+                                  AND t1.month_key = t.time_key),
+          period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY'
+                                AND t1.month_key = t.time_key)
+    WHERE hierarchy_level = 'MONTH'
+      AND (   period_start_date IS NULL
+           OR period_end_date IS NULL);
+
+   UPDATE nbi_dim_calendar_time t
+      SET period_start_date = (SELECT MIN (day)
+                                 FROM nbi_dim_calendar_time t1
+                                WHERE t1.hierarchy_level = 'DAY'
+                                  AND t1.week_key = t.time_key),
+          period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY'
+                                AND t1.week_key = t.time_key)
+    WHERE hierarchy_level = 'WEEK'
+      AND (   period_start_date IS NULL
+           OR period_end_date IS NULL);
+
+
+   UPDATE nbi_dim_calendar_time t
+      SET period_start_date = (SELECT MIN (day)
+                                 FROM nbi_dim_calendar_time t1
+                                WHERE t1.hierarchy_level = 'DAY'
+                                  AND t1.day_key = t.time_key),
+          period_end_date = (SELECT MAX (day)
+                               FROM nbi_dim_calendar_time t1
+                              WHERE t1.hierarchy_level = 'DAY'
+                                AND t1.day_key = t.time_key)
+    WHERE hierarchy_level = 'DAY'
+      AND (   period_start_date IS NULL
+           OR period_end_date IS NULL);
+
+   V_STMT := 'Delete partial months';
+   DELETE
+     FROM NBI_DIM_CALENDAR_TIME
+    WHERE HIERARCHY_LEVEL = 'MONTH'
+      AND NOT EXISTS (SELECT 'Next Month Exists'
+                    FROM NBI_DIM_CALENDAR_TIME D
+                   WHERE D.HIERARCHY_LEVEL = 'DAY'
+                     AND ((D.MONTH = (NBI_DIM_CALENDAR_TIME.MONTH + 1) and d.year = NBI_DIM_CALENDAR_TIME.year)
+                            OR
+                           (D.MONTH = 1 AND NBI_DIM_CALENDAR_TIME.MONTH = 12 AND D.YEAR = (NBI_DIM_CALENDAR_TIME.YEAR + 1))));
+
+   COMMIT;
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_POPULATE_CAL_DIM_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

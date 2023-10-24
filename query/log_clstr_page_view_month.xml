@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_page_view_month" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Cluster Page Views by Month"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:DAY:LOG_DATE:LOG_DATE@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:DAY:ENVIRONMENT:ENVIRONMENT@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:VIEW_COUNT:VIEW_COUNT@
+FROM     
+(SELECT log_date, environment, sum(view_count) VIEW_COUNT
+from LOG_SUMMARY
+WHERE  (@WHERE:PARAM:USER_DEF:STRING:env@ = environment)
+AND  (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@ = host_name)
+AND LOG_DATE BETWEEN TRUNC(@WHERE:PARAM:USER_DEF:DATE:startdate@,'MON') AND ADD_MONTHS(TRUNC(@WHERE:PARAM:USER_DEF:DATE:startdate@,'MON'),1)-1
+group by log_date, environment
+)
+WHERE @FILTER@]]></nsql>
+            <attribute id="log_date" required="false"/>
+            <attribute id="environment" required="false"/>
+            <attribute id="view_count" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_startdate" required="false"/>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="log_clstr_freq_page_drill" code="dailydrill">
+                
+                
+                
+                
+                <nls languageCode="en" name="dailydrill"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="environment" dataSource="data" paramCode="env"/>
+                <linkParam dataRef="log_date" dataSource="data" paramCode="log_date"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

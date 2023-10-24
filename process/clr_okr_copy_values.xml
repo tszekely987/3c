@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="clr_okr_copy_values" createdBy="admin" endStep="Finish" source="customer" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Copy OKR Aggregated Calculated Values to Custom Number Attributes for ALL OKR records" languageCode="en" name="OKR - Copy/Update Custom Attribute Numbers for ALL OKR"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security>
+              <UserSecurity rightCode="PROCESS-DEF-INST-INITIATE" userName="admin"/>
+              <UserSecurity rightCode="PROCESS-DEF-INST-WRITE" userName="admin"/>
+            </Security>
+            <Objects>
+              <Object manualStart="false" name="thisXmlDocument" objectType="xml_document" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="c_copy_script" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls description="Copy/Update Script" languageCode="en" name="Copy/Update Script"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:xog="http://www.niku.com/xog" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <!-- Server Variable Info -->
+                          <gel:log level="info" message="Gel Script to Copy Calculated Aggregated Values to Number Attributes: Version 1.1"/>
+                          <!-- Get a DB Connection to Clarity -->
+                          <gel:setDataSource dbId="Niku"/>
+                          <!-- Get the Proxy User ID -->
+                          <sql:query var="presult"><![CDATA[
+		SELECT odf_pk, clr_total_target_agg, clr_total_actual_agg, round(clr_avg_attain_calc,2)
+		FROM odf_clr_okr_v2
+		where clr_avg_attain_calc is not null
+	]]></sql:query>
+                          <core:forEach items="${presult.rowsByIndex}" trim="true" var="prow">
+                            <core:set value="${prow[i+0]}" var="v_okr_id"/>
+                            <core:set value="${prow[i+1]}" var="v_okr_tt"/>
+                            <core:set value="${prow[i+2]}" var="v_okr_ta"/>
+                            <core:set value="${prow[i+3]}" var="v_okr_pct"/>
+                            <!-- Update Related OKR Numbers -->
+                            <sql:update var="update_okr_nums"><![CDATA[			
+				UPDATE odf_ca_clr_okr
+				SET clr_okr_total_target = ${v_okr_tt},
+					clr_okr_total_actual = ${v_okr_ta},
+					clr_okr_avg_attain = ${v_okr_pct}
+				WHERE id = ${v_okr_id}			
+			]]></sql:update>
+                          </core:forEach>
+                        </gel:script>
+                      </scriptText>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

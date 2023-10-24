@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_RES_SKILLS_INDEX_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_RES_SKILLS_INDEX_SP" 
+AS
+    V_SKILL_ID NUMERIC;
+    V_PARENT_ID NUMERIC;
+    V_CHILD_ID NUMERIC;
+    V_LEVEL INTEGER;
+    V_P_LEVEL INTEGER;
+
+    BEGIN
+    DELETE FROM RPT_RES_SKILLS_INDEX;
+    DELETE FROM RPT_RES_SKILLS_FLAT;
+
+    DECLARE CURSOR CURSOR1 IS
+    SELECT S.ID, 0, 1
+    FROM   RSM_SKILLS S
+    WHERE  NVL(S.PARENT_SKILL_ID,0) = 0;
+    BEGIN
+    OPEN CURSOR1;
+    LOOP
+        FETCH CURSOR1 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL;
+        EXIT WHEN CURSOR1%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_SKILL_ID,
+             V_LEVEL,
+             1
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(1) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR1;
+    END;
+    DECLARE CURSOR CURSOR2 IS
+    SELECT S.ID, S.ID, 2, 2
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.SKILL_LEVEL = 1
+    UNION
+    SELECT S.ID, S.PARENT_SKILL_ID, 2, SI.SKILL_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.SKILL_LEVEL = 1;
+    BEGIN
+    OPEN CURSOR2;
+    LOOP
+        FETCH CURSOR2 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR2%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(2) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR2;
+    END;
+    DECLARE CURSOR CURSOR3 IS
+    SELECT S.ID, S.ID, 3, 3
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 2
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 3, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 2) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR3;
+    LOOP
+        FETCH CURSOR3 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR3%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(3) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR3;
+    END;
+    DECLARE CURSOR CURSOR4 IS
+    SELECT S.ID, S.ID, 4, 4
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 3
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 4, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 3) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR4;
+    LOOP
+        FETCH CURSOR4 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR4%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(4) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR4;
+    END;
+    DECLARE CURSOR CURSOR5 IS
+    SELECT S.ID, S.ID, 5, 5
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 4
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 5, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 4) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR5;
+    LOOP
+        FETCH CURSOR5 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR5%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(5) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR5;
+    END;
+
+    DECLARE CURSOR CURSOR6 IS
+    SELECT S.ID, S.ID, 6, 6
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 5
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 6, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 5) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR6;
+    LOOP
+        FETCH CURSOR6 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR6%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(6) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR6;
+    END;
+    DECLARE CURSOR CURSOR7 IS
+    SELECT S.ID, S.ID, 7, 7
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 6
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 7, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 6) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR7;
+    LOOP
+        FETCH CURSOR7 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR7%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(7) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR7;
+    END;
+
+    DECLARE CURSOR CURSOR8 IS
+    SELECT S.ID, S.ID, 8, 8
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 7
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 8, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 7) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR8;
+    LOOP
+        FETCH CURSOR8 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR8%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(8) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR8;
+    END;
+
+    DECLARE CURSOR CURSOR9 IS
+    SELECT S.ID, S.ID, 9, 9
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 8
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 9, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 8) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR9;
+    LOOP
+        FETCH CURSOR9 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR9%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(9) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR9;
+    END;
+
+    DECLARE CURSOR CURSOR10 IS
+    SELECT S.ID, S.ID, 10, 10
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+    WHERE  SI.PARENT_LEVEL = 9
+    UNION
+    SELECT P.CHILD_ID, SI.PARENT_SKILL_ID, 10, SI.PARENT_LEVEL
+    FROM   RPT_RES_SKILLS_INDEX SI
+           INNER JOIN (SELECT S.ID CHILD_ID, S.PARENT_SKILL_ID, SI.PARENT_LEVEL
+                       FROM   RPT_RES_SKILLS_INDEX SI
+                              INNER JOIN RSM_SKILLS S ON SI.SKILL_ID = S.PARENT_SKILL_ID           
+                       WHERE  SI.PARENT_LEVEL = 9) P ON SI.SKILL_ID = P.PARENT_SKILL_ID
+    WHERE  1=1;
+    BEGIN
+    OPEN CURSOR10;
+    LOOP
+        FETCH CURSOR10 INTO V_SKILL_ID, V_PARENT_ID, V_LEVEL, V_P_LEVEL;
+        EXIT WHEN CURSOR10%NOTFOUND;
+        BEGIN
+        INSERT INTO RPT_RES_SKILLS_INDEX
+            (
+             SKILL_ID,
+             PARENT_SKILL_ID,
+             SKILL_LEVEL,
+             PARENT_LEVEL
+            )
+        VALUES
+            (
+             V_SKILL_ID,
+             V_PARENT_ID,
+             V_LEVEL,
+             V_P_LEVEL
+            );
+          EXCEPTION
+            WHEN OTHERS THEN
+            BEGIN
+                RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_INDEX(10) - ' || SQLERRM);
+                ROLLBACK;
+                GOTO OUTPUT;
+            END; 
+        END;
+        COMMIT;
+    END LOOP;
+    CLOSE CURSOR10;
+    END;
+
+    BEGIN
+    INSERT INTO RPT_RES_SKILLS_FLAT
+        (
+         SKILL_ID,
+         LEVEL1_SKILL_ID,
+         LEVEL2_SKILL_ID,
+         LEVEL3_SKILL_ID,
+         LEVEL4_SKILL_ID,
+         LEVEL5_SKILL_ID,
+         LEVEL6_SKILL_ID,
+         LEVEL7_SKILL_ID,
+         LEVEL8_SKILL_ID,
+         LEVEL9_SKILL_ID,
+         LEVEL10_SKILL_ID,
+         LEVEL1_NAME,
+         LEVEL2_NAME,
+         LEVEL3_NAME,
+         LEVEL4_NAME,
+         LEVEL5_NAME,
+         LEVEL6_NAME,
+         LEVEL7_NAME,
+         LEVEL8_NAME,
+         LEVEL9_NAME,
+         LEVEL10_NAME,
+         HIERARCHY_LEVEL,
+		 LAST_UPDATED_DATE
+        )
+    SELECT S.SKILL_ID,
+           MAX(CASE WHEN S.PARENT_LEVEL = 1 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 2 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 3 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 4 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 5 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 6 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 7 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 8 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 9 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 10 THEN S.PARENT_SKILL_ID ELSE 0 END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 1 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 2 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 3 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 4 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 5 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 6 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 7 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 8 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 9 THEN SD.SKILL_NAME ELSE NULL END),
+           MAX(CASE WHEN S.PARENT_LEVEL = 10 THEN SD.SKILL_NAME ELSE NULL END),
+           S.SKILL_LEVEL,
+		   MAX(SD.LAST_UPDATED_DATE)
+    FROM   RPT_RES_SKILLS_INDEX S
+           LEFT OUTER JOIN RSM_SKILLS SD ON S.PARENT_SKILL_ID = SD.ID
+    GROUP BY S.SKILL_ID, S.SKILL_LEVEL;
+    EXCEPTION
+        WHEN OTHERS THEN
+        BEGIN
+            RAISE_APPLICATION_ERROR (-20000, 'Error in RPT_RES_SKILLS_FLAT - ' || SQLERRM);
+            ROLLBACK;
+            GOTO OUTPUT;
+        END; 
+    END;
+    COMMIT;
+    &lt;&lt;OUTPUT&gt;&gt;
+    RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

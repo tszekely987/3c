@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="tso.utlLookupValFind" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls description="tso.utlLookupValFind" languageCode="en" name="Lookup Value Finder"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   DISTINCT 
+         @SELECT:DIM:USER_DEF:IMPLIED:theDIMENSION:UniqueId:dimId@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:theLevel:theLevel@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:type_and_code:type_and_code@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:name:name@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:descr:descr@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:HasParentLookup:HasParentLookup@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:enum:enum@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:is_active:is_active@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:url_link_general:url_link_general@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:url_link_values:url_link_values@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:CASE WHEN theLevel = 1 THEN url_link_general ELSE url_link_values END:url_link@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:CASE WHEN theLevel = 1 THEN UniqueId ELSE NULL END:hg_has_children@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:CASE WHEN theLevel = 1 THEN 1 ELSE 0 END:isLookup@,
+		 @SELECT:DIM_PROP:USER_DEF:IMPLIED:theDIMENSION:CASE WHEN theLevel = 2 THEN 1 ELSE 0 END:isValue@
+FROM (
+SELECT DISTINCT 
+1 theLevel,
+cl.lookup_type type_and_code,
+cl.lookup_type UniqueId,
+lt.name name, 
+lt.description descr,
+CASE WHEN cl.parent_lookup_code IS NOT NULL THEN 1 ELSE 0 END HasParentLookup,
+NULL enum,
+lt.is_active,
+'/niku/app?action=nmc.lookupOpenCategory&lookup_type=' || cl.lookup_type url_link_general,
+'/niku/app?action=nmc.lookupLuvList&lookup_type=' || cl.lookup_type || '&'  || 'displayPartition=partition1' url_link_values
+FROM CMN_LOOKUPS_V cl
+LEFT OUTER JOIN cmn_lookup_types_v LT ON LT.LOOKUP_TYPE = CL.LOOKUP_TYPE
+ AND LT.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT OUTER JOIN CMN_LOOKUPS_V parL ON parL.language_code = @WHERE:PARAM:LANGUAGE@
+  AND parL.lookup_code = cl.parent_lookup_code
+  AND 1=2
+LEFT OUTER JOIN ( SELECT UPPER( @WHERE:PARAM:USER_DEF:STRING:filter_type@ ) theType,
+                                           UPPER( @WHERE:PARAM:USER_DEF:STRING:filter_code@ ) theCode,
+                                           UPPER( @WHERE:PARAM:USER_DEF:STRING:filter_value@ ) theValue,
+                                           UPPER( @WHERE:PARAM:USER_DEF:STRING:filter_name@ ) theName,
+                                           @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ passCode,
+										   NVL(@WHERE:PARAM:USER_DEF:INTEGER:FILTER_HIDDEN_SYSTEM@,0) search_system
+                              FROM DUAL ) passKey ON 1=1    
+WHERE 5=5
+AND cl.language_code = @WHERE:PARAM:LANGUAGE@
+AND ( passKey.theType IS NULL OR UPPER(cl.lookup_type) LIKE '%' || passKey.theType || '%'  )
+AND ( passKey.theCode IS NULL OR UPPER(cl.lookup_code) LIKE '%' || passKey.theCode || '%'  )
+AND ( passKey.theValue IS NULL OR UPPER(cl.name) LIKE '%' || passKey.theValue || '%'  )
+AND ( passKey.theName IS NULL OR UPPER(lt.name) LIKE '%' || passKey.theName || '%'  )
+AND ( ( cl.lookup_type not like 'ODF.OBJECT.%' AND passKey.search_system = 0 ) OR ( passKey.search_system = 1 ) )
+AND ( ( cl.lookup_type not like 'ODF.NSQL.%'  AND passKey.search_system = 0 ) OR ( passKey.search_system = 1 ) )
+AND ( ( cl.lookup_type not like 'ODF.SYSTEM.%'  AND passKey.search_system = 0 ) OR ( passKey.search_system = 1 ) )
+AND passKey.passCode IS NULL
+UNION ALL
+SELECT DISTINCT 
+2 theLevel,
+cl.lookup_code,
+cl.lookup_type || cl.lookup_code UniqueId,
+cl.name theName, 
+cl.description theDesc,
+NULL HasParentLookup,
+cl.lookup_enum,
+cl.is_active,
+'/niku/app?action=nmc.lookupOpenCategory&lookup_type=' || cl.lookup_type url_link_general,
+'/niku/app?action=nmc.lookupLuvList&lookup_type=' || cl.lookup_type || '&'  || 'displayPartition=partition1' url_link_values
+FROM CMN_LOOKUPS_V cl
+LEFT OUTER JOIN cmn_lookup_types_v LT ON LT.LOOKUP_TYPE = CL.LOOKUP_TYPE
+ AND LT.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT OUTER JOIN CMN_LOOKUPS_V parL ON parL.language_code = @WHERE:PARAM:LANGUAGE@
+  AND parL.lookup_code = cl.parent_lookup_code
+  AND 1=2
+LEFT OUTER JOIN ( SELECT @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ passCode
+                              FROM DUAL ) passKey ON 1=1    
+WHERE 5=5
+AND cl.language_code = @WHERE:PARAM:LANGUAGE@
+AND cl.lookup_type not like 'ODF.OBJECT.%'
+AND cl.lookup_type not like 'ODF.NSQL.%'
+AND cl.lookup_type not like 'ODF.SYSTEM.%'
+AND passKey.passCode IS NOT NULL
+AND cl.lookup_type = passKey.passCode
+) SQ
+WHERE 2=2
+AND @FILTER@]]></nsql>
+            <attribute id="dimid" required="false"/>
+            <attribute id="thelevel" required="false"/>
+            <attribute id="type_and_code" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Lookup Type / Lookup Code"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Lookup/Value Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="descr" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Description"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="hasparentlookup" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Has a Parent Lookup"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="Checkmark"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="enum" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Enum Value"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_active" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Active"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="CalAccepted"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-2" typeCode="CalDeclined"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="url_link_general" required="false"/>
+            <attribute id="url_link_values" required="false"/>
+            <attribute id="url_link" required="false"/>
+            <attribute id="hg_has_children" required="false"/>
+            <attribute id="islookup" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Lookup"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="isvalue" required="false"/>
+            <attribute id="param_filter_type" required="false"/>
+            <attribute id="param_filter_hidden_system" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_filter_hidden_system"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_filter_value" required="false"/>
+            <attribute id="param_filter_code" required="false"/>
+            <attribute id="param_filter_name" required="false"/>
+            <attribute id="param_hg_row_id" required="false"/>
+            <links>
+              <link action="tsoUrlRedirectClarityPag" code="lookup">
+                
+                
+                
+                
+                <nls languageCode="en" name="Lookup"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="url_link" dataSource="data" paramCode="url"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

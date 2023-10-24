@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_BUSINESS_OBJECT_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_BUSINESS_OBJECT_DEL_SP" (P_DOMAIN_NAME IN VARCHAR2, P_DOMAIN_ID NUMBER)
+IS
+BEGIN
+DELETE cmn_attribute_values
+ WHERE attribute_set_id IN (SELECT   id
+                            FROM     cmn_attribute_value_sets
+                            WHERE    business_object_id =
+                                      (SELECT   id
+                                       FROM     cmn_business_objects
+                                       WHERE    pk_id = p_domain_id
+                                       AND      table_name = p_domain_name));
+
+DELETE cmn_attribute_value_sets
+ WHERE business_object_id =
+        (SELECT   id
+         FROM     cmn_business_objects
+         WHERE    pk_id = p_domain_id
+         AND      table_name = p_domain_name);
+
+DELETE
+  FROM cmn_view_resources
+ WHERE view_id IN (SELECT   a.id
+                   FROM     cmn_object_views a, cmn_business_objects b
+                   WHERE    b.id = a.object_id
+                   AND      b.table_name = p_domain_name
+                   AND      b.pk_id = p_domain_id);
+
+DELETE cmn_view_attributes
+ WHERE object_view_id IN (SELECT   id
+                          FROM     cmn_object_views
+                          WHERE    object_id =
+                                    (SELECT   id
+                                     FROM     cmn_business_objects
+                                     WHERE    table_name = p_domain_name
+                                     AND      pk_id = p_domain_id));
+
+DELETE cmn_attributes
+ WHERE table_name = 'CMN_BUSINESS_OBJECTS'
+AND    pk_id =
+        (SELECT   id
+         FROM     cmn_business_objects
+         WHERE    table_name = p_domain_name
+         AND      pk_id = p_domain_id);
+
+DELETE cmn_object_views
+ WHERE object_id =
+        (SELECT   id
+         FROM     cmn_business_objects
+         WHERE    table_name = p_domain_name
+         AND      pk_id = p_domain_id);
+
+DELETE cmn_business_objects
+ WHERE table_name = p_domain_name
+AND    pk_id = p_domain_id;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

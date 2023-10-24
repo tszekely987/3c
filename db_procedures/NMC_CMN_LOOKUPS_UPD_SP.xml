@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NMC_CMN_LOOKUPS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NMC_CMN_LOOKUPS_UPD_SP" (
+   P_LOOKUP_TYPE            IN   VARCHAR2,
+   P_LOOKUP_CODE            IN   VARCHAR2,
+   P_LOOKUP_NAME            IN   VARCHAR2,
+   P_LOOKUP_DESCRIPTION     IN   VARCHAR2,
+   P_SORT_ORDER             IN   NUMBER,
+   P_IS_ACTIVE              IN   NUMBER,
+   P_LAST_UPDATED_BY        IN   NUMBER DEFAULT 1,
+   P_LANGUAGE_CODE          IN   VARCHAR2,
+   P_PARTITION_CODE IN VARCHAR2 DEFAULT 'NIKU.ROOT',
+   P_PARTITION_MODE_CODE IN VARCHAR2 DEFAULT 'PARTITION_AND_ANSTRS_DESDNTS'   
+)
+IS
+   V_COUNT                       NUMBER;   
+   V_LOOKUP_ENUM                 NUMBER;
+   V_PARENT_LOOKUP_CODE  VARCHAR2(30);
+   V_LOOKUP_LEVEL                 NUMBER;
+   V_IS_SYSTEM                   NUMBER;
+   V_IS_ADMIN_VISIBLE            NUMBER;
+   V_IS_UPGRADE_PROTECTED        NUMBER;
+   V_ID                          NUMBER;
+BEGIN
+   SELECT KEY_ATTRIBUTE_ID INTO V_ID
+   FROM CMN_LOV_OBJECTS a , CMN_LOOKUP_TYPES b
+   WHERE a.LOOKUP_TYPE_CODE = P_LOOKUP_TYPE
+   AND a.LOOKUP_TYPE_CODE = b.LOOKUP_TYPE;
+   IF (V_ID = 6)/* Then this is lookup_enum column*/
+   THEN
+   /* Get the Lookup Related Information for this Lookup Type - Lookup Enum */
+   SELECT    PARENT_LOOKUP_CODE, LOOKUP_LEVEL,LOOKUP_ENUM, IS_SYSTEM, IS_ADMIN_VISIBLE, IS_UPGRADE_PROTECTED
+   INTO      V_PARENT_LOOKUP_CODE, V_LOOKUP_LEVEL,V_LOOKUP_ENUM, V_IS_SYSTEM, V_IS_ADMIN_VISIBLE, V_IS_UPGRADE_PROTECTED
+   FROM      CMN_LOOKUPS
+   WHERE     LOOKUP_TYPE = P_LOOKUP_TYPE
+   AND       LOOKUP_ENUM = P_LOOKUP_CODE;
+   ELSE /* Then this is lookup_code column*/
+   /* Get the Lookup Related Information for this Lookup Type - Lookup Code */
+   SELECT    PARENT_LOOKUP_CODE, LOOKUP_LEVEL,LOOKUP_ENUM, IS_SYSTEM, IS_ADMIN_VISIBLE, IS_UPGRADE_PROTECTED
+   INTO      V_PARENT_LOOKUP_CODE, V_LOOKUP_LEVEL,V_LOOKUP_ENUM, V_IS_SYSTEM, V_IS_ADMIN_VISIBLE, V_IS_UPGRADE_PROTECTED
+   FROM      CMN_LOOKUPS
+   WHERE     LOOKUP_TYPE = P_LOOKUP_TYPE
+   AND       LOOKUP_CODE = P_LOOKUP_CODE;
+   END IF; 
+   /* Call DTG SP to update this lookup */
+   CMN_LOOKUPS_UPD_SP (
+       P_LOOKUP_TYPE,
+       P_LOOKUP_CODE,
+       P_LOOKUP_NAME,
+       P_LOOKUP_DESCRIPTION,
+       V_LOOKUP_ENUM,
+       P_SORT_ORDER,
+       V_IS_SYSTEM,
+       P_IS_ACTIVE,
+       V_IS_ADMIN_VISIBLE,
+       V_IS_UPGRADE_PROTECTED,
+       P_LAST_UPDATED_BY,
+       V_PARENT_LOOKUP_CODE,
+       V_LOOKUP_LEVEL,
+       P_PARTITION_CODE,
+       P_PARTITION_MODE_CODE
+   );
+  
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

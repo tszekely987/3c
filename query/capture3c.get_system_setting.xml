@@ -1,0 +1,1143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_system_setting" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_system_setting"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT
+	@SELECT:DIM:USER_DEF:IMPLIED:CODES:SETTING_ID:CODE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:SETTING:SETTING@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:RAW_VALUE:RAW_VALUE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:DISPLAY_VALUE:DISPLAY_VALUE@
+FROM (
+	-- To convert to SQL replace @NVL@ with NVL (Oracle) ISNULL (MSSQL)
+	-- SESSION OPTIONS (DONE)
+	SELECT
+			'SEC_BAD_LOGIN_LIMIT' AS setting_id
+			, 'Invalid Login Limit' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_BAD_LOGIN_LIMIT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_SESSION_EXPIRATION' AS setting_id
+			, 'Minutes Of Inactivity Until Logout' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_SESSION_EXPIRATION'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- CHANGE PASSWORD OPTIONS (DONE)
+	SELECT
+			'SEC_PWD_CHG_DAYS' AS setting_id
+			, 'Number Of Days Until Password Expires' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_PWD_CHG_DAYS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_PWD_DIFF_FROM_USER' AS setting_id
+			, 'User Name And Password Cannot Be The Same' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_PWD_DIFF_FROM_USER'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_PWD_HISTORY' AS setting_id
+			, 'Password History - Count' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_PWD_HISTORY'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_PWD_HISTORY_DAYS' AS setting_id
+			, 'Password History - Days' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_PWD_HISTORY_DAYS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_PASSWORD_LENGTH' AS setting_id
+			, 'Minimum Password Length' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_PASSWORD_LENGTH'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_UPPERCASE_ENABLE' AS setting_id
+			, 'Minimum Upper Case Letters (Checkbox)' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_UPPERCASE_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_UPPERCASE_LENGTH' AS setting_id
+			, 'Minimum Upper Case Letters' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_UPPERCASE_LENGTH'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_LOWERCASE_ENABLE' AS setting_id
+			, 'Minimum Lower Case Letters (Checkbox)' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_LOWERCASE_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_LOWERCASE_LENGTH' AS setting_id
+			, 'Minimum Lower Case Letters' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_LOWERCASE_LENGTH'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_NUMERIC_ENABLE' AS setting_id
+			, 'Minimum Numerical Digits (Checkbox)' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_NUMERIC_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_NUMERIC_LENGTH' AS setting_id
+			, 'Minimum Numerical Digits' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_NUMERIC_LENGTH'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_SPECIAL_ENABLE' AS setting_id
+			, 'Minimum Special Characters (Checkbox)' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_SPECIAL_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_MIN_SPECIAL_LENGTH' AS setting_id
+			, 'Minimum Special Characters' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_MIN_SPECIAL_LENGTH'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_PASSWORD_REG_EXPR' AS setting_id
+			, 'Regular Expression' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SEC_PASSWORD_REG_EXPR'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SEC_PASSWORD_REG_EXPR_ERR_MSG' AS setting_id
+			, 'Error Message' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_captions_nls.name AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_captions_nls.name AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_captions_nls
+			WHERE cmn_options.id = cmn_captions_nls.pk_id
+                    AND cmn_captions_nls.table_name = 'CMN_OPTIONS'
+					AND cmn_options.option_code = 'SEC_PASSWORD_REG_EXPR'
+                    AND cmn_captions_nls.language_code = 'en'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- DOCUMENT MANAGER OPTIONS (DONE)
+	SELECT
+			'DMS_EXTENSIONS_ALLOWED' AS setting_id
+			, 'Authorized File Extensions' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'DMS_EXTENSIONS_ALLOWED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DMS_SCANNING_ENABLE' AS setting_id
+			, 'Enable File Scanning of Documents' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'DMS_SCANNING_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DMS_ACCESS_DOCUMENTS_DEFAULT' AS setting_id
+			, 'Allow Non-participants to Access Documents' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = 'true' THEN 'Yes'
+                        ELSE 'No'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'DMS_ACCESS_DOCUMENTS_DEFAULT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ENABLE_DMS_DOWNLOAD' AS setting_id
+			, 'Enable Document Download' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'ENABLE_DMS_DOWNLOAD'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DMS_DOCUMENT_MAX_SIZE' AS setting_id
+			, 'Maximum File Size for Document Download' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'DMS_DOCUMENT_MAX_SIZE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DMS_DOCUMENT_WARN_SIZE' AS setting_id
+			, 'Warning File Size for Document Download' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'DMS_DOCUMENT_WARN_SIZE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- DATA WAREHOUSE OPTIONS
+	-- TODO: Languages
+	SELECT
+			'DWH_ENTITY_KEY' AS setting_id
+			, 'Entity for Fiscal Periods' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.entity_key AS VARCHAR(1000)) AS raw_value
+					, CAST(e.entity AS VARCHAR(1000)) AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.entity_key AS VARCHAR(1000)) AS raw_value
+					, NULL AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DWH_WEEKLY_PERIODS' AS setting_id
+			, 'Include Weekly Period Data' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.WEEKLY_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.WEEKLY_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.WEEKLY_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.WEEKLY_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DWH_MONTHLY_PERIODS' AS setting_id
+			, 'Include Monthly Period Data' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.MONTHLY_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.MONTHLY_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.MONTHLY_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.MONTHLY_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DWH_FISCAL_PERIODS' AS setting_id
+			, 'Include Fiscal Period Data' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.FISCAL_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.FISCAL_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.FISCAL_SLICES AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.FISCAL_SLICES = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DWH_ONE_FISCAL_PERIOD' AS setting_id
+			, 'Consistent Fiscal Periods across Entities' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.ONE_SET_OF_FISCAL_PERIODS AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.ONE_SET_OF_FISCAL_PERIODS = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.ONE_SET_OF_FISCAL_PERIODS AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.ONE_SET_OF_FISCAL_PERIODS = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'DWH_FIN_PLANS_POR_ONLY' AS setting_id
+			, 'Include only financial Plan of Record' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(dwhs.FIN_PLANS_POR_ONLY AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.FIN_PLANS_POR_ONLY = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS DWHS, ENTITY E
+            WHERE (DWHS.ENTITY_KEY IS NOT NULL AND CAST(E.ID AS VARCHAR(60)) = DWHS.ENTITY_KEY)
+
+            UNION
+
+            SELECT
+					CAST(dwhs.FIN_PLANS_POR_ONLY AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN dwhs.FIN_PLANS_POR_ONLY = 1 THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+            FROM DWH_SETTINGS dwhs
+            WHERE ENTITY_KEY IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- ADVANCED REPORTING
+	-- TODO: Advanced Reporting Server URL
+	-- TODO: Organization ID
+	-- TODO: Clarity PPM Database Schema
+	-- TODO: Data Warehouse Database Schema
+	SELECT
+			'JSFT_GRP_ROLE_SYNC' AS setting_id
+			, 'Allow Jaspersoft Role Synchronization' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'JSFT_GRP_ROLE_SYNC'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- API
+	-- TODO: REST API Status
+	-- TODO: API URL
+	-- TODO: API Documentation URL
+	SELECT
+			'ACCESS_TOKEN_ENABLED' AS setting_id
+			, 'Enable API key based access' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'ACCESS_TOKEN_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ACCESS_TOKEN_SALT' AS setting_id
+			, 'Salt for encrypting API keys' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'ACCESS_TOKEN_SALT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ACCESS_TOKEN_MAX_EXPIRATION' AS setting_id
+			, 'Maximum expiration in days for API keys' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'ACCESS_TOKEN_MAX_EXPIRATION'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ACCESS_TOKEN_MAX_PER_USER' AS setting_id
+			, 'Maximum number of keys allowed per user' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'ACCESS_TOKEN_MAX_PER_USER'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- NEW USER EXPERIENCE (DONE)
+	SELECT
+			'PPMUX_WAR_ENABLED' AS setting_id
+			, 'Activate New User Experience' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'PPMUX_WAR_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TIMESHEET_WAR_APP_ENABLED' AS setting_id
+			, 'Activate Timesheets' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TIMESHEET_WAR_APP_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'HIDE_IE11_WARNING_PPMUX' AS setting_id
+			, 'Hide IE11 Not Supported Banner' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'HIDE_IE11_WARNING_PPMUX'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- OTHER
+	-- TODO: Chart Colors
+	SELECT
+			'COMPANY_NAME' AS setting_id
+			, 'Company Name' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'COMPANY_NAME'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'CMN_GRAPHS_CONS_COLORS' AS setting_id
+			, 'Use Consistent Chart Colors' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+                    AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'CMN_GRAPHS_CONS_COLORS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'CMN_GZIP_ENCODING' AS setting_id
+			, 'Use GZip HTML Encoding' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'CMN_GZIP_ENCODING'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'E2E_TSV_LINKS_ENABLE' AS setting_id
+			, 'Enable TSV links for Export to Excel' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'E2E_TSV_LINKS_ENABLE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SAML_ENABLED' AS setting_id
+			, 'Enable SAML Authentication' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'SAML_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	-- SUBSCRIPTION COMPLIANCE SETUP
+	-- TODO: Product Version
+	-- TODO: Domain Name
+	-- TODO: SaaS Environment
+	SELECT
+			'TEL_SITE_ID' AS setting_id
+			, 'Site ID' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_SITE_ID'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_IS_PROD_ENV' AS setting_id
+			, 'Production Environment' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = 'yes' THEN 'Yes'
+                        ELSE 'No'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_IS_PROD_ENV'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_PLA_AGREEMENT' AS setting_id
+			, 'PLA Customer' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = 'yes' THEN 'Yes'
+                        ELSE 'No'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_PLA_AGREEMENT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TELEMETRY_OPT_IN' AS setting_id
+			, 'Opt-in' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TELEMETRY_OPT_IN'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_CHARGEBACK_ID' AS setting_id
+			, 'Charge Identifier' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_CHARGEBACK_ID'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_INSTANCE_ID' AS setting_id
+			, 'Instance' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_INSTANCE_ID'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_EMAIL' AS setting_id
+			, 'Error Notification Email' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_EMAIL'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_IS_PROXY_ENABLED' AS setting_id
+			, 'User Proxy' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+                        WHEN cmn_option_values.value = '1' THEN 'true'
+                        ELSE 'false'
+                      END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_IS_PROXY_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_PROXY_URL' AS setting_id
+			, 'Proxy URL' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_PROXY_URL'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_PROXY_USERNAME' AS setting_id
+			, 'Username' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_PROXY_USERNAME'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'TEL_PROXY_PASSWORD' AS setting_id
+			, 'Password' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_options.is_active = 1
+					AND cmn_options.option_code = 'TEL_PROXY_PASSWORD'
+			) lj ON 1=1
+) d
+WHERE @FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="setting" required="false"/>
+            <attribute id="raw_value" required="false"/>
+            <attribute id="display_value" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

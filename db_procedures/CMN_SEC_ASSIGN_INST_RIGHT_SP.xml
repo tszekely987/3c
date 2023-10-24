@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_ASSIGN_INST_RIGHT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_ASSIGN_INST_RIGHT_SP" (
+   P_PRINCIPAL_TYPE    IN   VARCHAR2,
+   P_PRINCIPAL_CODE    IN   VARCHAR2,
+   P_RIGHT_CODE        IN   VARCHAR2,
+   P_INSTANCE_ID       IN   NUMBER,
+   P_CREATED_BY        IN   NUMBER DEFAULT 1,
+   P_PRINCIPAL_ID      IN   NUMBER DEFAULT 0
+)
+IS
+   V_PRINCIPAL_ID                          NUMBER;
+   V_RIGHT_ID                              NUMBER;
+   V_CNT1                                  NUMBER;
+BEGIN
+
+    BEGIN
+      SELECT   ID
+      INTO     V_RIGHT_ID
+      FROM     CMN_SEC_GROUPS
+      WHERE    GROUP_CODE = P_RIGHT_CODE;
+      
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR (-20003, 'GROUP_CODE FOR RIGHT DOES NOT EXIST');
+      WHEN OTHERS THEN
+        NULL;
+    END;
+    
+
+    IF P_PRINCIPAL_TYPE = 'GROUP'
+    THEN
+      BEGIN
+        SELECT  ID
+        INTO    V_PRINCIPAL_ID
+        FROM    CMN_SEC_GROUPS
+        WHERE   GROUP_CODE = P_PRINCIPAL_CODE;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+         IF P_PRINCIPAL_ID != 0
+         THEN
+           V_PRINCIPAL_ID := P_PRINCIPAL_ID;
+         ELSE
+          RAISE_APPLICATION_ERROR (-20004, 'GROUP_CODE FOR GROUP DOES NOT EXIST');
+         END IF;
+        WHEN OTHERS THEN
+          NULL;
+      END;
+    ELSE
+      BEGIN
+        SELECT  ID
+        INTO    V_PRINCIPAL_ID
+        FROM    CMN_SEC_USERS
+        WHERE   USER_NAME = P_PRINCIPAL_CODE;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          IF P_PRINCIPAL_ID != 0
+          THEN
+            V_PRINCIPAL_ID := P_PRINCIPAL_ID;
+          ELSE
+            RAISE_APPLICATION_ERROR (-20005, 'USER_NAME DOES NOT EXIST');
+          END IF;
+        WHEN OTHERS THEN
+          NULL;
+      END;
+    END IF;
+
+    SELECT   COUNT (*)
+    INTO     V_CNT1
+    FROM     CMN_SEC_ASSGND_OBJ_PERM
+    WHERE    PRINCIPAL_TYPE     = P_PRINCIPAL_TYPE
+    AND      PRINCIPAL_ID       = V_PRINCIPAL_ID
+    AND      RIGHT_ID           = V_RIGHT_ID
+    AND      OBJECT_INSTANCE_ID = P_INSTANCE_ID;
+
+    IF    V_CNT1 = 0
+    THEN    
+      INSERT INTO CMN_SEC_ASSGND_OBJ_PERM 
+          (
+                ID, 
+                PRINCIPAL_TYPE, 
+                PRINCIPAL_ID, 
+                OBJECT_ID, 
+                PERMISSION_ID, 
+                OBJECT_INSTANCE_ID,
+                CREATED_DATE,
+                CREATED_BY, 
+                LAST_UPDATED_DATE, 
+                LAST_UPDATED_BY, 
+                RIGHT_ID)
+          SELECT   CMN_SEC_ASSGND_OBJ_PERM_S1.NEXTVAL,
+                   P_PRINCIPAL_TYPE,
+                   V_PRINCIPAL_ID, 
+                   OBJECT_ID, 
+                   PERMISSION_ID,
+                   P_INSTANCE_ID,
+                   SYSDATE,
+                   P_CREATED_BY,
+                   SYSDATE,
+                   P_CREATED_BY,
+                   V_RIGHT_ID
+          FROM     CMN_SEC_ASSGND_OBJ_PERM
+          WHERE    PRINCIPAL_TYPE = 'GROUP'
+          AND      PRINCIPAL_ID   = V_RIGHT_ID;
+    END IF;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_GROUP_HIERS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_GROUP_HIERS_INS_SP" (
+      NEW_GROUP_ID          NUMBER,
+      NEW_PARENT_GROUP_ID   NUMBER
+   )
+   AS
+   BEGIN
+      IF NEW_GROUP_ID = NEW_PARENT_GROUP_ID
+      THEN
+         INSERT INTO CMN_SEC_GROUP_FLAT_HIERS (
+                        ID,
+                        GROUP_ID,
+                        PARENT_GROUP_ID,
+                        CREATED_DATE,
+                        CREATED_BY,
+                        LAST_UPDATED_DATE,
+                        LAST_UPDATED_BY
+                     )
+              VALUES (
+                 CMN_SEC_GROUP_FLAT_HIERS_S1.NEXTVAL,
+                 NEW_GROUP_ID,
+                 NEW_GROUP_ID,
+                 SYSDATE,
+                 1,
+                 SYSDATE,
+                 1
+              );
+      ELSE
+         INSERT INTO CMN_SEC_GROUP_FLAT_HIERS
+                     (ID,
+                      GROUP_ID,
+                      PARENT_GROUP_ID,
+                      CREATED_DATE,
+                      CREATED_BY,
+                      LAST_UPDATED_DATE,
+                      LAST_UPDATED_BY
+                     )
+            SELECT CMN_SEC_GROUP_FLAT_HIERS_S1.NEXTVAL,
+                   FH2.GROUP_ID,
+                   FH.PARENT_GROUP_ID,
+                   SYSDATE,
+                   1,
+                   SYSDATE,
+                   1
+              FROM CMN_SEC_GROUP_FLAT_HIERS FH, CMN_SEC_GROUP_FLAT_HIERS FH2
+             WHERE FH.GROUP_ID = NEW_PARENT_GROUP_ID
+               AND FH2.PARENT_GROUP_ID = NEW_GROUP_ID;
+      END IF;
+   END CMN_SEC_GROUP_HIERS_INS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

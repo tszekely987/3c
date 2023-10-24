@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_slow_actions_by_day" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Slow Actions by Day"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:log:z.id:id@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.host_name:host_name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.start_time:start_time@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.finish_time:finish_time@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.action_method:action_method@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.url_short:url_short@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.bytes_sent:bytes_sent@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:round(z.elapsed_time/1000,1):elapsed_time@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:z.session_cookie:session_cookie@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:log:u.user_name:user_name@
+FROM     LOG_DETAILS Z
+LEFT OUTER JOIN LOG_SESSIONS S ON (Z.SESSION_COOKIE = S.TOKEN)
+LEFT OUTER JOIN CMN_SEC_USERS U ON (S.USER_ID = U.ID)
+WHERE  z.LOG_DATE = @WHERE:PARAM:USER_DEF:DATE:logdate@
+AND    (@WHERE:PARAM:USER_DEF:STRING:env@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:env@=Z.ENVIRONMENT)
+AND      @FILTER@]]></nsql>
+            <attribute id="id" required="false"/>
+            <attribute id="host_name" required="false"/>
+            <attribute id="start_time" required="false"/>
+            <attribute id="finish_time" required="false"/>
+            <attribute id="action_method" required="false"/>
+            <attribute id="url_short" required="false"/>
+            <attribute id="bytes_sent" required="false"/>
+            <attribute id="elapsed_time" required="false"/>
+            <attribute id="session_cookie" required="false"/>
+            <attribute id="user_name" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_logdate" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

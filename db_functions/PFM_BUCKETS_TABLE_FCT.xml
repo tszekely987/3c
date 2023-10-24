@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_BUCKETS_TABLE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_BUCKETS_TABLE_FCT" (p_id NUMBER, p_curve CLOB, p_period_type VARCHAR, p_periods NUMBER, p_start DATE, p_cal_type VARCHAR DEFAULT 'DEFAULT', p_entity NUMBER DEFAULT 0)
+   RETURN PFM_BUCKETS PIPELINED
+/*
+*/
+
+IS
+   v_slices PFM_SLICES;
+   v_calendar PFM_CALENDAR;
+BEGIN
+
+  v_calendar := PFM_CALENDAR_FCT( p_start, p_period_type, p_periods, p_cal_type, p_entity );
+  v_slices := PFM_SLICES_FCT( p_id, p_curve, v_calendar );
+
+  for i in  ( select * from (select slice_number, slice from table( v_slices ) )
+                pivot
+            (
+               sum(slice) SLICE
+               for slice_number in (1 as TS1,2 as TS2,3 as TS3,4 as TS4, 5 as TS5 ,6 AS TS6, 7 AS TS7, 8 AS TS8, 9 AS TS9, 10 AS TS10, 11 AS TS11, 12 AS TS12, 13 AS TS13, 14 AS TS14, 15 AS TS15, 16 AS TS16)
+             )
+            )
+    loop
+    pipe row( PFM_BUCKET ( p_id, i.ts1_slice, i.ts2_slice, i.ts3_slice, i.ts4_slice, i.ts5_slice, i.ts6_slice, i.ts7_slice, i.ts8_slice
+                                , i.ts9_slice, i.ts10_slice, i.ts11_slice, i.ts12_slice, i.ts13_slice, i.ts14_slice, i.ts15_slice, i.ts16_slice));
+   end loop;
+
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

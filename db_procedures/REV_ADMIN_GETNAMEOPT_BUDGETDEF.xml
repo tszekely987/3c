@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_ADMIN_GETNAMEOPT_BUDGETDEF</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_ADMIN_GETNAMEOPT_BUDGETDEF" (
+RC1 	IN OUT REV_ADMIN_GETNAMEOPT_BUDGETPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+costsourcelabor   NUMBER;
+ratesourcelabor   NUMBER;
+ratelocationlabor   NUMBER;
+rateoverridelabor 	NUMBER(1,0);
+budgetlevellabor  NUMBER;
+costsourcematerials   NUMBER;
+ratesourcematerials   NUMBER;
+ratelocationmaterials   NUMBER;
+rateoverridematerials 	NUMBER(1,0);
+budgetlevelmaterials  NUMBER;
+costsourceequipment   NUMBER;
+ratesourceequipment   NUMBER;
+ratelocationequipment   NUMBER;
+rateoverrideequipment 	NUMBER(1,0);
+budgetlevelequipment  NUMBER;
+costsourcelabor_des 	GLOBALPKG.STRING;
+ratesourcelabor_des 	GLOBALPKG.STRING;
+ratelocationlabor_des 	GLOBALPKG.STRING;
+costsourcematerials_des 	GLOBALPKG.STRING;
+ratesourcematerials_des 	GLOBALPKG.STRING;
+ratelocationmaterials_des 	GLOBALPKG.STRING;
+costsourceequipment_des 	GLOBALPKG.STRING;
+ratesourceequipment_des 	GLOBALPKG.STRING;
+ratelocationequipment_des 	GLOBALPKG.STRING;
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/25/01
+*/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   dfltbudgetcostsrclbr,  dfltbudgetratesrclbr,  dfltbudgetrateloclbr,
+		  dfltbudgetrateallowovrdlbr,  dfltbudgetlevellbr,  dfltbudgetcostsrcmtl,  dfltbudgetratesrcmtl,
+		  dfltbudgetratelocmtl,  dfltbudgetrateallowovrdmtl,  dfltbudgetlevelmtl,  dfltbudgetcostsrcequip,
+		  dfltbudgetratesrcequip,  dfltbudgetratelocequip,  dfltbudgetrateallowovrdequip,
+		  dfltbudgetlevelequip
+		INTO rev_admin_getnameopt_budgetdef.costsourcelabor, rev_admin_getnameopt_budgetdef.ratesourcelabor, rev_admin_getnameopt_budgetdef.ratelocationlabor,
+		 rev_admin_getnameopt_budgetdef.rateoverridelabor, rev_admin_getnameopt_budgetdef.budgetlevellabor, rev_admin_getnameopt_budgetdef.costsourcematerials, rev_admin_getnameopt_budgetdef.ratesourcematerials,
+		 rev_admin_getnameopt_budgetdef.ratelocationmaterials, rev_admin_getnameopt_budgetdef.rateoverridematerials, rev_admin_getnameopt_budgetdef.budgetlevelmaterials, rev_admin_getnameopt_budgetdef.costsourceequipment,
+		 rev_admin_getnameopt_budgetdef.ratesourceequipment, rev_admin_getnameopt_budgetdef.ratelocationequipment, rev_admin_getnameopt_budgetdef.rateoverrideequipment,
+		 rev_admin_getnameopt_budgetdef.budgetlevelequipment FROM nameoptions;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+-- Record not found
+
+		raise_application_error(-20189, '00001');
+	END;
+	ELSE
+	BEGIN
+--budgetet ad the poject level  don't display deails
+
+		IF  rev_admin_getnameopt_budgetdef.budgetlevellabor = 2 THEN
+		BEGIN
+			rev_admin_getnameopt_budgetdef.costsourcelabor :=  -104;
+			rev_admin_getnameopt_budgetdef.costsourcelabor_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratesourcelabor :=  -104;
+			rev_admin_getnameopt_budgetdef.ratesourcelabor_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratelocationlabor :=  -104;
+			rev_admin_getnameopt_budgetdef.ratelocationlabor_des :=  ' ';
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.costsourcelabor_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.costsourcelabor;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.ratesourcelabor_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.ratesourcelabor;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   description
+				INTO rev_admin_getnameopt_budgetdef.ratelocationlabor_des FROM costkeylevel
+				WHERE cklevel = rev_admin_getnameopt_budgetdef.ratelocationlabor;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+		IF  rev_admin_getnameopt_budgetdef.budgetlevelmaterials = 2 THEN
+		BEGIN
+			rev_admin_getnameopt_budgetdef.costsourcematerials :=  -104;
+			rev_admin_getnameopt_budgetdef.costsourcematerials_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratesourcematerials :=  -104;
+			rev_admin_getnameopt_budgetdef.ratesourcematerials_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratelocationmaterials :=  -104;
+			rev_admin_getnameopt_budgetdef.ratelocationmaterials_des :=  '
+			   ';
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.costsourcematerials_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.costsourcematerials;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.ratesourcematerials_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.ratesourcematerials;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   description
+				INTO rev_admin_getnameopt_budgetdef.ratelocationmaterials_des FROM costkeylevel
+				WHERE cklevel = rev_admin_getnameopt_budgetdef.ratelocationmaterials;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+--budgetet ad the poject level - don't display deails
+
+		IF  rev_admin_getnameopt_budgetdef.budgetlevelequipment = 2 THEN
+		BEGIN
+			rev_admin_getnameopt_budgetdef.costsourceequipment :=  -104;
+			rev_admin_getnameopt_budgetdef.costsourceequipment_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratesourceequipment :=  -104;
+			rev_admin_getnameopt_budgetdef.ratesourceequipment_des :=  ' ';
+			rev_admin_getnameopt_budgetdef.ratelocationequipment :=  -104;
+			rev_admin_getnameopt_budgetdef.ratelocationequipment_des :=  '
+			   ';
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.costsourceequipment_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.costsourceequipment;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   Description
+				INTO rev_admin_getnameopt_budgetdef.ratesourceequipment_des FROM ppa_Matrix
+				WHERE MatrixKey = rev_admin_getnameopt_budgetdef.ratesourceequipment;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   description
+				INTO rev_admin_getnameopt_budgetdef.ratelocationequipment_des FROM costkeylevel
+				WHERE cklevel = rev_admin_getnameopt_budgetdef.ratelocationequipment;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  rev_admin_getnameopt_budgetdef.budgetlevellabor "budgetlevellabor",  rev_admin_getnameopt_budgetdef.ratesourcelabor "ratesourcelabor",  rev_admin_getnameopt_budgetdef.ratesourcelabor_des "ratesourcelabor_des",  rev_admin_getnameopt_budgetdef.costsourcelabor "costsourcelabor",  rev_admin_getnameopt_budgetdef.costsourcelabor_des "costsourcelabor_des",  rev_admin_getnameopt_budgetdef.ratelocationlabor "ratelocationlabor",  rev_admin_getnameopt_budgetdef.ratelocationlabor_des "ratelocationlabor_des",  rev_admin_getnameopt_budgetdef.rateoverridelabor "rateoverridelabor",  rev_admin_getnameopt_budgetdef.budgetlevelmaterials "budgetlevelmaterials",  rev_admin_getnameopt_budgetdef.ratesourcematerials "ratesourcematerials",  rev_admin_getnameopt_budgetdef.ratesourcematerials_des "ratesourcematerials_des",  rev_admin_getnameopt_budgetdef.costsourcematerials "costsourcematerials",  rev_admin_getnameopt_budgetdef.costsourcematerials_des "costsourcematerials_des",  rev_admin_getnameopt_budgetdef.ratelocationmaterials "ratelocationmaterials",  rev_admin_getnameopt_budgetdef.ratelocationmaterials_des "ratelocationmaterials_des",  rev_admin_getnameopt_budgetdef.rateoverridematerials "rateoverridematerials",  rev_admin_getnameopt_budgetdef.budgetlevelequipment "budgetlevelequipment",  rev_admin_getnameopt_budgetdef.ratesourceequipment "ratesourceequipment",  rev_admin_getnameopt_budgetdef.ratesourceequipment_des "ratesourceequipment_des",  rev_admin_getnameopt_budgetdef.costsourceequipment "costsourceequipment",  rev_admin_getnameopt_budgetdef.costsourceequipment_des "costsourceequipment_des",  rev_admin_getnameopt_budgetdef.ratelocationequipment "ratelocationequipment",  rev_admin_getnameopt_budgetdef.ratelocationequipment_des "ratelocationequipment_des",  rev_admin_getnameopt_budgetdef.rateoverrideequipment "rateoverrideequipment"
+		FROM DUAL;
+	END;
+	END IF;
+END rev_admin_getnameopt_budgetdef;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,859 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="csk_documentReviewProcess" createdBy="admin" endStep="Finish" source="csk.niku.com" startEvent="create" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls description="Review process for Operations and Proposal documents" languageCode="en" name="Document Review"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <StartCondition><![CDATA[( document.category ==  lookup("DOC_CATEGORY", "DOC_PROPOSAL") ||  document.category ==  lookup("DOC_CATEGORY", "DOC_OPERATIONS") )]]></StartCondition>
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisDocument" objectType="document" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" type="BPM_POT_PRIMARY"/>
+              <Object manualStart="false" name="thisProject" objectType="project" parentObjectName="thisDocument" parentObjectRef="assocobjectid" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" type="BPM_POT_LINKED"/>
+            </Objects>
+            <Steps>
+              <Step id="csk.step.docTypeDecision" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls description="The system checks the document type to determine which step to take next." languageCode="en" name="Document Type is Operations or Proposal?"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[( document.thisDocument.status ==  lookup("DOC_STATUS", "SUBMITTED") )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( document.thisDocument.category ==  lookup("DOC_CATEGORY", "DOC_OPERATIONS") )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk.step.archDsgnDecision"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( document.thisDocument.category ==  lookup("DOC_CATEGORY", "DOC_PROPOSAL") )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk.step.charterDecision"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Start" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk.step.docTypeDecision"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_MULTI_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk.step.charterDecision" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="The project manager gets a notification to review the proposal document, then approve or reject it." languageCode="en" name="Project Manager Approves or Rejects Proposal Document"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="false" aiDescription="The following proposal document has been submitted for your review:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Please review the document.  Then choose Approved or Rejected below to indicate your decision and update the status on the document." aiObjectName="ActionItem-csk_act_reviewCharter" aiPriority="CAL_MEDIUM" aiSubject="Please review Proposal document for project: ${thisProject.name}" aiUserStatusOnly="0" code="csk_act_reviewCharter" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="This notification is sent to the product manager to review the document." languageCode="en" name="Review Proposal Document Action"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="S'ha enviat el següent document de proposta per al seu revisión:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Revise el document i, a continuació, seleccioni l'opció Aprovat o Rebutjat per indicar la seva decisió i actualitzar l'estat del document." languageCode="ca" name="Revisi el document de proposta per al proyecto: ${thisProject.name}"/>
+                    <message description="Následující dokument návrhu byl odeslán k vašemu posouzení:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Dokument posuďte. Poté níže zvolte možnost Schváleno, nebo Zamítnuto, čímž označíte své rozhodnutí a aktualizujete stav dokumentu." languageCode="cs" name="Posuďte dokument návrhu projektu: ${thisProject.name}"/>
+                    <message description="Følgende forslag er sendt til dig til gennemgang:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Gennemgå dokumentet. Vælg derefter Godkendt eller Afvist herunder for at indikere din beslutning, og opdatér status på dokumentet." languageCode="da" name="Gennemgå dokumentet med forslag for projekt: ${thisProject.name}"/>
+                    <message description="Se ha enviado el siguiente documento de propuesta para su revisión:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Revise el documento y, a continuación, seleccione la opción Aprobado o Rechazado para indicar su decisión y actualizar el estado del documento." languageCode="es" name="Revise el documento de propuesta para el proyecto: ${thisProject.name}"/>
+                    <message description="Seuraava tarjousasiakirja on lähetetty sinulle tarkistettavaksi:&#13;&#10;&#13;&#10;Asiakirja: ${thisDocument.name}&#13;&#10;&#13;&#10;Tarkista asiakirja. Ilmaise tarkistuksen tulos valitsemalla alla Hyväksytty tai Hylätty ja päivitä asiakirjan tila." languageCode="fi" name="Tarkista projektin uusi tarjousasiakirja: ${thisProject.name}"/>
+                    <message description="Le document de proposition suivant a été soumis pour révision :&#13;&#10;&#13;&#10;Document : ${thisDocument.name}&#13;&#10;&#13;&#10;Révisez ce document, puis sélectionnez l'option Approuvé(e) ou Rejeté(e) ci-dessous pour indiquer votre décision et mettre à jour le statut du document." languageCode="fr" name="Révisez le document de proposition pour le projet : ${thisProject.name}"/>
+                    <message description="A következő javaslati dokumentumot benyújtották Önhöz ellenőrzésre:&#13;&#10;&#13;&#10;Dokumentum: ${thisDocument.name}&#13;&#10;&#13;&#10;Ellenőrizze a dokumentumot, azután alább jelezze döntését, és frissítse a dokumentum állapotát a Jóváhagyva vagy az Elutasítva lehetőség választásával." languageCode="hu" name="Ellenőrizze a következő projekt javaslati dokumentumát : ${thisProject.name}"/>
+                    <message description="Il seguente documento di proposta è stato inviato per la revisione dell'utente:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Effettuare la revisione del documento e selezionare Approvato o Rifiutato per indicare la propria decisione e aggiornare lo stato del documento." languageCode="it" name="Eseguire la revisione del documento di proposta per il progetto : ${thisProject.name}"/>
+                    <message description="以下の提案ドキュメントがレビュー用に提出されました:&#13;&#10;&#13;&#10;ドキュメント: ${thisDocument.name}&#13;&#10;&#13;&#10;このドキュメントをレビューしてください。その後、以下の [承認済み] または [拒否済み] を選択して決定を反映し、ドキュメントのステータスを更新してください。" languageCode="ja" name="このプロジェクトの提案ドキュメントをレビューしてください: ${thisProject.name}"/>
+                    <message description="다음 제안 문서가 검토를 위해 제출되었습니다. &#13;&#10;&#13;&#10;문서: ${thisDocument.name}&#13;&#10;&#13;&#10;문서를 검토하십시오. 그런 다음 아래에서 '승인됨' 또는 '거부됨'을 선택하여 문서에 대한 결정 사항을 나타내고 문서 상태를 업데이트하십시오." languageCode="ko" name="${thisProject.name} 프로젝트에 대한 제안 문서를 검토하십시오."/>
+                    <message description="Het volgende voorsteldocument is voor uw beoordeling verzonden: &#13;&#10;&#13;&#10;Document: ${thisDocument.name} &#13;&#10;&#13;&#10;Beoordeel het document. Kies vervolgens Goedgekeurd of Afgewezen hieronder om uw beslissing kenbaar te maken en werk vervolgens de documentstatus bij." languageCode="nl" name="Beoordeel voorsteldocument voor project: ${thisProject.name}"/>
+                    <message description="Følgende forslagsdokument er sendt til deg for gjennomgang:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Gjennomgå dokumentet. Velg deretter Godkjent eller Forkastet nedenfor for å angi din beslutning og oppdatere statusen på dokumentet." languageCode="no" name="Gjennomgå forslagsdokument for prosjekt: ${thisProject.name}"/>
+                    <message description="Przesłano Ci do przeglądu następującą dokumentację ofertową:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Przejrzyj dokument. Następnie wybierz poniżej opcję Zatwierdzone lub Odrzucone, aby wskazać swoją decyzję i zaktualizować status dokumentu." languageCode="pl" name="Przejrzyj dokumentację ofertową projektu: ${thisProject.name}"/>
+                    <message description="O documento da proposta mencionado abaixo foi enviado para sua análise:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Analise o documento. Em seguida, selecione Aprovado ou Rejeitado abaixo para indicar sua decisão e atualizar o status." languageCode="pt" name="Analise o documento da proposta do projeto: ${thisProject.name}"/>
+                    <message description="Följande förslag har skickats för din granskning:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Granska dokumentet. Välj sedan Godkänd eller Avvisad nedan för att ange ditt beslut och uppdatera dokumentets status." languageCode="sv" name="Granska förslagsdokumentet för projekt: ${thisProject.name}"/>
+                    <message description="Aşağıdaki teklif belgesi gözden geçirmeniz için gönderildi:&#13;&#10;&#13;&#10;Belge: ${thisDocument.name}&#13;&#10;&#13;&#10;Lütfen belgeyi gözden geçirin. Ardından kararınızı belirtmek ve belgeyle ilgili durumu güncellemek için Onaylandı veya Reddedildi'yi seçin." languageCode="tr" name="Lütfen proje için Teklif belgesini gözden geçirin: ${thisProject.name}"/>
+                    <message description="以下提议文档已提交供您复查:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;请复查该文档。然后选择下面的“已核准”或“已拒绝”来表示您的决策并更新文档的状态。" languageCode="zh" name="请复查此项目的提议文档: ${thisProject.name}"/>
+                    <message description="已提交以下提案供您檢閱：&#13;&#10;&#13;&#10;文件：${thisDocument.name}&#13;&#10;&#13;&#10;請檢閱文件。接著選擇以下的 [已核准] 或 [已否決] 代表您的決定，並更新文件的狀態。" languageCode="zh_TW" name="請檢閱專案 ${thisProject.name} 的 [提案] 文件"/>
+                    <message description="Следующее предложение представлено на рассмотрение:&#13;&#10;&#13;&#10;Документ: ${thisDocument.name}&#13;&#10;&#13;&#10;Проверьте этот документ. Затем выберите ниже решение «утверждено» или «отклонено» и измените статус документа." languageCode="ru" name="Выполните проверку предложения для проекта: ${thisProject.name}"/>
+                    <message description="Das folgende Vorschlagsdokument wurde Ihnen zur Prüfung vorgelegt:&#13;&#10;&#13;&#10; Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Überprüfen Sie das Dokument. Wählen Sie dann unten 'Genehmigt' oder 'Abgelehnt' aus, um Ihre Entscheidung anzuzeigen und den Status im Dokument zu aktualisieren." languageCode="de" name="Prüfen Sie das Vorschlagsdokument für Projekt: ${thisProject.name}"/>
+                    <message description="The following proposal document has been submitted for your review:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Please review the document.  Then choose Approved or Rejected below to indicate your decision and update the status on the document." languageCode="en" name="Please review Proposal document for project: ${thisProject.name}"/>
+                    <Assignees>
+                      <Assignee id="Manager" objectName="thisProject" objectTypeCode="project" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="APPROVED" statusTypeCode="DOC_STATUS"/>
+                      <AIAction statusCode="REJECTED" statusTypeCode="DOC_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk.step.docStatusDecision"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk.step.archDsgnDecision" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls description="The project manager gets a notification to review the operations document, then approve or reject it." languageCode="en" name="Project Manager Approves or Rejects Operations Document"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="false" aiDescription="The following document has been submitted for your review:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Please review the document.  Then choose Approved or Rejected below to indicate your decision and update the status on the document." aiObjectName="ActionItem-csk_act_archDesign" aiPriority="CAL_MEDIUM" aiSubject="Please review a new document for project: ${thisProject.name}" aiUserStatusOnly="0" code="csk_act_archDesign" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="This notification is sent to the product manager to review the document." languageCode="en" name="Operations Document Review Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="S'ha enviat el següent document per al seu revisión:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Revise el document i, a continuació, seleccioni l'opció Aprovat o Rebutjat per indicar la seva decisió i actualitzar l'estat del document." languageCode="ca" name="Revisi un document nou per al proyecto: ${thisProject.name}"/>
+                    <message description="Následující dokument byl odeslán k vašemu posouzení:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Dokument posuďte. Poté níže zvolte možnost Schváleno nebo Zamítnuto, čímž označíte své rozhodnutí a aktualizujete stav dokumentu." languageCode="cs" name="Posuďte nový dokument projektu: ${thisProject.name}."/>
+                    <message description="Følgende dokument er sendt til dig til gennemgang:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Gennemgå dokumentet. Vælg derefter Godkendt eller Afvist herunder for at indikere din beslutning, og opdatér status på dokumentet." languageCode="da" name="Gennemgå et nyt dokument for projekt: ${thisProject.name}"/>
+                    <message description="Das folgende Dokument wurde Ihnen zur Prüfung vorgelegt:&#13;&#10;&#13;&#10; Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Überprüfen Sie das Dokument. Wählen Sie dann unten 'Genehmigt' oder 'Abgelehnt' aus, um Ihre Entscheidung anzuzeigen und den Status im Dokument zu aktualisieren." languageCode="de" name="Prüfen Sie ein neues Dokument für Projekt: ${thisProject.name}"/>
+                    <message description="The following document has been submitted for your review:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;Please review the document.  Then choose Approved or Rejected below to indicate your decision and update the status on the document." languageCode="en" name="Please review a new document for project: ${thisProject.name}"/>
+                    <message description="Se ha enviado el siguiente documento para su revisión:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Revise el documento y, a continuación, seleccione la opción Aprobado o Rechazado para indicar su decisión y actualizar el estado del documento." languageCode="es" name="Revise un documento nuevo para el proyecto: ${thisProject.name}"/>
+                    <message description="Seuraava asiakirja on lähetetty sinulle tarkistettavaksi:&#13;&#10;&#13;&#10;Asiakirja: ${thisDocument.name}&#13;&#10;&#13;&#10;Tarkista asiakirja. Ilmaise tarkistuksen tulos valitsemalla alla Hyväksytty tai Hylätty ja päivitä asiakirjan tila." languageCode="fi" name="Tarkista projektin uusi asiakirja: ${thisProject.name}"/>
+                    <message description="Le document suivant a été soumis pour révision :&#13;&#10;&#13;&#10;Document : ${thisDocument.name}&#13;&#10;&#13;&#10;Révisez ce document, puis sélectionnez l'option Approuvé(e) ou Rejeté(e) ci-dessous pour indiquer votre décision et mettre à jour le statut du document." languageCode="fr" name="Révisez le nouveau document pour le projet : ${thisProject.name}"/>
+                    <message description="A következő dokumentumot benyújtották Önhöz ellenőrzésre:&#13;&#10;&#13;&#10;Dokumentum: ${thisDocument.name}&#13;&#10;&#13;&#10;Ellenőrizze a dokumentumot, azután alább jelezze döntését, és frissítse a dokumentum állapotát a Jóváhagyva vagy az Elutasítva lehetőség választásával." languageCode="hu" name="Ellenőrizze a következő projekt egy új dokumentumát : ${thisProject.name}"/>
+                    <message description="Il documento seguente è stato inviato per la revisione dell'utente:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Effettuare la revisione del documento e selezionare Approvato o Rifiutato per indicare la propria decisione e aggiornare lo stato del documento." languageCode="it" name="Eseguire la revisione di un nuovo documento per il progetto : ${thisProject.name}"/>
+                    <message description="以下のドキュメントがレビュー用に提出されました:&#13;&#10;&#13;&#10;ドキュメント: ${thisDocument.name}&#13;&#10;&#13;&#10;このドキュメントをレビューしてください。その後、以下の [承認済み] または [拒否済み] を選択して決定を反映し、ドキュメントのステータスを更新してください。" languageCode="ja" name="このプロジェクトの新しいドキュメントをレビューしてください: ${thisProject.name}"/>
+                    <message description="다음 문서가 검토를 위해 제출되었습니다. &#13;&#10;&#13;&#10;문서: ${thisDocument.name}&#13;&#10;&#13;&#10;문서를 검토하십시오. 그런 다음 아래에서 '승인됨' 또는 '거부됨'을 선택하여 문서에 대한 결정 사항을 나타내고 문서 상태를 업데이트하십시오." languageCode="ko" name="${thisProject.name} 프로젝트에 대한 새 문서를 검토하십시오."/>
+                    <message description="Het volgende document is voor uw beoordeling verzonden: &#13;&#10;&#13;&#10;Document: ${thisDocument.name} &#13;&#10;&#13;&#10;Beoordeel het document. Kies vervolgens Goedgekeurd of Afgewezen hieronder om uw beslissing kenbaar te maken en werk vervolgens de status van het document bij." languageCode="nl" name="Beoordeel een nieuw document voor project: ${thisProject.name}"/>
+                    <message description="Følgende dokument er sendt til deg for gjennomgang:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Gjennomgå dokumentet. Velg deretter Godkjent eller Forkastet nedenfor for å angi din beslutning og oppdatere statusen på dokumentet." languageCode="no" name="Gjennomgå et nytt dokument for prosjekt: ${thisProject.name}"/>
+                    <message description="Przesłano Ci do przeglądu następujący dokument:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Przejrzyj dokument. Następnie wybierz poniżej opcję Zatwierdzone lub Odrzucone, aby wskazać swoją decyzję i zaktualizować status dokumentu." languageCode="pl" name="Przejrzyj nowy dokument projektu: ${thisProject.name}"/>
+                    <message description="O documento mencionado foi enviado para sua análise:&#13;&#10;&#13;&#10;Documento: ${thisDocument.name}&#13;&#10;&#13;&#10;Analise o documento. Em seguida, selecione Aprovado ou Rejeitado abaixo para indicar sua decisão e atualizar o status." languageCode="pt" name="Analise o novo documento do projeto: ${thisProject.name}"/>
+                    <message description="Следующий документ представлен на рассмотрение:&#13;&#10;&#13;&#10;Документ: ${thisDocument.name}&#13;&#10;&#13;&#10;Проверьте этот документ. Затем выберите ниже решение «утверждено» или «отклонено» и измените статус документа." languageCode="ru" name="Выполните проверку нового документа для проекта: ${thisProject.name}"/>
+                    <message description="Följande dokument har skickats för din granskning:&#13;&#10;&#13;&#10;Dokument: ${thisDocument.name}&#13;&#10;&#13;&#10;Granska dokumentet. Välj sedan Godkänd eller Avvisad nedan för att ange ditt beslut och uppdatera dokumentets status." languageCode="sv" name="Granska ett nytt dokument för projekt: ${thisProject.name}"/>
+                    <message description="Aşağıdaki belge gözden geçirmeniz için gönderildi:&#13;&#10;&#13;&#10;Belge: ${thisDocument.name}&#13;&#10;&#13;&#10;Lütfen belgeyi gözden geçirin. Ardından kararınızı belirtmek ve belgeyle ilgili durumu güncellemek için Onaylandı veya Reddedildi'yi seçin." languageCode="tr" name="Lütfen proje için yeni bir belgeyi gözden geçirin: ${thisProject.name}"/>
+                    <message description="以下文档已提交供您复查:&#13;&#10;&#13;&#10;Document: ${thisDocument.name}&#13;&#10;&#13;&#10;请复查该文档。然后选择下面的“已核准”或“已拒绝”来表示您的决策并更新文档的状态。" languageCode="zh" name="请复查此项目的新文档: ${thisProject.name}"/>
+                    <message description="已提交以下文件供您檢閱：&#13;&#10;&#13;&#10;文件：${thisDocument.name}&#13;&#10;&#13;&#10;請檢閱文件。接著選擇以下的 [已核准] 或 [已否決] 代表您的決定，並更新文件的狀態。" languageCode="zh_TW" name="請檢閱專案 ${thisProject.name} 的新文件"/>
+                    <Assignees>
+                      <Assignee id="Manager" objectName="thisProject" objectTypeCode="project" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="APPROVED" statusTypeCode="DOC_STATUS"/>
+                      <AIAction statusCode="REJECTED" statusTypeCode="DOC_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk.step.docStatusDecision"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk.step.docStatusDecision" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <nls description="The system checks if the project manager approved or rejected the document." languageCode="en" name="Approved or Rejected?"/>
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_MULTIPLE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.archDsgnDecision.ActionItem-csk_act_archDesign.allassignees-APPROVED == 1 ||  actionitem.csk.step.charterDecision.ActionItem-csk_act_reviewCharter.allassignees-APPROVED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk.step.approveDoc"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.archDsgnDecision.ActionItem-csk_act_archDesign.allassignees-REJECTED == 1 ||  actionitem.csk.step.charterDecision.ActionItem-csk_act_reviewCharter.allassignees-REJECTED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk.step.docRejected"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.charterDecision.ActionItem-csk_act_reviewCharter.allassignees-APPROVED == 1 ||  actionitem.csk.step.charterDecision.ActionItem-csk_act_reviewCharter.allassignees-REJECTED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_closeCharterAI"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.archDsgnDecision.ActionItem-csk_act_archDesign.allassignees-APPROVED == 1 ||  actionitem.csk.step.archDsgnDecision.ActionItem-csk_act_archDesign.allassignees-REJECTED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_closeArchDsgnAI"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk.step.docRejected" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="If the product manager rejected the document then the system updates the document status to Rejected and notifies the document owner." languageCode="en" name="Update Status to Rejected and Notify Document Owner"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_docRejected" objectMethod="status" objectName="thisDocument" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Set Document Status to Rejected"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="REJECTED"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action aiClose="true" aiDescription="This is to notify you that the following document was rejected by the project manager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Project Manager: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Please set this action item to Done to signify that you have received the notification." aiObjectName="ActionItem-csk_act_docRejectedAI" aiPriority="CAL_MEDIUM" aiSubject="The project manager rejected your document: ${thisDocument.name}" aiUserStatusOnly="0" code="csk_act_docRejectedAI" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="The Document Owner is notified that the document was rejected." languageCode="en" name="Notify Owner Document Rejected"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="El gestor de projectes ha rebutjat el document siguiente.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gestor de proyectos: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Marque aquesta acció amb l'estat Terminado per informar del rebut d'aquesta notificació." languageCode="ca" name="El gestor de projectes ha rebutjat el documento: ${thisDocument.name}."/>
+                    <message description="Tímto vás upozorňujeme, že následující dokument byl manažerem projektu zamítnut.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Manažer projektu: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Nastavením této akce na hodnotu Hotovo dejte najevo, že jste obdrželi upozornění." languageCode="cs" name="Manažer projektu zamítl váš dokument: ${thisDocument.name}."/>
+                    <message description="Dette er for at underrette dig om, at følgende dokument er blevet afvist af projektlederen.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektleder: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Angiv dette handlingselement som Udført for at anerkende, at du mar modtaget meddelelsen." languageCode="da" name="Projektlederen har afvist dit dokument: ${thisDocument.name}"/>
+                    <message description="Hiermit wird Ihnen mitgeteilt, dass das folgende Dokument vom Projektmanager abgelehnt wurde. &#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektmanager: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Setzen Sie diese Aktion auf 'Erledigt', um zu signalisieren, dass Sie diese Benachrichtigung erhalten haben." languageCode="de" name="Der Projektmanager hat Ihr Dokument abgelehnt: ${thisDocument.name}"/>
+                    <message description="This is to notify you that the following document was rejected by the project manager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Project Manager: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Please set this action item to Done to signify that you have received the notification." languageCode="en" name="The project manager rejected your document: ${thisDocument.name}"/>
+                    <message description="El gestor de proyectos ha rechazado el documento siguiente.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gestor de proyectos: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Marque esta acción con el estado Terminado para informar del recibo de esta notificación." languageCode="es" name="El gestor de proyectos ha rechazado el documento: ${thisDocument.name}."/>
+                    <message description="Projektipäällikkö hylkäsi seuraavan asiakirjan.&#13;&#10;&#13;&#10;Asiakirja: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektipäällikkö: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Ilmaise vastaanottaneesi tämän ilmoituksen merkitsemällä tämä toimenpide valmiiksi." languageCode="fi" name="Projektipäällikkö hylkäsi asiakirjan: ${thisDocument.name}"/>
+                    <message description="Ce message est destiné à vous informer que le document suivant a été rejeté par le chef de projets.&#13;&#10;&#13;&#10;Document : &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Chef de projets : ${thisProject.manager_id}&#13;&#10;&#13;&#10;Pour confirmer que vous avez reçu cette notification, définissez le statut de cette action sur Terminé(e)." languageCode="fr" name="Le chef de projets a rejeté votre document : ${thisDocument.name}"/>
+                    <message description="Ezúton értesítjük, hogy a következő dokumentumot elutasította a projektvezető.&#13;&#10;&#13;&#10;Dokumentum: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektvezető: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Állítsa ezt az elvégzendő feladatot a Kész értékre, jelezve ezzel, hogy megkapta az értesítést." languageCode="hu" name="A projektvezető elutasította a következő dokumentumát: ${thisDocument.name}"/>
+                    <message description="Messaggio di notifica: il documento seguente è stato rifiutato dal manager di progetto.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Manager di progetto: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Selezionare Completato per confermare la ricezione della notifica." languageCode="it" name="Documento rifiutato dal manager di progetto: ${thisDocument.name}"/>
+                    <message description="この通知は、以下のドキュメントがプロジェクト マネージャによって拒否されたことを知らせるものです。&#13;&#10;&#13;&#10;ドキュメント: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;プロジェクト マネージャ: ${thisProject.manager_id}&#13;&#10;&#13;&#10;このアクション アイテムを [完了] に設定し、通知を受け取ったことを知らせてください。" languageCode="ja" name="プロジェクト マネージャはドキュメントを拒否しました: ${thisDocument.name}"/>
+                    <message description="다음 문서가 프로젝트 관리자에 의해 거부되었습니다.&#13;&#10;&#13;&#10;문서: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;프로젝트 관리자: ${thisProject.manager_id}&#13;&#10;&#13;&#10;이 알림을 수신했음을 나타내려면 이 작업 항목을 [완료]로 설정하십시오." languageCode="ko" name="프로젝트 관리자가 ${thisDocument.name} 문서를 거부했습니다."/>
+                    <message description="U ontvangt deze melding omdat het volgende document is afgewezen door de projectmanager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projectmanager: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Markeer dit actiepunt als Gereed om aan te geven dat u de melding hebt ontvangen." languageCode="nl" name="De projectmanager heeft uw document afgewezen: ${thisDocument.name}"/>
+                    <message description="Dette er for å varsle deg om at følgende dokument ble forkastet av prosjektleder.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Prosjektleder: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Angi dette aksjonspunktet som Ferdig for å vise at du har mottatt varselet." languageCode="no" name="Prosjektlederen forkastet dokumentet ditt: ${thisDocument.name}"/>
+                    <message description="To jest powiadomienie informujące, że kierownik projektu odrzucił następujący dokument.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Kierownik projektu: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Ustaw tę czynność do wykonania jako gotową, aby potwierdzić otrzymanie powiadomienia." languageCode="pl" name="Kierownik projektu odrzucił dokument: ${thisDocument.name}"/>
+                    <message description="Esteja notificado de que o documento mencionado foi rejeitado pelo gerente do projeto.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gerente do projeto: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Defina este item de ação como Concluído para indicar que você recebeu a notificação." languageCode="pt" name="O gerente do projeto rejeitou seu documento: ${thisDocument.name}"/>
+                    <message description="Следующий документ отклонен менеджером проекта.&#13;&#10;&#13;&#10;Документ: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Менеджер проекта: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Отметьте этот элемент действия как выполненный, чтобы подтвердить получение данного уведомления." languageCode="ru" name="Менеджер проекта отклонил документ: ${thisDocument.name}"/>
+                    <message description="Detta meddelar dig att följande dokument har avvisats av projektledaren.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektledare: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Ange detta åtgärdsalterantiv som klart för att visa att du har fått meddelandet." languageCode="sv" name="Projektledaren har avvisat ditt dokument: ${thisDocument.name}"/>
+                    <message description="Bu bildirim, aşağıdaki belgenin proje yöneticisi tarafından reddedildiğini bildirme amaçlıdır.&#13;&#10;&#13;&#10;Belge: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Proje Yöneticisi: ${thisProject.manager_id}&#13;&#10;&#13;&#10;Bildirimi aldığınızı belirtmek için lütfen bu eylem öğesini Tamamlandı olarak ayarlayın." languageCode="tr" name="Proje yöneticisi belgenizi reddetti: ${thisDocument.name}"/>
+                    <message description="此消息通知您以下文档已被项目经理拒绝。&#13;&#10;&#13;&#10;文档: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;项目经理: ${thisProject.manager_id}&#13;&#10;&#13;&#10;请将此操作项设为“完成”，以表示您已经收到通知。" languageCode="zh" name="项目经理已拒绝您的文档: ${thisDocument.name}"/>
+                    <message description="在此通知您專案經理已否決以下文件。&#13;&#10;&#13;&#10;文件：&#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;專案經理：${thisProject.manager_id}&#13;&#10;&#13;&#10;請將這個動作項目設為 [完成] 以表示您已收到通知。" languageCode="zh_TW" name="專案經理已否決您的文件：${thisDocument.name}"/>
+                    <Assignees>
+                      <Assignee id="Owner" objectName="thisDocument" objectTypeCode="document" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="DONE" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.docRejected.ActionItem-csk_act_docRejectedAI.allassignees-DONE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk.step.approveDoc" isMileStone="false" sequenceNo="8">
+                
+                
+                
+                
+                <nls languageCode="en" name="Update Status to Approved and Notify Document Owner"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_docApproved" objectMethod="status" objectName="thisDocument" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Set Document Status to Approved"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="APPROVED"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action aiClose="true" aiDescription="This is to notify you that the following document was approved by the project manager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Project Manager: ${thisProject.manager_id}" aiObjectName="ActionItem-csk_act_ownerApprovedAI" aiPriority="CAL_MEDIUM" aiSubject="The project manager approved your document: ${thisDocument.name}" aiUserStatusOnly="0" code="csk_act_ownerApprovedAI" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Notify Owner Document Approved"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="El gestor de projectes ha aprovat el document siguiente.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gestor de proyectos: ${thisProject.manager_id}" languageCode="ca" name="El gestor de projectes ha aprovat el documento: ${thisDocument.name}."/>
+                    <message description="Tímto vás upozorňujeme, že následující dokument byl manažerem projektu schválen.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Manažer projektu: ${thisProject.manager_id}" languageCode="cs" name="Manažer projektu schválil váš dokument: ${thisDocument.name}."/>
+                    <message description="Dette er for at underrette dig om, at følgende dokument er blevet godkendt af projektlederen.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektleder: ${thisProject.manager_id}" languageCode="da" name="Projektlederen har godkendt dit dokument: ${thisDocument.name}"/>
+                    <message description="Hiermit wird Ihnen mitgeteilt, dass das folgende Dokument vom Projektmanager genehmigt wurde. &#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektmanager: ${thisProject.manager_id}" languageCode="de" name="Der Projektmanager hat Ihr Dokument genehmigt: ${thisDocument.name}"/>
+                    <message description="This is to notify you that the following document was approved by the project manager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Project Manager: ${thisProject.manager_id}" languageCode="en" name="The project manager approved your document: ${thisDocument.name}"/>
+                    <message description="El gestor de proyectos ha aprobado el documento siguiente.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gestor de proyectos: ${thisProject.manager_id}" languageCode="es" name="El gestor de proyectos ha aprobado el documento: ${thisDocument.name}."/>
+                    <message description="Projektipäällikkö hyväksyi seuraavan asiakirjan.&#13;&#10;&#13;&#10;Asiakirja: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektipäällikkö: ${thisProject.manager_id}" languageCode="fi" name="Projektipäällikkö hyväksyi asiakirjan: ${thisDocument.name}"/>
+                    <message description="Ce message est destiné à vous informer que le document suivant a été approuvé par le chef de projets.&#13;&#10;&#13;&#10;Document : &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Chef de projets : ${thisProject.manager_id}" languageCode="fr" name="Le chef de projets a approuvé votre document : ${thisDocument.name}"/>
+                    <message description="Ezúton értesítjük, hogy a következő dokumentumot jóváhagyta a projektvezető.&#13;&#10;&#13;&#10;Dokumentum: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektvezető: ${thisProject.manager_id}" languageCode="hu" name="A projektvezető jóváhagyta a következő dokumentumát: ${thisDocument.name}"/>
+                    <message description="Messaggio di notifica: il documento seguente è stato approvato dal manager di progetto.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Manager di progetto: ${thisProject.manager_id}" languageCode="it" name="Documento approvato dal manager di progetto: ${thisDocument.name}"/>
+                    <message description="この通知は、以下のドキュメントがプロジェクト マネージャによって承認されたことを知らせるものです。&#13;&#10;&#13;&#10;ドキュメント: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;プロジェクト マネージャ: ${thisProject.manager_id}" languageCode="ja" name="プロジェクト マネージャはドキュメントを承認しました: ${thisDocument.name}"/>
+                    <message description="다음 문서가 프로젝트 관리자에 의해 승인되었습니다.&#13;&#10;&#13;&#10;문서: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;프로젝트 관리자: ${thisProject.manager_id}" languageCode="ko" name="프로젝트 관리자가 ${thisDocument.name} 문서를 승인했습니다."/>
+                    <message description="U ontvangt deze melding omdat het volgende document is goedgekeurd door de projectmanager.&#13;&#10;&#13;&#10;Document: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projectmanager: ${thisProject.manager_id}" languageCode="nl" name="De projectmanager heeft uw document goedgekeurd: ${thisDocument.name}"/>
+                    <message description="Dette er for å varsle deg om at følgende dokument ble godkjent av prosjektleder.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Prosjektleder: ${thisProject.manager_id}" languageCode="no" name="Prosjektlederen godkjente dokumentet ditt: ${thisDocument.name}"/>
+                    <message description="To jest powiadomienie informujące, że kierownik projektu zatwierdził następujący dokument.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Kierownik projektu: ${thisProject.manager_id}" languageCode="pl" name="Kierownik projektu zatwierdził dokument: ${thisDocument.name}"/>
+                    <message description="Esteja notificado de que o documento mencionado foi aprovado pelo gerente do projeto.&#13;&#10;&#13;&#10;Documento: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Gerente do projeto: ${thisProject.manager_id}" languageCode="pt" name="O gerente do projeto aprovou seu documento: ${thisDocument.name}"/>
+                    <message description="Следующий документ утвержден менеджером проекта.&#13;&#10;&#13;&#10;Документ: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Менеджер проекта: ${thisProject.manager_id}" languageCode="ru" name="Менеджер проекта утвердил документ: ${thisDocument.name}"/>
+                    <message description="Detta meddelar dig att följande dokument har godkänts av projektledaren.&#13;&#10;&#13;&#10;Dokument: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Projektledare: ${thisProject.manager_id}" languageCode="sv" name="Projektledaren har godkänt ditt dokument: ${thisDocument.name}"/>
+                    <message description="Bu bildirim, aşağıdaki belgenin proje yöneticisi tarafından onaylandığını bildirme amaçlıdır.&#13;&#10;&#13;&#10;Belge: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;Proje Yöneticisi: ${thisProject.manager_id}" languageCode="tr" name="Proje yöneticisi belgenizi onayladı: ${thisDocument.name}"/>
+                    <message description="此消息通知您以下文档已被项目经理核准。&#13;&#10;&#13;&#10;文档: &#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;项目经理: ${thisProject.manager_id}" languageCode="zh" name="项目经理已批准您的文档: ${thisDocument.name}"/>
+                    <message description="在此通知您專案經理已核准以下文件。&#13;&#10;&#13;&#10;文件：&#13;&#10;${thisDocument.name}&#13;&#10;&#13;&#10;專案經理：${thisProject.manager_id}" languageCode="zh_TW" name="專案經理已核准您的文件：${thisDocument.name}"/>
+                    <Assignees>
+                      <Assignee id="Owner" objectName="thisDocument" objectTypeCode="document" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="DONE" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk.step.approveDoc.ActionItem-csk_act_ownerApprovedAI.allassignees-DONE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_closeCharterAI" isMileStone="false" sequenceNo="9">
+                
+                
+                
+                
+                <nls languageCode="en" name="Close Proposal Action Item"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_closeCharterAI" objectMethod="closeactionitem" objectName="ActionItem-csk_act_reviewCharter" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Close Proposal Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_closeArchDsgnAI" isMileStone="false" sequenceNo="10">
+                
+                
+                
+                
+                <nls languageCode="en" name="Close Operations Action Item"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_closeArchDsgnAI" objectMethod="closeactionitem" objectName="ActionItem-csk_act_archDesign" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Close Operations Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="4" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

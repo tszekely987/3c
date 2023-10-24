@@ -1,0 +1,780 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="tsoIdeaApprovalPOC" createdBy="admin" endStep="Finish" source="customer" startEvent="create" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls description="TSO: Idea approval workflow. After approval, selected ideas are converted to projects. For POCs, this always go to an approval." languageCode="en" name="Idea Approval POC"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisIdea" objectType="idea" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+              <Object manualStart="false" name="tso_act_convIdeaToLargeProj_convertideatoproject_project_id" objectType="project" parentObjectName="thisIdea" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_IMPLIED"/>
+              <Object manualStart="false" name="tso_act_convIdeaToMedProj_convertideatoproject_project_id" objectType="project" parentObjectName="thisIdea" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_IMPLIED"/>
+              <Object manualStart="false" name="tso_act_convIdeaToProj_convertideatoproject_project_id" objectType="project" parentObjectName="thisIdea" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_IMPLIED"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 6) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tso.step.validate"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tso.step.validate" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <nls description="Makes sure Type, Category, and Business Owner, are filled in. If cost is greater than a threshold filter ($10K), check to see if BRD is filled out, otherwise approve. If Fast Track is checked, bypass approval." languageCode="en" name="Validate fields and Submission Criteria"/>
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition note="Go To Approval" sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Go To Approval" languageCode="en" name="Go To Approval"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[idea.thisIdea.obj_fast_track == 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tso.step.awaitApproval"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition note="Fast Tracked" sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Fast Tracked" languageCode="en" name="Fast Tracked"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[idea.thisIdea.obj_fast_track == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tsoDetermineTemplate"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tso.step.awaitApproval" isMileStone="true" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="The appropriate approvers are to go over documentation from BRD and validate." languageCode="en" name="Await Project Approval"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." aiObjectName="ActionItem-tsoReviewIdea" aiPriority="CAL_HIGH" aiSubject="Please review idea: ${thisIdea.name}" aiUserStatusOnly="0" code="tsoReviewIdea" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Idea Review by Business Owner" languageCode="en" name="Review Idea"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="ca" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="cs" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="da" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="de" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="en" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="es" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="fi" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="fr" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="hu" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="it" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="ja" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="ko" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="nl" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="no" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="pl" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="pt" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="ru" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="sv" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="tr" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="zh" name="Please review idea: ${thisIdea.name}"/>
+                    <message description="The following idea has been submitted for your approval.  &#13;&#10;&#13;&#10;Idea: ${thisIdea.name}&#13;&#10;Requestor: ${thisIdea.initiator_id} &#13;&#10;Type: ${thisIdea.obj_request_type}&#13;&#10;Category: ${thisIdea.obj_request_category}&#13;&#10;Cost: ${thisIdea.planned_cst_total} &#13;&#10;Benefit: ${thisIdea.planned_ben_total} &#13;&#10;ROI: ${thisIdea.planned_roi}&#13;&#10;&#13;&#10;When the review process is complete, please select Approve to update the idea status to Approved, or select Incomplete to notify the Idea Originator that the idea needs updates before the Idea Originator resubmits it for your approval." languageCode="zh_TW" name="Please review idea: ${thisIdea.name}"/>
+                    <Assignees>
+                      <Assignee id="paulMartin" type="BPM_ASSIGNEE_RESOURCE"/>
+                      <Assignee id="paulLewis" type="BPM_ASSIGNEE_RESOURCE"/>
+                      <Assignee id="peterThompson" type="BPM_ASSIGNEE_RESOURCE"/>
+                      <Assignee id="0" objectAttributeCode="obj_business_owner" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_CUSTOM_RES_LOV"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="REJECT" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                      <AIAction statusCode="APPROVE" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition note="Approved" sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Approved" languageCode="en" name="Approved"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[actionitem.tso.step.awaitApproval.ActionItem-tsoReviewIdea.assignees-APPROVE >= 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tsoDetermineTemplate"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition note="Reject" sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Reject" languageCode="en" name="Reject"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[actionitem.tso.step.awaitApproval.ActionItem-tsoReviewIdea.assignees-REJECT >= 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tso.step.rejectProject"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tsoDetermineTemplate" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls description="Identify the size of the project based on form information and create using corresponding template." languageCode="en" name="Determine Project Template"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( idea.thisIdea.obj_request_type ==  lookup("OBJ_IDEA_PROJECT_TYPE", "type100") ) ||  ( idea.thisIdea.obj_request_type ==  lookup("OBJ_IDEA_PROJECT_TYPE", "type400") ) ||  ( idea.thisIdea.obj_request_type ==  null)]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tsoCreateLargeProject"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( idea.thisIdea.obj_request_type ==  lookup("OBJ_IDEA_PROJECT_TYPE", "type300") )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tsoCreateMediumProject"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( idea.thisIdea.obj_request_type ==  lookup("OBJ_IDEA_PROJECT_TYPE", "type200") )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="tsoCreateSmallProject"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tso.step.rejectProject" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                <nls description="Idea Status is marked as rejected." languageCode="en" name="Reject Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="tsoSetStatusSubmittedForApproval" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Status must first be set to Submitted For Approval before it can be set to Rejected" languageCode="en" name="Set Status to Submitted For Approval"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="6"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action code="tsoSetStatusToRejected" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Set Idea Status to Rejected" languageCode="en" name="Set Status to Rejected"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="3"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tsoCreateLargeProject" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="Use the Major Project Template" languageCode="en" name="Create Large Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="tso_act_convIdeaToLargeProj" objectMethod="convertideatoproject" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Convert Idea to Project" languageCode="en" name="Convert Idea to Project"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="copy_financials" value="1"/>
+                      <Param name="project_id" objectCode="project" objectName="tso_act_convIdeaToLargeProj_convertideatoproject_project_id"/>
+                      <Param name="copy_idea_team" value="1"/>
+                      <Param name="idea_id"/>
+                      <Param name="process_code" value="csk_majorITProject"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tsoCreateMediumProject" isMileStone="false" sequenceNo="8">
+                
+                
+                
+                
+                <nls description="Use the Infrastructure Deployment Template" languageCode="en" name="Create Medium Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="tso_act_convIdeaToMedProj" objectMethod="convertideatoproject" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Convert Idea to Project" languageCode="en" name="Convert Idea to Project"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="copy_financials" value="1"/>
+                      <Param name="project_id" objectCode="project" objectName="tso_act_convIdeaToMedProj_convertideatoproject_project_id"/>
+                      <Param name="copy_idea_team" value="1"/>
+                      <Param name="idea_id"/>
+                      <Param name="process_code" value="csk_InfrastructureProject"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="tsoCreateSmallProject" isMileStone="false" sequenceNo="9">
+                
+                
+                
+                
+                <nls description="Use the Application Change Template" languageCode="en" name="Create Small Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="tso_act_convIdeaToProj" objectMethod="convertideatoproject" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="Convert Idea to Project" languageCode="en" name="Convert Idea to Project"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="copy_financials" value="1"/>
+                      <Param name="project_id" objectCode="project" objectName="tso_act_convIdeaToProj_convertideatoproject_project_id"/>
+                      <Param name="copy_idea_team" value="1"/>
+                      <Param name="idea_id"/>
+                      <Param name="process_code" value="csk_appChangeProject"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="3" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

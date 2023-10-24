@@ -1,0 +1,44 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RES_W_ALLOC_COST_V">
+    <indexes/>
+    <text_length>1734</text_length>
+    <text>SELECT t.prResourceID RESOURCE_ID,
+       t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID, 
+       c.start_date WEEK_START_DATE,
+       0 ALLOC_HOURS,
+       0 HARD_ALLOC_HOURS,
+       0 ALLOC_COST,
+       0 HARD_ALLOC_COST
+FROM   prTeam t, srm_resources r, rpt_calendar c
+WHERE  t.prResourceID = r.id
+AND    r.resource_type &lt;= 1
+AND    c.period_type = 'WEEKLY'
+UNION
+SELECT t.prResourceID RESOURCE_ID,
+       t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID, 
+       s.slice_date WEEK_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'WEEKLYRESOURCEALLOCCURVE' THEN 
+                 (CASE WHEN r.resource_type &lt;= 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ALLOC_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'WEEKLYRESOURCEHARDALLOC' THEN
+                 (CASE WHEN r.resource_type &lt;= 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) HARD_ALLOC_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'WEEKLYRESOURCEALLOCCURVE' THEN s.slice * cst.cost_rate ELSE 0 END,0)) ALLOC_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'WEEKLYRESOURCEHARDALLOC' THEN s.slice * cst.cost_rate ELSE 0 END,0)) HARD_ALLOC_COST
+FROM   prTeam t
+       INNER JOIN srm_resources r ON t.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON t.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+       LEFT OUTER JOIN nbi_proj_res_rates_and_costs cst ON t.prProjectID = cst.project_id AND
+                       t.prID = cst.team_id AND
+                       cst.task_id = -1 AND
+                       s.slice_date BETWEEN cst.from_date AND cst.to_date
+WHERE (sr.request_name IN ('WEEKLYRESOURCEALLOCCURVE','WEEKLYRESOURCEHARDALLOC'))
+GROUP BY t.prResourceID, t.prProjectID, t.prID, s.slice_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

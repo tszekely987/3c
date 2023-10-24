@@ -1,0 +1,956 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.earnedValuePhaseAnalysis" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Earned Value Analysis by Phase (Instance = Project)" languageCode="en" name="Earned Value Analysis by Phase"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT 
+       @SELECT:DIM:USER_DEF:IMPLIED:phase:phase.prid:phase_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:MAX(@NVL@(Phase.prWBSSequence,0)):phase_wbs_sequence@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:phase.prExternalID:phase_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:phase.prname:phase_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:phase.prstart:phase_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:@DBUSER@.COP_CALC_FINISH_TIME_FCT(phase.prfinish):phase_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:TaskStat.name:phase_status@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:phase.prprojectId:project_int_id@, 
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:inv.code:project_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:inv.name:project_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:@UPPER@(inv.odf_object_code):investment_code@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:inv.manager_id:proj_manager_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:phase:r.full_name:project_manager@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(EVREC.ev_acwp,0) + @NVL@(EVREC.ev_etc,0):EAC@, 
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_eac_t:EAC_T@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_eac_at:EAC_AT@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_bac:BAC@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_etc:ETC@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_etc_t:ETC_T@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_etc_at:ETC_AT@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_bcws:BCWS@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_bcwp:BCWP@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_acwp:ACWP@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_cv:CV@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_cpi:CPI@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_sv:SV@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_spi:SPI@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.ev_last_calc:last_calculated@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.obj_ev_cv_pct:cv_pct@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:EVREC.obj_ev_sv_pct:sv_pct@
+FROM   PRTASK TASK
+LEFT   OUTER  JOIN PRTASK Phase
+              ON   TASK.prProjectID = Phase.prProjectID  
+              AND  Phase.prWBSLevel  = 1
+              AND  TASK.prWBSSequence >= Phase.prWBSSequence
+LEFT   OUTER  JOIN ODF_TASK_V2 EVREC 
+              ON   EVREC.prprojectid = Phase.prprojectId AND EVREC.odf_pk = phase.prid
+LEFT   OUTER  JOIN INV_INVESTMENTS inv
+              ON   inv.id = phase.prprojectID 
+LEFT   OUTER  JOIN INV_PROJECTS prj 
+              ON   prj.PrId = inv.id 
+LEFT   OUTER  JOIN CMN_LOOKUPS_V TaskStat 
+              ON   phase.prstatus = TaskStat.lookup_enum 
+              AND  TaskStat.lookup_type = 'prTaskStatus'
+              AND  TaskStat.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER  JOIN srm_resources r
+              ON   inv.manager_id = r.user_id 
+WHERE  ( (phase.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@ 
+          AND @WHERE:PARAM:XML:INTEGER:/data/id/@value@ IS NOT NULL) 
+          OR (@WHERE:PARAM:XML:INTEGER:/data/id/@value@ IS NULL) )
+AND    @LOWER@(inv.odf_object_code) = 'project'
+AND    @WHERE:PARAM:USER_DEF:INTEGER:inv.is_active:ACTIVE_FILTER@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:prj.is_template:TEMPLATE_FILTER@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:prj.is_program:PROGRAM_FILTER@
+AND    @WHERE:SECURITY:PROJECT:inv.ID@
+AND    @FILTER@
+AND    ((Phase.prstatus IS NULL) OR (@WHERE:PARAM:USER_DEF:INTEGER:Phase.prstatus:TASK_STATUS@))
+GROUP  BY phase.prprojectId, 
+	  phase.prid, phase.prname,phase.prExternalID,
+	  phase.prstart,phase.prfinish,TaskStat.name,inv.name, inv.code, inv.odf_object_code,inv.manager_id,
+	  r.full_name, EVREC.ev_eac_t, EVREC.ev_eac_at, EVREC.ev_bac,
+	  EVREC.ev_etc, EVREC.ev_etc_t, EVREC.ev_etc_at,
+	  EVREC.ev_bcws, EVREC.ev_bcwp, EVREC.ev_acwp,
+	  EVREC.ev_cv, EVREC.ev_cpi, EVREC.ev_sv, EVREC.ev_spi,
+	  EVREC.ev_last_calc, EVREC.obj_ev_cv_pct, EVREC.obj_ev_sv_pct]]></nsql>
+            <attribute id="bac" required="false">
+              
+              
+              
+              
+              <nls description="BAC Cost" languageCode="en" name="BAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc" required="false">
+              
+              
+              
+              
+              <nls description="ETC Cost" languageCode="en" name="ETC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_t" required="false">
+              
+              
+              
+              
+              <nls description="ETC (T) - Typical" languageCode="en" name="ETC (T)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_at" required="false">
+              
+              
+              
+              
+              <nls description="ETC (AT) - Atypical" languageCode="en" name="ETC (AT)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="bcws" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Planned Value (BCWS)" languageCode="en" name="Planned Value (BCWS)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="bcwp" required="false">
+              
+              
+              
+              
+              
+              <nls description="Earned Value (BCWP)" languageCode="en" name="Earned Value (BCWP)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="acwp" required="false">
+              
+              
+              
+              
+              <nls description="Actual Cost (ACWP)" languageCode="en" name="Actual Cost (ACWP)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cv" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Cost Variance (CV)" languageCode="en" name="Cost Variance (CV)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cpi" required="false">
+              
+              
+              
+              
+              <nls description="Cost Performance Index (CPI)" languageCode="en" name="Cost Performance Index (CPI)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sv" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Schedule Variance (SV)" languageCode="en" name="Schedule Variance (SV)"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="spi" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Performance Index (SPI)" languageCode="en" name="Schedule Performance Index (SPI)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_calculated" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Earned Value Last Updated" languageCode="en" name="Earned Value Last Updated"/>
+            </attribute>
+            <attribute id="cv_pct" required="false">
+              
+              
+              
+              
+              <nls description="Cost Variance %" languageCode="en" name="Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sv_pct" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Variance %" languageCode="en" name="Schedule Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_active_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              <nls description="Active Filter" languageCode="en" name="Active Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_template_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Template Filter" languageCode="en" name="Template Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_program_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Program Filter" languageCode="en" name="Program Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_task_status" lookup="prTaskStatus" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Phase Status Filter" languageCode="en" name="Phase Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Phase Internal ID" languageCode="en" name="Phase Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_wbs_sequence" required="false">
+              
+              
+              
+              
+              <nls description="Phase WBS Sequence" languageCode="en" name="Phase WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_id" required="false">
+              
+              
+              
+              
+              <nls description="Phase ID" languageCode="en" name="Phase ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_name" required="false">
+              
+              
+              
+              
+              <nls description="Phase" languageCode="en" name="Phase"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_start" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+            </attribute>
+            <attribute id="phase_finish" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_status" required="false">
+              
+              
+              
+              
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_id" required="false">
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_code" required="false">
+              
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_manager_int_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac" required="false">
+              
+              <nls description="EAC Cost" languageCode="en" name="EAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac_t" required="false">
+              
+              <nls description="EAC (T) - Typical" languageCode="en" name="EAC (T)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac_at" required="false">
+              
+              
+              
+              
+              <nls description="EAC (AT) - Atypical" languageCode="en" name="EAC (AT)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.taskProperties" code="phaseProperties">
+                
+                
+                
+                
+                <nls description="Phase Properties" languageCode="en" name="Phase Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="projectId"/>
+                <linkParam dataRef="phase_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="returnAction"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_code" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

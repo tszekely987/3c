@@ -1,0 +1,1158 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_FINAL_APPROVE_BPBR</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_FINAL_APPROVE_BPBR" (
+invoiceno 	VARCHAR2 ,
+COMPANY_CODE 	VARCHAR2 ,
+userid 	VARCHAR2 ,
+invoiceamount 	NUMBER ,
+taxamount 	NUMBER,
+RET OUT NUMBER)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+printed 	NUMBER(5,0);
+arposted 	NUMBER(3,0);
+status 	GLOBALPKG.STRING;
+glposted 	GLOBALPKG.STRING;
+PROJECT_CODE 	GLOBALPKG.STRING;
+billdate 	DATE;
+TAXCODE 	GLOBALPKG.STRING;
+admincode 	GLOBALPKG.STRING;
+taxoverride   NUMBER(32,6);
+adminoverride   NUMBER(32,6);
+applytaxes 	NUMBER(3,0);
+useadmincharges 	NUMBER(3,0);
+admin_charges   NUMBER(32,6);
+taxcalcamount   NUMBER(32,6);
+transno   NUMBER;
+applytonumber   NUMBER;
+dummy_money   NUMBER(32,6);
+return_   NUMBER;
+error_code  NUMBER;
+tax_admin_calculated 	NUMBER(1,0);
+iBatchNo  NUMBER;
+CLNTCLASS 	GLOBALPKG.STRING;
+PROJCLASS 	GLOBALPKG.STRING;
+RESOURCE_CLASS  GLOBALPKG.STRING;
+--COSTCLASS   GLOBALPKG.STRING;
+TRANSCLASS 	GLOBALPKG.STRING;
+WIPCLASS 	GLOBALPKG.STRING;
+retlocationid 	GLOBALPKG.STRING;
+retdepartcode 	GLOBALPKG.STRING;
+ENTITY 	GLOBALPKG.STRING;
+locationid 	GLOBALPKG.STRING;
+departcode 	GLOBALPKG.STRING;
+newtransno  NUMBER;
+projecttype 	GLOBALPKG.STRING;
+empval 	GLOBALPKG.STRING;
+charge_code   GLOBALPKG.STRING;
+TRANSTYPE 	GLOBALPKG.STRING;
+masterTransNo PPA_BILLINGS.TRANSNO%TYPE;
+iLastUpdatedby  PAC_CMN_USERS_V.USER_ID%TYPE;
+
+STATUS_NUMBER NUMBER(1);
+HAS_SUB_PROJECTS NUMBER(1);
+PROJECT_ID NUMBER;
+
+/*** MultiCurrency change  ***/
+--- cursor to insert amount in all currency into --
+--- TEMP_PPA_INVOICEDETAILSSP_FINA &amp; TEMP_PRELIMSP_FINAL_APPROVE_BP --
+CURSOR transbillValues_curr IS
+  SELECT TV.AMOUNT,TV.EXCHANGE_ID, TV.EXCHANGE_RATE, TV.CURRENCY_TYPE, TV.CURRENCY_CODE
+  FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+  WHERE T.TRANSNO = TV.TRANSNO
+  AND T.INVOICENO = Sp_Final_Approve_Bpbr.invoiceno;
+
+--- Cursor for inserting records into invoiceheader_values ---
+CURSOR invoiceAmount_curr IS
+  SELECT SUM(TV.Amount) AMOUNT, MAX(TV.EXCHANGE_ID) EXCHANGE_ID, MAX(TV.EXCHANGE_RATE) EXCHANGE_RATE,
+    MAX(TV.CURRENCY_TYPE) CURRENCY_TYPE, MAX(TV.CURRENCY_CODE) CURRENCY_CODE
+  FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+  WHERE T.InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+  AND T.TRANSTYPE  NOT IN ('AU', 'AD', 'AY')
+  AND T.TRANSNO = TV.TRANSNO
+  GROUP BY TV.TRANSNO, TV.CURRENCY_TYPE ;
+
+BEGIN
+/***
+  * This procedure
+  * 1)Calculates the Tax amount and Admin charges  for the CONTRACT &amp; RETAINER type projects only
+  *	if the Use Admincharges= 1 &amp; Tax type = 1  are set.All the calculated inforamtions  are inserted into
+  *	TEMP_PPA_INVOICEDETAILSSP_FINA so that the calling procedures (REV_BILL_FINALAPP_POSTTOWIP ,
+  * Sp_Finalapproval_Posttowip ) will use this table to get the TAX/ADMIN amounts
+  * 2)Does the approval process also by inserting records into PPA_BILLINGS &amp; INVOICEHEADER
+  ***/
+    RET := 0;
+
+	DELETE FROM TEMP_PRELIMSP_FINAL_APPROVE_BP;
+	DELETE FROM TEMP_FINALSP_FINAL_APPROVE_BPB;
+
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT PAC_CMN_USERS_V.USER_ID
+          INTO Sp_Final_Approve_Bpbr.iLastUpdatedby
+          FROM PAC_CMN_USERS_V
+          WHERE RESOURCE_CODE = Sp_Final_Approve_Bpbr.UserID;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   TAX_TYPE,  NVL(useadmincharges, 0)
+		INTO Sp_Final_Approve_Bpbr.applytaxes, Sp_Final_Approve_Bpbr.useadmincharges FROM NAMEOPTIONS;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	Sp_Final_Approve_Bpbr.glposted :=  'N';
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM BILLINGSCHEDULE
+		WHERE invoiceno = Sp_Final_Approve_Bpbr.invoiceno
+		 AND atf = 1 );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		Sp_Final_Approve_Bpbr.printed :=  1;
+		Sp_Final_Approve_Bpbr.arposted :=  1;
+		Sp_Final_Approve_Bpbr.status :=  '0';
+		Sp_Final_Approve_Bpbr.STATUS_NUMBER := 0;
+		Sp_Final_Approve_Bpbr.glposted :=  'D';
+	END;
+	ELSE
+		Sp_Final_Approve_Bpbr.printed :=  0;
+		Sp_Final_Approve_Bpbr.arposted :=  0;
+		Sp_Final_Approve_Bpbr.status :=  '9';
+		Sp_Final_Approve_Bpbr.STATUS_NUMBER := 9;
+	END IF;
+/*  LB  04/18/96   PTR # 3533  */
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		/*** (MultiCurrency change) - removed the Amount column and instead use the amount from the cursor invoiceAmount_curr ***/
+		SELECT   BillingDate,  PROJECT_CODE, TransNo,  ApplyTo
+		INTO Sp_Final_Approve_Bpbr.billdate, Sp_Final_Approve_Bpbr.PROJECT_CODE,
+			 Sp_Final_Approve_Bpbr.transno, Sp_Final_Approve_Bpbr.applytonumber
+		FROM PPA_TRANSBILL
+		WHERE InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO PPA_POSTINGBATCH (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+		   SELECT S_307_1_PPA_POSTINGBATCH.NEXTVAL , TRUNC(SYSDATE), Sp_Final_Approve_Bpbr.userid, 'B', 'Final Approve BP/BR'
+		   FROM DUAL;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    RET := -1;
+		RETURN ;
+	END;
+	END IF;
+	SELECT S_307_1_PPA_POSTINGBATCH.CURRVAL INTO Sp_Final_Approve_Bpbr.iBatchNo FROM dual;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	/*** (MultiCurrency change) - use the Amounts from ppa_transbill_values corresponding to BILLING record ***/
+	INSERT INTO PPA_BILLINGS (TRANSNO, SOURCEMODULE, ApplyTo, TRANSTYPE, ApplyToTransType, COMPANY_CODE, PROJECT_CODE, CHARGE_CODE, RESOURCE_CODE,
+          Input_Type, BillingDate, InvoiceNo, ENTRY_RESOURCE_CODE, EntryDate,
+				LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, GLPosted, Quantity, Notes, BatchNo, Status,external_id)
+       SELECT  S_13_1_PPA_BILLINGS.nextval, T.SOURCEMODULE, T.ApplyTo, T.TRANSTYPE, T.ApplyToTransType, T.COMPANY_CODE, T.PROJECT_CODE, T.CHARGE_CODE, T.RESOURCE_CODE,
+             T.INPUT_TYPE, T.BillingDate, T.InvoiceNo, Sp_Final_Approve_Bpbr.userid, TRUNC(SYSDATE),
+		   		   Sp_Final_Approve_Bpbr.userid, TRUNC(SYSDATE), Sp_Final_Approve_Bpbr.glposted, T.Quantity, T.Notes,
+				   Sp_Final_Approve_Bpbr.iBatchNo, 0,T.external_id
+		   FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+		   WHERE T.InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+		   AND T.TRANSNO = TV.TRANSNO
+		   AND TV.CURRENCY_TYPE = 'BILLING';
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    RET := -1;
+		RETURN ;
+	END;
+	END IF;
+
+	/*** MultiCurrency Changes - Insert into values table ppa_billing_values. ***/
+
+	--- get the transno of the record inserted into ppa_billing --
+	SELECT S_13_1_PPA_BILLINGS.currval INTO Sp_Final_Approve_Bpbr.masterTransNo  FROM dual;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO PPA_BILLING_VALUES(ID, TRANSNO, EXCHANGE_ID, AMOUNT, AMOUNTREMAINING, BILLRATE, CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_RATE)
+		   SELECT  PPA_BILLING_VALUES_S1.NEXTVAL, masterTransNo, TV.EXCHANGE_ID, TV.AMOUNT, TV.AMOUNT, TV.BILLRATE, TV.CURRENCY_TYPE, TV.CURRENCY_CODE, TV.EXCHANGE_RATE
+		   FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+		   WHERE T.InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+		   AND T.TRANSNO = TV.TRANSNO;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    RET := -1;
+		RETURN ;
+	END;
+	END IF;
+ 	/***/
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   TransNo
+		INTO Sp_Final_Approve_Bpbr.newtransno FROM PPA_BILLINGS
+		WHERE BatchNo = Sp_Final_Approve_Bpbr.iBatchNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE PPA_BILLINGS
+	SET ApplyTo = TransNo
+	WHERE TransNo = Sp_Final_Approve_Bpbr.newtransno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    RET := -1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+		INTO Sp_Final_Approve_Bpbr.empval FROM DEFAULT_COSTKEY_VALUES
+		WHERE costkey_level = 4;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+    INTO Sp_Final_Approve_Bpbr.charge_code FROM DEFAULT_COSTKEY_VALUES
+		WHERE costkey_level = 3;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   type_,  locationid,  departcode,  WIPCLASS,  class
+		INTO Sp_Final_Approve_Bpbr.projecttype, Sp_Final_Approve_Bpbr.locationid, Sp_Final_Approve_Bpbr.departcode,
+			 Sp_Final_Approve_Bpbr.WIPCLASS, Sp_Final_Approve_Bpbr.PROJCLASS
+    FROM pac_mnt_projects
+		WHERE COMPANY_CODE = Sp_Final_Approve_Bpbr.COMPANY_CODE
+		AND PROJECT_CODE = Sp_Final_Approve_Bpbr.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   CLNTCLASS
+		INTO Sp_Final_Approve_Bpbr.CLNTCLASS FROM CLNTSUPP
+		WHERE COMPANY_CODE = Sp_Final_Approve_Bpbr.COMPANY_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	/*
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COSTCLASS
+		INTO Sp_Final_Approve_Bpbr.COSTCLASS FROM COSTCODE
+    WHERE COSTCODE = Sp_Final_Approve_Bpbr.charge_code;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT   RESOURCE_CLASS
+    INTO Sp_Final_Approve_Bpbr.RESOURCE_CLASS
+    FROM PAC_MNT_RESOURCES
+		WHERE RESOURCE_CODE = Sp_Final_Approve_Bpbr.empval;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+/*
+    With the exception of values 'CCL' and 'RL' for locationid and
+    'CCD' and 'RD' for departcode the following procedure will
+     return the locationid and departcode depending on the value
+     in the sourcefield columns in nameoptions. For the exceptions
+     mentioned above the locationid and departcode will be taken
+     from projcontrol or projchgorder.
+*/
+	BEGIN
+	Sp_Transactionlocdept_Output(COMPANY_CODE=&gt;Sp_Final_Approve_Bpbr.COMPANY_CODE,
+	 					         PROJECT_CODE=&gt;Sp_Final_Approve_Bpbr.PROJECT_CODE,
+								 CHARGE_CODE=&gt;Sp_Final_Approve_Bpbr.charge_code,
+								  RESOURCE_CODE=&gt;Sp_Final_Approve_Bpbr.empval,
+								 locationid=&gt;Sp_Final_Approve_Bpbr.retlocationid,
+								 departcode=&gt;Sp_Final_Approve_Bpbr.retdepartcode);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  Sp_Final_Approve_Bpbr.retdepartcode IS NOT NULL THEN
+		Sp_Final_Approve_Bpbr.departcode :=  Sp_Final_Approve_Bpbr.retdepartcode;
+	END IF;
+	IF  Sp_Final_Approve_Bpbr.retlocationid IS NOT NULL THEN
+		Sp_Final_Approve_Bpbr.locationid :=  Sp_Final_Approve_Bpbr.retlocationid;
+	END IF;
+	BEGIN
+	Sp_Getentity_Output(COMPANY_CODE=&gt;Sp_Final_Approve_Bpbr.COMPANY_CODE,
+						PROJECT_CODE=&gt;Sp_Final_Approve_Bpbr.PROJECT_CODE,
+						emplycodeinit=&gt;Sp_Final_Approve_Bpbr.empval,
+						ENTITY=&gt;Sp_Final_Approve_Bpbr.ENTITY);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  Sp_Final_Approve_Bpbr.projecttype = 'P' THEN
+		Sp_Final_Approve_Bpbr.TRANSTYPE :=  'BP';
+		Sp_Final_Approve_Bpbr.TRANSCLASS :=  'CONTRACT';
+	ELSE
+		IF  Sp_Final_Approve_Bpbr.projecttype = 'R' THEN
+			Sp_Final_Approve_Bpbr.TRANSTYPE :=  'BR';
+			Sp_Final_Approve_Bpbr.TRANSCLASS :=  'RETAINER';
+		END IF;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO PPA_BILLINGDETAILS (TransNo, LocationID, DepartCode, ENTITY, ProjectType, ClientClass, ProjectClass,
+          TRANSCLASS, RESOURCE_CLASS, WIPCLASS, BillScheduleDate)
+		   SELECT  Sp_Final_Approve_Bpbr.newtransno, Sp_Final_Approve_Bpbr.locationid,
+		   Sp_Final_Approve_Bpbr.departcode, Sp_Final_Approve_Bpbr.ENTITY,
+		   Sp_Final_Approve_Bpbr.projecttype, Sp_Final_Approve_Bpbr.CLNTCLASS,
+       Sp_Final_Approve_Bpbr.PROJCLASS,
+       Sp_Final_Approve_Bpbr.TRANSCLASS, Sp_Final_Approve_Bpbr.RESOURCE_CLASS,
+		   Sp_Final_Approve_Bpbr.WIPCLASS, Sp_Final_Approve_Bpbr.billdate
+		FROM DUAL;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    RET := -1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   TAXCODE,  admincode,  taxoverride,  adminoverride
+		INTO Sp_Final_Approve_Bpbr.TAXCODE, Sp_Final_Approve_Bpbr.admincode, Sp_Final_Approve_Bpbr.taxoverride,
+			 Sp_Final_Approve_Bpbr.adminoverride
+		FROM BILLINGSCHEDULE
+		WHERE COMPANY_CODE = Sp_Final_Approve_Bpbr.COMPANY_CODE
+		AND PROJECT_CODE = Sp_Final_Approve_Bpbr.PROJECT_CODE
+		AND TRUNC(billdate) = TRUNC(Sp_Final_Approve_Bpbr.billdate);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	Sp_Final_Approve_Bpbr.admin_charges :=  0;
+	Sp_Final_Approve_Bpbr.taxcalcamount :=  0;
+	Sp_Final_Approve_Bpbr.tax_admin_calculated :=  0;
+
+	--- Calculate the ADMIN charges ---
+	IF  Sp_Final_Approve_Bpbr.useadmincharges = 1 THEN
+	BEGIN
+		IF  NVL(Sp_Final_Approve_Bpbr.adminoverride, 0) &gt; 0 THEN
+
+		/*** (MultiCurrency Change ***/
+		/*** Modified the temp tables (TEMP_PPA_INVOICEDETAILSSP_FINA , TEMP_PRELIMSP_FINAL_APPROVE_BP )
+		/*** to store the records of all currencies inorder to populate the VALUES  tables INVOICEHEADER_VALUES ****/
+
+		BEGIN
+			Sp_Final_Approve_Bpbr.tax_admin_calculated :=  1;
+			--Sp_Final_Approve_Bpbr.admin_charges :=  ROUND(( Sp_Final_Approve_Bpbr.amountbilled
+			--										   * Sp_Final_Approve_Bpbr.adminoverride ) / 100, 2);
+
+			FOR transbillValues_rec IN transbillValues_curr
+			LOOP
+			BEGIN
+			   StoO_error   := 0;
+			   StoO_rowcnt  := 0;
+			    --- calculate the admincharges using the amount from ppa_transbill_values ---
+				INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA (InvoiceNo, EntryType, LevelCode, Percentage, TaxableAmt, Amount,
+					   		TAXCODE, CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+				 SELECT  Sp_Final_Approve_Bpbr.invoiceno, 'A', 'BR/BP OR', Sp_Final_Approve_Bpbr.adminoverride,
+                   transbillValues_rec.AMOUNT, ROUND( ( transbillValues_rec.AMOUNT *Sp_Final_Approve_Bpbr.adminoverride)/100,6) ,
+							   '', transbillValues_rec.CURRENCY_TYPE, transbillValues_rec.CURRENCY_CODE, transbillValues_rec.EXCHANGE_ID,
+							   transbillValues_rec.EXCHANGE_RATE
+				 FROM DUAL;
+
+			   StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+
+			END;
+			IF  StoO_error != 0 THEN
+         	    RET := -1;
+				RETURN ;
+			END IF;
+			END LOOP;
+		END;
+		ELSE
+			BEGIN
+			BEGIN
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			StoO_rowcnt := 0;
+			SELECT 1 INTO StoO_selcnt
+			FROM DUAL
+			WHERE Sp_Final_Approve_Bpbr.admincode IS NOT NULL
+			AND EXISTS (
+					   SELECT  1
+				 	   FROM TAXCODE
+					   WHERE code = Sp_Final_Approve_Bpbr.admincode
+				 	   AND active = 1 );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+			BEGIN
+				Sp_Final_Approve_Bpbr.tax_admin_calculated :=  1;
+
+				FOR transbillValues_rec IN transbillValues_curr
+				LOOP
+				BEGIN
+			    StoO_error   := 0;
+			    StoO_rowcnt  := 0;
+				INSERT INTO TEMP_PRELIMSP_FINAL_APPROVE_BP (EntryType, LevelCode, Percentage, Amount, TAXCODE,
+				   CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+					   SELECT  'A', M.code, M.amount, transbillValues_rec.AMOUNT,
+					   		   Sp_Final_Approve_Bpbr.admincode, transbillValues_rec.CURRENCY_TYPE,
+							   transbillValues_rec.CURRENCY_CODE, transbillValues_rec.EXCHANGE_ID,
+							   transbillValues_rec.EXCHANGE_RATE
+					   FROM TAXCODE_METHOD T, TAX_METHOD M
+					   WHERE T.TAXCODE = Sp_Final_Approve_Bpbr.admincode
+					   AND M.code = T.tax_method_code
+					   AND M.active = 1
+					   AND TRUNC(Sp_Final_Approve_Bpbr.billdate)
+					   	   BETWEEN TRUNC(M.from_date) AND TRUNC(M.TO_DATE)
+					   AND M.taxtype = 'ADM';
+				StoO_rowcnt := SQL%ROWCOUNT;
+
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				END LOOP;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+/* If admin charges are applied, amount billed needs to include them to be
+            taxed if applicable  */
+			END;
+			END IF;
+			END;
+			END IF;
+		END;
+		END IF;
+		--- Calculate the TAX charges ---
+		IF  Sp_Final_Approve_Bpbr.applytaxes = 1 THEN
+		BEGIN
+			IF  NVL(Sp_Final_Approve_Bpbr.taxoverride, 0) &gt; 0 THEN
+			BEGIN
+				Sp_Final_Approve_Bpbr.tax_admin_calculated :=  1;
+				--Sp_Final_Approve_Bpbr.taxcalcamount :=  ROUND(( Sp_Final_Approve_Bpbr.amountbilled
+				--   * Sp_Final_Approve_Bpbr.taxoverride ) / 100, 2);
+
+				--- Multi Currency Change ---
+				FOR transbillValues_rec IN transbillValues_curr
+				LOOP
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				--- calculate the admincharges using the amount from ppa_transbill_values ---
+				INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA (InvoiceNo, EntryType, LevelCode, Percentage,
+					   		TaxableAmt, Amount, TAXCODE, CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+					   SELECT  Sp_Final_Approve_Bpbr.invoiceno, 'T', 'BR/BP OR', Sp_Final_Approve_Bpbr.taxoverride,
+					   		   transbillValues_rec.AMOUNT, ROUND(( transbillValues_rec.AMOUNT * Sp_Final_Approve_Bpbr.taxoverride ) / 100, 2),
+							   '', transbillValues_rec.CURRENCY_TYPE, transbillValues_rec.CURRENCY_CODE, transbillValues_rec.EXCHANGE_ID,
+							   transbillValues_rec.EXCHANGE_RATE
+					   FROM DUAL;
+				StoO_rowcnt := SQL%ROWCOUNT;
+
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				END LOOP;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+			END;
+			ELSE
+				BEGIN
+				BEGIN
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				StoO_rowcnt := 0;
+				SELECT 1 INTO StoO_selcnt
+				FROM DUAL
+				WHERE Sp_Final_Approve_Bpbr.TAXCODE IS NOT NULL
+				AND EXISTS (
+						   SELECT  1
+					 	   FROM TAXCODE
+						   WHERE code = Sp_Final_Approve_Bpbr.TAXCODE
+					 	   AND active = 1 );
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF StoO_selcnt != 0 THEN
+				BEGIN
+					Sp_Final_Approve_Bpbr.tax_admin_calculated :=  1;
+
+					--- Multi Currency Change ---
+					FOR transbillValues_rec IN transbillValues_curr
+					LOOP
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					INSERT INTO TEMP_PRELIMSP_FINAL_APPROVE_BP (EntryType, LevelCode, Percentage, Amount, TAXCODE,
+					  CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+						   SELECT  'T', M.code, M.amount, transbillValues_rec.AMOUNT, Sp_Final_Approve_Bpbr.TAXCODE,
+						   	 transbillValues_rec.CURRENCY_TYPE, transbillValues_rec.CURRENCY_CODE, transbillValues_rec.EXCHANGE_ID,
+						     transbillValues_rec.EXCHANGE_RATE
+						   FROM TAXCODE_METHOD T, TAX_METHOD M
+						   WHERE T.TAXCODE = Sp_Final_Approve_Bpbr.TAXCODE
+						   AND M.code = T.tax_method_code
+						   AND M.active = 1
+						   AND TRUNC(Sp_Final_Approve_Bpbr.billdate)
+						   	   BETWEEN TRUNC(M.from_date) AND TRUNC(M.TO_DATE)
+						   AND M.taxtype = 'TAX';
+					StoO_rowcnt := SQL%ROWCOUNT;
+
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+					END LOOP;
+					IF  StoO_error != 0 THEN
+					    RET := -1;
+						RETURN ;
+					END IF;
+				END;
+				END IF;
+				END;
+				END IF;
+			END;
+			END IF;
+			IF  Sp_Final_Approve_Bpbr.tax_admin_calculated = 1 THEN
+			BEGIN
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				INSERT INTO TEMP_FINALSP_FINAL_APPROVE_BPB (EntryType, LevelCode, Percentage, TAXCODE, Amount,CURRENCY_TYPE,
+				   CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+					   SELECT  EntryType, LevelCode, Percentage, TAXCODE, SUM(Amount), CURRENCY_TYPE, CURRENCY_CODE,
+					     EXCHANGE_ID, EXCHANGE_RATE
+					   FROM TEMP_PRELIMSP_FINAL_APPROVE_BP
+					   GROUP BY EntryType, LevelCode, Percentage, TAXCODE,CURRENCY_TYPE, CURRENCY_CODE,
+					     	    EXCHANGE_ID, EXCHANGE_RATE;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA (InvoiceNo, EntryType, LevelCode, Percentage, TaxableAmt,
+					   		Amount, TAXCODE, CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+					   SELECT  Sp_Final_Approve_Bpbr.invoiceno, EntryType, LevelCode, Percentage, Amount,
+					   		   ROUND(( Amount * ( Percentage / 100 ) ), 2), TAXCODE, CURRENCY_TYPE,
+							   CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE
+					   FROM TEMP_FINALSP_FINAL_APPROVE_BPB;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+/* 2/3/99 PTR#10845 */
+				IF  Sp_Final_Approve_Bpbr.applytaxes = 1 THEN
+				BEGIN
+					BEGIN
+					Sp_Calculate_Taxes_On_Admin(Sp_Final_Approve_Bpbr.invoiceno,Sp_Final_Approve_Bpbr.return_);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+					IF  Sp_Final_Approve_Bpbr.return_ != 0 THEN
+					    RET := -1;
+						RETURN ;
+					END IF;
+				END;
+				END IF;
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   SUM(Amount)
+					INTO Sp_Final_Approve_Bpbr.taxcalcamount FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+					WHERE InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+					 AND EntryType = 'T'
+					 AND CURRENCY_TYPE = 'BILLING';
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   SUM(Amount)
+					INTO Sp_Final_Approve_Bpbr.admin_charges FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+					WHERE InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+					 AND EntryType = 'A'
+					 AND CURRENCY_TYPE = 'BILLING';
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+			END;
+			END IF;
+			--- (Multi Currency Change)--UPDATE projects by getting the amountbilled of the 'BILLING' Record --
+      SELECT ID INTO Sp_Final_Approve_Bpbr.PROJECT_ID FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = Sp_Final_Approve_Bpbr.PROJECT_CODE;
+
+			DELETE FROM TEMP_BIL_SUBPROJECTS;
+
+			INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+			VALUES ( Sp_Final_Approve_Bpbr.COMPANY_CODE,
+				   	 Sp_Final_Approve_Bpbr.PROJECT_CODE,
+					 Sp_Final_Approve_Bpbr.PROJECT_ID,
+					 Sp_Final_Approve_Bpbr.PROJECT_ID,
+					 Sp_Final_Approve_Bpbr.PROJECT_ID,
+					 0,
+					 Sp_Final_Approve_Bpbr.STATUS);
+
+			PAC_BIL_GET_SUBPROJECTS_SP ( 0, Sp_Final_Approve_Bpbr.STATUS_NUMBER, Sp_Final_Approve_Bpbr.HAS_SUB_PROJECTS ) ;
+
+			FOR transbillValues_rec IN transbillValues_curr
+			LOOP
+			   IF  (transbillValues_rec.CURRENCY_TYPE = 'BILLING') THEN
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+        UPDATE pac_mnt_projects
+				SET amountbilled = NVL(amountbilled, 0) + transbillValues_rec.AMOUNT
+				WHERE COMPANY_CODE = Sp_Final_Approve_Bpbr.COMPANY_CODE
+				 AND PROJECT_CODE = Sp_Final_Approve_Bpbr.PROJECT_CODE;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error != 0 THEN
+	/*  LB  11/10/95  Check if header exists. If so must be ATF rebill. Delete and
+	                         readd.  */
+	         	    RET := -1;
+					RETURN ;
+				END IF;
+			  END IF;
+			END LOOP;
+			BEGIN
+			BEGIN
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			StoO_rowcnt := 0;
+			SELECT 1 INTO StoO_selcnt
+			FROM DUAL
+			WHERE  EXISTS (
+				SELECT  1
+				 FROM INVOICEHEADER
+				WHERE invoiceno = Sp_Final_Approve_Bpbr.invoiceno
+				 AND invtype = 'I' );
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF StoO_selcnt != 0 THEN
+			BEGIN
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				DELETE FROM INVOICEHEADER
+					WHERE invoiceno = Sp_Final_Approve_Bpbr.invoiceno
+					 AND invtype = 'I';
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+				--- Delete from invoiceheader_values ---
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				DELETE FROM INVOICEHEADER_VALUES
+					WHERE invoiceno = Sp_Final_Approve_Bpbr.invoiceno;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error != 0 THEN
+				    RET := -1;
+					RETURN ;
+				END IF;
+			END;
+			END IF;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			--- added the new column amount_remaining ---
+			INSERT INTO INVOICEHEADER (invoiceno, invtype, cmsgroupno, invoicedate, COMPANY_CODE, RESOURCE_CODE,
+				   		printed, arposted, status, invoiceno_applyto, consolidated, has_billing_subprojects, billing_project_code )
+				   VALUES (Sp_Final_Approve_Bpbr.invoiceno, 'I', Sp_Final_Approve_Bpbr.invoiceno,
+				   		  Sp_Final_Approve_Bpbr.billdate, Sp_Final_Approve_Bpbr.COMPANY_CODE, Sp_Final_Approve_Bpbr.userid,
+				   		  Sp_Final_Approve_Bpbr.printed, Sp_Final_Approve_Bpbr.arposted,
+				   		  Sp_Final_Approve_Bpbr.status, Sp_Final_Approve_Bpbr.invoiceno,
+						  0, Sp_Final_Approve_Bpbr.has_sub_projects,Sp_Final_Approve_Bpbr.project_code);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			    RET := -1;
+				RETURN ;
+			END IF;
+
+			/*** Multi Currency Change -- Insert into INVOICEHEADER_VALUES  from the cursor invoiceAmount_curr ***/
+
+			FOR invoiceAmount_rec IN invoiceAmount_curr
+			LOOP
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			--- Tax Amount ----
+			SELECT   SUM(Amount)
+					INTO Sp_Final_Approve_Bpbr.taxcalcamount FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+					WHERE InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+					 AND EntryType = 'T'
+					 AND CURRENCY_TYPE = invoiceAmount_rec.CURRENCY_TYPE;
+		    --- Admin Charges ---
+			SELECT   SUM(Amount)
+					INTO Sp_Final_Approve_Bpbr.admin_charges FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+					WHERE
+						  InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno
+					 	  AND EntryType = 'A' AND CURRENCY_TYPE = invoiceAmount_rec.CURRENCY_TYPE;
+
+			INSERT INTO INVOICEHEADER_VALUES (
+				   id,
+				   invoiceno,
+				   invoiceamount,
+				   amount_remaining,
+				   taxamount,
+				   admincharge,
+				   currency_type,
+			       currency_code,
+				   exchange_id,
+				   exchange_rate)
+			VALUES (
+				   invoiceheader_values_S1.nextval,
+				   Sp_Final_Approve_Bpbr.invoiceno,
+				   NVL(invoiceAmount_rec.amount,0),
+				   NVL(invoiceAmount_rec.amount,0),
+				   Sp_Final_Approve_Bpbr.taxcalcamount,
+				   Sp_Final_Approve_Bpbr.admin_charges,
+				   invoiceAmount_rec.CURRENCY_TYPE,
+				   invoiceAmount_rec.CURRENCY_CODE,
+				   invoiceAmount_rec.EXCHANGE_ID,
+				   invoiceAmount_rec.EXCHANGE_RATE
+				   	);
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			END LOOP;
+			IF  StoO_error != 0 THEN
+			    RET := -1;
+				RETURN ;
+			END IF;
+
+			/* Insert into PAC_BIL_INVOICE_TRN_DETAILS to use later for line item credit memos tax/admin reversal
+			   We must keep tax information at a detail level in this case */
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+            INSERT INTO PAC_BIL_INVOICE_TRN_DETAILS (ID, INVOICE_NO, TRANSNO, ENTRY_TYPE,
+		   		   					 			   TAX_CODE, TAX_METHOD_CODE, PERCENTAGE,
+												   AMOUNT, CURRENCY_CODE, CURRENCY_TYPE,
+												   EXCHANGE_ID, EXCHANGE_RATE,
+   												   CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY )
+			    SELECT  PAC_BIL_INVOICE_TRN_DETAILS_S1.NEXTVAL, Sp_Final_Approve_Bpbr.invoiceno, Sp_Final_Approve_Bpbr.newtransno, EntryType,
+			 		  TAXCODE, LevelCode, Percentage,
+			          TaxableAmt, CURRENCY_CODE, CURRENCY_TYPE,
+					  EXCHANGE_ID, EXCHANGE_RATE,
+					  SYSDATE, iLastUpdatedby, SYSDATE, iLastUpdatedby
+			        FROM TEMP_PPA_INVOICEDETAILSSP_FINA ;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+			  NULL;
+			WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+			  RET := -1;
+			  RETURN ;
+			END;
+
+		--- Multicurrency change:deleting from ppa_transbill_values ---
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			DELETE FROM PPA_TRANSBILL_VALUES
+				WHERE TRANSNO IN (SELECT PPA_TRANSBILL.TRANSNO FROM PPA_TRANSBILL
+				                  WHERE  InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error = 0 THEN
+
+			--- deleting from ppa_transbill ---
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				DELETE FROM PPA_TRANSBILL
+					WHERE InvoiceNo = Sp_Final_Approve_Bpbr.invoiceno;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				IF  StoO_error = 0 THEN
+				    RET := 0;
+					RETURN ;
+				ELSE
+				    RET := -1;
+					RETURN ;
+				END IF;
+			ELSE
+			    ----- Error ----
+			    RET := -1;
+				RETURN ;
+
+			END IF;
+
+			--modified by : Nitin
+			--comment : sp_calculate_taxes_on_admin )out parameter added )
+			--            created temp tables which were missing from procedure
+			-- comment by Nitin : included the return value used for procedure
+			--Date formatting included in the code for select
+END Sp_Final_Approve_Bpbr;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

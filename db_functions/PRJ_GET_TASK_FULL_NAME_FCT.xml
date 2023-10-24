@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_GET_TASK_FULL_NAME_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_GET_TASK_FULL_NAME_FCT" (
+  task_id NUMBER,
+  project_id NUMBER
+)
+   RETURN VARCHAR2
+IS
+  taskSequence NUMBER;
+  taskName VARCHAR2(10000);
+  taskLevel NUMBER;
+  top_node VARCHAR2(5000);
+
+  UF1_oval2   PRTASK.PRNAME%TYPE;
+  UF1_oval3   PRTASK.PRWBSLEVEL%TYPE;  
+  
+  CURSOR UF1_cursor IS
+    SELECT PRTASK.PRNAME, PRTASK.PRWBSLEVEL
+	FROM PRTASK WHERE PRTASK.PRWBSSEQUENCE &lt;= taskSequence 
+	AND PRTASK.PRWBSSEQUENCE != 0 AND PRTASK.PRPROJECTID =  PRJ_GET_TASK_FULL_NAME_FCT.project_id 
+	order by PRTASK.PRWBSSEQUENCE desc;
+	
+BEGIN
+ 
+   SELECT PRNAME, PRWBSLEVEL, PRWBSSEQUENCE INTO taskName, taskLevel, taskSequence FROM PRTASK WHERE PRID = PRJ_GET_TASK_FULL_NAME_FCT.task_id;
+   
+   BEGIN
+		top_node := taskName;	
+		OPEN UF1_cursor;
+		LOOP
+		FETCH UF1_cursor INTO UF1_oval2, UF1_oval3;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+	   	BEGIN
+			 IF UF1_oval3 &lt; taskLevel THEN
+			 BEGIN
+			 	  top_node := UF1_oval2;
+				  taskName := UF1_oval2 || '/' || taskName;
+				  
+			      IF UF1_oval3 = 1 THEN 
+				  	 EXIT;
+				  END IF; 
+				  tasklevel := UF1_oval3;  				  
+			 END;
+			 END IF;
+		END;
+		END LOOP;
+		CLOSE UF1_cursor;
+	END;
+	RETURN taskName;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

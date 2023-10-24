@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CBK_PREVIEW_REVERSALS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CBK_PREVIEW_REVERSALS_SP" 
+(
+  P_USER_ID                 NUMBER,
+  P_JOB_SOURCE              VARCHAR2,
+  P_FF_GL_PERIOD_ID         NUMBER,
+  P_FF_INCLUDE_CHILDREN     NUMBER,
+  P_FF_INV_ID               NUMBER,
+  V_JOB_RUN_ID              OUT NUMBER,
+  P_TRANSNO                 NUMBER DEFAULT NULL,
+  P_FF_CHARGECODE           GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_INPUT_TYPE           GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_RESOURCE_CODE        GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_TRANSTYPE            VARCHAR2 DEFAULT NULL,
+  P_FF_COSTTYPE             VARCHAR2 DEFAULT NULL,
+  V_TRANS_COUNT             OUT NUMBER
+)
+IS
+
+  V_GL_PERIOD_START     DATE;
+  V_GL_PERIOD_END       DATE;
+  
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_errmsg       GLOBALPKG.STRING;
+
+
+BEGIN
+
+-- Filter processing Validate against reverting All!
+   BEGIN
+     SELECT PER.START_DATE, PER.END_DATE
+     INTO  V_GL_PERIOD_START, V_GL_PERIOD_END
+     FROM BIZ_COM_PERIODS PER
+     WHERE PER.ID = P_FF_GL_PERIOD_ID; 
+   END;    
+
+-- Get current JOB_ID 
+   SELECT PAC_CHG_BATCH_HEADERS_S1.nextval INTO V_JOB_RUN_ID FROM DUAL;
+
+   -- Reverse Charges  
+   -- Reverse Debits
+   BEGIN
+	INSERT INTO CBK_PREVIEW_REVERSALS
+	(
+	  TRANSNO,
+	  JOB_RUN_ID ,
+      CREATED_DATE,
+      CREATED_BY,
+      LAST_UPDATED_DATE,
+      LAST_UPDATED_BY
+    )
+    SELECT DISTINCT
+      old.TRANSACTION_ID,
+      V_JOB_RUN_ID,
+      SYSDATE,
+      P_USER_ID, 
+      SYSDATE, 
+      P_USER_ID
+      FROM CBK_GL_TXNS old 
+      WHERE ( P_TRANSNO IS NULL OR old.TRANSACTION_ID = P_TRANSNO)
+      AND old.CHARGEBACK_TYPE = 'D'
+      AND old.TRANSACTION_SOURCE = 'W'
+      AND old.ID NOT IN
+      ( SELECT REVERSALS.TRANSACTION_ID
+        FROM CBK_GL_TXNS REVERSALS
+        WHERE REVERSALS.TRANSACTION_ID = OLD.ID
+        AND REVERSALS.CHARGEBACK_TYPE = 'R'
+      )
+      AND old.TRANSACTION_ID IN
+      (
+        SELECT WIP.TRANSNO FROM PPA_WIP WIP
+        WHERE  WIP.TRANSDATE BETWEEN V_GL_PERIOD_START AND V_GL_PERIOD_END
+        AND (P_FF_CHARGECODE IS NULL OR UPPER(WIP.CHARGE_CODE) LIKE P_FF_CHARGECODE)
+        AND (P_FF_INPUT_TYPE IS NULL OR UPPER(WIP.INPUT_TYPE) LIKE P_FF_INPUT_TYPE)
+        AND (P_FF_RESOURCE_CODE IS NULL OR UPPER(WIP.RESOURCE_CODE) LIKE P_FF_RESOURCE_CODE)
+        AND (P_FF_TRANSTYPE IS NULL OR WIP.TRANSTYPE = P_FF_TRANSTYPE)
+		AND (P_FF_COSTTYPE IS NULL OR WIP.COST_TYPE = P_FF_COSTTYPE)
+        AND NVL(WIP.IN_ERROR,0) != 1
+        AND NVL(WIP.GLPOSTED,'N') = 'Y'
+        AND NVL(WIP.STATUS,0) = 0
+        AND  (
+              NVL(P_FF_INCLUDE_CHILDREN,0) = 0 AND (P_FF_INV_ID IS NULL OR P_FF_INV_ID = WIP.INVESTMENT_ID))
+          OR (
+              P_FF_INCLUDE_CHILDREN = 1 AND WIP.INVESTMENT_ID IN
+                (SELECT FLAT.FROM_INV_ID 
+                 FROM INV_INVESTMENT_ALLOCS_FLAT FLAT
+                 WHERE FLAT.TO_INV_ID = P_FF_INV_ID)
+        )
+        AND  WIP.TRANSNO NOT IN 
+                 (
+                 SELECT GLLOCK.TRANSACTION_ID
+                 FROM CBK_GL_TXNS GLLOCK, CBK_INVOICE IVCLOCK
+                   WHERE GLLOCK.TRANSACTION_ID = WIP.TRANSNO
+                       AND GLLOCK.INVOICE_ID = IVCLOCK.ID
+                       AND (IVCLOCK.STATUS_CODE = 4
+                       OR IVCLOCK.IS_LOCKED = 1)
+                 )
+      );
+  
+      StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+      V_TRANS_COUNT := StoO_rowcnt;
+	  
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          null;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          raise_application_error(-20255, 'Error inserting into CBK_PREVIEW_REVERSALS!' || StoO_errmsg );
+      END;
+
+
+     
+   
+  EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20780, 'PREVIEW REVERSE GL ALLOCATION FAILED : ' || SQLERRM);
+END CBK_PREVIEW_REVERSALS_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

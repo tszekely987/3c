@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_CREATE_INDEX_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_CREATE_INDEX_SP" (v_table_name   VARCHAR2, 
+                                                 v_index_name   VARCHAR2, 
+                                                 v_index_type   VARCHAR2, 
+                                                 v_colum_name_s VARCHAR2,
+												 v_tablespace_name VARCHAR2) 
+authid current_user 
+AS 
+  index_exists     NUMBER := 0; 
+  table_exists     NUMBER := 0; 
+  index_stmt       VARCHAR2(4000); 
+  index_tablespace VARCHAR2(255); 
+BEGIN 
+	DBMS_OUTPUT.PUT_LINE ('Creating Index on : ' || v_table_name);
+    SELECT COUNT(1) 
+    INTO   table_exists 
+    FROM   user_objects 
+    WHERE  object_name = UPPER(v_table_name) 
+           AND object_type = 'TABLE'; 
+   IF table_exists = 0
+   THEN
+      RETURN;
+   END IF;
+	
+    DBMS_OUTPUT.PUT_LINE ('table_exists: ' || table_exists);
+	IF v_tablespace_name IS NOT NULL THEN
+    -- Get the index tablespace name 
+    SELECT tablespace_name 
+    INTO   index_tablespace 
+    FROM   user_indexes 
+    WHERE  tablespace_name = UPPER(v_tablespace_name) 
+    AND ROWNUM = 1; 
+    DBMS_OUTPUT.PUT_LINE ('index_tablespace passed is NULL: ' || index_tablespace);
+	ELSE
+	SELECT NVL(tablespace_name,v_tablespace_name) 
+    INTO   index_tablespace 
+    FROM   user_indexes 
+    WHERE  table_name = UPPER(v_table_name) 
+    AND ROWNUM = 1; 
+   END IF;
+   
+    DBMS_OUTPUT.PUT_LINE ('index_tablespace: ' || index_tablespace);
+
+    IF table_exists &gt; 0 THEN 
+      BEGIN 
+          SELECT COUNT(1) 
+          INTO   index_exists 
+          FROM   user_indexes 
+          WHERE  table_name = UPPER(v_table_name) 
+                 AND index_name = UPPER(v_index_name); 
+
+          IF index_exists &gt; 0 THEN 
+            --EXECUTE IMMEDIATE 'Drop INDEX '|| v_index_name; 
+            dbms_output.Put_line('Index Name already exists!'); 
+			RETURN;
+		  END IF;
+		  
+          IF index_tablespace IS NOT NULL THEN
+            index_stmt := 'CREATE ' 
+                          || v_index_type 
+                          ||' INDEX ' 
+                          || v_index_name 
+                          || ' ON ' 
+                          || v_table_name 
+                          || ' ( ' 
+                          || v_colum_name_s 
+                          || ') TABLESPACE ' 
+                          || index_tablespace; 
+			DBMS_OUTPUT.PUT_LINE ('Index Statement: ' || index_stmt);
+			EXECUTE IMMEDIATE index_stmt;        
+		  ELSE
+			index_stmt := 'CREATE ' 
+                          || v_index_type 
+                          ||' INDEX ' 
+                          || v_index_name 
+                          || ' ON ' 
+                          || v_table_name 
+                          || ' ( ' 
+                          || v_colum_name_s 
+                          || ')';
+			DBMS_OUTPUT.PUT_LINE ('Index Statement: ' || index_stmt);
+			EXECUTE IMMEDIATE index_stmt; 
+		   END IF; 
+      END; 
+    END IF; 
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

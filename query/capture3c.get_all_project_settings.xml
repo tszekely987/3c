@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_all_project_settings" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_all_project_settings"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT
+	@SELECT:DIM:USER_DEF:IMPLIED:CODES:SETTING_ID:CODE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:LAST_UPDATED_DATE:LAST_UPDATED_DATE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:LAST_UPDATED_BY:LAST_UPDATED_BY@
+FROM (
+	SELECT
+		j.setting_id
+		, j.last_updated_date
+		, csu.user_name AS last_updated_by
+	FROM
+	(
+
+	-- To convert to SQL replace @NVL@ with NVL (Oracle) ISNULL (MSSQL)
+	-- LEFT COLUMN
+	SELECT
+			'PRJ_DEFAULT_LOAD_PATTERN' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values, cmn_lookups_v
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DEFAULT_LOAD_PATTERN'
+					AND cmn_lookups_v.is_active = 1
+					AND cmn_lookups_v.language_code = 'en'
+					AND cmn_lookups_v.lookup_type = 'prAssignmentPattern'
+					AND CAST(cmn_lookups_v.lookup_enum AS VARCHAR(500)) = cmn_option_values.value
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRGUIDELINES' AS setting_id
+			, CAST(@NVL@(lj.last_updated_by, 1) AS INT)
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					1 AS last_updated_by
+					, prsite.prmodtime AS last_updated_date
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'FIRST_MONTH_FISCAL_YEAR' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.option_code = 'FIRST_MONTH_FISCAL_YEAR'
+					AND  cmn_options.id = cmn_option_values.option_id
+					AND  cmn_option_values.component_id IS NULL
+					AND  cmn_option_values.user_id IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRWEEKSTART' AS setting_id
+			, CAST(@NVL@(lj.last_updated_by, 1) AS INT) AS last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					1 AS last_updated_by
+					, prsite.prmodtime AS last_updated_date
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_EFFORT_DISP_UNIT' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_EFFORT_DISP_UNIT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_CHG_ENABLE_PRJ_CHARGECODE' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_CHG_ENABLE_PRJ_CHARGECODE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'RIM_NOTIFY_ON_DELETE' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'RIM_NOTIFY_ON_DELETE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SCH_EXPORT_CUR_BASELINE_ONLY' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'SCH_EXPORT_CUR_BASELINE_ONLY'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'MSP_ASSIGN_UNITS_MAPPING' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'MSP_ASSIGN_UNITS_MAPPING'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'MSP_LIGHTWEIGHT_SAVEAS' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'MSP_LIGHTWEIGHT_SAVEAS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'AGL_INTEGRATION_OWNER' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'AGL_INTEGRATION_OWNER'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ALLOW_DELETE_INV_WITH_ACTUALS' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'ALLOW_DELETE_INV_WITH_ACTUALS'
+			) lj ON 1=1
+
+	-- RIGHT COLUMN
+	UNION ALL
+
+	SELECT
+			'PRROUNDALLOCPCT' AS setting_id
+			, CAST(@NVL@(lj.last_updated_by, 1) AS INT)
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					1 AS last_updated_by
+					, prsite.prmodtime AS last_updated_date
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_DISABLE_EFFORTTASK_CREATE' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DISABLE_EFFORTTASK_CREATE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_DISABLE_TASK_REASSIGN' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DISABLE_TASK_REASSIGN'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_EDIT_ALLOC_WHEN_LOCKED' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_EDIT_ALLOC_WHEN_LOCKED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_FORCE_OTENTRY_WHEN_HDBKD' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_FORCE_OTENTRY_WHEN_HDBKD'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_SHOW_TASKS_WHEN_HDBKD' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_SHOW_TASKS_WHEN_HDBKD'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'STAFF_TO_PARTICIPANTS_ENABLED' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'STAFF_TO_PARTICIPANTS_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_ENF_HARD_BOOKING_RIGHTS' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_ENF_HARD_BOOKING_RIGHTS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_HIDE_SYSTEM_GROUPS_OPTION' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_HIDE_SYSTEM_GROUPS_OPTION'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_OVERRIDE_REQ_APPROVE' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_OVERRIDE_REQ_APPROVE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_ALLOW_MIXED_BOOK' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_ALLOW_MIXED_BOOK'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_RES_TO_ROLE_DEFAULT' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_RES_TO_ROLE_DEFAULT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_REQ_BOOK_DECREMENT_VALUE' AS setting_id
+			, lj.last_updated_by
+			, lj.last_updated_date
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_options.last_updated_by
+					, cmn_options.last_updated_date
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_REQ_BOOK_DECREMENT_VALUE'
+			) lj ON 1=1
+	) j
+	JOIN cmn_sec_users csu ON csu.id = j.last_updated_by
+) x
+WHERE @FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="last_updated_date" required="false"/>
+            <attribute id="last_updated_by" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

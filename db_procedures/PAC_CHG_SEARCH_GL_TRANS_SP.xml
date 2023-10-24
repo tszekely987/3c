@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_SEARCH_GL_TRANS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_SEARCH_GL_TRANS_SP" 
+(
+  in_cSummaryType       IN VARCHAR2 DEFAULT 'SUMMARY',
+  in_dFromDates         IN DATE,
+  in_dToDates           IN DATE,
+  userID                IN NUMBER,
+  sessionID             IN NUMBER,
+  languageCode          IN VARCHAR2,
+  in_cTransSource       IN VARCHAR2 DEFAULT 'ALL',
+  P_SORT_DIRECTION		IN VARCHAR2,
+  RC1               IN OUT PAC_CHG_SRCH_GL_SUMMARIES_PKG.RCT1
+)
+AS
+  cSummaryType             VARCHAR2(30);
+  cSummaryText             VARCHAR2(30);
+  cResourceCode            VARCHAR2(96);
+  dToDates                 DATE;
+  dFromDates               DATE;
+  COUNTER                  NUMBER := 0;
+  V_STMT                   VARCHAR2(255);
+  V_SQL                    VARCHAR2 (32000);
+  V_DATE                   DATE;
+  V_SYSTEM_CURRENCY        VARCHAR2(30);
+  V_EXCHANGE_RATE_TYPE     VARCHAR2(30);
+  V_SYSTEM_AMOUNT          NUMBER(32, 6);
+  V_TRANS_SOURCE           VARCHAR2(30);
+  V_MULTI_CURRENCY		   CHAR(1);
+  StoO_selcnt              INTEGER;
+  StoO_error               INTEGER;
+  StoO_rowcnt              INTEGER;
+  StoO_crowcnt             INTEGER := 0;
+  StoO_fetchstatus         INTEGER := 0;
+  StoO_errmsg              GLOBALPKG.STRING;
+  StoO_sqlstatus           INTEGER;
+  V_SECURITY_LEVEL INTEGER := 0;
+  V_DEFAULT_ENTITY  VARCHAR2(60);
+  V_RESOURCE_ENTITY VARCHAR2(60);  
+  
+  TYPE T_TRANSNO_TAB IS TABLE OF PPA_WIP.TRANSNO%TYPE;
+  TYPE T_TRANSDATE_TAB IS TABLE OF PPA_WIP.TRANSDATE%TYPE;  
+  TYPE T_AMOUNT_TAB IS TABLE OF PPA_WIP_VALUES.TOTALAMOUNT%TYPE;    
+
+  T_TRANSNO T_TRANSNO_TAB;
+  T_TRANSDATE T_TRANSDATE_TAB;
+  T_AMOUNT T_AMOUNT_TAB;
+ 
+  CURSOR C_TRANS_REC (C_FROM_DATE DATE, C_TO_DATE DATE, C_RESOURCE_CODE VARCHAR2) IS
+    SELECT W.TRANSNO, W.TRANSDATE, V.TOTALAMOUNT, V.CURRENCY_CODE, W.PROJECT_CODE, W.TRANSTYPE
+      FROM PPA_WIP W,
+           PPA_WIP_VALUES V
+     WHERE W.GLPOSTED = 'N'
+       AND W.TRANSDATE BETWEEN C_FROM_DATE AND C_TO_DATE
+       AND W.TRANSNO = V.TRANSNO
+       AND V.CURRENCY_TYPE = 'NATURAL'
+       AND V.TOTALAMOUNT != 0
+       AND W.STATUS=0
+       AND PAC_FOS_IS_VALID_LOC_GL_FCT(C_RESOURCE_CODE, W.LOCATIONID, V_DEFAULT_ENTITY, V_SECURITY_LEVEL, V_RESOURCE_ENTITY) = 1
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'ENTITY'
+                      AND NVL(PE.VALUE, W.ENTITY) = W.ENTITY)
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'LOCATION'
+                      AND NVL(PE.VALUE, W.LOCATIONID) = W.LOCATIONID)
+      AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'DEPARTMENT'
+                     AND NVL(PE.VALUE, W.DEPARTCODE) = W.DEPARTCODE)
+      AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'PROJECT'
+                     AND NVL(PE.VALUE, W.PROJECT_CODE) = W.PROJECT_CODE)
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'TRANSCLASS'
+                      AND NVL(PE.VALUE, W.TRANSCLASS) = W.TRANSCLASS)
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'WIPCLASS'
+                      AND NVL(PE.VALUE, W.WIPCLASS) = W.WIPCLASS)
+      AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'CHARGE_CODE'
+                       AND NVL(PE.VALUE, W.CHARGE_CODE) = W.CHARGE_CODE)
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'RESOURCE'
+                      AND NVL(PE.VALUE, W.RESOURCE_CODE) = W.RESOURCE_CODE)
+       AND NOT EXISTS (SELECT 1 FROM WIPCLASS WC
+                        WHERE W.WIPCLASS = WC.WIPCLASS
+                          AND ALLOCATION_TYPE = 'NO_CHARGEBACKS')
+;
+
+  CURSOR C_ADJUST_REC (C_FROM_DATE DATE, C_TO_DATE DATE, C_RESOURCE_CODE VARCHAR2) IS
+     SELECT W.TRANSNO, A.BILLINGDATE "TRANSDATE", V.AMOUNT * -1 "TOTALAMOUNT", V.CURRENCY_CODE, A.PROJECT_CODE, W.TRANSTYPE
+       FROM PPA_BILLINGS A,
+            PPA_BILLING_VALUES V,
+            PPA_WIP W
+      WHERE A.TRANSTYPE = 'A'
+        AND A.GLPOSTED = 'N'
+        AND A.APPLYTO = W.TRANSNO
+        AND A.BILLINGDATE BETWEEN C_FROM_DATE AND C_TO_DATE -- or should we use W.TRANSDATE
+        AND A.TRANSNO = V.TRANSNO
+        AND W.GLPOSTED = 'Y'
+        AND V.CURRENCY_TYPE = 'NATURAL'
+        AND PAC_FOS_IS_VALID_LOC_GL_FCT(C_RESOURCE_CODE, W.LOCATIONID, V_DEFAULT_ENTITY, V_SECURITY_LEVEL, V_RESOURCE_ENTITY) = 1
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'ENTITY'
+                      AND NVL(PE.VALUE, W.ENTITY) = W.ENTITY)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'LOCATION'
+                       AND NVL(PE.VALUE, W.LOCATIONID) = W.LOCATIONID)
+      AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'DEPARTMENT'
+                     AND NVL(PE.VALUE, W.DEPARTCODE) = W.DEPARTCODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'PROJECT'
+                       AND NVL(PE.VALUE, W.PROJECT_CODE) = W.PROJECT_CODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'TRANSCLASS'
+                       AND NVL(PE.VALUE, W.TRANSCLASS) = W.TRANSCLASS)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'WIPCLASS'
+                       AND NVL(PE.VALUE, W.WIPCLASS) = W.WIPCLASS)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'CHARGE_CODE'
+                       AND NVL(PE.VALUE, W.CHARGE_CODE) = W.CHARGE_CODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'RESOURCE'
+                       AND NVL(PE.VALUE, W.RESOURCE_CODE) = W.RESOURCE_CODE)
+        AND NOT EXISTS (SELECT 1 FROM WIPCLASS WC
+                         WHERE W.WIPCLASS = WC.WIPCLASS
+                           AND ALLOCATION_TYPE = 'NO_CHARGEBACKS')
+     ;
+
+BEGIN
+  PAC_CHG_SEARCH_GL_TRANS_SP.V_STMT             := 'Initializing variables';
+  PAC_CHG_SEARCH_GL_TRANS_SP.cSummaryType       := RTRIM(NLS_UPPER(NVL(PAC_CHG_SEARCH_GL_TRANS_SP.in_cSummaryType, 'SUMMARY')));
+
+  -- so we don't have to require dates...
+  PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates         := NVL(PAC_CHG_SEARCH_GL_TRANS_SP.in_dFromDates, TO_DATE('01/01/1900', 'MM/DD/YYYY'));
+  PAC_CHG_SEARCH_GL_TRANS_SP.dToDates           := NVL(PAC_CHG_SEARCH_GL_TRANS_SP.in_dToDates, TO_DATE('12/31/2999', 'MM/DD/YYYY'));
+
+  V_DATE := SYSDATE;
+
+  V_STMT := 'Selecting transaction source';
+  SELECT DECODE(NLS_UPPER(in_cTransSource),
+                'NEW', 'W',
+                'ADJUSTED', 'A',
+                'WA')
+    INTO PAC_CHG_SEARCH_GL_TRANS_SP.V_TRANS_SOURCE
+    FROM DUAL;
+	
+  V_STMT := 'Selecting default entity';
+  BEGIN
+    SELECT NVL(ENTITY_SECURITY, 0),
+           NVL(DEFAULTENTITY, ' ')
+      INTO V_SECURITY_LEVEL,
+           V_DEFAULT_ENTITY
+      FROM NAMEOPTIONS;
+  END;
+  
+  V_STMT := 'Getting Resource Code';
+  SELECT UNIQUE_NAME
+    INTO cResourceCode
+    FROM SRM_RESOURCES
+   WHERE USER_ID = PAC_CHG_SEARCH_GL_TRANS_SP.userID; 	
+  
+  V_STMT := 'Selecting resource entity';
+  BEGIN
+     SELECT L.ENTITY
+       INTO V_RESOURCE_ENTITY
+       FROM PAC_MNT_RESOURCES R,
+            LOCATIONS L
+       WHERE R.RESOURCE_CODE = PAC_CHG_SEARCH_GL_TRANS_SP.cResourceCode
+       AND R.LOCATIONID = L.LOCATIONID;
+  END; 		
+
+  V_STMT := 'Selecting system currency';
+  SELECT NVL(MAX(V.VALUE), 'USD')
+    INTO V_SYSTEM_CURRENCY
+    FROM cmn_options O,
+         cmn_option_values V
+   WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY'
+     AND O.ID = V.OPTION_ID;
+
+  V_STMT := 'Getting Resource Code';
+  SELECT USER_NAME
+    INTO cResourceCode
+    FROM CMN_SEC_USERS
+   WHERE ID = PAC_CHG_SEARCH_GL_TRANS_SP.userID;
+      
+  V_STMT := 'Determine whether the system is running on multi-currency';
+  SELECT VALUE INTO V_MULTI_CURRENCY FROM CMN_OPTION_VALUES WHERE OPTION_ID = 
+  ( SELECT ID FROM CMN_OPTIONS WHERE OPTION_CODE = 'CMN_IS_MULTI_CURRENCY_SYSTEM' );
+   
+
+  V_STMT := 'Make sure entity search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'ENTITY', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'ENTITY');
+
+  V_STMT := 'Make sure location search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'LOCATION', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'LOCATION');
+
+  V_STMT := 'Make sure department search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'DEPARTMENT', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'DEPARTMENT');
+
+  V_STMT := 'Make sure project search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'PROJECT', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'PROJECT');
+
+  V_STMT := 'Make sure transclass search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'TRANSCLASS', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'TRANSCLASS');
+
+  V_STMT := 'Make sure wipclass search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'WIPCLASS', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'WIPCLASS');
+
+  V_STMT := 'Make sure charge code search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'CHARGE_CODE', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'CHARGE_CODE');
+
+  V_STMT := 'Make sure resource search param exists';
+  INSERT INTO PAC_CHG_SRCH_GL_PARAMS (ID, SESSIONID, PARAMETER, VALUE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+  SELECT PAC_CHG_SRCH_GL_PARAMS_S1.NEXTVAL, PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID, 'RESOURCE', NULL, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID, V_DATE, PAC_CHG_SEARCH_GL_TRANS_SP.userID FROM DUAL
+   WHERE NOT EXISTS (SELECT 1 FROM PAC_CHG_SRCH_GL_PARAMS
+                      WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                        AND PARAMETER = 'RESOURCE');
+
+  -- each user should have only 1 session active,
+  --   and no one else should be able to preview the same information at the same time
+  V_STMT := 'Cleaning up session data';
+  DELETE FROM PAC_CHG_SRCH_GL_SUMMARIES
+   WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID;
+  DELETE FROM PAC_CHG_SRCH_GL_TRANS
+   WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID;  
+
+  IF INSTR(PAC_CHG_SEARCH_GL_TRANS_SP.V_TRANS_SOURCE, 'W') &gt; 0 THEN
+  BEGIN
+    --if system is in single currency, don't bother with currency conversion
+	IF V_MULTI_CURRENCY = '0' THEN
+	BEGIN
+	  SELECT W.TRANSNO, W.TRANSDATE, V.TOTALAMOUNT
+	    BULK COLLECT INTO T_TRANSNO, T_TRANSDATE, T_AMOUNT
+   		  FROM PPA_WIP W,
+               PPA_WIP_VALUES V
+          WHERE W.GLPOSTED = 'N'
+            AND W.TRANSDATE BETWEEN PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates AND  PAC_CHG_SEARCH_GL_TRANS_SP.dToDates
+            AND W.TRANSNO = V.TRANSNO
+            AND V.CURRENCY_TYPE = 'NATURAL'
+            AND V.TOTALAMOUNT != 0
+            AND W.STATUS=0
+            AND PAC_FOS_IS_VALID_LOC_GL_FCT( PAC_CHG_SEARCH_GL_TRANS_SP.cResourceCode, W.LOCATIONID, V_DEFAULT_ENTITY, V_SECURITY_LEVEL, V_RESOURCE_ENTITY) = 1
+            AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'ENTITY'
+                      AND NVL(PE.VALUE, W.ENTITY) = W.ENTITY)
+            AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'LOCATION'
+                      AND NVL(PE.VALUE, W.LOCATIONID) = W.LOCATIONID)
+            AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'DEPARTMENT'
+                     AND NVL(PE.VALUE, W.DEPARTCODE) = W.DEPARTCODE)
+      	    AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'PROJECT'
+                     AND NVL(PE.VALUE, W.PROJECT_CODE) = W.PROJECT_CODE)
+            AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'TRANSCLASS'
+                      AND NVL(PE.VALUE, W.TRANSCLASS) = W.TRANSCLASS)
+            AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'WIPCLASS'
+                      AND NVL(PE.VALUE, W.WIPCLASS) = W.WIPCLASS)
+            AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'CHARGE_CODE'
+                       AND NVL(PE.VALUE, W.CHARGE_CODE) = W.CHARGE_CODE)
+            AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'RESOURCE'
+                      AND NVL(PE.VALUE, W.RESOURCE_CODE) = W.RESOURCE_CODE)
+            AND NOT EXISTS (SELECT 1 FROM WIPCLASS WC
+                        WHERE W.WIPCLASS = WC.WIPCLASS
+                          AND ALLOCATION_TYPE = 'NO_CHARGEBACKS');
+		
+	  FORALL i in 1 .. T_TRANSNO.COUNT
+  	    -- do bulk insert
+	    INSERT INTO PAC_CHG_SRCH_GL_TRANS
+        (
+          ID,
+          TRANS_SOURCE,
+          TRANSNO,
+          TRANS_DATE,
+          AMOUNT,
+          SESSIONID,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        VALUES
+		(   
+          PAC_CHG_SRCH_GL_TRANS_S1.NEXTVAL,
+          'W',
+    	  T_TRANSNO(i),
+   		  T_TRANSDATE(i),
+		  T_AMOUNT(i),
+          PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID,
+          PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+          PAC_CHG_SEARCH_GL_TRANS_SP.userID,
+          PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+          PAC_CHG_SEARCH_GL_TRANS_SP.userID
+		);
+		  
+	    COUNTER := SQL%ROWCOUNT; 
+
+	END;
+	ELSE
+	BEGIN
+      V_STMT := 'Beginning trans loop';
+      FOR C_TRANS_DATA IN C_TRANS_REC (
+          PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates,
+          PAC_CHG_SEARCH_GL_TRANS_SP.dToDates,
+          PAC_CHG_SEARCH_GL_TRANS_SP.cResourceCode)
+        LOOP
+        -- see if we need to convert amount to system currency
+          IF C_TRANS_DATA.CURRENCY_CODE != V_SYSTEM_CURRENCY THEN
+            V_STMT := 'Selecting exchange rate type';
+            SELECT DECODE(C_TRANS_DATA.TRANSTYPE,
+                        'L', LABOR_EXCHANGE_RATE_TYPE,
+                        'M', MATERIALS_EXCHANGE_RATE_TYPE,
+                        'Q', EQUIPMENT_EXCHANGE_RATE_TYPE,
+                        'X', EXPENSE_EXCHANGE_RATE_TYPE)
+              INTO V_EXCHANGE_RATE_TYPE
+              FROM PAC_MNT_PROJECTS
+              WHERE PROJECT_CODE = C_TRANS_DATA.PROJECT_CODE;
+
+            V_STMT := 'Converting home to system currency';
+            SELECT CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                   C_TRANS_DATA.TRANSDATE, C_TRANS_DATA.CURRENCY_CODE, V_SYSTEM_CURRENCY,
+                   C_TRANS_DATA.TOTALAMOUNT, V_EXCHANGE_RATE_TYPE)
+              INTO V_SYSTEM_AMOUNT
+              FROM DUAL;
+          ELSE
+            V_SYSTEM_AMOUNT := C_TRANS_DATA.TOTALAMOUNT;
+          END IF;
+
+          INSERT INTO PAC_CHG_SRCH_GL_TRANS
+          (
+            ID,
+            TRANS_SOURCE,
+            TRANSNO,
+            TRANS_DATE,
+            AMOUNT,
+            SESSIONID,
+            CREATED_DATE,
+            CREATED_BY,
+            LAST_UPDATED_DATE,
+            LAST_UPDATED_BY
+          )
+          SELECT
+            PAC_CHG_SRCH_GL_TRANS_S1.NEXTVAL,
+            'W',
+            C_TRANS_DATA.TRANSNO,
+            C_TRANS_DATA.TRANSDATE,
+            V_SYSTEM_AMOUNT,
+            PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID
+          FROM DUAL;
+
+          -- Commit the transactions after every 1000 records
+          IF MOD( COUNTER, 1000 ) = 0 THEN
+            COMMIT;
+          END IF;
+
+          COUNTER := COUNTER + 1;
+        END LOOP;
+	  END;
+	  END IF;
+
+    COMMIT;
+  END;
+  END IF;
+
+  IF INSTR(PAC_CHG_SEARCH_GL_TRANS_SP.V_TRANS_SOURCE, 'A') &gt; 0 THEN
+  BEGIN
+    --if system is in single currency, don't bother with currency conversion
+	IF V_MULTI_CURRENCY = '0' THEN
+	BEGIN
+	  INSERT INTO PAC_CHG_SRCH_GL_TRANS
+      (
+        ID,
+        TRANS_SOURCE,
+        TRANSNO,
+        TRANS_DATE,
+        AMOUNT,
+        SESSIONID,
+        CREATED_DATE,
+        CREATED_BY,
+        LAST_UPDATED_DATE,
+        LAST_UPDATED_BY
+      )
+      SELECT  PAC_CHG_SRCH_GL_TRANS_S1.NEXTVAL,
+            'A',
+            W.TRANSNO,
+            A.BILLINGDATE,
+            V.AMOUNT * -1, 
+            PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID
+       FROM PPA_BILLINGS A,
+            PPA_BILLING_VALUES V,
+            PPA_WIP W
+      WHERE A.TRANSTYPE = 'A'
+        AND A.GLPOSTED = 'N'
+        AND A.APPLYTO = W.TRANSNO
+        AND A.BILLINGDATE BETWEEN PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates AND PAC_CHG_SEARCH_GL_TRANS_SP.dToDates -- or should we use W.TRANSDATE
+        AND A.TRANSNO = V.TRANSNO
+        AND W.GLPOSTED = 'Y'
+        AND V.CURRENCY_TYPE = 'NATURAL'
+        AND PAC_FOS_IS_VALID_LOC_GL_FCT(PAC_CHG_SEARCH_GL_TRANS_SP.cResourceCode, W.LOCATIONID, V_DEFAULT_ENTITY, V_SECURITY_LEVEL, V_RESOURCE_ENTITY) = 1
+       AND EXISTS (SELECT 1
+                     FROM PAC_CHG_SRCH_GL_PARAMS PE
+                    WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                      AND PE.PARAMETER = 'ENTITY'
+                      AND NVL(PE.VALUE, W.ENTITY) = W.ENTITY)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'LOCATION'
+                       AND NVL(PE.VALUE, W.LOCATIONID) = W.LOCATIONID)
+      AND EXISTS (SELECT 1
+                    FROM PAC_CHG_SRCH_GL_PARAMS PE
+                   WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                     AND PE.PARAMETER = 'DEPARTMENT'
+                     AND NVL(PE.VALUE, W.DEPARTCODE) = W.DEPARTCODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'PROJECT'
+                       AND NVL(PE.VALUE, W.PROJECT_CODE) = W.PROJECT_CODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'TRANSCLASS'
+                       AND NVL(PE.VALUE, W.TRANSCLASS) = W.TRANSCLASS)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'WIPCLASS'
+                       AND NVL(PE.VALUE, W.WIPCLASS) = W.WIPCLASS)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'CHARGE_CODE'
+                       AND NVL(PE.VALUE, W.CHARGE_CODE) = W.CHARGE_CODE)
+        AND EXISTS (SELECT 1
+                      FROM PAC_CHG_SRCH_GL_PARAMS PE
+                     WHERE PE.SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID
+                       AND PE.PARAMETER = 'RESOURCE'
+                       AND NVL(PE.VALUE, W.RESOURCE_CODE) = W.RESOURCE_CODE)
+        AND NOT EXISTS (SELECT 1 FROM WIPCLASS WC
+                         WHERE W.WIPCLASS = WC.WIPCLASS
+                           AND ALLOCATION_TYPE = 'NO_CHARGEBACKS');
+        COUNTER := COUNTER + SQL%ROWCOUNT;						   
+	END;
+	ELSE
+	BEGIN 
+
+      V_STMT := 'Beginning adjustment loop';
+      FOR C_ADJUST_DATA IN C_ADJUST_REC (
+          PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates,
+          PAC_CHG_SEARCH_GL_TRANS_SP.dToDates,
+          PAC_CHG_SEARCH_GL_TRANS_SP.cResourceCode)
+        LOOP
+          -- see if we need to convert amount to system currency
+          IF C_ADJUST_DATA.CURRENCY_CODE != V_SYSTEM_CURRENCY THEN
+            V_STMT := 'Selecting exchange rate type';
+            SELECT DECODE(C_ADJUST_DATA.TRANSTYPE,
+                        'L', LABOR_EXCHANGE_RATE_TYPE,
+                        'M', MATERIALS_EXCHANGE_RATE_TYPE,
+                        'Q', EQUIPMENT_EXCHANGE_RATE_TYPE,
+                        'X', EXPENSE_EXCHANGE_RATE_TYPE)
+              INTO V_EXCHANGE_RATE_TYPE
+              FROM PAC_MNT_PROJECTS
+             WHERE PROJECT_CODE = C_ADJUST_DATA.PROJECT_CODE;
+
+            V_STMT := 'Converting home to system currency';
+            SELECT CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT (
+                   C_ADJUST_DATA.TRANSDATE, C_ADJUST_DATA.CURRENCY_CODE, V_SYSTEM_CURRENCY,
+                   C_ADJUST_DATA.TOTALAMOUNT, V_EXCHANGE_RATE_TYPE)
+              INTO V_SYSTEM_AMOUNT
+              FROM DUAL;
+          ELSE
+            V_SYSTEM_AMOUNT := C_ADJUST_DATA.TOTALAMOUNT;
+          END IF;
+
+          INSERT INTO PAC_CHG_SRCH_GL_TRANS
+          (
+            ID,
+            TRANS_SOURCE,
+            TRANSNO,
+            TRANS_DATE,
+            AMOUNT,
+            SESSIONID,
+            CREATED_DATE,
+            CREATED_BY,
+            LAST_UPDATED_DATE,
+            LAST_UPDATED_BY
+          )
+          SELECT
+            PAC_CHG_SRCH_GL_TRANS_S1.NEXTVAL,
+            'A',
+            C_ADJUST_DATA.TRANSNO,
+            C_ADJUST_DATA.TRANSDATE,
+            V_SYSTEM_AMOUNT,
+            PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID,
+            PAC_CHG_SEARCH_GL_TRANS_SP.V_DATE,
+            PAC_CHG_SEARCH_GL_TRANS_SP.userID
+          FROM DUAL;
+
+          -- Commit the transactions after every 1000 records
+          IF MOD( COUNTER, 1000 ) = 0 THEN
+            COMMIT;
+          END IF;
+
+          COUNTER := COUNTER + 1;
+        END LOOP;
+	  END;
+	  END IF;
+
+    COMMIT;
+	END;
+  END IF;
+
+  IF COUNTER != 0 THEN
+    -- now summarize the information based on the Summary Type
+    V_STMT := 'Determining summary type';
+    SELECT DECODE(PAC_CHG_SEARCH_GL_TRANS_SP.cSummaryType,
+            'SUMMARY',       '''*''',
+            'ENTITIES',      'W.ENTITY',
+            'LOCATIONS',     'W.LOCATIONID',
+            'DEPARTMENTS',   'W.DEPARTCODE',
+            'PROJECTS',      'W.PROJECT_CODE',
+            'WIPCLASSES',    'W.WIPCLASS',
+            'TRANSCLASSES',  'W.TRANSCLASS',
+            'CHARGECODES',   'W.CHARGE_CODE',
+            'RESOURCES',     'W.RESOURCE_CODE',
+            '''*''')
+    INTO PAC_CHG_SEARCH_GL_TRANS_SP.cSummaryText
+    FROM DUAL;
+
+    V_STMT := 'Building dynamic SQL statement';
+    V_SQL := 'INSERT INTO PAC_CHG_SRCH_GL_SUMMARIES (ID,SUMMARY_TYPE,SUMMARY_VALUE,TRANS_COUNT,AMOUNT,FROM_DATE,TO_DATE,SESSIONID,STATUS,CREATED_DATE,CREATED_BY,LAST_UPDATED_DATE,LAST_UPDATED_BY) ';
+
+    V_SQL := V_SQL || 'SELECT CMN_ID_NEXTVAL_FCT(''PAC_CHG_SRCH_GL_SUMMARIES'',''PAC_CHG_SRCH_GL_SUMMARIES_S1''), ''' || PAC_CHG_SEARCH_GL_TRANS_SP.cSummaryType || ''', ' || cSummaryText || ',COUNT(1),SUM(T.AMOUNT), TO_DATE(''' || TO_CHAR(PAC_CHG_SEARCH_GL_TRANS_SP.dFromDates,'mm/dd/yyyy') || ''', ''mm/dd/yyyy''),TO_DATE(''' || TO_CHAR(PAC_CHG_SEARCH_GL_TRANS_SP.dToDates,'mm/dd/yyyy') || ''', ''mm/dd/yyyy''),' || TO_CHAR(PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID) || ', ''N'', TO_DATE(''' || TO_CHAR(V_DATE,'mm/dd/yyyy') || ''', ''mm/dd/yyyy''),' || TO_CHAR(userID) || ', TO_DATE(''' || TO_CHAR(V_DATE,'mm/dd/yyyy') || ''', ''mm/dd/yyyy''),' || TO_CHAR(userID) || ' FROM PAC_CHG_SRCH_GL_TRANS T, PPA_WIP W WHERE T.TRANSNO = W.TRANSNO AND T.SESSIONID = ' || TO_CHAR(SESSIONID); -- T.TRANS_SOURCE = ''W'' AND
+
+    IF PAC_CHG_SEARCH_GL_TRANS_SP.cSummaryType != 'SUMMARY' THEN
+      V_SQL := V_SQL || ' GROUP BY ' || cSummaryText || ' ORDER BY ' || cSummaryText || ' ' || P_SORT_DIRECTION;
+    END IF;
+
+    V_STMT := 'Summarizing transactions';
+    EXECUTE IMMEDIATE V_SQL;
+  END IF;
+
+  V_STMT := 'Returning transaction summary';
+  OPEN RC1 FOR
+  SELECT ID, SUMMARY_TYPE, SUMMARY_VALUE, TRANS_COUNT, AMOUNT, FROM_DATE, TO_DATE
+    FROM PAC_CHG_SRCH_GL_SUMMARIES
+   WHERE SESSIONID = PAC_CHG_SEARCH_GL_TRANS_SP.SESSIONID;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20782, 'SEARCHING GL TRANS FAILED : ' || V_STMT || ': ' || SQLERRM);
+END PAC_CHG_SEARCH_GL_TRANS_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

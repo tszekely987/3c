@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="agl.prjOverview" isUserPortletAvailable="0" source="agl.ca.com">
+            
+            
+            
+            
+            <nls description="Overview" languageCode="en" name="Overview"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:t.prprojectid:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:SUM(odf_t.agl_tsk_est_stypts):estimated_story_points@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:SUM(odf_t.agl_tsk_acp_stypts):accepted_story_points@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN SUM(@NVL@(odf_t.agl_tsk_est_stypts,0)) = 0 
+                                                      THEN NULL ELSE (SUM(@NVL@(odf_t.agl_tsk_acp_stypts,0)) / SUM(odf_t.agl_tsk_est_stypts)) * 100 END:pct_done@
+FROM   prtask t 
+       INNER JOIN odf_ca_task odf_t ON t.prid = odf_t.id
+WHERE  odf_t.agl_tsk_id IS NOT NULL
+AND    odf_t.agl_tsk_story_id IS NULL
+AND    (odf_t.agl_tsk_ordinal IS NULL OR odf_t.agl_tsk_ordinal = 0)
+AND    t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND   (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_t.agl_tsk_release)
+AND   (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+       OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT @DBUSER@.CMN_TO_NUMBER_FCT(mvl.value) FROM odf_multi_valued_lookups mvl
+                                                       WHERE  mvl.pk_id = odf_t.id
+                                                       AND    mvl.attribute = 'agl_tsk_milestones'))
+AND    @FILTER@
+GROUP  BY t.prprojectid]]></nsql>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="estimated_story_points" required="false">
+              
+              
+              
+              
+              <nls description="Estimated Story Points" languageCode="en" name="Estimated Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="accepted_story_points" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Accepted Story Points" languageCode="en" name="Accepted Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pct_done" required="false">
+              
+              
+              
+              
+              <nls description="% Done By Agile Plan Estimate" languageCode="en" name="% Done By Agile Plan Estimate"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_release" lookup="AGL_RELEASES" required="false">
+              
+              <nls description="Agile Release Filter" languageCode="en" name="Agile Release Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_milestone" lookup="AGL_MILESTONES" required="false">
+              
+              
+              
+              
+              <nls description="Agile Milestone Filter" languageCode="en" name="Agile Milestone Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

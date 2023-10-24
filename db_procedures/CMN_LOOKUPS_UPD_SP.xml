@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUPS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUPS_UPD_SP" (
+   P_LOOKUP_TYPE            IN   VARCHAR2,
+   P_LOOKUP_CODE            IN   VARCHAR2,
+   P_LOOKUP_NAME            IN   VARCHAR2,
+   P_LOOKUP_DESCRIPTION     IN   VARCHAR2,
+   P_LOOKUP_ENUM            IN   NUMBER,
+   P_SORT_ORDER             IN   NUMBER,
+   P_IS_SYSTEM              IN   NUMBER,
+   P_IS_ACTIVE              IN   NUMBER,
+   P_IS_ADMIN_VISIBLE       IN   NUMBER,
+   P_IS_UPGRADE_PROTECTED   IN   NUMBER,
+   P_LAST_UPDATED_BY        IN   NUMBER DEFAULT 1,
+   P_PARENT_LOOKUP_CODE             IN   VARCHAR2 DEFAULT NULL,
+   P_LOOKUP_LEVEL             IN   NUMBER DEFAULT 1,
+   P_PARTITION_CODE IN VARCHAR2 DEFAULT 'NIKU.ROOT',
+   P_PARTITION_MODE_CODE IN VARCHAR2 DEFAULT 'PARTITION_AND_ANSTRS_DESDNTS'
+)
+IS
+   V_COUNT                       NUMBER;
+   V_ID                          NUMBER;
+BEGIN
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_ID
+   FROM     CMN_LOOKUPS
+   WHERE    LOOKUP_TYPE = P_LOOKUP_TYPE
+   AND      LOOKUP_CODE = P_LOOKUP_CODE;
+   IF (V_ID != -9)
+   THEN
+      UPDATE CMN_LOOKUPS
+         SET LOOKUP_ENUM = P_LOOKUP_ENUM,
+             PARENT_LOOKUP_CODE = P_PARENT_LOOKUP_CODE,
+             LOOKUP_LEVEL = P_LOOKUP_LEVEL,
+             SORT_ORDER = P_SORT_ORDER,
+             IS_SYSTEM = P_IS_SYSTEM,
+             IS_ACTIVE = P_IS_ACTIVE,
+             IS_ADMIN_VISIBLE = P_IS_ADMIN_VISIBLE,
+             IS_UPGRADE_PROTECTED = P_IS_UPGRADE_PROTECTED,
+             PARTITION_CODE = P_PARTITION_CODE,
+             PARTITION_MODE_CODE = P_PARTITION_MODE_CODE,
+             LAST_UPDATED_DATE = SYSDATE,
+             LAST_UPDATED_BY = P_LAST_UPDATED_BY
+       WHERE ID = V_ID;
+      /* Find out if this lookup was already translated */
+      SELECT   COUNT (DISTINCT (NAME || DESCRIPTION))
+      INTO     V_COUNT
+      FROM     CMN_CAPTIONS_NLS
+      WHERE    TABLE_NAME = 'CMN_LOOKUPS'
+      AND      PK_ID = V_ID;
+      IF (V_COUNT &lt;= 1)/* Not translated yet */
+      THEN
+         CMN_CAPTIONS_NLS_UPD_SP (
+            'CMN_LOOKUPS',
+            V_ID,
+            P_LOOKUP_NAME,
+            P_LOOKUP_DESCRIPTION,
+            P_LAST_UPDATED_BY
+         );
+      END IF;   
+   END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

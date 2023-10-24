@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CRV_BLB_SLICE_RESET_ALL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CRV_BLB_SLICE_RESET_ALL_SP" 
+	(
+	  P_FIELD_ID      NUMBER,
+		P_STATUS_VALUE	NUMBER
+	)
+	AS
+	   V_SQL                         VARCHAR2 (1000);
+	BEGIN
+--		V_SQL := 'UPDATE CRV_SQL_CURVES SET SLICE_STATUS = ' || P_STATUS_VALUE || ' WHERE SLICE_STATUS IS NULL AND ROWNUM &lt;= 1000';
+		LOOP
+      UPDATE CRV_SQL_CURVES
+         SET SLICE_STATUS = P_STATUS_VALUE
+       WHERE SLICE_STATUS IS NULL
+         AND FIELD_ID = P_FIELD_ID
+         AND ROWNUM &lt;= 1000;
+      EXIT WHEN SQL%ROWCOUNT = 0;
+			COMMIT;
+		END LOOP;
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="AGREEMENT_DEPENDENCIES" displayAttributeName="dependency_name" hiddenAttributeName="unique_code" objectCode="" sortAttributeName="id" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="" languageCode="en" name="Agreement Dependencies"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:b.unique_code:unique_code@,
+  @SELECT:b.id:id@,
+  @SELECT:b.name:dependency_name@,
+  @SELECT:b.code:dependency_code@,
+  @SELECT:b.dependency_type:dependency_type@
+FROM (
+  SELECT CONCAT(CONCAT(inv.odf_object_code,':'),inv.id) AS unique_code, inv.id, inv.name, inv.code, a.dependency_type
+  FROM inv_investments inv JOIN (
+		SELECT obj.code AS obj_object_code, cap.name AS dependency_type
+		FROM odf_objects obj 
+		    JOIN cmn_captions_nls cap ON cap.table_name = 'ODF_OBJECTS' 
+			   AND cap.language_code = @WHERE:PARAM:LANGUAGE@ 
+			   AND cap.pk_id = obj.id
+			   AND ( (obj.template_extension = 'inv_extension' ) OR obj.code IN ('project', 'idea') )
+            -- JOIN odf_object_capabilities ooc ON obj.code = ooc.object_code AND ooc.enabled = 1 AND ooc.capability_code = 'AGREEMENT_ENABLED'
+		WHERE 1=1
+	) a ON a.obj_object_code = inv.odf_object_code  AND @NVL@(inv.odf_template, 0) != 1
+	LEFT OUTER JOIN inv_projects ip ON ip.prid = inv.id
+  WHERE 1=1
+  	AND @NVL@(ip.is_program,0) != 1 AND @NVL@(ip.is_template, 0) != 1
+	@BROWSE-ONLY:
+	AND inv.is_active = 1
+	AND @WHERE:SECURITY:INV:inv.id@
+	:BROWSE-ONLY@
+) b
+WHERE  1=1 AND @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="dependency_name"/>
+              <displayedSuggestionAttribute value="dependency_type"/>
+              <displayedSuggestionAttribute value="dependency_code"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="dependency_name"/>
+              <searchedSuggestionAttribute value="dependency_type"/>
+              <searchedSuggestionAttribute value="dependency_code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Agreement Dependencies" languageCode="en" name="Agreement Dependencies"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Agreement Dependencies" languageCode="en" name="Agreement Dependencies"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="dependency_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="dependency_code" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="dependency_type" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="dependency_name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="dependency_code" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="dependency_type" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="" languageCode="en" name="Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

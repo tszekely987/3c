@@ -1,0 +1,19 @@
+<ClarityDBViewQuery>
+  <QueryResult code="TEMP_TS_LOGS_V">
+    <indexes/>
+    <text_length>707</text_length>
+    <text>with fields as(
+select  lookup_enum item_id, name name, lookup_code item_code
+from    cmn_lookups_v
+where   lookup_type = 'BLB_SLICE_ITEM'
+and     language_code = 'en'
+and     is_active = 1
+),
+logs as (
+select b.job_run_id, b.phase, b.field field_num, f.name field_name, b.operation, nvl( b.step_order, 0 ) step, nvl( b.batch_num,0) batch_num,  b.request_name, b.num_objects, (( b.finish_date - b.start_date )*86400.0) SECONDS, b.start_date, b.finish_date, b.created_date
+  from temp_ts_logs b, fields f
+ where b.field = f.item_id
+)
+select "JOB_RUN_ID","PHASE","FIELD_NUM","FIELD_NAME","OPERATION","STEP","BATCH_NUM","REQUEST_NAME","NUM_OBJECTS","SECONDS","START_DATE","FINISH_DATE","CREATED_DATE" from logs</text>
+  </QueryResult>
+</ClarityDBViewQuery>

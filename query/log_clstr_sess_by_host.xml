@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_sess_by_host" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Cluster session count by host"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:LOGS:A.HOST_NAME:HOST_NAME@,
+         @SELECT:DIM:USER_DEF:IMPLIED:TIME:A.LOG_HOUR:HOUR@,      @SELECT:METRIC:USER_DEF:IMPLIED:A.SESSION_COUNT:SESSION_COUNT@
+FROM
+(SELECT HOST_NAME@+@' ('@+@TZ_OFFSET@+@')' HOST_NAME,
+        LOG_HOUR - @DBUSER@.LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 LOG_HOUR,
+        SESSION_COUNT
+FROM
+LOG_SUMMARY
+WHERE LOG_DATE=@WHERE:PARAM:USER_DEF:DATE:log_date@
+AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+AND (@WHERE:PARAM:USER_DEF:STRING:env@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT)
+UNION
+SELECT Z.HOST_NAME, Z.LOG_HOUR, SUM(Z.SESSION_COUNT) FROM
+	(SELECT 'TOTAL SESSIONS' HOST_NAME,
+		LOG_HOUR - @DBUSER@.LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 LOG_HOUR,
+		SESSION_COUNT
+	FROM
+	LOG_SUMMARY
+	WHERE LOG_DATE=@WHERE:PARAM:USER_DEF:DATE:log_date@
+	AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+	AND (@WHERE:PARAM:USER_DEF:STRING:env@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT)
+	AND (select count(distinct(host_name)) from LOG_SUMMARY where LOG_DATE=@WHERE:PARAM:USER_DEF:DATE:log_date@
+		AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+		AND (@WHERE:PARAM:USER_DEF:STRING:env@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT)) > 1
+	) Z
+GROUP BY HOST_NAME, LOG_HOUR
+) A WHERE @FILTER@]]></nsql>
+            <attribute id="host_name" required="false"/>
+            <attribute id="hour" required="false"/>
+            <attribute id="session_count" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

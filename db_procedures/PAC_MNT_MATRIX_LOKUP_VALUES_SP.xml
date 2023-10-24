@@ -1,0 +1,928 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_LOKUP_VALUES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_LOKUP_VALUES_SP" 
+(
+  matrixKey            NUMBER,
+  matrixColumnNo       NUMBER,
+  in_qbeValue       IN VARCHAR2 DEFAULT NULL,
+  in_qbeDescription IN VARCHAR2 DEFAULT NULL,
+  in_valueData1     IN VARCHAR2 DEFAULT NULL,
+  in_valueData2     IN VARCHAR2 DEFAULT NULL,
+  in_valueData3     IN VARCHAR2 DEFAULT NULL,
+  in_valueData4     IN VARCHAR2 DEFAULT NULL,
+  in_valueData5     IN VARCHAR2 DEFAULT NULL,
+  in_valueData6     IN VARCHAR2 DEFAULT NULL,
+  in_valueData7     IN VARCHAR2 DEFAULT NULL,
+  in_valueData8     IN VARCHAR2 DEFAULT NULL,
+  in_valueData9     IN VARCHAR2 DEFAULT NULL,
+  in_valueData10    IN VARCHAR2 DEFAULT NULL,
+  LANGUAGE             VARCHAR2,
+  in_roleResource   IN VARCHAR2  DEFAULT NULL,
+  RC1           IN OUT PAC_MNT_MATRIX_LOKUP_VALUESPKG.RCT1,
+  cUserName         IN VARCHAR2)
+AS
+  qbeValue             GLOBALPKG.STRING;
+  qbeDescription       GLOBALPKG.STRING;
+  valueData1           GLOBALPKG.STRING;
+  valueData2           GLOBALPKG.STRING;
+  valueData3           GLOBALPKG.STRING;
+  valueData4           GLOBALPKG.STRING;
+  valueData5           GLOBALPKG.STRING;
+  valueData6           GLOBALPKG.STRING;
+  valueData7           GLOBALPKG.STRING;
+  valueData8           GLOBALPKG.STRING;
+  valueData9           GLOBALPKG.STRING;
+  valueData10          GLOBALPKG.STRING;
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          GLOBALPKG.STRING;
+  StoO_sqlstatus       INTEGER;
+  matrixFiled          GLOBALPKG.STRING;
+  matrixFiledDependent GLOBALPKG.STRING;
+  cLocationID          GLOBALPKG.STRING;
+  cDepartCode          GLOBALPKG.STRING;
+  cClient              GLOBALPKG.STRING;
+  cProject             GLOBALPKG.STRING;
+  cCharge_Code         GLOBALPKG.STRING;
+  cInput_Type          GLOBALPKG.STRING;
+  cResource_Code       GLOBALPKG.STRING;
+  cClientClass         GLOBALPKG.STRING;
+  cProjClass           GLOBALPKG.STRING;
+  cResource_Class      GLOBALPKG.STRING;
+  cWipClass            GLOBALPKG.STRING;
+  cRole                GLOBALPKG.STRING;
+  cTransType           GLOBALPKG.STRING;
+  cCostType            GLOBALPKG.STRING;
+  bAllTransTypes       NUMBER(3,0);
+  v_roleResource       GLOBALPKG.STRING;
+BEGIN
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_qbeValue;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_qbeDescription;
+
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData1 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData1;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData2 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData2;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData3 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData3;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData4 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData4;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData5 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData5;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData6 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData6;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData7 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData7;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData8;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData9 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData9;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10 := PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_valueData10;
+
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cLocationID := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cDepartCode := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClient := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProject := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cCharge_Code := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cInput_Type := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cResource_Code := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClientClass := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProjClass := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cResource_Class := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cWipClass := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cRole := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cTransType := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.cCostType := NULL;
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.bAllTransTypes := 0;
+
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData1), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData1)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData1 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData2), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData2)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData2 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData3), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData3)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData3 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData4), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData4)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData4 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData5), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData5)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData5 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData6), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData6)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData6 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData7), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData7)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData7 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData9), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData9)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData9 FROM DUAL;
+  SELECT DECODE(TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10), '*', NULL, TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10)) INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10 FROM DUAL;
+
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue := PAC_QBE_SEARCH_STRING_FCT(PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue);
+  PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription := PAC_QBE_SEARCH_STRING_FCT(PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription);
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled
+      FROM PPA_MATRIXCOLDEF
+     WHERE MatrixKey = PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixKey
+       AND ColumnNo = PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixColumnNo;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF (matrixKey = -99999) THEN
+    SELECT 'resource_role'
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled
+      FROM dual;
+	END IF;
+
+	DELETE FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    IF (matrixKey = -99999) THEN
+      INSERT INTO TEMP_TEMPPAC_MNT_MATRIX_LOKUP_ (TEMPFIELDNAME,TEMPCOLUMNNO,TEMPDATA)
+      SELECT 'resource_role', matrixColumnNo, NULL
+        FROM dual;
+
+      INSERT INTO TEMP_TEMPPAC_MNT_MATRIX_LOKUP_ (TEMPFIELDNAME,TEMPCOLUMNNO,TEMPDATA)
+      SELECT 'project_code', 9, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData9
+        FROM dual;
+
+      INSERT INTO TEMP_TEMPPAC_MNT_MATRIX_LOKUP_ (TEMPFIELDNAME,TEMPCOLUMNNO,TEMPDATA)
+      SELECT 'resource_code', 10, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10
+        FROM dual;
+    ELSE
+      INSERT INTO TEMP_TEMPPAC_MNT_MATRIX_LOKUP_ (TEMPFIELDNAME,TEMPCOLUMNNO,TEMPDATA)
+      SELECT  FieldName,ColumnNo,NULL
+        FROM PPA_MATRIXCOLDEF
+       WHERE MatrixKey = PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixKey;
+    END IF;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+       SET tempData = DECODE(tempColumnNo,
+                             1, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData1,
+                             2, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData2,
+                             3, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData3,
+                             4, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData4,
+                             5, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData5,
+                             6, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData6,
+                             7, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData7,
+                             8, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8,
+                             9, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData8,
+                            10, PAC_MNT_MATRIX_LOKUP_VALUES_SP.valueData10);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+    StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cLocationID
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'locationid';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cDepartCode
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'departcode';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClient
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'company_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProject
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'project_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cCharge_Code
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'chargecode';
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cInput_Type
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'inputtype';
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cResource_Code
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'resource_code';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClientClass
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'clntclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProjClass
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'projclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cResource_Class
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'resource_class';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cWipClass
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'wipclass';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cRole
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'resource_role';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cTransType
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+     WHERE tempFieldName = 'transtype';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_LOKUP_VALUES_SP.cCostType
+      FROM TEMP_TEMPPAC_MNT_MATRIX_LOKUP_
+      WHERE tempFieldName = 'cost_type';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN TOO_MANY_ROWS THEN
+        StoO_rowcnt := 2;
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+
+  IF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'entity' THEN
+    BEGIN
+      OPEN RC1 FOR
+      SELECT RTRIM(ENTITY) "Entity", description "Name"
+        FROM ENTITY
+       WHERE UPPER(ENTITY) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+         AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+         AND entity = NVL(PAC_FOS_RESOURCE_ENTITY_FCT(cUserName), entity)
+      UNION
+      SELECT NAME, DESCRIPTION
+        FROM CMN_LOOKUPS_V
+       WHERE LOOKUP_CODE = 'ALL'
+         AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+         AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+      ORDER BY 1;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'locationid' THEN
+    BEGIN
+      IF TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cDepartCode) IS NULL THEN
+        OPEN RC1 FOR
+        SELECT RTRIM(locationid) "LocationID", locationdescription "Description"
+          FROM LOCATIONS
+         WHERE UPPER(locationid) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(locationdescription) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(cUserName, locationid) = 1
+        UNION
+        SELECT NAME,  DESCRIPTION FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      ELSE
+        OPEN RC1 FOR
+        SELECT DISTINCT RTRIM(L.locationid) "LocationID", L.locationdescription "Description"
+          FROM LOCATIONS L, LOCATIONDEPT LD
+         WHERE LD.locationid = L.locationid
+           AND LD.departcode = PAC_MNT_MATRIX_LOKUP_VALUES_SP.cDepartCode
+           AND UPPER(L.locationid)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(L.locationdescription)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(cUserName, L.locationid) = 1
+        UNION
+        SELECT NAME,  DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      END IF;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'departcode' THEN
+    BEGIN
+      IF TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cLocationID) IS NULL THEN
+        OPEN RC1 FOR
+        SELECT RTRIM(departcode) "Department", description "Description"
+          FROM DEPARTMENTS
+         WHERE UPPER(departcode) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      ELSE
+        OPEN RC1 FOR
+        SELECT DISTINCT RTRIM(D.departcode) "Department", D.description "Description"
+          FROM DEPARTMENTS D, LOCATIONDEPT LD
+         WHERE LD.departcode = D.departcode
+           AND LD.locationid = PAC_MNT_MATRIX_LOKUP_VALUES_SP.cLocationID
+           AND UPPER(D.departcode) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(D.description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(cUserName, LD.locationid) = 1
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      END IF;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'company_code' THEN
+    BEGIN
+      IF TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProject) IS NULL THEN
+        OPEN RC1 FOR
+        SELECT RTRIM(C.COMPANY_CODE) "COMPANY_CODE No", C.COMPANY_NAME "Name"
+          FROM CLNTSUPP C, SRM_COMPANIES S
+          WHERE C.CLNTCLASS = NVL(RTRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClientClass), C.CLNTCLASS)
+            AND UPPER(C.COMPANY_CODE)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+            AND UPPER(C.COMPANY_NAME)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+            AND S.ID = C.SRM_ID
+            AND S.STATUS = (SELECT ID
+                              FROM CMN_LOOKUPS
+                             WHERE LOOKUP_CODE = 'ACTIVE'
+                               AND LOOKUP_TYPE = 'CMP_COMPANY_STATUS')
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      ELSE
+        OPEN RC1 FOR
+        SELECT RTRIM(C.COMPANY_CODE) "COMPANY_CODE No", C.COMPANY_NAME "Name"
+          FROM CLNTSUPP C, PAC_MNT_PROJECTS P,SRM_COMPANIES S
+         WHERE C.CLNTCLASS = NVL(RTRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClientClass), C.CLNTCLASS)
+           AND P.COMPANY_CODE = C.COMPANY_CODE
+           AND P.PROJECT_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProject
+           AND UPPER(C.COMPANY_CODE) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(C.COMPANY_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+           AND S.ID = C.SRM_ID
+           AND S.STATUS = (SELECT ID
+                             FROM CMN_LOOKUPS
+                            WHERE LOOKUP_CODE = 'ACTIVE'
+                              AND LOOKUP_TYPE = 'CMP_COMPANY_STATUS')
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      END IF;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'project_code' THEN
+    BEGIN
+      IF TRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClient) IS NULL THEN
+        OPEN RC1 FOR
+        SELECT RTRIM(P.PROJECT_CODE) "PROJECT_CODE No", I.NAME "Description"
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS I
+         WHERE P.ID = I.ID
+           --AND P.class = NVL(RTRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProjClass), P.class)
+           AND UPPER(P.PROJECT_CODE)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(I.NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      ELSE
+        OPEN RC1 FOR
+        SELECT RTRIM(P.PROJECT_CODE) "PROJECT_CODE No", I.NAME "Description"
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS I
+         WHERE P.ID = I.ID
+           AND P.class = NVL(RTRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cProjClass), P.class)
+           AND P.COMPANY_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.cClient
+           AND UPPER(P.PROJECT_CODE) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(I.NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+        UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1;
+      END IF;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'chargecode' THEN
+    BEGIN
+      OPEN RC1 FOR
+      SELECT RTRIM(PREXTERNALID) "Charge Code", PRNAME "Description"
+        FROM PRCHARGECODE
+       WHERE PRISOPEN &lt;&gt; 0
+         AND UPPER(PREXTERNALID) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+         AND UPPER(PRNAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+      UNION
+      SELECT NAME, DESCRIPTION
+        FROM CMN_LOOKUPS_V
+       WHERE LOOKUP_CODE = 'ALL'
+         AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+         AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+      ORDER BY 1;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'inputtype' THEN
+    BEGIN
+      OPEN RC1 FOR
+      SELECT PREXTERNALID "Input Type", PRNAME "Description"
+        FROM PRTYPECODE
+       WHERE UPPER(PRNAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+	    AND UPPER(PREXTERNALID) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+         AND PRISOPEN &lt;&gt; 0
+      UNION
+      SELECT NAME, DESCRIPTION
+        FROM CMN_LOOKUPS_V
+       WHERE LOOKUP_CODE = 'ALL'
+         AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+         AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+       ORDER BY 1;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'resource_code' THEN
+    v_roleResource := in_roleResource;
+    IF PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_roleResource = 'ALL' THEN
+      v_roleResource := NULL;
+    END IF;
+
+    OPEN RC1 FOR
+    SELECT RTRIM(P.RESOURCE_CODE) "RESOURCE_CODE", R.FULL_NAME
+      FROM SRM_RESOURCES R,
+           PAC_MNT_RESOURCES P,
+		   PRJ_RESOURCES PRJ 
+     WHERE R.ID = P.ID
+	   AND R.ID = PRJ.PRID
+       AND P.resource_class = NVL(RTRIM(PAC_MNT_MATRIX_LOKUP_VALUES_SP.cResource_Class), P.resource_class)
+       AND UPPER(P.RESOURCE_CODE) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+       AND UPPER(R.FULL_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+       AND (-999 = NVL(v_roleResource, -999) OR R.RESOURCE_TYPE IN ( v_roleResource ) ) --AND R.PERSON_TYPE &lt;&gt; 0
+       AND R.is_active &lt;&gt; 0
+	   AND PRJ.PRISROLE = 0
+     UNION
+    SELECT NAME, DESCRIPTION FROM CMN_LOOKUPS_V
+     WHERE LOOKUP_CODE = 'ALL'
+       AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+       AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+     ORDER BY 1;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'clntclass' THEN
+    OPEN RC1 FOR
+    SELECT RTRIM(CLNTCLASS) "COMPANY_CODE Class", description "Description"
+      FROM CLNTCLASS
+     WHERE UPPER(CLNTCLASS) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+       AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+     UNION
+    SELECT NAME, DESCRIPTION
+      FROM CMN_LOOKUPS_V
+     WHERE LOOKUP_CODE = 'ALL'
+       AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+       AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+    ORDER BY 1;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'projclass' THEN
+    OPEN RC1 FOR
+    SELECT RTRIM(PROJCLASS) "PROJECT_CODE Class", description "Description"
+      FROM PROJCLASS
+     WHERE UPPER(PROJCLASS) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+       AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+     UNION
+    SELECT NAME, DESCRIPTION
+      FROM CMN_LOOKUPS_V
+     WHERE LOOKUP_CODE = 'ALL'
+       AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+       AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+     ORDER BY 1;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'resource_class' THEN
+    OPEN RC1 FOR
+    SELECT RTRIM(resource_class) "Resource Class", description "Description"
+      FROM PAC_FOS_RESOURCE_CLASS
+     WHERE UPPER(resource_class) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+       AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+       AND active = 1
+     UNION
+    SELECT NAME, DESCRIPTION
+      FROM CMN_LOOKUPS_V
+     WHERE LOOKUP_CODE = 'ALL'
+       AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+       AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+     ORDER BY 1;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'wipclass' THEN
+    OPEN RC1 FOR
+    SELECT RTRIM(WIPCLASS) "WIP Class", description "Description"
+      FROM WIPCLASS
+     WHERE UPPER(WIPCLASS) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+       AND UPPER(description)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+     UNION
+    SELECT NAME, DESCRIPTION
+      FROM CMN_LOOKUPS_V
+     WHERE LOOKUP_CODE = 'ALL'
+       AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+       AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+     ORDER BY 1;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'transtype' THEN
+    BEGIN
+      IF PAC_MNT_MATRIX_LOKUP_VALUES_SP.bAllTransTypes = 0 THEN
+        OPEN RC1 FOR
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE IN ('L', 'M', 'Q', 'X')
+           AND LOOKUP_TYPE = 'PAC_MATRIX_TRANSACTION_CLASS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+           AND UPPER(NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(DESCRIPTION) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+         UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+         ORDER BY 1, 2;
+      ELSE
+        OPEN RC1 FOR
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_TYPE = 'PAC_MATRIX_TRANSACTION_CLASS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+           AND UPPER(NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+           AND UPPER(DESCRIPTION)  LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+         UNION
+        SELECT NAME, DESCRIPTION
+          FROM CMN_LOOKUPS_V
+         WHERE LOOKUP_CODE = 'ALL'
+           AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+           AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+         ORDER BY 1, 2;
+      END IF;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'transclass' THEN
+    BEGIN
+      OPEN RC1 FOR
+      SELECT RTRIM(TRANSCLASS) "Trx Type", description "Description"
+        FROM TRANSCLASS
+       WHERE UPPER(TRANSCLASS) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+         AND UPPER(description) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+       UNION
+      SELECT NAME, DESCRIPTION
+        FROM CMN_LOOKUPS_V
+       WHERE LOOKUP_CODE = 'ALL'
+         AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+         AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+       ORDER BY 1;
+    END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'cost_type' THEN
+  BEGIN
+    OPEN RC1 FOR
+      SELECT lookup_code, description
+        FROM CMN_LOOKUPS_V
+        WHERE LOOKUP_TYPE = 'LOOKUP_FIN_COSTTYPECODE'
+        AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        AND UPPER(NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+        AND UPPER(DESCRIPTION) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+      UNION
+      SELECT name as lookup_code, description
+        FROM CMN_LOOKUPS_V
+        WHERE LOOKUP_CODE = 'ALL'
+        AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+        AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+        ORDER BY 1,2;
+  END;
+  ELSIF PAC_MNT_MATRIX_LOKUP_VALUES_SP.matrixFiled = 'resource_role' THEN
+    BEGIN
+      v_roleResource := in_roleResource;
+      IF PAC_MNT_MATRIX_LOKUP_VALUES_SP.in_roleResource = 'ALL' THEN
+        v_roleResource := NULL;
+      END IF;
+      BEGIN
+	    IF (matrixKey = -99999) THEN
+		  OPEN RC1 FOR
+          SELECT DISTINCT(R.UNIQUE_NAME) "ROLE_CODE ID", R.FULL_NAME "ROLE_CODE Description"
+            FROM SRM_RESOURCES R, PRJ_RESOURCES P
+           WHERE R.IS_ACTIVE &lt;&gt; 0
+             AND R.ID = P.PRID
+             AND P.PRISROLE = 1
+             AND UPPER(R.UNIQUE_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+             AND UPPER(R.FULL_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+             AND (-999 = NVL(v_roleResource, -999) OR R.RESOURCE_TYPE IN (v_roleResource))
+           ORDER BY 1;
+        ELSE
+		  OPEN RC1 FOR
+          SELECT RTRIM(SR.UNIQUE_NAME) "ROLE_CODE ID",
+                 SR.FULL_NAME "ROLE_CODE Description"
+            FROM SRM_RESOURCES SR, PRJ_RESOURCES P
+           WHERE 1=1
+             --AND SR.PERSON_TYPE = 0   
+             AND SR.IS_ACTIVE &lt;&gt; 0
+             AND SR.ID = P.PRID
+             AND P.PRISROLE = 1
+             AND UPPER(SR.UNIQUE_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeValue
+             AND UPPER(SR.FULL_NAME) LIKE PAC_MNT_MATRIX_LOKUP_VALUES_SP.qbeDescription
+             AND (-999 = NVL(v_roleResource, -999) OR SR.RESOURCE_TYPE IN (v_roleResource))
+           UNION
+          SELECT NAME, DESCRIPTION FROM CMN_LOOKUPS_V
+           WHERE LOOKUP_CODE = 'ALL'
+             AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+             AND LANGUAGE_CODE = PAC_MNT_MATRIX_LOKUP_VALUES_SP.LANGUAGE
+           ORDER BY 1;
+        END IF;
+      END;
+    END;
+  END IF;
+END PAC_MNT_MATRIX_LOKUP_VALUES_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

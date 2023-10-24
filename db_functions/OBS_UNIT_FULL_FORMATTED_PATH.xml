@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>OBS_UNIT_FULL_FORMATTED_PATH</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."OBS_UNIT_FULL_FORMATTED_PATH" (
+    P_UNIT_ID INTEGER,
+    P_FORMAT_OBS INTEGER
+    )
+    RETURN VARCHAR2
+  IS
+   V_RETURN_VALUE VARCHAR2(2000) := '';
+    V_ENTITY_CODE VARCHAR2(60) := '';
+  BEGIN
+
+    select FULL_OBS_PATH INTO V_RETURN_VALUE from PRJ_FULL_OBS_PATH_V WHERE unit_id = P_UNIT_ID;
+
+    -- MAX function to avoid the case were the query is not returning any rows
+    select MAX(e.entity) INTO V_ENTITY_CODE  from prj_obs_units pu, prj_obs_types pt, entity e
+        where pu.type_id = pt.id and
+              (pt.id = e.org_chart_obs_type_id  or pt.id = e.geo_chart_obs_type_id) and
+              pu.id = P_UNIT_ID;
+
+    IF length(V_ENTITY_CODE) &gt; 0 THEN
+      IF (P_FORMAT_OBS = 1) THEN
+        V_RETURN_VALUE := V_ENTITY_CODE || ':' || V_RETURN_VALUE;
+      ELSE
+        V_RETURN_VALUE := '/' || V_ENTITY_CODE || '/' || V_RETURN_VALUE;
+      END IF;
+    ELSE
+      V_RETURN_VALUE := '/' || V_RETURN_VALUE;
+    END IF;
+
+    RETURN V_RETURN_VALUE;
+    EXCEPTION
+     WHEN OTHERS
+     THEN
+        RETURN V_RETURN_VALUE;
+  END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

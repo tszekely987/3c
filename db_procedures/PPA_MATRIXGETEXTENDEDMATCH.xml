@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXGETEXTENDEDMATCH</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_MATRIXGETEXTENDEDMATCH" (
+iMatrixKey  NUMBER ,
+bReturnAllMatches   NUMBER ,
+cCompColArray   VARCHAR2 ,
+cCompOpArray  VARCHAR2 ,
+iColCount   NUMBER ,
+dTransDate  DATE ,
+iBestMatchRowID   IN OUT NUMBER,
+nNumVal1  IN OUT NUMBER,
+nNumVal2  IN OUT NUMBER,
+nNumVal3  IN OUT NUMBER,
+cStrVal1  IN OUT VARCHAR2,
+cCompVal1   VARCHAR2 ,
+cCompVal2   VARCHAR2 ,
+cCompVal3   VARCHAR2 ,
+cCompVal4   VARCHAR2 ,
+cCompVal5   VARCHAR2 ,
+cCompVal6   VARCHAR2 ,
+cCompVal7   VARCHAR2 ,
+cCompVal8   VARCHAR2 ,
+cCompVal9   VARCHAR2 ,
+cCompVal10  VARCHAR2 ,
+RC1   IN OUT PPA_MATRIXGETEXTENDEDMATCHPkg.RCT1)
+AS
+StoO_selcnt INTEGER;
+StoO_error  INTEGER;
+StoO_rowcnt INTEGER;
+StoO_crowcnt  INTEGER := 0;
+StoO_fetchstatus  INTEGER := 0;
+StoO_errmsg GLOBALPKG.STRING;
+StoO_sqlstatus  INTEGER;
+iRow  NUMBER;
+iLup  NUMBER;
+iWeight   NUMBER(32,0);
+iLupWeight  NUMBER(32,0);
+cCompareOp  GLOBALPKG.STRING;
+cCompareCol   GLOBALPKG.STRING;
+bMatch  NUMBER(5,0);
+cVal1   GLOBALPKG.STRING;
+cVal2   GLOBALPKG.STRING;
+cVal3   GLOBALPKG.STRING;
+cVal4   GLOBALPKG.STRING;
+cVal5   GLOBALPKG.STRING;
+cVal6   GLOBALPKG.STRING;
+cVal7   GLOBALPKG.STRING;
+cVal8   GLOBALPKG.STRING;
+cVal9   GLOBALPKG.STRING;
+cVal10  GLOBALPKG.STRING;
+cCompVal  GLOBALPKG.STRING;
+cVal  GLOBALPKG.STRING;
+cPrevVal1   GLOBALPKG.STRING;
+cPrevVal2   GLOBALPKG.STRING;
+cPrevVal3   GLOBALPKG.STRING;
+cPrevVal4   GLOBALPKG.STRING;
+cPrevVal5   GLOBALPKG.STRING;
+cPrevVal6   GLOBALPKG.STRING;
+cPrevVal7   GLOBALPKG.STRING;
+cPrevVal8   GLOBALPKG.STRING;
+cPrevVal9   GLOBALPKG.STRING;
+cPrevVal10  GLOBALPKG.STRING;
+cPrevVal  GLOBALPKG.STRING;
+/*
+ * NOTE:
+ *
+ * If you alter this stored procedure you _MUST_ make sure that you changes are mirrored
+ * in the procedure: ppa_MatrixGetExtendedMatchTest -- used by Matrix Manager -- inorder
+ * to make sure that the two procedures are in sync.  ppa_GetMatrixMatchTest is used to test
+ * for values in the Matrix Manager but allows users to test for wildcards.
+ *
+ */
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Uma Siva
+   Modified Date :07/25/01
+*/
+
+
+  DELETE FROM temp_Resultsppa_MatrixGetExten;
+  BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT   MIN(MatrixRowKey)
+    INTO iRow FROM ppa_MatrixValues
+    WHERE MatrixKey = iMatrixKey
+     AND dTransDate  BETWEEN FromDate AND
+       ToDate;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN TOO_MANY_ROWS THEN
+        StoO_rowcnt := 2;
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+  &lt;&lt;i_loop1&gt;&gt;
+  WHILE  StoO_rowcnt &gt; 0 AND   iRow IS NOT NULL LOOP
+  BEGIN
+    iWeight :=  0;
+    BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      SELECT   Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,  Value8,  Value9,  Value10
+      INTO cVal1, cVal2, cVal3, cVal4, cVal5, cVal6, cVal7, cVal8, cVal9, cVal10 FROM ppa_MatrixValues
+      WHERE MatrixRowKey = iRow;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+/* do matching */
+    iLup :=  1;
+    &lt;&lt;i_loop2&gt;&gt;
+    WHILE  iLup &lt;= iColCount LOOP
+    BEGIN
+      iLupWeight :=  0;
+      cCompareOp :=  SUBSTR(cCompOpArray,
+         iLup, 1);
+      cCompareCol :=  SUBSTR(cCompColArray,
+         iLup, 1);
+      IF  cCompareCol = '1' THEN
+      BEGIN
+        IF  iLup = 1 THEN
+          cCompVal :=  cCompVal1;
+          cVal :=  cVal1;
+          cPrevVal :=  cPrevVal1;
+        END IF;
+        IF  iLup = 2 THEN
+          cCompVal :=  cCompVal2;
+          cVal :=  cVal2;
+          cPrevVal :=  cPrevVal2;
+        END IF;
+        IF  iLup = 3 THEN
+          cCompVal :=  cCompVal3;
+          cVal :=  cVal3;
+          cPrevVal :=  cPrevVal3;
+        END IF;
+        IF  iLup = 4 THEN
+          cCompVal :=  cCompVal4;
+          cVal :=  cVal4;
+          cPrevVal :=  cPrevVal4;
+        END IF;
+        IF  iLup = 5 THEN
+          cCompVal :=  cCompVal5;
+          cVal :=  cVal5;
+          cPrevVal :=  cPrevVal5;
+        END IF;
+        IF  iLup = 6 THEN
+          cCompVal :=  cCompVal6;
+          cVal :=  cVal6;
+          cPrevVal :=  cPrevVal6;
+        END IF;
+        IF  iLup = 7 THEN
+          cCompVal :=  cCompVal7;
+          cVal :=  cVal7;
+          cPrevVal :=  cPrevVal7;
+        END IF;
+        IF  iLup = 8 THEN
+          cCompVal :=  cCompVal8;
+          cVal :=  cVal8;
+          cPrevVal :=  cPrevVal8;
+        END IF;
+        IF  iLup = 9 THEN
+          cCompVal :=  cCompVal9;
+          cVal :=  cVal9;
+          cPrevVal :=  cPrevVal9;
+        END IF;
+        IF  iLup = 10 THEN
+          cCompVal :=  cCompVal10;
+          cVal :=  cVal10;
+          cPrevVal :=  cPrevVal10;
+        END IF;
+        IF  cVal IS NULL THEN
+          iLupWeight :=  1;
+        ELSE
+        BEGIN
+          bMatch :=  0;
+          IF  cCompareOp = '0' THEN
+          BEGIN
+            IF  cVal = cCompVal THEN
+              bMatch :=  1;
+            END IF;
+          END;
+          END IF;
+          IF  cCompareOp = '5' THEN
+          BEGIN
+            IF  cVal != cCompVal THEN
+              bMatch :=  1;
+            END IF;
+          END;
+          END IF;
+          IF  cCompareOp = '1' THEN
+          BEGIN
+            IF  cCompVal &lt; cVal AND   cVal &lt; NVL(cPrevVal, '~~~~~~~~~~~~~~~') THEN
+            BEGIN
+              bMatch :=  1;
+              cPrevVal :=  cVal;
+            END;
+            END IF;
+          END;
+          END IF;
+          IF  cCompareOp = '2' THEN
+          BEGIN
+            IF  cCompVal = cVal THEN
+            BEGIN
+              bMatch :=  1;
+              cPrevVal :=  '';
+            END;
+            ELSE
+              IF  cCompVal &lt; cVal AND   cVal &lt; NVL(cPrevVal, '~~~~~~~~~~~~~~~') THEN
+              BEGIN
+                bMatch :=  1;
+                cPrevVal :=  cVal;
+              END;
+              END IF;
+              END IF;
+            END;
+            END IF;
+            IF  cCompareOp = '3' THEN
+            BEGIN
+              IF  cCompVal &gt; cVal AND   cVal &gt; NVL(cPrevVal, ' ') THEN
+              BEGIN
+                bMatch :=  1;
+                cPrevVal :=  cVal;
+              END;
+              END IF;
+            END;
+            END IF;
+            IF  cCompareOp = '4' THEN
+            BEGIN
+              IF  cCompVal = cVal THEN
+              BEGIN
+                bMatch :=  1;
+                cPrevVal :=  '999999999999999';
+              END;
+              ELSE
+                IF  cCompVal &gt; cVal AND   cVal &gt; NVL(TRIM(cPrevVal), ' ') THEN
+                BEGIN
+                  bMatch :=  1;
+                  cPrevVal :=  cVal;
+                END;
+                END IF;
+                END IF;
+              END;
+              END IF;
+              IF  cCompareOp = '6' THEN
+              BEGIN
+
+                IF  cCompVal  LIKE cVal THEN
+                  bMatch :=  1;
+                END IF;
+              END;
+              END IF;
+              IF  cCompareOp  IN('3', '1', '2', '4') THEN
+              BEGIN
+                IF  iLup = 1 THEN
+                  cPrevVal1 :=  cPrevVal;
+                END IF;
+                IF  iLup = 2 THEN
+                  cPrevVal2 :=  cPrevVal;
+                END IF;
+                IF  iLup = 3 THEN
+                  cPrevVal3 :=  cPrevVal;
+                END IF;
+                IF  iLup = 4 THEN
+                  cPrevVal4 :=  cPrevVal;
+                END IF;
+                IF  iLup = 5 THEN
+                  cPrevVal5 :=  cPrevVal;
+                END IF;
+                IF  iLup = 6 THEN
+                  cPrevVal6 :=  cPrevVal;
+                END IF;
+                IF  iLup = 7 THEN
+                  cPrevVal7 :=  cPrevVal;
+                END IF;
+                IF  iLup = 8 THEN
+                  cPrevVal8 :=  cPrevVal;
+                END IF;
+                IF  iLup = 9 THEN
+                  cPrevVal9 :=  cPrevVal;
+                END IF;
+                IF  iLup = 10 THEN
+                  cPrevVal10 :=  cPrevVal;
+                END IF;
+              END;
+              END IF;
+              IF  bMatch != 0 THEN
+                iLupWeight :=  POWER(ROUND( TO_NUMBER(100),0),
+                   iColCount - iLup
+                   + 1);
+              END IF;
+            END;
+            END IF;
+            IF  iLupWeight &gt; 0 THEN
+              iWeight :=  iWeight
+                 + iLupWeight;
+            ELSE
+            BEGIN
+              iWeight :=  0;
+              EXIT;
+            END;
+            END IF;
+          END;
+          END IF;
+          iLup :=  iLup
+             + 1;
+        END;
+        END LOOP;
+        IF  iWeight &gt; 0 THEN
+          BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+          INSERT INTO temp_Resultsppa_MatrixGetExten (MatrixRowKey, Weight)VALUES (iRow, iWeight);
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+          END;
+        END IF;
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          SELECT   MIN(MatrixRowKey)
+          INTO iRow FROM ppa_MatrixValues
+          WHERE MatrixKey = iMatrixKey
+           AND dTransDate  BETWEEN FromDate AND
+             ToDate
+           AND MatrixRowKey &gt; iRow;
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END;
+      END LOOP;
+      IF  bReturnAllMatches != 0 THEN
+      BEGIN
+        IF  bReturnAllMatches &gt; 0 THEN
+          OPEN RC1 FOR
+          SELECT M.MatrixRowKey,  M.FromDate,  M.ToDate,  M.Value1,  M.Value2,  M.Value3,  M.Value4,  M.Value5,  M.Value6,  M.Value7,  M.Value8,  M.Value9,  M.Value10,  M.NumVal1,  M.NumVal2,  M.NumVal3,  M.StrVal1 FROM temp_Resultsppa_MatrixGetExten R, ppa_MatrixValues M
+          WHERE M.MatrixRowKey = R.MatrixRowKey
+           AND M.MatrixKey = iMatrixKey
+          ORDER BY M.Value1 , M.Value2 , M.Value3 , M.Value4 , M.Value5
+             , M.Value6 , M.Value7 , M.Value8 , M.Value9 , M.Value10 ;
+        ELSE
+          OPEN RC1 FOR
+          SELECT M.MatrixRowKey,  M.FromDate,  M.ToDate,  M.Value1,  M.Value2,  M.Value3,  M.Value4,  M.Value5,  M.Value6,  M.Value7,  M.Value8,  M.Value9,  M.Value10,  M.NumVal1,  M.NumVal2,  M.NumVal3,  M.StrVal1 FROM temp_Resultsppa_MatrixGetExten R, ppa_MatrixValues M
+          WHERE M.MatrixRowKey = R.MatrixRowKey
+           AND M.MatrixKey = iMatrixKey
+          ORDER BY M.Value1 DESC, M.Value2 DESC, M.Value3 DESC, M.Value4
+             DESC, M.Value5 DESC, M.Value6 DESC, M.Value7 DESC, M.Value8 DESC,
+             M.Value9 DESC, M.Value10 DESC;
+        END IF;
+      END;
+      END IF;
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        SELECT   MatrixRowKey
+        INTO iBestMatchRowID FROM temp_Resultsppa_MatrixGetExten
+        ORDER BY Weight ;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        SELECT   M.NumVal1,  M.NumVal2,  M.NumVal3,  M.StrVal1
+        INTO nNumVal1, nNumVal2, nNumVal3, cStrVal1 FROM ppa_MatrixValues M
+        WHERE M.MatrixRowKey = iBestMatchRowID;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      NULL;
+END ppa_MatrixGetExtendedMatch;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

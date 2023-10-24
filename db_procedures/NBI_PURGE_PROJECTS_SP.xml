@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PURGE_PROJECTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PURGE_PROJECTS_SP" 
+AS
+   V_STMT                        VARCHAR2(100);
+   V_START_TIME                  DATE;
+   V_DURATION                    NUMBER;
+   V_COUNT                       INTEGER;
+BEGIN
+   V_START_TIME := SYSDATE;
+   V_STMT := 'SELECTING COUNT OF PROJECT TYPE EVENTS';
+   SELECT COUNT (1)
+   INTO   V_COUNT
+   FROM   NBI_EVENTS
+   WHERE  STATUS = 'PROCESSING'
+      AND PRJ_OBJECT_TYPE = 'PROJECT'
+      AND ROWNUM = 1;
+
+   IF V_COUNT = 0
+   THEN
+      RETURN;
+   END IF;
+
+   V_STMT := 'PURGING PROJECTS - DELETING FROM NBI_PROJECT_CURRENT_FACTS';
+   DELETE FROM NBI_PROJECT_CURRENT_FACTS
+   WHERE project_id IN
+      (SELECT /*+index (NBI_EVENTS nbi_events_n1)*/ prj_object_id
+       FROM   NBI_EVENTS
+       WHERE  status = 'PROCESSING'
+       AND    prj_object_type = 'PROJECT');
+   
+   V_STMT := 'PURGING PROJECTS - DELETING FROM NBI_PROJECT_FORECAST';
+   DELETE FROM NBI_PROJECT_FORECAST
+   WHERE project_id IN
+      (SELECT prj_object_id
+       FROM   NBI_EVENTS
+       WHERE  status = 'PROCESSING'
+       AND    prj_object_type = 'PROJECT');
+   
+   V_STMT := 'PURGING PROJECTS - DELETING FROM NBI_PM_PT_FACTS';
+   DELETE /*+index (nbi_pm_pt_facts nbi_pm_pt_facts_pk)*/ FROM NBI_PM_PT_FACTS
+   WHERE project_id IN
+      (SELECT /*+index (nbi_events nbi_events_n1)*/ prj_object_id
+       FROM   NBI_EVENTS
+       WHERE  status = 'PROCESSING'
+       AND    prj_object_type = 'PROJECT');
+          
+   V_STMT := 'PURGING PROJECTS - DELETING FROM NBI_FM_PT_FACTS';
+   DELETE /*+index (nbi_fm_pt_facts nbi_fm_pt_facts_pk)*/FROM NBI_FM_PT_FACTS
+   WHERE project_id IN
+      (SELECT /*+index (nbi_events nbi_events_n1)*/ prj_object_id
+       FROM   NBI_EVENTS
+       WHERE  status = 'PROCESSING'
+       AND    prj_object_type = 'PROJECT');
+   
+   V_STMT := 'PURGING PROJECTS - DELETING FROM NBI_PRT_FACTS';
+   LOOP
+     DELETE /*+index (nbi_prt_facts nbi_prt_facts_n1)*/ FROM NBI_PRT_FACTS
+     WHERE project_id IN
+        (SELECT /*+index (nbi_events nbi_events_n1)*/ prj_object_id
+         FROM   NBI_EVENTS
+         WHERE  status = 'PROCESSING'
+         AND    prj_object_type = 'PROJECT')
+     AND ROWNUM &lt;= 5000;
+     EXIT WHEN SQL%ROWCOUNT = 0;
+     COMMIT;
+   END LOOP;
+
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE (
+      'Time taken for NBI_PURGE_PROJECTS_SP : ' || V_DURATION
+   );
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS THEN
+      COMMIT;
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_PURGE_PROJECTS_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

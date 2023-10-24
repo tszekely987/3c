@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_GEN_GL_TRANS_POST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_GEN_GL_TRANS_POST_SP" 
+(
+  P_USERID          NUMBER,
+  P_SESSIONID       NUMBER,
+  P_LANGUAGE_CODE   VARCHAR2,
+  P_BATCH_ID		NUMBER,
+  P_GL_PERIOD		DATE,
+  P_IS_MULTI_CURRENCY  VARCHAR2,
+  P_SYSTEM_CURRENCY    VARCHAR2
+)
+AS
+  V_DATE            DATE;
+  V_COUNTER         INTEGER;
+  V_STMT            VARCHAR2(255);
+
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+
+  CURSOR C_TRANS_REC (C_SESSIONID NUMBER) IS
+  SELECT T.TRANS_SOURCE,
+         T.TRANSNO,
+         W.TRANSDATE,
+         E.ID "ENTITY_ID",
+         E.ENTITY "ENTITY",		 
+         L.ID "LOCATION_ID",
+         L.LOCATIONID "LOCATION",		 
+         D.ID "DEPARTMENT_ID",
+         D.DEPARTCODE "DEPARTMENT",		 
+         P.ID "PROJECT_ID",
+         WC.ID "WIPCLASS_ID",
+         WC.WIPCLASS "WIPCLASS",		 
+         TC.ID "TRANSCLASS_ID",
+         TC.TRANSCLASS "TRANSCLASS",		 
+         C.PRID "CHARGECODE_ID",
+         RC.ID  "RESOURCECLASS_ID",
+         RC.RESOURCE_CLASS "RESOURCECLASS",		 
+         R.ID "RESOURCE_ID",
+         W.QUANTITY,
+         V.TOTALAMOUNT,
+         V.CURRENCY_CODE,
+         DECODE(W.TRANSTYPE,
+                'L', P.LABOR_EXCHANGE_RATE_TYPE,
+                'M', P.MATERIALS_EXCHANGE_RATE_TYPE,
+                'Q', P.EQUIPMENT_EXCHANGE_RATE_TYPE,
+                'X', P.EXPENSE_EXCHANGE_RATE_TYPE) "EXCHANGE_RATE_TYPE",
+         WC.ALLOCATION_TYPE
+    FROM PAC_CHG_SRCH_GL_SUMMARIES S,
+         PAC_CHG_SRCH_GL_TRANS T,
+         PPA_WIP W,
+         PPA_WIP_VALUES V,
+         ENTITY E,
+         LOCATIONS L,
+         DEPARTMENTS D,
+         PAC_MNT_PROJECTS P,
+         WIPCLASS WC,
+         TRANSCLASS TC,
+         PRCHARGECODE C,
+         SRM_RESOURCES R,
+         PAC_FOS_RESOURCE_CLASS RC
+   WHERE S.SESSIONID = C_SESSIONID
+     AND S.STATUS != 'N'
+     AND S.SESSIONID = T.SESSIONID
+     AND T.TRANS_SOURCE = 'W'
+     AND T.TRANSNO = W.TRANSNO
+     AND S.SUMMARY_VALUE = DECODE(S.SUMMARY_TYPE,
+                             'SUMMARY',      '*',
+                             'ENTITIES',     W.ENTITY,
+                             'LOCATIONS',    W.LOCATIONID,
+                             'DEPARTMENTS',  W.DEPARTCODE,
+                             'PROJECTS',     W.PROJECT_CODE,
+                             'WIPCLASSES',   W.WIPCLASS,
+                             'TRANSCLASSES', W.TRANSCLASS,
+                             'CHARGECODES',  W.CHARGE_CODE,
+                             'RESOURCES',    W.RESOURCE_CODE)
+     AND W.TRANSNO = V.TRANSNO
+     AND V.CURRENCY_TYPE = 'NATURAL'
+     AND L.ENTITY = E.ENTITY
+     AND W.EMPLYHOMELOCATION = L.LOCATIONID
+     AND W.EMPLYHOMEDEPART = D.DEPARTCODE
+     AND W.PROJECT_CODE = P.PROJECT_CODE
+     AND W.WIPCLASS = WC.WIPCLASS
+     AND WC.ALLOCATION_TYPE != 'NO_CHARGEBACKS'
+     AND W.TRANSCLASS = TC.TRANSCLASS
+     AND W.CHARGE_CODE = C.PREXTERNALID
+     AND W.RESOURCE_CLASS = RC.RESOURCE_CLASS
+     AND W.RESOURCE_CODE = R.UNIQUE_NAME;
+
+  CURSOR C_ADJUST_REC (C_SESSIONID NUMBER) IS
+   SELECT A.TRANSNO
+     FROM PAC_CHG_SRCH_GL_SUMMARIES S,
+          PAC_CHG_SRCH_GL_TRANS T,
+          PPA_BILLINGS A,
+          PPA_WIP W
+    WHERE S.SESSIONID = C_SESSIONID
+      AND S.STATUS != 'N'
+      AND S.SESSIONID = T.SESSIONID
+      AND T.TRANS_SOURCE = 'A'
+      AND T.TRANSNO = A.APPLYTO
+      AND A.APPLYTO = W.TRANSNO
+      AND W.GLPOSTED = 'Y'
+      AND S.SUMMARY_VALUE = DECODE(S.SUMMARY_TYPE,
+                              'SUMMARY',      '*',
+                              'ENTITIES',     W.ENTITY,
+                              'LOCATIONS',    W.LOCATIONID,
+                              'DEPARTMENTS',  W.DEPARTCODE,
+                              'PROJECTS',     W.PROJECT_CODE,
+                              'WIPCLASSES',   W.WIPCLASS,
+                              'TRANSCLASSES', W.TRANSCLASS,
+                              'CHARGECODES',  W.CHARGE_CODE,
+                              'RESOURCES',    W.RESOURCE_CODE)
+;
+
+BEGIN
+  V_STMT := 'Initializing variables';
+  V_DATE := SYSDATE;
+  V_COUNTER := 0;
+
+  V_STMT := 'Beginning trans generate allocations loop';
+  FOR C_TRANS_DATA IN C_TRANS_REC (P_SESSIONID)
+    LOOP
+      PAC_CHG_GEN_GL_ALLOCS_POST_SP(
+	    0,
+        P_USERID,
+        P_SESSIONID,
+		0,
+		P_BATCH_ID,
+        P_GL_PERIOD,
+        P_IS_MULTI_CURRENCY,
+	    P_SYSTEM_CURRENCY,
+        C_TRANS_DATA.TRANS_SOURCE,
+        C_TRANS_DATA.TRANSNO,
+        C_TRANS_DATA.TRANSDATE,
+        C_TRANS_DATA.ENTITY_ID,
+        C_TRANS_DATA.ENTITY,
+        C_TRANS_DATA.LOCATION_ID,
+        C_TRANS_DATA.LOCATION,		
+        C_TRANS_DATA.DEPARTMENT_ID,
+        C_TRANS_DATA.DEPARTMENT,		
+		null,
+        C_TRANS_DATA.PROJECT_ID,
+        C_TRANS_DATA.WIPCLASS_ID,
+        C_TRANS_DATA.WIPCLASS,		
+        C_TRANS_DATA.TRANSCLASS_ID,
+        C_TRANS_DATA.TRANSCLASS,		
+        C_TRANS_DATA.CHARGECODE_ID,
+        C_TRANS_DATA.RESOURCECLASS_ID,
+        C_TRANS_DATA.RESOURCECLASS,		
+        C_TRANS_DATA.RESOURCE_ID,
+        C_TRANS_DATA.QUANTITY,
+        C_TRANS_DATA.TOTALAMOUNT,
+        C_TRANS_DATA.CURRENCY_CODE,
+        C_TRANS_DATA.EXCHANGE_RATE_TYPE,
+        C_TRANS_DATA.ALLOCATION_TYPE
+		);
+
+      -- Commit the transactions after every 100 records
+      IF MOD( V_COUNTER, 100 ) = 0 THEN
+        COMMIT;
+      END IF;
+
+      V_COUNTER := V_COUNTER + 1;
+    END LOOP;
+
+  IF V_COUNTER &gt; 0 THEN
+    COMMIT;
+    V_COUNTER := 0;
+  END IF;
+
+  V_STMT := 'Beginning adjustments generate allocations loop';
+  FOR C_ADJUST_DATA IN C_ADJUST_REC (P_SESSIONID)
+    LOOP
+      PAC_CHG_REV_GL_ALLOC_POST_SP(P_SESSIONID, P_USERID, P_BATCH_ID, C_ADJUST_DATA.TRANSNO, P_GL_PERIOD, P_LANGUAGE_CODE); 
+
+      -- Commit the transactions after every 100 records
+      IF MOD( V_COUNTER, 100 ) = 0 THEN
+        COMMIT;
+      END IF;
+
+      V_COUNTER := V_COUNTER + 1;
+    END LOOP;
+
+  IF V_COUNTER &gt; 0 THEN
+    COMMIT;
+    V_COUNTER := 0;
+  END IF;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20778, 'GENERATING GL TRANSACTIONS FAILED : ' || V_STMT || ': ' || SQLERRM);
+END PAC_CHG_GEN_GL_TRANS_POST_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

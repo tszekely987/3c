@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_PARSE_CURVE02_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_PARSE_CURVE02_FCT" ( P_CURVE IN CLOB )
+RETURN NK_CURVE
+IS
+
+  V_OUTPUT_CURVE NK_CURVE := NK_CURVE(2,0,0,null);
+  V_OUTPUT_SEGMENT NK_SEGMENT;
+  V_OUTPUT_EXCEPTION NK_EXCEPTION;
+  IDX NUMBER; S_IDX NUMBER := 0; P_IDX NUMBER := 4; W_IDX NUMBER; START_IDX NUMBER; FINISH_IDX NUMBER;
+  V_SEGMENT VARCHAR2(32000);
+  V_SCRATCH_PAD VARCHAR2(10000);
+  V_EXCP_SCRATCH_PAD VARCHAR2(10000);
+
+BEGIN
+
+  V_OUTPUT_CURVE.SEGMENTS := NK_SEGMENTS();
+  V_SEGMENT := regexp_substr(P_CURVE,'[^|]+', 1,P_IDX );
+  WHILE(V_SEGMENT IS NOT NULL) LOOP
+    V_OUTPUT_SEGMENT := NK_SEGMENT(0,0,0,0,0,0,null,null,null);
+    -- get the dates
+    V_SCRATCH_PAD := regexp_substr(V_SEGMENT,'[^@]+', 1,1);
+    V_OUTPUT_SEGMENT.SEGMENT_START := TO_NUMBER(regexp_substr(V_SCRATCH_PAD,'[^-]+', 1,1));
+    V_OUTPUT_SEGMENT.SEGMENT_FINISH := V_OUTPUT_SEGMENT.SEGMENT_START + NVL(TO_NUMBER(regexp_substr(V_SCRATCH_PAD,'[^-]+', 1,2)),1);
+    -- get the rate
+    V_SCRATCH_PAD := regexp_substr(V_SEGMENT,'[^@[]+', 1,2);
+    V_OUTPUT_SEGMENT.RATE := TO_NUMBER(V_SCRATCH_PAD);
+
+    -- get the work_weeks
+    START_IDX := INSTR(V_SEGMENT,'[',1,1);
+    V_SCRATCH_PAD := NULL;
+    IF(START_IDX &gt; 0) THEN
+      FINISH_IDX := INSTR(V_SEGMENT,']',START_IDX,1);
+      V_SCRATCH_PAD := SUBSTR(V_SEGMENT,START_IDX+1,FINISH_IDX-START_IDX-1);
+      V_EXCP_SCRATCH_PAD := SUBSTR(V_SEGMENT,FINISH_IDX+1);
+    END IF;
+    IF(V_SCRATCH_PAD IS NOT NULL) THEN
+      V_OUTPUT_SEGMENT.WORK_WEEK_TOTALS := NK_WORK_WEEK_TOTALS();
+      FOR W_IDX IN 0 .. 6 LOOP
+        V_OUTPUT_SEGMENT.WORK_WEEK_TOTALS.EXTEND(1);
+        V_OUTPUT_SEGMENT.WORK_WEEK_TOTALS(W_IDX+1) := TO_NUMBER(regexp_substr(V_SCRATCH_PAD,'[^,]+', 1,W_IDX+1))*3600;
+      END LOOP;
+
+      IF(V_EXCP_SCRATCH_PAD IS NOT NULL)THEN
+        V_OUTPUT_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+
+        -- iterate through the exceptions
+        W_IDX := 1;
+        V_SCRATCH_PAD := regexp_substr(V_EXCP_SCRATCH_PAD,'[^:]+', 1,W_IDX);
+        WHILE(V_SCRATCH_PAD IS NOT NULL) LOOP
+          V_OUTPUT_EXCEPTION := NK_EXCEPTION(0,0,0,null);
+          V_OUTPUT_EXCEPTION.START_DATE := TO_NUMBER(regexp_substr(V_SCRATCH_PAD,'[^-[]+', 1,1));
+          V_OUTPUT_EXCEPTION.FINISH_DATE := V_OUTPUT_EXCEPTION.START_DATE + NVL(TO_NUMBER(regexp_substr(V_SCRATCH_PAD,'[^-[]+', 1,2)),1);
+          START_IDX := INSTR(V_SCRATCH_PAD,'[',1,1);
+          IF(START_IDX &gt;0) THEN
+            FINISH_IDX := INSTR(V_SCRATCH_PAD,']',START_IDX,1);
+            V_OUTPUT_EXCEPTION.TOTAL := TO_NUMBER(SUBSTR(V_SCRATCH_PAD,START_IDX+1,FINISH_IDX-START_IDX-1))*3600;
+          END IF;
+          V_OUTPUT_SEGMENT.EXCEPTIONS.EXTEND(1);
+          V_OUTPUT_SEGMENT.EXCEPTIONS(W_IDX) := V_OUTPUT_EXCEPTION;
+          -- get next exception
+          W_IDX := W_IDX + 1;
+          V_SCRATCH_PAD := regexp_substr(V_EXCP_SCRATCH_PAD,'[^:]+', 1,W_IDX);
+
+        END LOOP;
+
+      END IF;
+    END IF;
+
+    V_OUTPUT_SEGMENT.SEGMENT_SUM := NK_SEGMENT_SUM_JULIAN_FCT(V_OUTPUT_SEGMENT);
+    V_OUTPUT_CURVE.CURVE_SUM := V_OUTPUT_CURVE.CURVE_SUM + V_OUTPUT_SEGMENT.SEGMENT_SUM;
+
+    -- get the next segment
+    S_IDX := S_IDX + 1;
+    V_OUTPUT_CURVE.SEGMENTS.EXTEND(1);
+    V_OUTPUT_CURVE.SEGMENTS(S_IDX) := V_OUTPUT_SEGMENT;
+    P_IDX := P_IDX + 1;
+    V_SEGMENT := regexp_substr(P_CURVE,'[^|]+', 1,P_IDX );
+  END LOOP;
+  return v_output_curve;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

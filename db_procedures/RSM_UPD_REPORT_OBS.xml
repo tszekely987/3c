@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RSM_UPD_REPORT_OBS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RSM_UPD_REPORT_OBS" 
+(
+    obs_type_id IN NUMBER
+)
+AS
+    obs_updated_date DATE;
+    rpt_updated_date DATE;
+BEGIN
+ /* Called From:
+     Procedure         :- 
+     Trigger           :- 
+     PMD TransactionId :- 
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+    SELECT NVL(MAX(LAST_UPDATED_DATE),SysDate)
+    INTO   obs_updated_date
+    FROM   PRJ_OBS_UNITS
+    WHERE  TYPE_ID = obs_type_id;
+
+    SELECT NVL(MAX(LAST_UPDATED_DATE),TO_DATE('01/01/00','MM/DD/YY'))
+    INTO   rpt_updated_date
+    FROM   PRJ_OBS_REPORTING
+    WHERE  TYPE_ID = obs_type_id;
+
+    IF obs_updated_date &gt;= rpt_updated_date THEN
+        DELETE FROM PRJ_OBS_REPORTING WHERE TYPE_ID = obs_type_id;
+        INSERT INTO PRJ_OBS_REPORTING
+           (
+            id,
+            type_id,
+            unit_id,
+            maximum_depth,
+            temp_parent_id,
+            level1_value,
+            level2_value,
+            level3_value,
+            level4_value,
+            level5_value,
+            level6_value,
+            level7_value,
+            level8_value,
+            level9_value,
+            level10_value,
+            created_date,
+            created_by,
+            last_updated_date,
+            last_updated_by
+           )
+        SELECT
+            prj_obs_reporting_s1.NextVal,
+            T.id,
+            U.id,
+            U.depth,
+            U.parent_id,
+            U.unique_name,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            SysDate,
+            1,
+            SysDate,
+            1
+        FROM
+            PRJ_OBS_TYPES T, PRJ_OBS_UNITS U
+        WHERE
+            T.id = U.type_id AND
+            T.id = obs_type_id AND
+            U.depth IN (SELECT MAX(depth) FROM PRJ_OBS_UNITS WHERE type_id = T.id AND
+            name &lt;&gt; 'unlabeled');
+
+        UPDATE PRJ_OBS_REPORTING
+            SET level2_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 1)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 1))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level3_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 2)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 2))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level4_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 3)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 3))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level5_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 4)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 4))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level6_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 5)),
+            temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 5))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level7_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 6)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 6))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level8_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 7)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 7))
+                WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level9_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 8)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 8))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_REPORTING
+            SET level10_value = (SELECT U.unique_name
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 9)),
+                temp_parent_id = (SELECT U.parent_id
+                                FROM   PRJ_OBS_UNITS U
+                                WHERE  temp_parent_id = U.id AND U.depth = (maximum_depth - 9))
+            WHERE type_id = obs_type_id;
+    END IF;
+
+    SELECT NVL(MAX(LAST_UPDATED_DATE),SysDate)
+    INTO   obs_updated_date
+    FROM   PRJ_OBS_LEVELS
+    WHERE  TYPE_ID = obs_type_id;
+
+    SELECT NVL(MAX(LAST_UPDATED_DATE),TO_DATE('01/01/00','MM/DD/YY'))
+    INTO   rpt_updated_date
+    FROM   PRJ_OBS_LABELS
+    WHERE  TYPE_ID = obs_type_id;
+
+    IF obs_updated_date &gt;= rpt_updated_date THEN
+        DELETE FROM PRJ_OBS_LABELS WHERE TYPE_ID = obs_type_id;
+        INSERT INTO PRJ_OBS_LABELS
+           (
+            id,
+            type_id,
+            level1_label,
+            level2_label,
+            level3_label,
+            level4_label,
+            level5_label,
+            level6_label,
+            level7_label,
+            level8_label,
+            level9_label,
+            level10_label,
+            created_date,
+            created_by,
+            last_updated_date,
+            last_updated_by
+           )
+         SELECT
+            prj_obs_labels_s1.NextVal,
+            T.id,
+            L.name,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            SysDate,
+            1,
+            SysDate,
+            1
+        FROM
+            PRJ_OBS_TYPES T, PRJ_OBS_LEVELS L
+        WHERE
+            T.id = L.type_id AND
+            T.id = obs_type_id AND
+            L.obs_level IN (SELECT MAX(obs_level) FROM PRJ_OBS_LEVELS WHERE type_id = T.id and
+                            RTrim(name) &lt;&gt; 'unlabeled');
+
+        UPDATE PRJ_OBS_LABELS
+            SET level2_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-1) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level3_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-2) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level4_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-3) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level5_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-4) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level6_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-5) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level7_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-6) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level8_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-7) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level9_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-8) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+        UPDATE PRJ_OBS_LABELS
+            SET level10_label = (SELECT L.name
+                                FROM   PRJ_OBS_LEVELS L
+                                WHERE  PRJ_OBS_LABELS.type_id = L.type_id AND
+                                       L.obs_level IN (SELECT (MAX(obs_level)-9) FROM PRJ_OBS_LEVELS
+                                                       WHERE L.type_id = type_id AND name &lt;&gt; 'unlabeled'))
+            WHERE type_id = obs_type_id;
+    END IF;
+    COMMIT;
+END RSM_UPD_REPORT_OBS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

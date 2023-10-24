@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.dashboardProjectBaselines" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project Baselines (Instance = Project)" languageCode="en" name="Project Baselines"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT  @select:dim:user_def:implied:period:temp.time_period:time_period@,
+        @select:dim_prop:user_def:implied:period:temp.period_end_date:month_label@,
+        @select:dim:user_def:implied:baseline:temp.id:id@,
+        @select:dim_prop:user_def:implied:baseline:temp.name:baseline_name@,
+        @select:metric:user_def:implied:temp.usage:cumulative_usage@
+FROM   (SELECT  cal.month_key time_period,
+                ld.period_end_date,
+                b.id id,
+                b.name AS name,
+                b.project_id proj_id,
+                SUM(@NVL@(s.slice,0)) OVER(PARTITION BY b.id ORDER BY cal.month_key ROWS UNBOUNDED PRECEDING) usage
+        FROM    prj_baselines b
+        INNER   JOIN prj_baseline_details bd ON  b.id = bd.baseline_id
+        INNER   JOIN prj_blb_slices s ON  bd.id = s.prj_object_id
+        INNER   JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id
+                                              AND sr.request_name IN ('MONTHLYNONCURRENTBASEPROJUSAGE')
+        INNER   JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+        INNER   JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                              AND ld.hierarchy_level = 'MONTH'		
+        WHERE   b.project_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+        AND     bd.is_current = 0		
+        UNION ALL
+        SELECT  cal.month_key time_period,
+                ld.period_end_date,		
+                b.id id,
+                b.name AS name,
+                b.project_id proj_id,
+                SUM(@NVL@(s.slice,0)) OVER(PARTITION BY b.id ORDER BY cal.month_key ROWS UNBOUNDED PRECEDING) usage
+        FROM    inv_investments p
+        INNER   JOIN prj_baselines b ON  p.id = b.project_id 
+                                     AND p.baseline_id = b.id
+        INNER   JOIN prj_baseline_details bd ON  b.id = bd.baseline_id
+        INNER   JOIN prj_blb_slices s ON  bd.id = s.prj_object_id 
+        INNER   JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id
+                                              AND sr.request_name IN ('MONTHLYCURRENTBASEPROJUSAGE')
+        INNER   JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+        INNER   JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                              AND ld.hierarchy_level = 'MONTH' 		
+        WHERE   @LOWER@(p.odf_object_code) = 'project'
+        AND     p.id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+        AND     bd.is_current = 1		
+        UNION ALL
+        SELECT  v.time_period time_period,
+                v.period_end_date,		
+                9999999 id,
+                (SELECT name 
+                 FROM   cmn_lookups_v cmn
+                 WHERE  cmn.lookup_type = 'COP_PORTLET_QUERY_TRANSLATIONS'
+                 AND    cmn.lookup_code = 'Current Plan'
+                 AND    cmn.language_code = @WHERE:PARAM:LANGUAGE@) AS name,
+                 v.proj_id proj_id,
+                 SUM(@NVL@(v.usage,0)) OVER(ORDER BY v.time_period ROWS UNBOUNDED PRECEDING) usage
+        FROM    (SELECT cal.month_key time_period,
+                        ld.period_end_date,		
+                        t.prprojectid proj_id,
+                        SUM(@NVL@(s.slice,0)) usage
+                 FROM   prassignment a          
+                 INNER  JOIN prtask t ON  t.prid = a.prtaskid
+                 INNER  JOIN srm_resources r ON  a.prresourceid = r.id
+                                             AND r.resource_type = 0				 
+                 INNER  JOIN prj_blb_slices s ON  a.prid = s.prj_object_id
+                 INNER  JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id
+                                                      AND sr.request_name IN ('MONTHLYRESOURCEESTCURVE','MONTHLYRESOURCEACTCURVE')
+                 INNER  JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+                 INNER  JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                                      AND ld.hierarchy_level = 'MONTH'				 
+                 WHERE  t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+                 GROUP  BY cal.month_key, ld.period_end_date, t.prprojectid) v
+	   ) temp
+WHERE   @WHERE:SECURITY:PROJECT:temp.proj_id@ 
+AND     @FILTER@]]></nsql>
+            <attribute id="time_period" lookup="COP_PORTLET_MONTHS" required="false">
+              
+              
+              
+              
+              <nls description="Time Period Filter" languageCode="en" name="Time Period Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="month_label" required="false">
+              
+              
+              
+              
+              <nls description="Month" languageCode="en" name="Month"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_name" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Name" languageCode="en" name="Baseline Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cumulative_usage" required="false">
+              
+              
+              
+              
+              <nls description="Cumulative Usage" languageCode="en" name="Cumulative Usage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

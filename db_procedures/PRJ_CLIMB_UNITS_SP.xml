@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_CLIMB_UNITS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_CLIMB_UNITS_SP" (p_unitID NUMBER, p_parentID NUMBER) IS
+   v_currentID NUMBER;
+
+   CURSOR parentUnit IS
+      SELECT PRJ_OBS_UNITS.ID, PRJ_OBS_UNITS.PARENT_ID
+      FROM   PRJ_OBS_UNITS
+      WHERE  PRJ_OBS_UNITS.ID = p_parentID
+      ;
+            
+BEGIN
+   FOR eachRecord IN parentUnit
+   LOOP
+   
+	    CMN_ID_SP('PRJ_OBS_UNITS_FLAT', v_currentID);
+   
+      INSERT INTO PRJ_OBS_UNITS_FLAT
+      (
+         ID,
+         UNIT_ID,
+         BRANCH_UNIT_ID,
+         CREATED_DATE,
+         CREATED_BY,
+         LAST_UPDATED_DATE,
+         LAST_UPDATED_BY
+      )
+      VALUES
+      (
+         v_currentID,
+         p_unitID,
+         eachRecord.ID,
+         sysdate,
+         1,
+         sysdate,
+         1
+      );
+      
+      IF eachRecord.PARENT_ID IS NOT NULL
+      THEN
+         prj_climb_units_sp(p_unitID, eachRecord.PARENT_ID);
+      END IF;
+         
+   END LOOP;
+END prj_climb_units_sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

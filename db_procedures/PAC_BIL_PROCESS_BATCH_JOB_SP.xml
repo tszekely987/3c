@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_PROCESS_BATCH_JOB_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_PROCESS_BATCH_JOB_SP" (
+cUserID   VARCHAR2 ,
+bSelective  NUMBER ,
+cBegEntity  VARCHAR2 ,
+cEndEntity  VARCHAR2 ,
+cBegLocation  VARCHAR2 ,
+cEndLocation  VARCHAR2 ,
+cBegDepartment  VARCHAR2 ,
+cEndDepartment  VARCHAR2 ,
+cBegClient  VARCHAR2 ,
+cEndClient  VARCHAR2 ,
+cBegProjClass   VARCHAR2 ,
+cEndProjClass   VARCHAR2 ,
+cBillCycle  VARCHAR2 ,
+dBillDate   DATE ,
+bConsolidateInvoices  NUMBER ,
+bAutoPost   NUMBER ,
+processBatches  NUMBER  DEFAULT 0,
+printBatch  NUMBER  DEFAULT 0,
+invoiceDate   DATE  DEFAULT '',
+in_printRunKey  IN NUMBER  DEFAULT 0,
+usePrinter  NUMBER  DEFAULT 0,
+contentModePrinter  NUMBER  DEFAULT 0,
+linesPerPagePrinter   NUMBER  DEFAULT 0,
+printerName   VARCHAR2  DEFAULT '',
+useFile   NUMBER  DEFAULT 0,
+contentModeFile   NUMBER  DEFAULT 0,
+linesPerPageFile  NUMBER  DEFAULT 0,
+fileName  VARCHAR2  DEFAULT '',
+languageId  VARCHAR2  DEFAULT 'en',
+generateNegativeInvoices  NUMBER,
+in_cFinProjectType    IN VARCHAR2  )
+AS
+printRunKey   NUMBER;
+StoO_selcnt INTEGER;
+StoO_error  INTEGER;
+StoO_rowcnt INTEGER;
+StoO_crowcnt  INTEGER := 0;
+StoO_fetchstatus  INTEGER := 0;
+StoO_errmsg GLOBALPKG.STRING;
+StoO_sqlstatus  INTEGER;
+iBillRunKey   NUMBER;
+outputType  GLOBALPKG.STRING;
+outputDetailMode  NUMBER;
+outputName  GLOBALPKG.STRING;
+outputLinesPerPage  NUMBER;
+useHSPrinter  NUMBER;
+cBillDate   GLOBALPKG.STRING;
+cInvoiceDate  GLOBALPKG.STRING;
+cFinProjectType GLOBALPKG.STRING;
+bError  NUMBER(10,0);
+toPrinter   NUMBER;
+toFile    NUMBER;
+iRetainPrecision NUMBER; -- retain precision change
+
+
+Temp_rc Pac_Bil_Print_Batch_Sppkg.rct1;
+BEGIN
+  toPrinter := Pac_Bil_Process_Batch_Job_Sp.usePrinter;
+  toFile    := Pac_Bil_Process_Batch_Job_Sp.useFile;
+  cFinProjectType := Pac_Bil_Process_Batch_Job_Sp.in_cFinProjectType;
+
+  IF  ( toPrinter = 1 )
+  THEN
+     toFile := 0;
+  ELSE
+     toFile := 1;
+  END IF;
+
+  Pac_Bil_Process_Batch_Job_Sp.printRunKey := Pac_Bil_Process_Batch_Job_Sp.in_printRunKey;
+  IF  ( Pac_Bil_Process_Batch_Job_Sp.printBatch = 1
+  AND   toPrinter = 0
+  AND   toFile = 0)
+  THEN
+    BEGIN
+       RAISE_APPLICATION_ERROR(-20712, 'Output type not selected');
+       RETURN ;
+    END;
+  END IF;
+  Pac_Bil_Process_Batch_Job_Sp.cBillDate := TO_CHAR(Pac_Bil_Process_Batch_Job_Sp.dBillDate, 'mm/dd/yyyy');
+  Pac_Bil_Process_Batch_Job_Sp.cInvoiceDate := TO_CHAR(Pac_Bil_Process_Batch_Job_Sp.invoiceDate, 'mm/dd/yyyy');
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+
+
+  IF  Pac_Bil_Process_Batch_Job_Sp.processBatches = 1 THEN
+  BEGIN
+
+    IF ( PAC_BIL_PROCESS_BATCH_JOB_SP.bSelective = 0 AND  PAC_BIL_PROCESS_BATCH_JOB_SP.bConsolidateInvoices = 1 ) THEN
+       RAISE_APPLICATION_ERROR( -20988, 'If you select Consolidate Invoices, you must use the Selective screen to indicate which Projects to combine onto one invoice.');
+    END IF;
+    SELECT CMN_GET_RETAIN_PRECISION_FCT() INTO iRetainPrecision FROM DUAL; -- retain precision change
+    
+    Pac_Bil_Process_Batches_Sp (Pac_Bil_Process_Batch_Job_Sp.cUserID,
+                  Pac_Bil_Process_Batch_Job_Sp.bSelective,
+                  Pac_Bil_Process_Batch_Job_Sp.cBegEntity,
+                  Pac_Bil_Process_Batch_Job_Sp.cEndEntity,
+                  Pac_Bil_Process_Batch_Job_Sp.cBegLocation,
+                  Pac_Bil_Process_Batch_Job_Sp.cEndLocation,
+                  Pac_Bil_Process_Batch_Job_Sp.cBegDepartment,
+                  Pac_Bil_Process_Batch_Job_Sp.cEndDepartment,
+                  Pac_Bil_Process_Batch_Job_Sp.cBegClient,
+                  Pac_Bil_Process_Batch_Job_Sp.cEndClient,
+                  Pac_Bil_Process_Batch_Job_Sp.cBegProjClass,
+                  Pac_Bil_Process_Batch_Job_Sp.cEndProjClass,
+                  Pac_Bil_Process_Batch_Job_Sp.cBillCycle,
+                  Pac_Bil_Process_Batch_Job_Sp.cBillDate,
+                  Pac_Bil_Process_Batch_Job_Sp.cFinProjectType,
+                  Pac_Bil_Process_Batch_Job_Sp.bConsolidateInvoices,
+                  Pac_Bil_Process_Batch_Job_Sp.generateNegativeInvoices,
+                  Pac_Bil_Process_Batch_Job_Sp.bAutoPost,
+                  Pac_Bil_Process_Batch_Job_Sp.iBillRunKey,
+                  Pac_Bil_Process_Batch_Job_Sp.bError,
+                  Pac_Bil_Process_Batch_Job_Sp.iRetainPrecision -- retain precision change
+                  );
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+  IF  Pac_Bil_Process_Batch_Job_Sp.printBatch = 1 THEN
+  BEGIN
+    IF  Pac_Bil_Process_Batch_Job_Sp.printRunKey = 0 THEN
+      Pac_Bil_Process_Batch_Job_Sp.printRunKey :=  Pac_Bil_Process_Batch_Job_Sp.iBillRunKey;
+    END IF;
+    IF  toPrinter = 1 THEN
+      Pac_Bil_Process_Batch_Job_Sp.outputType :=  'P';
+      Pac_Bil_Process_Batch_Job_Sp.outputDetailMode :=  Pac_Bil_Process_Batch_Job_Sp.contentModePrinter;
+      Pac_Bil_Process_Batch_Job_Sp.outputName :=  Pac_Bil_Process_Batch_Job_Sp.printerName;
+      Pac_Bil_Process_Batch_Job_Sp.outputLinesPerPage :=  Pac_Bil_Process_Batch_Job_Sp.linesPerPagePrinter;
+      Pac_Bil_Process_Batch_Job_Sp.useHSPrinter :=  toPrinter;
+    END IF;
+    IF  toFile = 1 THEN
+      Pac_Bil_Process_Batch_Job_Sp.outputType :=  'F';
+      Pac_Bil_Process_Batch_Job_Sp.outputDetailMode :=  Pac_Bil_Process_Batch_Job_Sp.contentModeFile;
+      Pac_Bil_Process_Batch_Job_Sp.outputName :=  Pac_Bil_Process_Batch_Job_Sp.fileName;
+      Pac_Bil_Process_Batch_Job_Sp.outputLinesPerPage :=  Pac_Bil_Process_Batch_Job_Sp.linesPerPageFile;
+      Pac_Bil_Process_Batch_Job_Sp.useHSPrinter :=  toFile;
+    END IF;
+
+    BEGIN
+    Pac_Bil_Print_Batch_Sp (Pac_Bil_Process_Batch_Job_Sp.cUserID,
+                Pac_Bil_Process_Batch_Job_Sp.printRunKey,
+                Pac_Bil_Process_Batch_Job_Sp.cInvoiceDate,
+                Pac_Bil_Process_Batch_Job_Sp.useHSPrinter,
+                Pac_Bil_Process_Batch_Job_Sp.outputDetailMode,
+                Pac_Bil_Process_Batch_Job_Sp.languageId,
+                temp_rc);
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+    IF StoO_error = 0 THEN
+       COMMIT WORK;
+    END IF;
+  END;
+  END IF;
+
+  BEGIN
+  Pac_Bil_Sched_Job_Sp(Pac_Bil_Process_Batch_Job_Sp.iBillRunKey,
+             Pac_Bil_Process_Batch_Job_Sp.printRunKey,
+             Pac_Bil_Process_Batch_Job_Sp.cUserID,
+             Pac_Bil_Process_Batch_Job_Sp.outputType,
+             Pac_Bil_Process_Batch_Job_Sp.outputName,
+             Pac_Bil_Process_Batch_Job_Sp.outputLinesPerPage);
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+  END;
+
+  BEGIN
+    IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 2 ) THEN
+      BEGIN
+        COMMIT WORK;
+        RAISE_APPLICATION_ERROR( -20306, 'Validation failed: Amount billed exceeded Contract amount.' );
+      END;
+      ELSIF ( Pac_Bil_Process_Batch_Job_Sp.bError != 0 ) THEN
+      BEGIN
+        IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 3 ) then
+          RAISE_APPLICATION_ERROR(-20985, 'You cannot select more than one project with billing subprojects.');
+        END IF;
+        IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 4 ) then
+          RAISE_APPLICATION_ERROR(-20986, 'You cannot bill projects with different project types when one project has billing subprojects.');
+        END IF;
+        IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 5 ) then
+          RAISE_APPLICATION_ERROR(-20911, 'You have selected more than one client to bill. Only one client may be billed at a time.');
+        END IF;
+        IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 6 ) then
+          RAISE_APPLICATION_ERROR(-20884, 'Projects with different billing currencies cannot be consolidated onto one invoice.');
+        END IF;
+        IF ( Pac_Bil_Process_Batch_Job_Sp.bError = 7 ) then
+          RAISE_APPLICATION_ERROR(-20917, 'Projects with different billing addresses cannot be consolidated onto one invoice.');
+        END IF;           
+      END;
+    END IF;
+  END;
+
+END Pac_Bil_Process_Batch_Job_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

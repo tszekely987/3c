@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_OPTIONS_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_OPTIONS_DEL_SP" (P_OPTION_CODE IN VARCHAR2)
+IS
+   V_ID                          NUMBER;
+BEGIN
+   /* Delete lookup values first */
+   CMN_OPTION_VALUES_DEL_SP (P_OPTION_CODE);
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_ID
+   FROM     CMN_OPTIONS
+   WHERE    OPTION_CODE = P_OPTION_CODE;
+   IF (V_ID != -9)
+   THEN
+      /* Delete captions */
+      CMN_CAPTIONS_NLS_DEL_SP ('CMN_OPTIONS', V_ID);
+      /* Delete lookup type */
+      DELETE
+        FROM CMN_OPTIONS
+       WHERE ID = V_ID;
+   END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

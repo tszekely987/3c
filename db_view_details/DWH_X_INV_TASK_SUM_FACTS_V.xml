@@ -1,0 +1,36 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_X_INV_TASK_SUM_FACTS_V">
+    <indexes/>
+    <text_length>1896</text_length>
+    <text>SELECT t.prID task_key,
+       t.prProjectID investment_key,
+       MAX(NVL(ev.itd_bcwp,0)) ev_earned_value,
+       MAX(NVL(ev.itd_bcws,0)) ev_planned_value,
+       MAX(NVL(ev.itd_bcwp,0) - NVL(ev.itd_acwp,0)) ev_cost_var,
+       MAX(NVL(ev.itd_bcwp,0) - NVL(ev.itd_bcws,0)) ev_schedule_var,
+       MAX(CASE WHEN NVL(ev.itd_bcwp,0) &lt;&gt; 0 THEN ((NVL(ev.itd_bcwp,0) - NVL(ev.itd_acwp,0)) / NVL(ev.itd_bcwp,0)) * 100
+            ELSE 0 END) ev_cost_var_pct,
+       MAX(CASE WHEN NVL(ev.itd_bcws,0) &lt;&gt; 0 THEN ((NVL(ev.itd_bcwp,0) - NVL(ev.itd_bcws,0)) / NVL(ev.itd_bcws,0)) * 100
+            ELSE 0 END) ev_schedule_var_pct,
+       MAX(CASE WHEN NVL(ev.itd_acwp,0) &lt;&gt; 0 THEN (NVL(ev.itd_bcwp,0) / NVL(ev.itd_acwp,0)) * 100
+            ELSE 0 END) ev_cpi, 
+       MAX(CASE WHEN NVL(ev.itd_bcws,0) &lt;&gt; 0 THEN (NVL(ev.itd_bcwp,0) / NVL(ev.itd_bcws,0)) * 100
+            ELSE 0 END) ev_spi,
+       MAX(CASE WHEN NVL(t.prpctcomplete, 0) &lt; 10000000000000 THEN NVL(t.prpctcomplete,0) * 100 ELSE 0 END) pct_complete,
+	   MAX(NVL(todo.todo_open_count,0)) todo_open_count,
+	   MAX(NVL(todo.todo_completed_count,0)) todo_completed_count,
+	   MAX(NVL(todo.todo_total_count,0)) todo_total_count,
+       MAX(GREATEST(t.last_updated_date, 
+	            NVL(ev.last_updated_date,TO_DATE('01/01/1910','MM/DD/YYYY')),
+	            NVL(todo.last_updated_date,TO_DATE('01/01/1910','MM/DD/YYYY')))) clarity_updated_date,
+	   MAX(NVL(bd.usage_sum / 3600, 0)) base_hours,
+	   MAX(NVL(bd.cost_sum, 0)) base_cost
+FROM   prTask t 
+       LEFT JOIN prj_baseline_details bd ON t.prid = bd.object_id AND bd.object_type = 'TASK' AND bd.is_current = 1  
+       LEFT OUTER JOIN prj_ev_history ev ON t.prID = ev.object_id
+                                        AND ev.object_type = 'TASK' AND ev.period_number = 0
+	   LEFT OUTER JOIN dwh_x_inv_task_todo_facts_v todo ON t.prID = todo.task_key
+WHERE  1=1
+GROUP BY t.prID, t.prProjectID</text>
+  </QueryResult>
+</ClarityDBViewQuery>

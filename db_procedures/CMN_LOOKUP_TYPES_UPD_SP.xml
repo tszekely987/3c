@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUP_TYPES_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUP_TYPES_UPD_SP" (
+   P_LOOKUP_TYPE             IN   VARCHAR2,
+   P_LOOKUP_TYPE_NAME        IN   VARCHAR2,
+   P_LOOKUP_TYPE_DESCRIPTION IN   VARCHAR2,
+   P_IS_SYSTEM               IN   NUMBER,
+   P_IS_ACTIVE               IN   NUMBER,
+   P_IS_ADMIN_VISIBLE        IN   NUMBER,
+   P_IS_SORTED_ALPHA         IN   NUMBER,
+   P_INTERNAL_ID_COLUMN      IN   VARCHAR2 DEFAULT 'lookup_code',
+   P_DISPLAY_LABEL_COLUMN    IN   VARCHAR2 DEFAULT 'name',   
+   P_LAST_UPDATED_BY         IN   NUMBER DEFAULT 1
+)
+IS
+   V_COUNT                       NUMBER;
+   V_ID                          NUMBER;
+   v_key_attribute_id NUMBER;
+   v_label_attribute_id NUMBER;
+BEGIN
+   SELECT   NVL (MAX (ID), -9)
+   INTO     V_ID
+   FROM     CMN_LOOKUP_TYPES
+   WHERE    LOOKUP_TYPE = P_LOOKUP_TYPE;
+   IF (V_ID != -9)
+   THEN
+   	/* Get the CMN_ATTRIBUTES.ID value for the
+   	    p_internal_id and p_display_label
+   	 */ 
+BEGIN
+SELECT 
+  a.id
+  INTO v_key_attribute_id
+FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = upper(P_INTERNAL_ID_COLUMN)
+  and table_name = 'CMN_LOV_OBJECTS';
+  EXCEPTION
+  	WHEN NO_DATA_FOUND THEN
+	SELECT 
+  a.id
+  INTO v_key_attribute_id
+FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = 'ID'
+  and table_name = 'CMN_LOV_OBJECTS';
+  END;
+IF v_key_attribute_id IS NULL OR v_key_attribute_id &lt;= 0
+THEN
+	SELECT 
+  a.id
+  INTO v_key_attribute_id
+FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = 'ID'
+  and table_name = 'CMN_LOV_OBJECTS';
+END IF;
+
+BEGIN
+SELECT 
+  a.id
+  INTO   v_label_attribute_id
+  FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = upper(P_DISPLAY_LABEL_COLUMN)
+  and table_name = 'CMN_LOV_OBJECTS' ;
+  EXCEPTION
+  	WHEN NO_DATA_FOUND THEN
+	SELECT 
+  a.id
+  INTO   v_label_attribute_id
+FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = 'NAME'
+  and table_name = 'CMN_LOV_OBJECTS';
+  END;
+IF   v_label_attribute_id IS NULL OR v_label_attribute_id &lt;= 0
+THEN
+	SELECT 
+  a.id
+  INTO   v_label_attribute_id
+FROM 
+  cmn_attributes a
+WHERE 
+  upper(a.column_name) = 'NAME'
+  and table_name = 'CMN_LOV_OBJECTS';
+END IF;  
+     	    
+      UPDATE CMN_LOOKUP_TYPES
+         SET IS_SYSTEM = P_IS_SYSTEM,
+             IS_ACTIVE = P_IS_ACTIVE,
+             IS_ADMIN_VISIBLE = P_IS_ADMIN_VISIBLE,
+             IS_SORTED_ALPHA = P_IS_SORTED_ALPHA,
+             LAST_UPDATED_DATE = SYSDATE,
+             LAST_UPDATED_BY = P_LAST_UPDATED_BY
+       WHERE ID = V_ID;
+       
+		 UPDATE CMN_LOV_OBJECTS
+		set key_attribute_id =  v_key_attribute_id,
+		label_Attribute_id =   v_label_attribute_id
+		where lookup_type_code =  P_LOOKUP_TYPE;
+
+       
+      /* Find out if this lookup type was already translated */
+      SELECT   COUNT (DISTINCT (NAME || DESCRIPTION))
+      INTO     V_COUNT
+      FROM     CMN_CAPTIONS_NLS
+      WHERE    TABLE_NAME = 'CMN_LOOKUP_TYPES'
+      AND      PK_ID = V_ID;
+      IF (V_COUNT &lt;= 1)/* Not translated yet or doesn't exist yet */
+      THEN
+         CMN_CAPTIONS_NLS_UPD_SP (
+            'CMN_LOOKUP_TYPES',
+            V_ID,
+            P_LOOKUP_TYPE_NAME,
+            P_LOOKUP_TYPE_DESCRIPTION,
+            P_LAST_UPDATED_BY
+         );
+      END IF;
+   END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="agl.prjAcceptedFeatures" isUserPortletAvailable="0" source="agl.ca.com">
+            
+            
+            
+            
+            <nls description="Accepted Features" languageCode="en" name="Accepted Features"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:b.sort:sort@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:b.c_label:label@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:b.progress:complete@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:100-b.progress:remaining@
+FROM  (SELECT t.prprojectid,
+              p_label.name @+@ @DBUSER@.CMN_TO_CHAR_FCT(@NVL@(a.accepted_pts,0)) @+@ ' / ' @+@ @DBUSER@.CMN_TO_CHAR_FCT(SUM(@NVL@(odf_t.agl_tsk_est_stypts,0))) AS c_label,  
+              CASE WHEN SUM(@NVL@(odf_t.agl_tsk_est_stypts,0)) = 0 THEN 0 ELSE (@NVL@(a.accepted_pts,0) / SUM(odf_t.agl_tsk_est_stypts)) * 100 END progress,
+              1 sort
+       FROM   prtask t 
+              INNER JOIN odf_ca_task odf_t ON t.prid = odf_t.id
+              INNER JOIN (SELECT name 
+                          FROM   cmn_lookups_v cmn
+                          WHERE  cmn.lookup_type = 'AGL_PORTLET_QUERY_TRANSLATIONS'
+                          AND    cmn.lookup_code = 'Stories Complete Points'
+                          AND    cmn.language_code = @WHERE:PARAM:LANGUAGE@) p_label ON 1 = 1
+              LEFT OUTER JOIN (SELECT tt.prprojectid, SUM(@NVL@(odf_tt.agl_tsk_acp_stypts,0)) accepted_pts
+                               FROM   prtask tt
+                                      INNER JOIN odf_ca_task odf_tt ON tt.prid = odf_tt.id
+                               WHERE  odf_tt.agl_tsk_pctdon_plest = 1
+                               AND    tt.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@							   
+                               AND   (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_tt.agl_tsk_release)
+                               AND   (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+                                      OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT @DBUSER@.CMN_TO_NUMBER_FCT(mvl.value)
+                                                                                      FROM   odf_multi_valued_lookups mvl
+                                                                                      WHERE  mvl.pk_id = odf_tt.id
+                                                                                      AND    mvl.attribute = 'agl_tsk_milestones'))
+                               GROUP BY tt.prprojectid) a ON t.prprojectid = a.prprojectid
+       WHERE  odf_t.agl_tsk_id IS NOT NULL
+       AND    odf_t.agl_tsk_story_id IS NULL
+       AND    (odf_t.agl_tsk_ordinal IS NULL OR odf_t.agl_tsk_ordinal = 0)
+       AND    t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+       AND   (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_t.agl_tsk_release)
+       AND   (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+              OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT @DBUSER@.CMN_TO_NUMBER_FCT(mvl.value)
+                                                              FROM   odf_multi_valued_lookups mvl
+                                                              WHERE  mvl.pk_id = odf_t.id
+                                                              AND    mvl.attribute = 'agl_tsk_milestones'))
+       GROUP  BY t.prprojectid, p_label.name, a.accepted_pts
+       UNION
+       SELECT t.prprojectid,
+              p_label.name @+@ @DBUSER@.CMN_TO_CHAR_FCT(@NVL@(a.accepted_sty,0)) @+@ ' / ' @+@ @DBUSER@.CMN_TO_CHAR_FCT(SUM(@NVL@(odf_t.agl_tsk_est_usrsty,0))) AS c_label,
+              CASE WHEN SUM(@NVL@(odf_t.agl_tsk_est_usrsty,0)) = 0 THEN 0 ELSE (@NVL@(a.accepted_sty,0) / SUM(odf_t.agl_tsk_est_usrsty)) * 100 END progress,
+              2 sort
+       FROM   prtask t 
+              INNER JOIN odf_ca_task odf_t on t.prid = odf_t.id
+              INNER JOIN (SELECT name 
+                          FROM   cmn_lookups_v cmn
+                          WHERE  cmn.lookup_type = 'AGL_PORTLET_QUERY_TRANSLATIONS'
+                          AND    cmn.lookup_code = 'Stories Complete Count'
+                          AND    cmn.language_code = @WHERE:PARAM:LANGUAGE@) p_label ON 1 = 1
+              LEFT OUTER JOIN (SELECT tt.prprojectid, SUM(@NVL@(odf_tt.agl_tsk_acp_usrsty,0)) accepted_sty
+                               FROM   prtask tt
+                                      INNER JOIN odf_ca_task odf_tt ON tt.prid = odf_tt.id
+                               WHERE  odf_tt.agl_tsk_pctdon_stc = 1
+                               AND    tt.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@							   
+                               AND   (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_tt.agl_tsk_release)
+                               AND   (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+                                      OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT @DBUSER@.CMN_TO_NUMBER_FCT(mvl.value)
+                                                                                      FROM   odf_multi_valued_lookups mvl
+                                                                                      WHERE  mvl.pk_id = odf_tt.id
+                                                                                      AND    mvl.attribute = 'agl_tsk_milestones'))
+                               GROUP BY tt.prprojectid) a ON t.prprojectid = a.prprojectid						  
+       WHERE  odf_t.agl_tsk_id IS NOT NULL
+       AND    odf_t.agl_tsk_story_id IS NULL
+       AND    (odf_t.agl_tsk_ordinal IS NULL OR odf_t.agl_tsk_ordinal = 0)
+       AND    t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+       AND   (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_t.agl_tsk_release)
+       AND   (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+              OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT @DBUSER@.CMN_TO_NUMBER_FCT(mvl.value)
+                                                              FROM   odf_multi_valued_lookups mvl
+                                                              WHERE  mvl.pk_id = odf_t.id
+                                                              AND    mvl.attribute = 'agl_tsk_milestones'))
+       GROUP BY t.prprojectid, p_label.name, a.accepted_sty) b
+WHERE @FILTER@]]></nsql>
+            <attribute id="sort" required="false">
+              
+              
+              
+              
+              <nls description="Sort" languageCode="en" name="Sort"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="label" required="false">
+              
+              
+              
+              
+              <nls description="Label" languageCode="en" name="Label"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="complete" required="false">
+              
+              
+              
+              
+              <nls description="Complete" languageCode="en" name="Complete"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="remaining" required="false">
+              
+              
+              
+              
+              <nls description="Remaining" languageCode="en" name="Remaining"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_release" lookup="AGL_RELEASES" required="false">
+              
+              
+              
+              
+              <nls description="Agile Release Filter" languageCode="en" name="Agile Release Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_milestone" lookup="AGL_MILESTONES" required="false">
+              
+              
+              
+              
+              <nls description="Agile Milestone Filter" languageCode="en" name="Agile Milestone Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

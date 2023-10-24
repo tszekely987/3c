@@ -1,0 +1,53 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_M_ASSIGN_HRS_V">
+    <indexes/>
+    <text_length>2437</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.prID ASSIGNMENT_ID,
+       a.TEAM_ID,
+       s.slice_date MONTH_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEACTCURVE' THEN
+          (CASE WHEN r.resource_type = 0 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ACTUAL_L_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEACTCURVE' THEN
+          (CASE WHEN r.resource_type = 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ACTUAL_Q_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEESTCURVE' THEN
+          (CASE WHEN r.resource_type = 0 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ETC_L_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEESTCURVE' THEN
+          (CASE WHEN r.resource_type = 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ETC_Q_HOURS,
+       0 BASELINE_L_HOURS,
+       0 BASELINE_Q_HOURS
+FROM   prTask t
+       INNER JOIN prAssignment a ON t.prID = a.prTaskID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON a.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name IN ('MONTHLYRESOURCEACTCURVE','MONTHLYRESOURCEESTCURVE'))
+AND   (r.resource_type &lt;= 1)
+GROUP BY t.prProjectID, t.prID, a.prID, s.slice_date, a.team_id
+UNION ALL
+SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.prID ASSIGNMENT_ID,
+       a.TEAM_ID,
+       s.slice_date MONTH_START_DATE,
+       0 ACTUAL_L_HOURS, 0 ACTUAL_Q_HOURS,
+       0 ETC_L_HOURS, 0 ETC_Q_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEBASECURVE' THEN
+          (CASE WHEN r.resource_type = 0 THEN s.slice ELSE 0 END) ELSE 0 END,0)) BASELINE_L_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEBASECURVE' THEN
+          (CASE WHEN r.resource_type = 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) BASELINE_Q_HOURS
+FROM   prTask t
+       INNER JOIN prAssignment a ON t.prID = a.prTaskID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_baseline_details bd ON a.prID = bd.object_id
+       INNER JOIN prj_blb_slices s ON bd.id = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name = 'MONTHLYRESOURCEBASECURVE')
+AND   (bd.object_type = 'ASSIGNMENT')
+AND   (bd.is_current = 1)
+AND   (r.resource_type &lt;= 1)
+GROUP BY t.prProjectID, t.prID, a.prID, s.slice_date, a.team_id
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

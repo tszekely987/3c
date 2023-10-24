@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_ASSIGNCREDITMEMONUMBER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_ASSIGNCREDITMEMONUMBER" (
+  cClient   VARCHAR2 ,
+  cProject  VARCHAR2 ,
+  cGroupNo  VARCHAR2 ,
+  cUserID   VARCHAR2 ,
+  in_cInvoiceDate   IN VARCHAR2 ,
+  cNextCMNo   IN OUT VARCHAR2,
+  cBillTo   IN OUT VARCHAR2
+)
+AS
+  cInvoiceDate  GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  msg   GLOBALPKG.STRING;
+  dInvoiceDate  DATE;
+BEGIN
+ /* Called From:
+     Procedure             :- INT_ASSIGNCREDITMEMONUMBER
+     Trigger                   :- None
+     PMD TransactionId :-
+     WMD ActionId        :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	bb_AssignCreditMemoNumber.cInvoiceDate := bb_AssignCreditMemoNumber.in_cInvoiceDate;
+	bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+	IF  NVL(RTRIM(bb_AssignCreditMemoNumber.cInvoiceDate), '') IS NULL THEN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   MIN(RPAD(TO_CHAR(B.BillingDate,'mm/dd/yyyy'), 12, ' '))
+			INTO bb_AssignCreditMemoNumber.cInvoiceDate FROM ppa_Billings B
+			WHERE B.InvoiceNo = bb_AssignCreditMemoNumber.cGroupNo
+			 and B.TransType = 'BC';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	SAVEPOINT TRAN1;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE semaphore2
+    SET value = 0;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  bb_AssignCreditMemoNumber.dInvoiceDate :=  TO_DATE(bb_AssignCreditMemoNumber.cInvoiceDate, 'mm/dd/yyyy');
+
+  BEGIN
+    sp_updateinvcreditmemono(transtype=&gt;'BC',
+    COMPANY_CODE=&gt;bb_AssignCreditMemoNumber.cClient,
+    invcdate=&gt;bb_AssignCreditMemoNumber.dInvoiceDate,
+    arinvcnmbr=&gt;bb_AssignCreditMemoNumber.cNextCMNo);
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT TRAN1;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT BILL_TO_COMPANY_CODE
+      INTO bb_AssignCreditMemoNumber.cBillTo
+      FROM pac_mnt_projects
+		WHERE COMPANY_CODE = bb_AssignCreditMemoNumber.cClient
+		 AND PROJECT_CODE = bb_AssignCreditMemoNumber.cProject;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	SAVEPOINT TRAN2;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE ppa_Billings
+    SET InvoiceNo = bb_AssignCreditMemoNumber.cNextCMNo,
+    BillingDate = TO_DATE(bb_AssignCreditMemoNumber.cInvoiceDate,'mm/dd/yyyy'),
+    LASTUPDTDBY_RESOURCE_CODE = bb_AssignCreditMemoNumber.cUserID,
+    LastUpdateDate = SYSDATE
+    WHERE InvoiceNo = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE invoiceheader
+    SET invoiceno = bb_AssignCreditMemoNumber.cNextCMNo,
+    printed = 1,
+    status = '0',
+    BILL_TO_COMPANY_CODE = bb_AssignCreditMemoNumber.cBillTo,
+    invoicedate = TO_DATE(bb_AssignCreditMemoNumber.cInvoiceDate,'mm/dd/yyyy')
+    WHERE invoiceno = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	END IF;
+	--- MultiCurrency Change update invoiceheader_values invoice number ---
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE invoiceheader_values
+    SET invoiceno = bb_AssignCreditMemoNumber.cNextCMNo
+    WHERE invoiceno = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	END IF;
+
+		--- MultiCurrency Change update PAC_BIL_INVOICE_TRN_DETAILS invoice number ---
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE PAC_BIL_INVOICE_TRN_DETAILS
+    SET Invoice_No = bb_AssignCreditMemoNumber.cNextCMNo
+    WHERE Invoice_No = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE ppa_InvoiceDetails
+    SET InvoiceNo = bb_AssignCreditMemoNumber.cNextCMNo
+    WHERE InvoiceNo = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	ELSE
+		COMMIT WORK;
+	END IF;
+--- MultiCurrency Change update ppa_invoicedetails_values invoice number ---
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    UPDATE ppa_InvoiceDetails_values
+    SET InvoiceNo = bb_AssignCreditMemoNumber.cNextCMNo
+    WHERE InvoiceNo = bb_AssignCreditMemoNumber.cGroupNo;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN2;
+		bb_AssignCreditMemoNumber.cNextCMNo :=  NULL;
+		RETURN ;
+	END;
+	ELSE
+		COMMIT WORK;
+	END IF;
+END bb_AssignCreditMemoNumber;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

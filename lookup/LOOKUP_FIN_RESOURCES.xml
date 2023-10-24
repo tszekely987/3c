@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="LOOKUP_FIN_RESOURCES" displayAttributeName="full_name" hiddenAttributeName="resource_id" objectCode="" sortAttributeName="full_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Financial Resources" languageCode="en" name="Financial Resources"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[select @SELECT:SR.id:RESOURCE_ID@, @SELECT:SR.unique_name:RESOURCE_CODE@, @SELECT:SR.full_name:FULL_NAME@,
+                @SELECT:SR.LAST_NAME:LAST_NAME@,
+                @SELECT:SR.FIRST_NAME:FIRST_NAME@,
+        @SELECT:(case
+		           when SR.RESOURCE_TYPE=0 then 'L'
+		           when SR.RESOURCE_TYPE=1 then 'Q'
+		           when SR.RESOURCE_TYPE=2 then 'M'
+		           when SR.RESOURCE_TYPE=3 then 'X'
+        END):resource_type@,
+        @SELECT:NLS.NAME:resource_type_caption@,
+        @SELECT:LANG.ID:LANGUAGE_ID@,
+        @SELECT:LANG.LANGUAGE_CODE:LANGUAGE_CODE@,
+        @SELECT:SR.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+	from SRM_RESOURCES SR,  PRJ_RESOURCES PRJRES,PAC_MNT_RESOURCES PR, CMN_LOOKUPS_V NLS, CMN_LANGUAGES LANG
+	where
+	@FILTER@
+	and SR.id=PR.id
+	and SR.id=PRJRES.PRID
+	and PRJRES.PRISROLE = 0
+	and NLS.language_code = @WHERE:PARAM:LANGUAGE@
+	and NLS.lookup_type = 'RESOURCE_TYPE'
+	and NLS.lookup_code = SR.RESOURCE_TYPE
+    AND NLS.LANGUAGE_CODE = LANG.LANGUAGE_CODE
+  AND (@WHERE:SECURITY:RESOURCE:SR.ID@)
+	@BROWSE-ONLY:
+	AND SR.IS_ACTIVE=1
+	AND PR.ACTIVE=1
+	AND (SR.RESOURCE_TYPE IN(
+      select (case
+          when VALUE='LABOR' then 0
+          when VALUE='EQUIPMENT' then 1
+          when VALUE='MATERIAL' then 2
+          when VALUE='EXPENSE' then 3
+        END) RESOURCE_TYPE from ODF_MULTI_VALUED_LOOKUPS where object='transactionheader' and attribute='txn_type'
+        and pk_id = @WHERE:PARAM:USER_DEF:STRING:TXN_HEADER_ID_CONSTRAIN@ ) or
+        @WHERE:PARAM:USER_DEF:STRING:TXN_HEADER_ID_CONSTRAIN@ is null)
+  :BROWSE-ONLY@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[select @SELECT:SR.id:RESOURCE_ID@, @SELECT:SR.unique_name:RESOURCE_CODE@, @SELECT:SR.full_name:FULL_NAME@,
+                @SELECT:SR.LAST_NAME:LAST_NAME@,
+                @SELECT:SR.FIRST_NAME:FIRST_NAME@,
+        @SELECT:(case
+		           when SR.RESOURCE_TYPE=0 then 'L'
+		           when SR.RESOURCE_TYPE=1 then 'Q'
+		           when SR.RESOURCE_TYPE=2 then 'M'
+		           when SR.RESOURCE_TYPE=3 then 'X'
+        END):resource_type@,
+        @SELECT:NLS.NAME:resource_type_caption@,
+        @SELECT:LANG.ID:LANGUAGE_ID@,
+        @SELECT:LANG.LANGUAGE_CODE:LANGUAGE_CODE@,
+        @SELECT:SR.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+	from SRM_RESOURCES SR,  PRJ_RESOURCES PRJRES,PAC_MNT_RESOURCES PR, CMN_LOOKUPS_V NLS, CMN_LANGUAGES LANG
+	where
+	@FILTER@
+	and SR.id=PR.id
+	and SR.id=PRJRES.PRID
+	and PRJRES.PRISROLE = 0
+	and NLS.language_code = @WHERE:PARAM:LANGUAGE@
+	and NLS.lookup_type = 'RESOURCE_TYPE'
+	and NLS.lookup_code = SR.RESOURCE_TYPE
+    AND NLS.LANGUAGE_CODE = LANG.LANGUAGE_CODE
+  AND (@WHERE:SECURITY:RESOURCE:SR.ID@)
+	@BROWSE-ONLY:
+	AND SR.IS_ACTIVE=1
+	AND PR.ACTIVE=1
+	AND (SR.RESOURCE_TYPE IN(
+      select (case
+          when VALUE='LABOR' then 0
+          when VALUE='EQUIPMENT' then 1
+          when VALUE='MATERIAL' then 2
+          when VALUE='EXPENSE' then 3
+        END) RESOURCE_TYPE from ODF_MULTI_VALUED_LOOKUPS where object='transactionheader' and attribute='txn_type'
+        and pk_id = @WHERE:PARAM:USER_DEF:STRING:TXN_HEADER_ID_CONSTRAIN@ ) or
+        @WHERE:PARAM:USER_DEF:STRING:TXN_HEADER_ID_CONSTRAIN@ is null)
+  :BROWSE-ONLY@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[select @SELECT:SR.id:RESOURCE_ID@, @SELECT:SR.unique_name:RESOURCE_CODE@, @SELECT:SR.full_name:FULL_NAME@,
+                @SELECT:SR.LAST_NAME:LAST_NAME@,
+                @SELECT:SR.FIRST_NAME:FIRST_NAME@,
+        @SELECT:(case
+		           when SR.RESOURCE_TYPE=0 then 'L'
+		           when SR.RESOURCE_TYPE=1 then 'Q'
+		           when SR.RESOURCE_TYPE=2 then 'M'
+		           when SR.RESOURCE_TYPE=3 then 'X'
+        END):resource_type@,
+        @SELECT:NLS.NAME:resource_type_caption@,
+        @SELECT:LANG.ID:LANGUAGE_ID@,
+        @SELECT:LANG.LANGUAGE_CODE:LANGUAGE_CODE@,
+        @SELECT:SR.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+	from SRM_RESOURCES SR,  PRJ_RESOURCES PRJRES,PAC_MNT_RESOURCES PR, CMN_LOOKUPS_V NLS, CMN_LANGUAGES LANG
+	where
+	@FILTER@
+	and SR.id=PR.id
+	and SR.id=PRJRES.PRID
+	and PRJRES.PRISROLE = 0
+	and NLS.language_code = @WHERE:PARAM:LANGUAGE@
+	and NLS.lookup_type = 'RESOURCE_TYPE'
+	and NLS.lookup_code = cast (SR.RESOURCE_TYPE as text)
+    AND NLS.LANGUAGE_CODE = LANG.LANGUAGE_CODE
+  AND (@WHERE:SECURITY:RESOURCE:SR.ID@)
+	@BROWSE-ONLY:
+	AND SR.IS_ACTIVE=1
+	AND PR.ACTIVE=1
+	AND (SR.RESOURCE_TYPE IN(
+      select (case
+          when VALUE='LABOR' then 0
+          when VALUE='EQUIPMENT' then 1
+          when VALUE='MATERIAL' then 2
+          when VALUE='EXPENSE' then 3
+        END) RESOURCE_TYPE from ODF_MULTI_VALUED_LOOKUPS where object='transactionheader' and attribute='txn_type'
+        and pk_id = @WHERE:PARAM:USER_DEF:INTEGER:TXN_HEADER_ID_CONSTRAIN@ ) or
+        @WHERE:PARAM:USER_DEF:INTEGER:TXN_HEADER_ID_CONSTRAIN@ is null)
+  :BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="full_name"/>
+              <displayedSuggestionAttribute value="resource_code"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="full_name"/>
+              <searchedSuggestionAttribute value="resource_code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Resource" languageCode="en" name="Select Resource"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Resources" languageCode="en" name="Select Resources"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="resource_code" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource ID" languageCode="en" name="Resource ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="full_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource Name" languageCode="en" name="Resource Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="resource_type" defaultValue="" lookupCode="FIN_BROWSE_RESOURCE_TYPE" order="3" widgetType="select">
+                
+                
+                
+                
+                <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="resource_id" order="4" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="Resource Internal Id" languageCode="en" name="Resource Internal Id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="resource_code" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource ID" languageCode="en" name="Resource ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="full_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource Name" languageCode="en" name="Resource Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="resource_type_caption" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Resource Type" languageCode="en" name="Resource Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

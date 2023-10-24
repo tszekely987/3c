@@ -1,0 +1,18 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RDM_ROADMAP_V">
+    <indexes/>
+    <text_length>2647</text_length>
+    <text>select rdm_roadmaps.id odf_pk, RDM_ROADMAPS.ID as roadmap_key, RDM_ROADMAPS.ID as clarity_roadmap_key, rdm_roadmaps.NAME as roadmap_name, rdm_roadmaps.CODE as roadmap_id, rdm_roadmaps.DESCRIPTION as description, rdm_roadmaps.START_PERIOD as start_period_key, (SELECT BCP.START_DATE FROM BIZ_COM_PERIODS BCP WHERE BCP.ID = RDM_ROADMAPS.START_PERIOD) as period_start_date, (SELECT COP_CALC_FINISH_FCT(BCPF.END_DATE)
+	        FROM ( SELECT periods.END_DATE,ROW_NUMBER() OVER (ORDER BY periods.START_DATE) AS ROW_NUMBER 
+	               FROM BIZ_COM_PERIODS periods, 
+	                    (select start_date from biz_com_periods where id = RDM_ROADMAPS.START_PERIOD) dates, 
+	                    (select entity_id from biz_com_periods where id=rdm_roadmaps.start_period) entityid
+	               WHERE periods.PERIOD_TYPE = 'ANNUALLY'
+	                 AND periods.START_DATE >= dates.start_date
+	                 and periods.entity_id=entityid.entity_id
+	             ) BCPF
+        WHERE BCPF.ROW_NUMBER = RDM_ROADMAPS.DURATION) as period_finish_date, rdm_roadmaps.DURATION as duration, RDM_ROADMAPS.CREATED_DATE as clarity_created_date, RDM_ROADMAPS.LAST_UPDATED_DATE as clarity_updated_date, rdm_roadmaps.STATUS as roadmap_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'RDM_ROADMAP_STATUS' and rownum = 1 and LOOKUP_CODE = rdm_roadmaps.STATUS) as status_caption, rdm_roadmaps.TYPE as roadmap_type_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'RDM_ROADMAP_TYPE' and rownum = 1 and LOOKUP_CODE = rdm_roadmaps.TYPE) as type_caption, NVL(AUTHOR.ID,0) as author_key, 
+        AUTHOR.FULL_NAME
+      author_caption, odf_ca_rdm_roadmap.clr_category as clr_category_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'CLR_ROADMAP_CATEGORY' and rownum = 1 and LOOKUP_CODE = odf_ca_rdm_roadmap.clr_category) as clr_category_caption, (  select id from srm_resources where id = odf_ca_rdm_roadmap.clr_executive )  as clr_executive_key, (  select full_name from srm_resources where id = odf_ca_rdm_roadmap.clr_executive ) clr_executive_caption, odf_ca_rdm_roadmap.clr_strategynarrativ as clr_strategynarrativ, dataw_context.language_code, dataw_context.id language_id from rdm_roadmaps rdm_roadmaps inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  JOIN odf_ca_rdm_roadmap odf_ca_rdm_roadmap ON odf_ca_rdm_roadmap.id=rdm_roadmaps.id LEFT OUTER JOIN srm_resources AUTHOR ON RDM_ROADMAPS.author = AUTHOR.ID  where 1 = 1 and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

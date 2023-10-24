@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DWH_SETUP_SLICEREQUESTS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DWH_SETUP_SLICEREQUESTS_SP" 
+    AS
+    V_CNT SIMPLE_INTEGER:=0;
+    BEGIN
+      -- This script is intended to modify time slice requests to conform with data warehouse requirements
+
+      /*
+        If already inserted, nothing to do
+      */
+      select count(*) into v_cnt from PRJ_BLB_SLICEREQUESTS WHERE IS_DWH_REQUEST = 1 and ID &lt; 5000000;
+      IF( v_cnt &gt; 0 ) THEN
+        RETURN;
+      END IF;
+
+      --
+      -- Monthly, Seed any missing legacy slice requests
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+        with default_dates as ( -- get minimum date range for months
+         select min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'MONTH', trunc( add_months( sysdate, -36 )), null, 72, 'DEFAULT', '' ) )
+        ),
+        default_requests as ( -- check for missing requests
+         select (select nvl(max(id),1000000)+1 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYBASEASSIGNCOSTS' request_name, 9 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+2 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEACTCURVE' request_name, 0 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+3 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEALLOCCURVE' request_name, 4 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+4 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEAVAILCURVE' request_name, 3 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+5 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEBASECURVE' request_name, 2 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+6 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEESTCURVE' request_name, 1 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+7 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'MONTHLYRESOURCEHARDALLOC' request_name, 22 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+8 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::etccost_curve::dwh_month' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::etccost_curve::default') field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+
+        -- these were added because the original requests from 14.1 had been deleted during the upgrade
+        union
+         select (select nvl(max(id),1000000)+10 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_usage::dwh_month' request_name, 6 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+11 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_cost::dwh_month' request_name, 10 field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+12 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::hardallccost_curve::dwh_month' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::hardallccost_curve::default') field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+13 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::actcost_curve::dwh_month' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::actcost_curve::default') field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+14 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::alloccost_curve::dwh_month' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::alloccost_curve::default') field, 3 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+
+        ) select * from default_requests ) c
+        on ( sr.request_name = c.request_name )
+        when matched then
+          update set is_dwh_request = 1, is_system = 1
+        when not matched then
+        insert ( id, request_name, field, period, frequency, from_date, to_date, num_periods, created_date, created_by, last_updated_date, last_updated_by, is_system, is_dwh_request )
+        values( c.id , c.request_name, c.field, c.period, c.frequency, c.from_date, c.to_date, c.num_periods, sysdate, 1, sysdate, 1, 1, 1 );
+
+      --
+      -- Min/Max the dates for legacy monthly slices
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+          with default_dates as ( -- get minimum date range for months
+           select min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'MONTH', trunc( add_months( sysdate, -36 )), null, 72, 'DEFAULT', '' ) )
+          ),
+          requests as ( -- get information about the requests and establish desired period and rollover
+           select request_name, period, frequency, from_date, to_date
+             from prj_blb_slicerequests
+            where request_name in ('MONTHLYBASEASSIGNCOSTS','MONTHLYRESOURCEACTCURVE','MONTHLYRESOURCEALLOCCURVE','MONTHLYRESOURCEAVAILCURVE','MONTHLYRESOURCEBASECURVE','MONTHLYRESOURCEESTCURVE','MONTHLYRESOURCEHARDALLOC')
+          ),
+          compute_dates as ( -- compute the minimum and maximum slice period dates
+           select r.request_name, least( d.min_date, nvl( r.from_date, d.min_date ) ) start_date, greatest( d.max_date, nvl( r.to_date, d.max_date ) ) end_date
+             from default_dates d, requests r
+          ),
+          slice_periods as ( -- get the number of periods for the final start and end dates for each request based on the min/max from_date, to_date
+            select request_name, min(start_date) min_date, max(end_date) max_date, count(*) num_periods from (
+              select request_name, u.start_date, u.end_date
+               from compute_dates u cross join table( crv_calendar_fct( 'MONTH', u.start_date, u.end_date, null, 'DEFAULT', '' ) ) )
+              group by request_name
+          )
+          select r.request_name, r.period, r.frequency, sp.min_date, sp.max_date, sp.num_periods
+            from requests r, slice_periods sp
+           where r.request_name = sp.request_name ) c
+      on ( sr.request_name = c.request_name )
+      when matched then
+      update set sr.frequency = c.period, sr.from_date = c.min_date, sr.to_date = c.max_date, sr.num_periods = c.num_periods, request_completed_date = null, last_updated_date = sysdate, expiration_date = null
+       where sr.frequency != c.frequency or sr.from_date is null or sr.from_date != c.min_date or sr.to_date is null or sr.to_date != c.max_date or sr.num_periods != c.num_periods;
+
+      --
+      -- Weekly, Seed any missing legacy slice requests
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+        with default_dates as ( -- get minimum date range for weeks
+         select min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'WEEK', trunc( add_months( sysdate, -12 )), null, 104, 'DEFAULT', 'WEEK_START=PRSITE' ) )
+        ),
+        default_requests as ( -- check for missing requests
+         select (select nvl(max(id),1000000)+1 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYBASEASSIGNCOSTS' request_name, 9 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+2 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEACTCURVE' request_name, 0 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+3 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEALLOCCURVE' request_name, 4 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+4 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEAVAILCURVE' request_name, 3 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+5 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEBASECURVE' request_name, 2 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+6 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEESTCURVE' request_name, 1 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+7 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'WEEKLYRESOURCEHARDALLOC' request_name, 22 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+8 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'DAILYRESOURCETIMECURVE' request_name, 5 field, 0 period, 6 frequency, min_date from_date, max_date to_date, 730 num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+9 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::etccost_curve::dwh_week' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::etccost_curve::default') field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+
+        -- these were added because the original requests from 14.1 had been deleted during the upgrade
+        union
+         select (select nvl(max(id),1000000)+10 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_usage::dwh_week' request_name, 6 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+11 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_cost::dwh_week' request_name, 10 field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+12 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::hardallccost_curve::dwh_week' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::hardallccost_curve::default') field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+13 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::actcost_curve::dwh_week' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::actcost_curve::default') field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        union
+         select (select nvl(max(id),1000000)+14 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::alloccost_curve::dwh_week' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::alloccost_curve::default') field, 1 period, 6 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+
+        ) select * from default_requests ) c
+        on ( sr.request_name = c.request_name )
+        when matched then
+          update set is_dwh_request = 1, is_system = 1
+        when not matched then
+        insert ( id, request_name, field, period, frequency, from_date, to_date, num_periods, created_date, created_by, last_updated_date, last_updated_by, is_system, is_dwh_request )
+        values( c.id , c.request_name, c.field, c.period, c.frequency, c.from_date, c.to_date, c.num_periods, sysdate, 1, sysdate, 1, 1, 1 );
+
+      --
+      -- Min/Max the dates for legacy weekly slices
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+          with default_dates as ( -- get minimum date range for weeks
+           select min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'WEEK', trunc( add_months( sysdate, -12 )), null, 104, 'DEFAULT', 'WEEK_START=PRSITE' ) )
+          ),
+          requests as ( -- get information about the requests and establish desired period and rollover
+           select request_name, period, frequency, from_date, to_date
+             from prj_blb_slicerequests
+            where request_name in ('WEEKLYBASEASSIGNCOSTS','WEEKLYRESOURCEACTCURVE','WEEKLYRESOURCEALLOCCURVE','WEEKLYRESOURCEAVAILCURVE','WEEKLYRESOURCEBASECURVE','WEEKLYRESOURCEESTCURVE','WEEKLYRESOURCEHARDALLOC')
+          ),
+          compute_dates as ( -- compute the minimum and maximum slice period dates
+           select r.request_name, least( d.min_date, nvl( r.from_date, d.min_date ) ) start_date, greatest( d.max_date, nvl( r.to_date, d.max_date ) ) end_date
+             from default_dates d, requests r
+          ),
+          slice_periods as ( -- get the number of periods for the final start and end dates for each request based on the min/max from_date, to_date
+            select request_name, min(start_date) min_date, max(end_date) max_date, count(*) num_periods from (
+              select request_name, u.start_date, u.end_date
+               from compute_dates u cross join table( crv_calendar_fct( 'WEEK', u.start_date, u.end_date, null, 'DEFAULT', 'WEEK_START=PRSITE' ) ) )
+              group by request_name
+          )
+          select r.request_name, r.period, r.frequency, sp.min_date, sp.max_date, sp.num_periods
+            from requests r, slice_periods sp
+           where r.request_name = sp.request_name ) c
+      on ( sr.request_name = c.request_name )
+      when matched then
+      update set sr.frequency = c.period, sr.from_date = c.min_date, sr.to_date = c.max_date, sr.num_periods = c.num_periods, request_completed_date = null, last_updated_date = sysdate, expiration_date = null
+       where sr.frequency != c.frequency or sr.from_date is null or sr.from_date != c.min_date or sr.to_date is null or sr.to_date != c.max_date or sr.num_periods != c.num_periods;
+
+
+      --
+      -- Min/Max the dates for daily time entries
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+          with default_dates as ( -- get minimum date range for weeks
+           select min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'DAY', trunc( add_months( sysdate, -12 )), null, 730, 'DEFAULT', '' ) )
+          ),
+          requests as ( -- get information about the requests and establish desired period and rollover
+           select request_name, period, frequency, from_date, to_date
+             from prj_blb_slicerequests
+            where request_name in ('DAILYRESOURCETIMECURVE' )
+          ),
+          compute_dates as ( -- compute the minimum and maximum slice period dates
+           select r.request_name, least( d.min_date, nvl( r.from_date, d.min_date ) ) start_date, greatest( d.max_date, nvl( r.to_date, d.max_date ) ) end_date
+             from default_dates d, requests r
+          ),
+          slice_periods as ( -- get the number of periods for the final start and end dates for each request based on the min/max from_date, to_date
+            select request_name, min(start_date) min_date, max(end_date) max_date, count(*) num_periods from (
+              select request_name, u.start_date, u.end_date
+               from compute_dates u cross join table( crv_calendar_fct( 'DAY', u.start_date, u.end_date, null, 'DEFAULT', '' ) ) )
+              group by request_name
+          )
+          select r.request_name, r.period, r.frequency, sp.min_date, sp.max_date, sp.num_periods
+            from requests r, slice_periods sp
+           where r.request_name = sp.request_name ) c
+      on ( sr.request_name = c.request_name )
+      when matched then
+      update set sr.frequency = 3, sr.from_date = c.min_date, sr.to_date = c.max_date, sr.num_periods = c.num_periods, request_completed_date = null, last_updated_date = sysdate, expiration_date = null
+       where sr.frequency != 3 or sr.from_date is null or sr.from_date != c.min_date or sr.to_date is null or sr.to_date != c.max_date or sr.num_periods != c.num_periods;
+
+      --
+      -- Have all slice requests seeded in 14.1 that point to DWH_BLB_SLICES now point to PRJ_BLB_SLICES
+      --
+--      update prj_blb_slicerequests set table_name = 'PRJ_BLB_SLICES' where table_name = 'DWH_BLB_SLICES';
+
+      --
+      -- Make sure all legacy slice requests are system so that they cannot be deleted.
+      --
+      update prj_blb_slicerequests set is_system = 1, is_dwh_request = 1, frequency = 6
+       where request_name in ('MONTHLYBASEASSIGNCOSTS','MONTHLYRESOURCEACTCURVE','MONTHLYRESOURCEALLOCCURVE','MONTHLYRESOURCEAVAILCURVE','MONTHLYRESOURCEBASECURVE','MONTHLYRESOURCEESTCURVE','MONTHLYRESOURCEHARDALLOC'
+       ,'WEEKLYBASEASSIGNCOSTS','WEEKLYRESOURCEACTCURVE','WEEKLYRESOURCEALLOCCURVE','WEEKLYRESOURCEAVAILCURVE','WEEKLYRESOURCEBASECURVE','WEEKLYRESOURCEESTCURVE','WEEKLYRESOURCEHARDALLOC'
+       ,'DAILYRESOURCETIMECURVE','DAILYRESOURCETIMECURVE' );
+
+      --
+      -- Seed fiscal slices but since we don't know which entity/period to use the seeded slices don't have
+      -- enough information to populate the from/to dates
+      --
+      merge into prj_blb_slicerequests sr
+      using (
+        with default_dates as (
+         select null min_date, null max_date, null num_periods from dual
+        ),
+        default_requests as ( -- check for missing requests
+         select (select nvl(max(id),1000000)+1 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::practcurve::dwh_fiscal' request_name, 0 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+2 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::prestcurve::dwh_fiscal' request_name, 1 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+3 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'resource::pravailcurve::dwh_fiscal' request_name, 3 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+4 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::pralloccurve::dwh_fiscal' request_name, 4 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+5 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_cost::dwh_fiscal' request_name, 10 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+6 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_team_usage::dwh_fiscal' request_name, 6 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+7 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::hard_curve::dwh_fiscal' request_name, 22 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+8 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::actcost_curve::dwh_fiscal' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::actcost_curve::default') field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+9 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::alloccost_curve::dwh_fiscal' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::alloccost_curve::default') field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+10 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'team::hardallccost_curve::dwh_fiscal' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'team::hardallccost_curve::default') field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+11 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_assignment_cost::dwh_fiscal' request_name, 9 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+12 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'baseline::current_assignment_usage::dwh_fiscal' request_name, 2 field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+         union
+         select (select nvl(max(id),1000000)+13 from prj_blb_slicerequests where id &lt; 5000000 and id &gt;= 1000000) id, 'assignment::etccost_curve::dwh_fiscal' request_name, (select field from prj_blb_slicerequests where is_template = 1 and request_name = 'assignment::etccost_curve::default') field, 11 period, 11 frequency, min_date from_date, max_date to_date, num_periods from default_dates
+        ) select * from default_requests ) c
+        on ( sr.request_name = c.request_name )
+        when matched then
+          update set is_dwh_request = 1, is_system = 1
+        when not matched then
+        insert ( id, request_name, field, period, frequency, from_date, to_date, num_periods, created_date, created_by, last_updated_date, last_updated_by, is_system, is_dwh_request, table_name, fiscal_entity_id, fiscal_period_type )
+        values( c.id , c.request_name, c.field, c.period, c.frequency, c.from_date, c.to_date, c.num_periods, sysdate, 1, sysdate, 1, 1, 1, 'PRJ_FISCAL_BLB_SLICES', null, null );
+
+      /* BKT Addition to set the time slice requests to consistent from_date and num_periods by period type */
+      merge into prj_blb_slicerequests sr
+      using (
+        with default_dates as ( -- get date range for slices
+            select 3 period, min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'MONTH', trunc( add_months( sysdate, -36 )), null, 72, 'DEFAULT', '' ))
+            union all
+            select 1 period, min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'WEEK', trunc( add_months( sysdate, -12 )), null, 104, 'DEFAULT', 'WEEK_START=PRSITE' ))
+            union all
+            select 0 period, min(start_date) min_date, max(finish_date) max_date, count(*) num_periods from table( crv_calendar_fct( 'DAY', trunc( add_months( sysdate, -12 )), null, 730, 'DEFAULT', '' ))
+        ),
+        slice_dates as ( -- get minimum date range for months
+            select 3 period, min(from_date) from_date, max(to_date) to_date from prj_blb_slicerequests where is_dwh_request = 1 and period = 3
+            union all
+            select 1 period, d.start_date from_date, d.end_date to_date
+            from    (select min(start_date) start_date, max(finish_date) end_date from (select min(from_date) from_date, max(to_date) to_date from prj_blb_slicerequests where is_dwh_request = 1 and period = 1) s, 
+                     table( crv_calendar_fct( 'WEEK', s.from_date, s.to_date, null, 'DEFAULT', 'WEEK_START=PRSITE' ))) d
+            union all
+            select 0 period, min(from_date) from_date, max(to_date) to_date from prj_blb_slicerequests where is_dwh_request = 1 and period = 0
+        ),
+       compute_dates as ( -- compute the minimum and maximum slice period dates
+            select r.request_name, r.period, r.frequency, least( d.min_date, nvl( s.from_date, d.min_date ) ) start_date, greatest( d.max_date, nvl( s.to_date, d.max_date ) ) end_date
+            from prj_blb_slicerequests r, default_dates d, slice_dates s
+            where r.is_dwh_request = 1 and r.period = d.period and r.period = s.period
+         ),
+        slice_periods as ( -- get the number of periods for the final start and end dates for each request based on the min/max from_date, to_date
+            select request_name, min(start_date) start_date, max(end_date) end_date, count(*) num_periods from (
+                select request_name, u.start_date, u.end_date
+                from compute_dates u cross join table( crv_calendar_fct( 'MONTH', u.start_date, u.end_date, null, 'DEFAULT', '' ) )
+                where u.period = 3 
+                union all 
+                select request_name, u.start_date, u.end_date
+                from compute_dates u cross join table( crv_calendar_fct( 'WEEK', u.start_date, u.end_date, null, 'DEFAULT', 'WEEK_START=PRSITE' ) )
+                where u.period = 1 
+                union all
+                select request_name, u.start_date, u.end_date
+                from compute_dates u cross join table( crv_calendar_fct( 'DAY', u.start_date, u.end_date, null, 'DEFAULT', '' ) )
+                where u.period = 0)
+            group by request_name
+         )
+        select r.request_name, r.period, r.frequency, sp.start_date, sp.end_date, sp.num_periods
+        from compute_dates r, slice_periods sp
+        where r.request_name = sp.request_name ) c
+      on ( sr.request_name = c.request_name )
+      when matched then
+      update set sr.frequency = c.frequency, sr.from_date = c.start_date, sr.to_date = c.end_date, sr.num_periods = c.num_periods, request_completed_date = null, last_updated_date = sysdate, expiration_date = null;
+      -- End of BKT Addition
+      
+      -- update dwh requests for developer datasets to default months
+      update prj_blb_slicerequests
+      set ( from_date, to_date, num_periods )
+        = ( select min(start_date), max(finish_date), count(*) num_periods from table( crv_calendar_fct( 'MONTH', trunc( add_months( sysdate, -36 )), null, 72, 'DEFAULT', '' ) ) )
+      where is_dwh_request = 1 and period = 3 and is_customer_db() = 0;
+
+      -- update dwh requests for developer datasets to default weeks
+      update prj_blb_slicerequests
+      set (from_date, to_date, num_periods )
+        = ( select min(start_date), max(finish_date), count(*) num_periods from table( crv_calendar_fct( 'WEEK', trunc( add_months( sysdate, -12 )), null, 104, 'DEFAULT', 'WEEK_START=PRSITE' ) ) )
+      where is_dwh_request = 1 and period = 1 and is_customer_db() = 0;
+
+      -- update dwh requests for developer datasets to default day
+      update prj_blb_slicerequests
+      set (from_date, to_date, num_periods )
+        = ( select min(start_date), max(finish_date), count(*) num_periods from table( crv_calendar_fct( 'DAY', trunc( add_months( sysdate, -12 )), null, 730, 'DEFAULT', '' ) ) )
+      where is_dwh_request = 1 and period = 0 and is_customer_db() = 0;
+
+    END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_FM_PTF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_FM_PTF_SP" (
+   P_PROJECT_ID        NUMBER,
+   P_FISCAL_TIME_KEY   VARCHAR2
+)
+AS
+   V_PROJECT_ID                  NUMBER;
+   V_IS_ACTIVE                   NUMBER;
+   V_ENTITY                      VARCHAR2(60);
+   V_ENTITY_NAME                 VARCHAR2(720);
+   V_LOCATION                    VARCHAR2(60);
+   V_LOCATION_NAME               VARCHAR2(720);
+   V_DEPARTMENT                  VARCHAR2(60);
+   V_DEPARTMENT_NAME             VARCHAR2(720);
+   V_BUDGET_HOURS                NUMBER;
+   V_ACTUAL_HOURS                NUMBER;
+   V_REV_BUDGET_LABOR            NUMBER;
+   V_REV_BUDGET_EQUIP            NUMBER;
+   V_REV_BUDGET_EXPENSE          NUMBER;
+   V_REV_BUDGET_MATL             NUMBER;
+   V_REV_BUDGET_TOTAL            NUMBER;
+   V_COST_BUDGET_LABOR           NUMBER;
+   V_COST_BUDGET_EQUIP           NUMBER;
+   V_COST_BUDGET_EXPENSE         NUMBER;
+   V_COST_BUDGET_MATL            NUMBER;
+   V_COST_BUDGET_TOTAL           NUMBER;
+   V_ACT_BILLING                 NUMBER;
+   V_REV_ACT_LABOR               NUMBER;
+   V_REV_ACT_EQUIP               NUMBER;
+   V_REV_ACT_EXPENSE             NUMBER;
+   V_REV_ACT_MATL                NUMBER;
+   V_REV_ACT_TOTAL               NUMBER;
+   V_COST_ACT_LABOR              NUMBER;
+   V_COST_ACT_EQUIP              NUMBER;
+   V_COST_ACT_EXPENSE            NUMBER;
+   V_COST_ACT_MATL               NUMBER;
+   V_COST_ACT_TOTAL              NUMBER;
+   V_COST_TO_COMPLETE            NUMBER;
+   V_PCT_BUDGET_EXPANDED         NUMBER;
+   V_BUDGET_MARGIN               NUMBER;
+   V_BUDGET_REV_NUMBER           NUMBER;
+   V_ROI_DATE                    DATE;
+   V_CURRENCY_CODE               VARCHAR2(30);
+   V_IS_OPP_ENABLED              NUMBER;
+   V_IS_FM_ENABLED               NUMBER;
+   V_IS_MGMT_ENABLED             NUMBER;
+   V_COUNT                       NUMBER;
+   V_STMT                        VARCHAR2(200);
+BEGIN
+   V_STMT := 'Selecting from NBI_PROJECT_CURRENT_FACTS';
+   SELECT ENTITY,
+          ENTITY_NAME,
+          LOCATION,
+          LOCATION_NAME,
+          DEPARTMENT,
+          DEPARTMENT_NAME,
+          BUDGET_HOURS,
+          ACTUAL_HOURS,
+          REV_BUDGET_LABOR,
+          REV_BUDGET_EQUIP,
+          REV_BUDGET_EXPENSE,
+          REV_BUDGET_MATL,
+          REV_BUDGET_TOTAL,
+          COST_BUDGET_LABOR,
+          COST_BUDGET_EQUIP,
+          COST_BUDGET_EXPENSE,
+          COST_BUDGET_MATL,
+          COST_BUDGET_TOTAL,
+          ACT_BILLING,
+          REV_ACT_LABOR,
+          REV_ACT_EQUIP,
+          REV_ACT_EXPENSE,
+          REV_ACT_MATL,
+          REV_ACT_TOTAL,
+          COST_ACT_LABOR,
+          COST_ACT_EQUIP,
+          COST_ACT_EXPENSE,
+          COST_ACT_MATL,
+          COST_ACT_TOTAL,
+          COST_ETC_TOTAL,
+          PCT_BUDGET_EXPANDED,
+          BUDGET_MARGIN,
+          BUDGET_REV_NUMBER,
+          ROI_DATE,
+          CURRENCY_CODE,
+          IS_ACTIVE,
+          IS_OPP_ENABLED,
+          IS_FM_ENABLED,
+          IS_MGMT_ENABLED
+     INTO V_ENTITY,
+          V_ENTITY_NAME,
+          V_LOCATION,
+          V_LOCATION_NAME,
+          V_DEPARTMENT,
+          V_DEPARTMENT_NAME,
+          V_BUDGET_HOURS,
+          V_ACTUAL_HOURS,
+          V_REV_BUDGET_LABOR,
+          V_REV_BUDGET_EQUIP,
+          V_REV_BUDGET_EXPENSE,
+          V_REV_BUDGET_MATL,
+          V_REV_BUDGET_TOTAL,
+          V_COST_BUDGET_LABOR,
+          V_COST_BUDGET_EQUIP,
+          V_COST_BUDGET_EXPENSE,
+          V_COST_BUDGET_MATL,
+          V_COST_BUDGET_TOTAL,
+          V_ACT_BILLING,
+          V_REV_ACT_LABOR,
+          V_REV_ACT_EQUIP,
+          V_REV_ACT_EXPENSE,
+          V_REV_ACT_MATL,
+          V_REV_ACT_TOTAL,
+          V_COST_ACT_LABOR,
+          V_COST_ACT_EQUIP,
+          V_COST_ACT_EXPENSE,
+          V_COST_ACT_MATL,
+          V_COST_ACT_TOTAL,
+          V_COST_TO_COMPLETE,
+          V_PCT_BUDGET_EXPANDED,
+          V_BUDGET_MARGIN,
+          V_BUDGET_REV_NUMBER,
+          V_ROI_DATE,
+          V_CURRENCY_CODE,
+          V_IS_ACTIVE,
+          V_IS_OPP_ENABLED,
+          V_IS_FM_ENABLED,
+          V_IS_MGMT_ENABLED
+     FROM NBI_PROJECT_CURRENT_FACTS
+    WHERE PROJECT_ID = P_PROJECT_ID;
+   V_STMT := 'Check if record already exists in NBI_FM_PT_FACTS';
+   SELECT COUNT (*)
+     INTO V_COUNT
+     FROM NBI_FM_PT_FACTS
+    WHERE PROJECT_ID = P_PROJECT_ID
+      AND FISCAL_TIME_KEY = P_FISCAL_TIME_KEY;
+
+   IF V_COUNT &lt;&gt; 0
+   THEN
+      BEGIN
+         V_STMT := 'Updating NBI_FM_PT_FACTS';
+         UPDATE NBI_FM_PT_FACTS
+            SET ENTITY = V_ENTITY,
+                ENTITY_NAME = V_ENTITY_NAME,
+                LOCATION = V_LOCATION,
+                LOCATION_NAME = V_LOCATION_NAME,
+                DEPARTMENT = V_DEPARTMENT,
+                DEPARTMENT_NAME = V_DEPARTMENT_NAME,
+                BUDGET_HOURS = V_BUDGET_HOURS,
+                ACTUAL_HOURS = V_ACTUAL_HOURS,
+                REV_BUDGET_LABOR = V_REV_BUDGET_LABOR,
+                REV_BUDGET_EQUIP = V_REV_BUDGET_EQUIP,
+                REV_BUDGET_EXPENSE = V_REV_BUDGET_EXPENSE,
+                REV_BUDGET_MATL = V_REV_BUDGET_MATL,
+                REV_BUDGET_TOTAL = V_REV_BUDGET_TOTAL,
+                COST_BUDGET_LABOR = V_COST_BUDGET_LABOR,
+                COST_BUDGET_EQUIP = V_COST_BUDGET_EQUIP,
+                COST_BUDGET_EXPENSE = V_COST_BUDGET_EXPENSE,
+                COST_BUDGET_MATL = V_COST_BUDGET_MATL,
+                COST_BUDGET_TOTAL = V_COST_BUDGET_TOTAL,
+                ACT_BILLING = V_ACT_BILLING,
+                REV_ACT_LABOR = V_REV_ACT_LABOR,
+                REV_ACT_EQUIP = V_REV_ACT_EQUIP,
+                REV_ACT_EXPENSE = V_REV_ACT_EXPENSE,
+                REV_ACT_MATL = V_REV_ACT_MATL,
+                REV_ACT_TOTAL = V_REV_ACT_TOTAL,
+                COST_ACT_LABOR = V_COST_ACT_LABOR,
+                COST_ACT_EQUIP = V_COST_ACT_EQUIP,
+                COST_ACT_EXPENSE = V_COST_ACT_EXPENSE,
+                COST_ACT_MATL = V_COST_ACT_MATL,
+                COST_ACT_TOTAL = V_COST_ACT_TOTAL,
+                COST_TO_COMPLETE = V_COST_TO_COMPLETE,
+                PCT_BUDGET_EXPENDED = V_PCT_BUDGET_EXPANDED,
+                BUDGET_MARGIN = V_BUDGET_MARGIN,
+                BUDGET_REV_NUMBER = V_BUDGET_REV_NUMBER,
+                ROI_DATE = V_ROI_DATE,
+                CURRENCY_CODE = V_CURRENCY_CODE,
+                IS_ACTIVE = V_IS_ACTIVE,
+                IS_OPP_ENABLED = V_IS_OPP_ENABLED,
+                IS_FM_ENABLED = V_IS_FM_ENABLED,
+                IS_MGMT_ENABLED = V_IS_MGMT_ENABLED
+          WHERE PROJECT_ID = P_PROJECT_ID
+            AND FISCAL_TIME_KEY = P_FISCAL_TIME_KEY;
+      END;
+   ELSE
+      BEGIN
+         V_STMT := 'Inserting into NBI_FM_PT_FACTS';
+         INSERT INTO NBI_FM_PT_FACTS (
+                        PROJECT_ID,
+                        FISCAL_TIME_KEY,
+                        ENTITY,
+                        ENTITY_NAME,
+                        LOCATION,
+                        LOCATION_NAME,
+                        DEPARTMENT,
+                        DEPARTMENT_NAME,
+                        BUDGET_HOURS,
+                        ACTUAL_HOURS,
+                        REV_BUDGET_LABOR,
+                        REV_BUDGET_EQUIP,
+                        REV_BUDGET_EXPENSE,
+                        REV_BUDGET_MATL,
+                        REV_BUDGET_TOTAL,
+                        COST_BUDGET_LABOR,
+                        COST_BUDGET_EQUIP,
+                        COST_BUDGET_EXPENSE,
+                        COST_BUDGET_MATL,
+                        COST_BUDGET_TOTAL,
+                        ACT_BILLING,
+                        REV_ACT_LABOR,
+                        REV_ACT_EQUIP,
+                        REV_ACT_EXPENSE,
+                        REV_ACT_MATL,
+                        REV_ACT_TOTAL,
+                        COST_ACT_LABOR,
+                        COST_ACT_EQUIP,
+                        COST_ACT_EXPENSE,
+                        COST_ACT_MATL,
+                        COST_ACT_TOTAL,
+                        COST_TO_COMPLETE,
+                        PCT_BUDGET_EXPENDED,
+                        BUDGET_MARGIN,
+                        BUDGET_REV_NUMBER,
+                        ROI_DATE,
+                        CURRENCY_CODE,
+                        IS_ACTIVE,
+                        IS_OPP_ENABLED,
+                        IS_FM_ENABLED,
+                        IS_MGMT_ENABLED
+                     )
+              VALUES (
+                 P_PROJECT_ID,
+                 P_FISCAL_TIME_KEY,
+                 V_ENTITY,
+                 V_ENTITY_NAME,
+                 V_LOCATION,
+                 V_LOCATION_NAME,
+                 V_DEPARTMENT,
+                 V_DEPARTMENT_NAME,
+                 V_BUDGET_HOURS,
+                 V_ACTUAL_HOURS,
+                 V_REV_BUDGET_LABOR,
+                 V_REV_BUDGET_EQUIP,
+                 V_REV_BUDGET_EXPENSE,
+                 V_REV_BUDGET_MATL,
+                 V_REV_BUDGET_TOTAL,
+                 V_COST_BUDGET_LABOR,
+                 V_COST_BUDGET_EQUIP,
+                 V_COST_BUDGET_EXPENSE,
+                 V_COST_BUDGET_MATL,
+                 V_COST_BUDGET_TOTAL,
+                 V_ACT_BILLING,
+                 V_REV_ACT_LABOR,
+                 V_REV_ACT_EQUIP,
+                 V_REV_ACT_EXPENSE,
+                 V_REV_ACT_MATL,
+                 V_REV_ACT_TOTAL,
+                 V_COST_ACT_LABOR,
+                 V_COST_ACT_EQUIP,
+                 V_COST_ACT_EXPENSE,
+                 V_COST_ACT_MATL,
+                 V_COST_ACT_TOTAL,
+                 V_COST_TO_COMPLETE,
+                 V_PCT_BUDGET_EXPANDED,
+                 V_BUDGET_MARGIN,
+                 V_BUDGET_REV_NUMBER,
+                 V_ROI_DATE,
+                 V_CURRENCY_CODE,
+                 V_IS_ACTIVE,
+                 V_IS_OPP_ENABLED,
+                 V_IS_FM_ENABLED,
+                 V_IS_MGMT_ENABLED
+              );
+      END;
+   END IF;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_FM_PTF_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

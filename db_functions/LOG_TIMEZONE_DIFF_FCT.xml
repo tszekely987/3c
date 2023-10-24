@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>LOG_TIMEZONE_DIFF_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."LOG_TIMEZONE_DIFF_FCT" (
+   P_USERID   IN   NUMBER
+)
+   RETURN INTEGER
+IS
+   V_TZ_OFFSET  NUMBER;
+   V_USER_TZ VARCHAR2(30);
+   V_DELTA NUMBER;
+
+BEGIN
+  -- Get the user's timezone
+  SELECT TIMEZONE INTO V_USER_TZ FROM CMN_SEC_USERS WHERE ID=P_USERID;
+
+  -- Get the user's timezone offset
+  SELECT substr(tz_offset(V_USER_TZ),0,instr(tz_offset(V_USER_TZ),':')-1) INTO V_TZ_OFFSET FROM DUAL;
+
+  -- Diff this from the db timezone
+  SELECT V_TZ_OFFSET - substr(dbtimezone,0,instr(dbtimezone,':')-1) INTO V_DELTA from dual;
+
+  RETURN V_DELTA;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>LOG_RETENTION_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."LOG_RETENTION_SP" (
+   P_JOB_RUN_ID           IN   NUMBER,
+   P_JOB_USER_ID          IN   NUMBER,
+   P_LOGS_RETENTION       IN   NUMBER,
+   P_SESSION_RETENTION    IN   NUMBER
+)
+IS
+   V_TARGETDATE DATE; V_DELETE_LIMIT INTEGER := 10000;
+BEGIN
+    -- Delete perf log records older than P_LOGS_RETENTION days old
+    SELECT TRUNC(SYSDATE) - P_LOGS_RETENTION INTO V_TARGETDATE FROM DUAL;
+    
+    LOOP
+        DELETE FROM LOG_DETAILS
+         WHERE LOG_DATE &lt; V_TARGETDATE
+           AND ROWNUM &lt;= V_DELETE_LIMIT;
+        EXIT WHEN SQL%ROWCOUNT = 0;
+    END LOOP;
+    COMMIT;
+    
+    LOOP
+        DELETE FROM LOG_SUMMARY
+         WHERE LOG_DATE &lt; V_TARGETDATE
+           AND ROWNUM &lt;= V_DELETE_LIMIT;
+        EXIT WHEN SQL%ROWCOUNT = 0;
+    END LOOP;
+    COMMIT;
+    
+    LOOP
+        DELETE FROM LOG_FILES
+         WHERE CREATED_DATE &lt; V_TARGETDATE
+           AND ROWNUM &lt;= V_DELETE_LIMIT;
+        EXIT WHEN SQL%ROWCOUNT = 0;
+    END LOOP;
+    COMMIT;
+  
+    -- Delete session token tracking data older than P_SESSION_RETENTION days old
+    SELECT TRUNC(SYSDATE) - P_SESSION_RETENTION INTO V_TARGETDATE FROM DUAL;
+    LOOP
+        DELETE FROM LOG_SESSIONS
+         WHERE CREATED_DATE &lt; V_TARGETDATE
+           AND ROWNUM &lt;= V_DELETE_LIMIT;
+        EXIT WHEN SQL%ROWCOUNT = 0;  
+    END LOOP;
+    COMMIT;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_ASND_INST_RIGHT_IDS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_ASND_INST_RIGHT_IDS_SP" (
+   P_PRINCIPAL_TYPE		 IN   VARCHAR2,
+   P_PRINCIPAL_ID    IN   NUMBER,
+   P_RIGHT_ID   		 IN   NUMBER,
+   P_INSTANCE_ID       IN   NUMBER,
+   P_CREATED_BY        IN   NUMBER DEFAULT 1,
+   P_FAIL_SILENT        IN   NUMBER DEFAULT 0
+)
+IS
+   V_CNT1		                           		 NUMBER;
+BEGIN
+
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_SEC_ASSGND_OBJ_PERM
+		WHERE    PRINCIPAL_TYPE 		= P_PRINCIPAL_TYPE
+		AND			 PRINCIPAL_ID 			= P_PRINCIPAL_ID
+		AND			 RIGHT_ID 					= P_RIGHT_ID
+		AND			 OBJECT_INSTANCE_ID = P_INSTANCE_ID;
+
+   	IF    V_CNT1 &gt; 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20006, 'RIGHT ASSIGNMENT EXISTS');
+   	END IF;
+		
+		INSERT INTO CMN_SEC_ASSGND_OBJ_PERM	
+				(
+							ID, 
+							PRINCIPAL_TYPE, 
+							PRINCIPAL_ID, 
+							OBJECT_ID,
+							PERMISSION_ID,
+							OBJECT_INSTANCE_ID, 
+							CREATED_DATE, 
+							CREATED_BY, 
+							LAST_UPDATED_DATE, 
+							LAST_UPDATED_BY, 
+							RIGHT_ID)
+				SELECT   CMN_SEC_ASSGND_OBJ_PERM_S1.NEXTVAL,
+								 P_PRINCIPAL_TYPE,
+								 P_PRINCIPAL_ID, 
+								 OBJECT_ID,
+								 PERMISSION_ID,
+								 P_INSTANCE_ID,
+								 SYSDATE,
+								 P_CREATED_BY,
+								 SYSDATE,
+								 P_CREATED_BY,
+								 P_RIGHT_ID
+				FROM     CMN_SEC_ASSGND_OBJ_PERM
+				WHERE    PRINCIPAL_TYPE = 'GROUP'
+				AND			 PRINCIPAL_ID   = P_RIGHT_ID;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

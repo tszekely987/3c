@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_PROJECT_APPROVE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_PROJECT_APPROVE_SP" (
+COMPANY_CODE  VARCHAR2 ,
+PROJECT_CODE  VARCHAR2 ,
+RESOURCE_CODE  VARCHAR2 )
+AS
+projrevisionid  NUMBER;
+targetedstartdate 	pac_mnt_projects.targetedstartdate%TYPE;
+targetedcompldate 	pac_mnt_projects.targetedcompldate%TYPE;
+BEGIN
+ 	SELECT  MAX(projrevisionid)
+ 	INTO 	PAC_MNT_PROJECT_APPROVE_SP.projrevisionid
+	FROM 	projrevision
+ 	WHERE 	COMPANY_CODE = PAC_MNT_PROJECT_APPROVE_SP.COMPANY_CODE
+ 	AND 	PROJECT_CODE = PAC_MNT_PROJECT_APPROVE_SP.PROJECT_CODE;
+
+	UPDATE 	pac_mnt_projects
+ 	SET
+	APPROVEDBY_RESOURCE_CODE = PAC_MNT_PROJECT_APPROVE_SP.RESOURCE_CODE,
+	approved = 1,
+	approveddatetime = SYSDATE
+	WHERE 	COMPANY_CODE = PAC_MNT_PROJECT_APPROVE_SP.COMPANY_CODE
+	AND 	PROJECT_CODE = PAC_MNT_PROJECT_APPROVE_SP.PROJECT_CODE;
+
+	UPDATE 	projrevision
+	SET
+		APPROVEDBY_RESOURCE_CODE = PAC_MNT_PROJECT_APPROVE_SP.RESOURCE_CODE,
+		approved = 1,
+		approveddatetime = SYSDATE
+	WHERE 	COMPANY_CODE = PAC_MNT_PROJECT_APPROVE_SP.COMPANY_CODE
+	AND 	PROJECT_CODE = PAC_MNT_PROJECT_APPROVE_SP.PROJECT_CODE
+	AND	projrevisionid = PAC_MNT_PROJECT_APPROVE_SP.projrevisionid;
+	SELECT 	DECODE(datesrevision, 1, currenttargetedstartdate, NULL),
+		DECODE(datesrevision, 1, currenttargetedstartdate, NULL)
+	INTO
+		PAC_MNT_PROJECT_APPROVE_SP.targetedstartdate,
+		PAC_MNT_PROJECT_APPROVE_SP.targetedcompldate
+	FROM	projrevision
+	WHERE 	COMPANY_CODE = PAC_MNT_PROJECT_APPROVE_SP.COMPANY_CODE
+	AND 	PROJECT_CODE = PAC_MNT_PROJECT_APPROVE_SP.PROJECT_CODE
+	AND	projrevisionid = PAC_MNT_PROJECT_APPROVE_SP.projrevisionid;
+	UPDATE 	pac_mnt_projects
+	SET	pac_mnt_projects.targetedstartdate = NVL(PAC_MNT_PROJECT_APPROVE_SP.targetedstartdate, pac_mnt_projects.targetedstartdate),
+		pac_mnt_projects.targetedcompldate = NVL(PAC_MNT_PROJECT_APPROVE_SP.targetedcompldate, pac_mnt_projects.targetedcompldate),
+		pac_mnt_projects.currentrevision = PAC_MNT_PROJECT_APPROVE_SP.projrevisionid
+	WHERE 	COMPANY_CODE = PAC_MNT_PROJECT_APPROVE_SP.COMPANY_CODE
+	AND 	PROJECT_CODE = PAC_MNT_PROJECT_APPROVE_SP.PROJECT_CODE;
+END PAC_MNT_PROJECT_APPROVE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

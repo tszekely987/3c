@@ -1,0 +1,52 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_PFM_OBS_UNIT_V">
+    <indexes/>
+    <text_length>3432</text_length>
+    <text>SELECT u.id obs_unit_key,
+       u.name obs_unit,
+       t.id obs_type_key,
+       t.name obs_type,
+	   u.depth hierarchy_level,
+       CASE WHEN NVL(u10.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'') || ' | ' || NVL(u9.name,'') || ' | ' || NVL(u10.name,'')
+            WHEN NVL(u9.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'') || ' | ' || NVL(u9.name,'')
+            WHEN NVL(u8.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'') || ' | ' || NVL(u8.name,'')
+            WHEN NVL(u7.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'') || ' | ' || NVL(u7.name,'')
+            WHEN NVL(u6.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'') || ' | ' ||
+                 NVL(u6.name,'')
+            WHEN NVL(u5.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'') || ' | ' || NVL(u5.name,'')
+            WHEN NVL(u4.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'') || ' | ' || NVL(u4.name,'')
+            WHEN NVL(u3.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'') || ' | ' || NVL(u3.name,'')
+            WHEN NVL(u2.id,0) &lt;&gt; 0 THEN
+                 NVL(u1.name,'') || ' | ' || NVL(u2.name,'')
+            ELSE
+                 NVL(u1.name,'N/A')
+            END obs_path
+FROM   prj_obs_units u
+       INNER JOIN prj_obs_types t ON u.type_id = t.id
+       INNER JOIN prj_obs_object_types ot ON t.id = ot.type_id
+       LEFT OUTER JOIN prj_obs_units u10 ON u.id = u10.id AND u.depth = 10
+       LEFT OUTER JOIN prj_obs_units u9 ON CASE WHEN u.depth = 9 THEN u.id ELSE u10.parent_id END = u9.id
+       LEFT OUTER JOIN prj_obs_units u8 ON CASE WHEN u.depth = 8 THEN u.id ELSE u9.parent_id END = u8.id
+       LEFT OUTER JOIN prj_obs_units u7 ON CASE WHEN u.depth = 7 THEN u.id ELSE u8.parent_id END = u7.id
+       LEFT OUTER JOIN prj_obs_units u6 ON CASE WHEN u.depth = 6 THEN u.id ELSE u7.parent_id END = u6.id
+       LEFT OUTER JOIN prj_obs_units u5 ON CASE WHEN u.depth = 5 THEN u.id ELSE u6.parent_id END = u5.id
+       LEFT OUTER JOIN prj_obs_units u4 ON CASE WHEN u.depth = 4 THEN u.id ELSE u5.parent_id END = u4.id
+       LEFT OUTER JOIN prj_obs_units u3 ON CASE WHEN u.depth = 3 THEN u.id ELSE u4.parent_id END = u3.id
+       LEFT OUTER JOIN prj_obs_units u2 ON CASE WHEN u.depth = 2 THEN u.id ELSE u3.parent_id END = u2.id
+       LEFT OUTER JOIN prj_obs_units u1 ON CASE WHEN u.depth = 1 THEN u.id ELSE u2.parent_id END = u1.id 
+WHERE  u.depth &lt;= 10
+AND    ot.table_name = 'PFM_PORTFOLIO'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

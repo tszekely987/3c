@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_FISCAL_CALENDAR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_FISCAL_CALENDAR_FCT" ( p_start DATE, p_period_type VARCHAR, p_periods NUMBER, p_entity NUMBER DEFAULT 0 )
+   RETURN PFM_CALENDAR
+IS
+ v_calendar PFM_CALENDAR;
+ v_start DATE;
+ v_period INTEGER;
+ v_period_type VARCHAR2(32);
+BEGIN
+  v_period := 0;
+  v_start := trunc( p_start );
+  CASE
+    WHEN p_period_type ='WEEK' THEN v_period_type := 'WEEKLY';
+    WHEN p_period_type ='MONTH' THEN v_period_type := 'MONTHLY';
+    WHEN p_period_type ='QUARTER' THEN v_period_type := 'QUARTERLY';
+    WHEN p_period_type ='YEAR' THEN v_period_type := 'ANNUALLY';
+    ELSE v_period_type := p_period_type;
+  END CASE;
+  v_calendar := PFM_CALENDAR();
+  FOR ao_rec IN (
+    select id, period_name, start_date, end_date from (
+        select id, period_name, start_date, end_date
+          from biz_com_periods where period_type = v_period_type
+           and start_date &lt;= v_start and end_date &gt;= v_start
+           and entity_id = p_entity
+        union
+        select id, period_name, start_date, end_date
+          from biz_com_periods where period_type = v_period_type
+           and end_date &gt;= v_start
+           and entity_id = p_entity
+    )
+    where rownum &lt;= p_periods order by start_date  )
+  LOOP
+    v_period := v_period + 1;
+    v_calendar.extend(1);
+    v_calendar(v_period) := PFM_PERIOD( v_period, ao_rec.start_date, ao_rec.end_date, ao_rec.period_name, 1);
+  END LOOP;
+  return v_calendar;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

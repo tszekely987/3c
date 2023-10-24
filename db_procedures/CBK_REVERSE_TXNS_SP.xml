@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CBK_REVERSE_TXNS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CBK_REVERSE_TXNS_SP" 
+(
+  P_USER_ID                 NUMBER,
+  P_JOB_SOURCE              VARCHAR2,
+  P_FF_GL_PERIOD_ID         NUMBER,
+  P_FF_INCLUDE_CHILDREN     NUMBER,
+  P_FF_INV_ID               NUMBER,
+  V_JOB_RUN_ID              OUT NUMBER,
+  P_TRANSNO                 NUMBER DEFAULT NULL,
+  P_FF_CHARGECODE           GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_INPUT_TYPE           GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_RESOURCE_CODE        GLOBALPKG.STRING DEFAULT NULL,
+  P_FF_TRANSTYPE            VARCHAR2 DEFAULT NULL,
+  P_FF_COSTTYPE             VARCHAR2 DEFAULT NULL
+)
+IS
+
+  V_GL_PERIOD_START     DATE;
+  V_GL_PERIOD_END       DATE;
+  
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_errmsg       GLOBALPKG.STRING;
+
+
+BEGIN
+
+-- Filter processing Validate against reverting All!
+   BEGIN
+     SELECT PER.START_DATE, PER.END_DATE
+     INTO  V_GL_PERIOD_START, V_GL_PERIOD_END
+     FROM BIZ_COM_PERIODS PER
+     WHERE PER.ID = P_FF_GL_PERIOD_ID; 
+   END;    
+
+-- Get current JOB_ID 
+   SELECT PAC_CHG_BATCH_HEADERS_S1.nextval INTO V_JOB_RUN_ID FROM DUAL;
+
+   -- Reverse Charges  
+   -- Reverse Debits
+   BEGIN
+	INSERT INTO CBK_GL_TXNS
+	(
+	  ID,
+	  INVOICE_ID ,
+	  JOB_RUN_ID ,
+	  PATH_ID,
+	  CHARGEBACK_TYPE,
+      JOB_SOURCE,
+	  ALLOCATION_ID,
+      ALLOCATION_DTL_ID,
+      TRANSACTION_SOURCE,
+      TRANSACTION_ID,
+      TRANSACTION_DATE,
+      DEBIT_ID,
+      ENTITY_ID,
+      GL_ACCOUNT_ID,
+      DEPARTMENT_ID,
+	  TRN_INV_ID,
+      CBK_INV_ID,
+      QUANTITY,
+      CREATED_DATE,
+      CREATED_BY,
+      LAST_UPDATED_DATE,
+      LAST_UPDATED_BY,
+      EXTERNAL_SOURCE_ID,
+      EXTERNAL_ID
+    )
+    SELECT
+      CBK_GL_TXNS_S1.nextval, 
+      null, 
+      V_JOB_RUN_ID,
+      old.PATH_ID,
+      old.CHARGEBACK_TYPE,
+      P_JOB_SOURCE,
+      old.ALLOCATION_ID,
+      old.ALLOCATION_DTL_ID,
+      'R',
+      old.ID,
+      old.TRANSACTION_DATE,
+      CBK_GL_TXNS_S1.currval, 
+      old.ENTITY_ID,
+      old.GL_ACCOUNT_ID,
+      old.DEPARTMENT_ID,
+      old.TRN_INV_ID,
+      old.CBK_INV_ID,
+      old.QUANTITY, 
+      SYSDATE,
+      P_USER_ID, 
+      SYSDATE, 
+      P_USER_ID, 
+      old.EXTERNAL_SOURCE_ID,
+      old.EXTERNAL_ID
+      FROM CBK_GL_TXNS old 
+      WHERE ( P_TRANSNO IS NULL OR old.TRANSACTION_ID = P_TRANSNO)
+      AND old.CHARGEBACK_TYPE = 'D'
+      AND old.TRANSACTION_SOURCE = 'W'
+      AND old.ID NOT IN
+      ( SELECT REVERSALS.TRANSACTION_ID
+        FROM CBK_GL_TXNS REVERSALS
+        WHERE REVERSALS.TRANSACTION_ID = OLD.ID
+        AND REVERSALS.CHARGEBACK_TYPE = 'R'
+      )
+      AND old.TRANSACTION_ID IN
+      (
+        SELECT WIP.TRANSNO FROM PPA_WIP WIP
+        WHERE  WIP.TRANSDATE BETWEEN V_GL_PERIOD_START AND V_GL_PERIOD_END
+        AND (P_FF_CHARGECODE IS NULL OR UPPER(WIP.CHARGE_CODE) LIKE P_FF_CHARGECODE)
+        AND (P_FF_INPUT_TYPE IS NULL OR UPPER(WIP.INPUT_TYPE) LIKE P_FF_INPUT_TYPE)
+        AND (P_FF_RESOURCE_CODE IS NULL OR UPPER(WIP.RESOURCE_CODE) LIKE P_FF_RESOURCE_CODE)
+        AND (P_FF_TRANSTYPE IS NULL OR WIP.TRANSTYPE = P_FF_TRANSTYPE)
+        AND (P_FF_COSTTYPE IS NULL OR WIP.COST_TYPE = P_FF_COSTTYPE)
+        AND NVL(WIP.IN_ERROR,0) != 1
+        AND NVL(WIP.GLPOSTED,'N') = 'Y'
+		/* this is questionable, why do we do this??? */
+        AND NVL(WIP.STATUS,0) = 0
+        AND  (P_FF_INCLUDE_CHILDREN = 0 AND (P_FF_INV_ID IS NULL OR P_FF_INV_ID = WIP.INVESTMENT_ID))
+          OR (
+              P_FF_INCLUDE_CHILDREN = 1 AND WIP.INVESTMENT_ID IN
+                (SELECT FLAT.FROM_INV_ID 
+                 FROM INV_INVESTMENT_ALLOCS_FLAT FLAT
+                 WHERE FLAT.TO_INV_ID = P_FF_INV_ID) 
+        )
+        AND  WIP.TRANSNO NOT IN 
+                 (
+                 SELECT GLLOCK.TRANSACTION_ID
+                 FROM CBK_GL_TXNS GLLOCK, CBK_INVOICE IVCLOCK
+                   WHERE GLLOCK.TRANSACTION_ID = WIP.TRANSNO
+                       AND GLLOCK.INVOICE_ID = IVCLOCK.ID
+                       AND (IVCLOCK.STATUS_CODE = 4
+                       OR IVCLOCK.IS_LOCKED = 1)
+                 )
+      );
+  
+      StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          null;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          raise_application_error(-20255, 'Error inserting into CBK_GL_TXNS!' || StoO_errmsg );
+      END;
+
+         -- Reverse Credits
+   BEGIN
+    INSERT INTO CBK_GL_TXNS
+    (
+      ID,
+      INVOICE_ID ,
+      JOB_RUN_ID ,
+      PATH_ID,
+      CHARGEBACK_TYPE,
+      JOB_SOURCE,
+      ALLOCATION_ID,
+      ALLOCATION_DTL_ID,
+      TRANSACTION_SOURCE,
+      TRANSACTION_ID,
+      TRANSACTION_DATE,
+      DEBIT_ID,
+      ENTITY_ID,
+      GL_ACCOUNT_ID,
+      DEPARTMENT_ID,
+      TRN_INV_ID,
+      CBK_INV_ID,
+      QUANTITY,
+      CREATED_DATE,
+      CREATED_BY,
+      LAST_UPDATED_DATE,
+      LAST_UPDATED_BY,
+      EXTERNAL_SOURCE_ID,
+      EXTERNAL_ID
+    )
+    SELECT
+      CBK_GL_TXNS_S1.nextval, 
+      null, 
+      V_JOB_RUN_ID,
+      old.PATH_ID,
+      old.CHARGEBACK_TYPE,
+      P_JOB_SOURCE,
+      old.ALLOCATION_ID,
+      old.ALLOCATION_DTL_ID,
+      'R',
+      old.ID,
+      old.TRANSACTION_DATE,
+      debits.DEBIT_ID,
+      old.ENTITY_ID,
+      old.GL_ACCOUNT_ID,
+      old.DEPARTMENT_ID,
+      old.TRN_INV_ID,
+      old.CBK_INV_ID,
+      old.QUANTITY, 
+      SYSDATE,
+      P_USER_ID, 
+      SYSDATE, 
+      P_USER_ID, 
+      old.EXTERNAL_SOURCE_ID,
+      old.EXTERNAL_ID
+      FROM CBK_GL_TXNS old, CBK_GL_TXNS debits
+      WHERE old.TRANSACTION_SOURCE = 'D'
+      AND old.CHARGEBACK_TYPE = 'C'
+      AND old.TRANSACTION_ID = debits.TRANSACTION_ID
+      AND debits.JOB_RUN_ID = V_JOB_RUN_ID
+      AND debits.TRANSACTION_SOURCE = 'R'
+      AND debits.CHARGEBACK_TYPE= 'D'
+      ;
+  
+      StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          null;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          raise_application_error(-20255, 'Error inserting into CBK_GL_TXNS!' || StoO_errmsg );
+      END;
+
+      
+    -- Insert reverseed child (values) records
+    BEGIN
+      INSERT INTO CBK_GL_TXN_VALUES
+      (
+        ID,
+        CBK_GL_TXN_ID,
+        CURRENCY_TYPE,
+        CURRENCY_CODE,
+        AMOUNT,
+		CREATED_DATE,
+		CREATED_BY,
+		LAST_UPDATED_BY,
+		LAST_UPDATED_DATE
+      )
+      SELECT
+        CBK_GL_TXN_VALUES_S1.nextval,
+        new.ID,
+        old.CURRENCY_TYPE, 
+        old.CURRENCY_CODE,
+        (old.AMOUNT * -1) NEW_AMOUNT,
+		SYSDATE,
+		P_USER_ID,
+		P_USER_ID,
+		SYSDATE
+        FROM CBK_GL_TXN_VALUES old, CBK_GL_TXNS new
+        WHERE new.TRANSACTION_SOURCE = 'R'
+        AND new.JOB_RUN_ID = V_JOB_RUN_ID
+        AND new.TRANSACTION_ID = old.CBK_GL_TXN_ID;
+
+      StoO_error := SQLCODE;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        null;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+        raise_application_error(-20255, 'Error inserting into CBK_GL_TXN_VALUES!' || StoO_errmsg );
+    END;
+
+     
+   -- Insert batch number using # of transactoins
+   BEGIN
+   INSERT INTO PAC_CHG_BATCH_HEADERS (ID, GL_PERIOD, TRANSACTIONS, CREATED_BY, CREATED_DATE, LAST_UPDATED_BY, LAST_UPDATED_DATE)
+   VALUES (V_JOB_RUN_ID, sysdate, StoO_rowcnt, P_USER_ID, sysdate, P_USER_ID, sysdate);
+    EXCEPTION
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+        raise_application_error(-20255, 'Error inserting into PAC_CHG_BATCH_HEADERS!' || StoO_errmsg );
+   END;
+
+   BEGIN
+     UPDATE PPA_WIP
+     SET GLPOSTED='N', GLPERIOD=NULL , LASTUPDATEDATE=SYSDATE , LASTUPDTDBY_RESOURCE_CODE = (SELECT USER_NAME FROM CMN_SEC_USERS WHERE ID = P_USER_ID) 
+     WHERE TRANSNO IN
+     ( SELECT old.TRANSACTION_ID 
+       FROM  CBK_GL_TXNS old, CBK_GL_TXNS new
+       WHERE new.JOB_RUN_ID = V_JOB_RUN_ID
+       AND new.CHARGEBACK_TYPE = 'D'
+       AND old.ID = new.TRANSACTION_ID
+     );
+   EXCEPTION
+     WHEN NO_DATA_FOUND THEN
+	   null;
+   END;   
+   
+  EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE_APPLICATION_ERROR(-20780, 'REVERSING GL ALLOCATION FAILED : ' || SQLERRM);
+END CBK_REVERSE_TXNS_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

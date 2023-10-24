@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SESSION_CLEANUP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SESSION_CLEANUP_SP" (MINS_BEFORE NUMBER DEFAULT 60)
+  IS
+     X_DATE DATE := NULL;
+  BEGIN
+     X_DATE := SYSDATE - MINS_BEFORE/1440;
+  
+    DELETE FROM TEMP_WBS
+    WHERE CACHEID IN
+      (SELECT CACHEID
+         FROM TEMP_WBS_KEYS WBS, CMN_SESSIONS SESS
+        WHERE WBS.SESSIONID = SESS.TOKEN
+          AND SESS.CREATED_DATE &lt; X_DATE);
+  
+    DELETE FROM TEMP_WBS_EXT
+    WHERE CACHEID IN
+      (SELECT CACHEID
+         FROM TEMP_WBS_KEYS WBS, CMN_SESSIONS SESS
+        WHERE WBS.SESSIONID = SESS.TOKEN
+          AND SESS.CREATED_DATE &lt; X_DATE);
+  
+    DELETE FROM TEMP_WBS_KEYS
+    WHERE SESSIONID IN
+        (SELECT TOKEN
+         FROM CMN_SESSIONS
+         WHERE CREATED_DATE &lt; X_DATE);
+         
+    DELETE FROM TEMP_PFM_CONSTRAINT_AGGRS
+    WHERE SESSION_ID IN
+        (SELECT TOKEN
+         FROM CMN_SESSIONS
+         WHERE CREATED_DATE &lt; X_DATE);     
+  
+    DELETE FROM CMN_SESSION_PROPERTIES
+    WHERE SESSION_ID IN
+      (SELECT ID
+       FROM CMN_SESSIONS
+       WHERE CREATED_DATE &lt; X_DATE);
+  
+    DELETE FROM cmn_jasper_sessions
+     WHERE clarity_token IN ( SELECT token FROM cmn_sessions WHERE created_date &lt; X_DATE );
+
+     DELETE FROM CMN_SESSION_ATTRS 
+     WHERE SESSION_ID in (select S.ID FROM CMN_SESSIONS S
+     WHERE CREATED_DATE &lt; X_DATE);
+  
+    DELETE FROM CMN_SESSIONS S
+    WHERE CREATED_DATE &lt; X_DATE;
+    
+    
+    DELETE FROM CMN_SESSION_AUDITS
+    WHERE SESSION_START_DATE &lt; X_DATE;
+  
+  END ;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

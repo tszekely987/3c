@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_BREAK_ALL_LOCKS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_BREAK_ALL_LOCKS_SP" (
+P_USER_ID NUMBER,
+P_RET_VAL	OUT	NUMBER	
+)
+/* Description:
+   ------------
+   This function removes all record from PRLOCK for a given user.
+
+   It will complete successfully in any case, whether there is no
+   lock in the first place or there is a SQL error.
+
+   Return Values:
+   --------------
+   0 if at least one "lock record" couldn't be removed (database record locked)
+   1 if all locks were removed or none existed in the first place
+
+*/
+IS
+   V_ROWID                       ROWID;
+   V_PRLASTID                    NUMBER;
+   E_RECORD_LOCKED               EXCEPTION;
+
+   CURSOR C_LOCKED_RECORDS (CP_USER_ID NUMBER)
+   IS
+      SELECT   ROWID
+      FROM     PRLOCK
+      WHERE    PRUSERID = CP_USER_ID;
+BEGIN
+   FOR C_REC IN C_LOCKED_RECORDS (P_USER_ID)
+   LOOP
+      SELECT   ROWID
+      INTO     V_ROWID
+      FROM     PRLOCK
+      WHERE    ROWID = C_REC.ROWID
+        FOR UPDATE OF PRRECORDID NOWAIT;
+   END LOOP;
+
+   /* If we finished the loop we acquired locks for all records. Let's go ahead
+      and delete them */
+
+   DELETE
+     FROM PRLOCK
+    WHERE PRUSERID = P_USER_ID;
+
+   P_RET_VAL := 1;
+EXCEPTION
+   WHEN E_RECORD_LOCKED
+   THEN
+      P_RET_VAL := 0;
+   WHEN OTHERS
+   THEN
+      P_RET_VAL := 1;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

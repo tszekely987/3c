@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_PORT_TOTAL_ROLE_FTE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_PORT_TOTAL_ROLE_FTE_FCT" (p_portfolio NUMBER, p_plan NUMBER, p_attr_name VARCHAR, p_start DATE DEFAULT NULL, p_finish DATE DEFAULT NULL )
+   RETURN PFM_SLICES PIPELINED
+IS
+ v_segments PFM_SEGMENTS;
+ v_start DATE;
+ v_finish DATE;
+ v_segstart INTEGER;
+ v_segfinish INTEGER;
+ v_sum NUMBER;
+
+BEGIN
+
+  v_sum := 0;
+  v_segstart := 0;
+  v_segfinish := 9999999;
+
+  IF (p_start IS NOT NULL) THEN
+    v_segstart := PFM_DATE_TO_JULIAN_FCT( p_start );
+  END IF;
+  IF (p_finish IS NOT NULL) THEN
+    v_segfinish := PFM_DATE_TO_JULIAN_FCT( p_finish );
+  END IF;
+
+  FOR ao_rec IN (
+       select port.id, port.object_id, port.clob_curve from pfm_clob_curves port, PFM_ROLE_CAPACITY rc
+        where port.object_id = rc.role_id and rc.portfolio_id = port.id and rc.plan_id = port.plan_id
+        and port.attribute = 'ROLE_CAPACITY' and port.table_name = 'PFM_PORTFOLIOS' and port.id = p_portfolio
+        and port.plan_id = p_plan
+  )
+  LOOP
+    IF ( ao_rec.clob_curve IS NOT NULL ) THEN
+      SELECT PFM_DATE_FROM_JULIAN_FCT(min(segment_start)),
+             PFM_DATE_FROM_JULIAN_FCT(max(segment_finish))
+             INTO v_start, v_finish
+             FROM table (PFM_SEGMENTS_FCT( 0, ao_rec.clob_curve, v_segstart, v_segfinish )) slice;
+      v_sum := PFM_SUM_FCT( ao_rec.clob_curve, v_start, v_finish );
+      pipe row(PFM_SLICE( ao_rec.id, ao_rec.object_id, v_start, v_finish, v_sum, 'period here' ));
+
+    END IF;
+  END LOOP;
+
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

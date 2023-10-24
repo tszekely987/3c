@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_GET_ROLLUP_TIME_INFO_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_GET_ROLLUP_TIME_INFO_SP" (
+   P_TABLE_NAME VARCHAR2,
+   P_PERIODS_TO_ROLL_UP INTEGER,
+   P_TIME_TYPE VARCHAR2,
+   P_TIME_SQL IN OUT VARCHAR2,
+   P_PROCESS_FROM_DATE IN OUT DATE,
+   P_TIME_TAB IN OUT NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE
+)
+IS
+   V_WEEKS_TO_UPDATE             INTEGER;
+   V_MONTHS_TO_UPDATE            INTEGER;
+   V_PERIODS_TO_UPDATE           INTEGER;
+   V_MONTHS_BETWEEN              INTEGER;
+   V_LAST_WEEK                   VARCHAR2 (100);
+   V_LAST_MONTH                  VARCHAR2 (100);
+   V_CURRENT_WEEK                VARCHAR2 (100);
+   V_CURRENT_MONTH               VARCHAR2 (100);
+   V_CURRENT_PERIOD              VARCHAR2 (100);
+   V_CNT                         INTEGER := 0;
+   V_STMT                        VARCHAR2 (200);
+   V_LAST_CURVE_DATE             DATE;
+   V_SQL                         VARCHAR2 (32000);
+   V_IDX                         INTEGER := 0;
+   V_NEW_IDX                     INTEGER := 0;
+   V_TIME_TAB                    NBI_UTILS_PKG.NBI_VARCHAR_TAB_TYPE;
+   V_WEEK_KEY                    VARCHAR2 (100);
+   V_MONTH_KEY                   VARCHAR2 (100);
+
+   CURSOR C_WEEKS
+   IS
+      SELECT   WEEK_KEY
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'WEEK'
+       ORDER BY YEAR DESC, WEEK DESC;
+
+   CURSOR C_MONTHS
+   IS
+      SELECT   MONTH_KEY
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'MONTH'
+       ORDER BY YEAR DESC, MONTH DESC;
+
+   CURSOR C_PERIODS
+   IS
+      SELECT   PERIOD_KEY
+      FROM     NBI_DIM_FISCAL_TIME
+      WHERE    HIERARCHY_LEVEL = 'PERIOD'
+       ORDER BY YEAR DESC, PERIOD DESC;
+BEGIN
+   V_STMT := 'Figuring out how many weeks/months/periods we need to load';
+
+   IF (
+         P_TABLE_NAME IN (
+                            'NBI_PM_PROJECT_TIME_SUMMARY',
+                            'NBI_FM_PROJECT_TIME_SUMMARY',
+                            'NBI_PM_PROJECT_TIME_FACTS',
+                            'NBI_FM_PROJECT_TIME_FACTS'
+                         )
+      )
+   THEN
+      V_WEEKS_TO_UPDATE := P_PERIODS_TO_ROLL_UP;
+      V_MONTHS_TO_UPDATE := P_PERIODS_TO_ROLL_UP / 4;
+      V_PERIODS_TO_UPDATE := P_PERIODS_TO_ROLL_UP / 4;
+   ELSIF (
+            P_TABLE_NAME IN (
+                               'NBI_RT_FACTS',
+                               'NBI_RESOURCE_TIME_SUMMARY'
+                            )
+         )
+   THEN
+      SELECT MAX (TRUNC (FROM_DATE) + NUM_PERIODS)
+      INTO     V_LAST_CURVE_DATE
+      FROM     PRJ_BLB_SLICEREQUESTS
+      WHERE    REQUEST_NAME IN (
+                                  'DAILYRESOURCEACTCURVE',
+                                  'DAILYRESOURCEBASECURVE',
+                                  'DAILYRESOURCEESTCURVE',
+                                  'DAILYRESOURCEAVAILCURVE',
+                                  'DAILYRESOURCEALLOCCURVE'
+                               )
+      AND      PERIOD = 0;
+      SELECT   CEIL (MONTHS_BETWEEN (V_LAST_CURVE_DATE, TRUNC (SYSDATE)))
+      INTO     V_MONTHS_BETWEEN
+      FROM     DUAL;
+      V_MONTHS_TO_UPDATE := (P_PERIODS_TO_ROLL_UP / 4) + V_MONTHS_BETWEEN;
+      V_WEEKS_TO_UPDATE := P_PERIODS_TO_ROLL_UP + CEIL (V_MONTHS_BETWEEN * 4.33);
+   ELSE
+      NULL;
+   END IF;
+
+   V_STMT := 'Figuring out if this is the first load ever';
+   V_SQL := 'SELECT COUNT(1) FROM ' || P_TABLE_NAME || ' WHERE ROWNUM = 1';
+   EXECUTE IMMEDIATE V_SQL
+      INTO V_CNT;
+
+   IF V_CNT = 0
+   THEN
+      V_WEEKS_TO_UPDATE := 9999999;
+      V_MONTHS_TO_UPDATE := 9999999;
+      V_PERIODS_TO_UPDATE := 9999999;    
+   END IF;
+
+   /* To roll up weeks, we only select the last 12 weeks. Need to prepare dynamic SQL string for those last 12 weeks */
+   /* To roll up months, we only select the last 3 months. Need to prepare dynamic SQL string for those last 3 months */
+   /* Quarter and Years are rolled up from months and quarters respectively */
+
+   V_STMT := 'Setting time info variables';
+   P_TIME_SQL := NULL;
+
+   IF (
+         P_TABLE_NAME IN (
+                            'NBI_PM_PROJECT_TIME_SUMMARY',
+                            'NBI_FM_PROJECT_TIME_SUMMARY',
+                            'NBI_PM_PROJECT_TIME_FACTS',
+                            'NBI_FM_PROJECT_TIME_FACTS'
+                         )
+      )
+   THEN
+      V_STMT := 'Building string of weeks that need to be rolled up again';
+
+      IF P_TIME_TYPE = 'WEEK'
+      THEN
+         SELECT   DECODE (
+                     TO_CHAR (TRUNC (SYSDATE), 'IW'),
+                     '01', DECODE (
+                              TO_CHAR (TRUNC (SYSDATE), 'MM'),
+                              '12', TO_CHAR (TRUNC (SYSDATE) + 365, 'YYYY'),
+                              TO_CHAR (TRUNC (SYSDATE), 'YYYY')
+                           ),
+                     '52', DECODE (
+                              TO_CHAR (TRUNC (SYSDATE), 'MM'),
+                              '01', TO_CHAR (TRUNC (SYSDATE) - 365, 'YYYY'),
+                              TO_CHAR (TRUNC (SYSDATE), 'YYYY')
+                           ),
+                     '53', DECODE (
+                              TO_CHAR (TRUNC (SYSDATE), 'MM'),
+                              '01', TO_CHAR (TRUNC (SYSDATE) - 365, 'YYYY'),
+                              TO_CHAR (TRUNC (SYSDATE), 'YYYY')
+                           ),
+                     TO_CHAR (TRUNC (SYSDATE), 'YYYY')
+                  ) ||
+                     '-' ||
+                     'WEEK' ||
+                     LPAD (TO_CHAR (TRUNC (SYSDATE), 'IW'), 2, '0')
+         INTO     V_CURRENT_WEEK
+         FROM     DUAL;
+         V_CNT := 0;
+
+         FOR C_WEEK_REC IN C_WEEKS
+         LOOP
+            /* 2nd through last entry in week series */
+            IF V_CNT &gt; 0
+            THEN
+               P_TIME_SQL := P_TIME_SQL || ', ''' || C_WEEK_REC.WEEK_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_WEEK_REC.WEEK_KEY;
+               V_IDX := V_IDX + 1;
+
+               IF V_CNT = V_WEEKS_TO_UPDATE
+               THEN
+                  EXIT;
+               END IF;
+
+               V_CNT := V_CNT + 1;
+            END IF;
+
+            /* First entry in weeks series */
+            IF C_WEEK_REC.WEEK_KEY = V_CURRENT_WEEK
+            THEN
+               P_TIME_SQL := '''' || C_WEEK_REC.WEEK_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_WEEK_REC.WEEK_KEY;
+               V_IDX := V_IDX + 1;
+               V_CNT := 1;
+            END IF;
+         END LOOP;
+      END IF;
+
+      V_STMT := 'Building string of months that need to be rolled up again';
+
+      IF P_TIME_TYPE = 'MONTH'
+      THEN
+         SELECT   TO_CHAR (TRUNC (SYSDATE), 'YYYY') || '-' || TO_CHAR (TRUNC (SYSDATE), 'MM')
+         INTO     V_CURRENT_MONTH
+         FROM     DUAL;
+         V_CNT := 0;
+
+         FOR C_MONTH_REC IN C_MONTHS
+         LOOP
+            IF V_CNT &gt; 0
+            THEN
+               P_TIME_SQL := P_TIME_SQL || ', ''' || C_MONTH_REC.MONTH_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_MONTH_REC.MONTH_KEY;
+               V_IDX := V_IDX + 1;
+
+               IF V_CNT = V_MONTHS_TO_UPDATE
+               THEN
+                  EXIT;
+               END IF;
+
+               V_CNT := V_CNT + 1;
+            END IF;
+
+            IF C_MONTH_REC.MONTH_KEY = V_CURRENT_MONTH
+            THEN
+               P_TIME_SQL := '''' || C_MONTH_REC.MONTH_KEY || '''';
+               V_CNT := 1;
+               P_TIME_TAB (V_IDX) := C_MONTH_REC.MONTH_KEY;
+               V_IDX := V_IDX + 1;
+            END IF;
+         END LOOP;
+      END IF;
+
+      V_STMT := 'Building string of periods that need to be rolled up again';
+
+      IF P_TIME_TYPE = 'PERIOD'
+      THEN
+         SELECT   PERIOD_KEY
+         INTO     V_CURRENT_PERIOD
+         FROM     NBI_DIM_FISCAL_TIME
+         WHERE    HIERARCHY_LEVEL = 'PERIOD'
+         AND      TRUNC (SYSDATE) BETWEEN PERIOD_START_DATE AND PERIOD_END_DATE - 1;
+         V_CNT := 0;
+
+         FOR C_PERIOD_REC IN C_PERIODS
+         LOOP
+            IF V_CNT &gt; 0
+            THEN
+               P_TIME_SQL := P_TIME_SQL || ', ''' || C_PERIOD_REC.PERIOD_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_PERIOD_REC.PERIOD_KEY;
+               V_IDX := V_IDX + 1;
+
+               IF V_CNT = V_PERIODS_TO_UPDATE
+               THEN
+                  EXIT;
+               END IF;
+
+               V_CNT := V_CNT + 1;
+            END IF;
+
+            IF C_PERIOD_REC.PERIOD_KEY = V_CURRENT_PERIOD
+            THEN
+               P_TIME_SQL := '''' || C_PERIOD_REC.PERIOD_KEY || '''';
+               V_CNT := 1;
+               P_TIME_TAB (V_IDX) := C_PERIOD_REC.PERIOD_KEY;
+               V_IDX := V_IDX + 1;
+            END IF;
+         END LOOP;
+      END IF;
+   ELSIF P_TABLE_NAME IN (
+                            'NBI_RT_FACTS',
+                            'NBI_RESOURCE_TIME_SUMMARY'
+                         )
+   THEN
+      V_STMT := 'Building string of weeks that need to be rolled up again';
+
+      IF P_TIME_TYPE = 'WEEK'
+      THEN
+         SELECT   DECODE (
+                     TO_CHAR (V_LAST_CURVE_DATE, 'IW'),
+                     '01', DECODE (
+                              TO_CHAR (V_LAST_CURVE_DATE, 'MM'),
+                              '12', TO_CHAR (V_LAST_CURVE_DATE + 365, 'YYYY'),
+                              TO_CHAR (V_LAST_CURVE_DATE, 'YYYY')
+                           ),
+                     '52', DECODE (
+                              TO_CHAR (V_LAST_CURVE_DATE, 'MM'),
+                              '01', TO_CHAR (V_LAST_CURVE_DATE - 365, 'YYYY'),
+                              TO_CHAR (V_LAST_CURVE_DATE, 'YYYY')
+                           ),
+                     '53', DECODE (
+                              TO_CHAR (V_LAST_CURVE_DATE, 'MM'),
+                              '01', TO_CHAR (V_LAST_CURVE_DATE - 365, 'YYYY'),
+                              TO_CHAR (V_LAST_CURVE_DATE, 'YYYY')
+                           ),
+                     TO_CHAR (V_LAST_CURVE_DATE, 'YYYY')
+                  ) ||
+                     '-' ||
+                     'WEEK' ||
+                     LPAD (TO_CHAR (V_LAST_CURVE_DATE, 'IW'), 2, '0')
+         INTO     V_LAST_WEEK
+         FROM     DUAL;
+         V_CNT := 0;
+
+         FOR C_WEEK_REC IN C_WEEKS
+         LOOP
+        V_WEEK_KEY := C_WEEK_REC.WEEK_KEY;
+            /* 2nd through last entry in week series */
+            IF V_CNT &gt; 0
+            THEN
+               P_TIME_SQL := P_TIME_SQL || ', ''' || C_WEEK_REC.WEEK_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_WEEK_REC.WEEK_KEY;
+               --               DBMS_OUTPUT.PUT_LINE('Index: ' || v_idx || ' Week: ' ||  C_WEEK_REC.WEEK_KEY);
+               V_IDX := V_IDX + 1;
+
+               IF V_CNT = V_WEEKS_TO_UPDATE
+               THEN
+                  -- For incremental runs only ... exit before we loop all the way back
+                  -- to the first week in NBI_DIM_CALENDAR_TIME
+                  EXIT;
+               END IF;
+               
+               V_CNT := V_CNT + 1;
+            END IF;
+
+            /* First entry in weeks series */
+            IF C_WEEK_REC.WEEK_KEY = V_LAST_WEEK
+            THEN
+               P_TIME_SQL := '''' || C_WEEK_REC.WEEK_KEY || '''';
+               V_CNT := 1;
+               P_TIME_TAB (V_IDX) := C_WEEK_REC.WEEK_KEY;
+               V_IDX := V_IDX + 1;
+            END IF;
+         END LOOP;
+      END IF;
+
+    V_STMT := 'Getting the process from date for WEEK type';
+    
+      SELECT   MIN (DAY)
+      INTO     P_PROCESS_FROM_DATE
+      FROM     NBI_DIM_CALENDAR_TIME
+      WHERE    HIERARCHY_LEVEL = 'DAY'
+      AND      WEEK_KEY = V_WEEK_KEY;
+      
+    V_STMT := 'Building string of months that need to be rolled up again';
+
+      IF P_TIME_TYPE = 'MONTH'
+      THEN
+         V_STMT := 'Building string of months that need to be rolled up again';
+         SELECT   TO_CHAR (V_LAST_CURVE_DATE, 'YYYY') || '-' || TO_CHAR (V_LAST_CURVE_DATE, 'MM')
+         INTO     V_LAST_MONTH
+         FROM     DUAL;
+         V_CNT := 0;
+
+         FOR C_MONTH_REC IN C_MONTHS
+         LOOP
+        V_MONTH_KEY := C_MONTH_REC.MONTH_KEY;
+            IF V_CNT &gt; 0
+            THEN
+               P_TIME_SQL := P_TIME_SQL || ', ''' || C_MONTH_REC.MONTH_KEY || '''';
+               P_TIME_TAB (V_IDX) := C_MONTH_REC.MONTH_KEY;
+               V_IDX := V_IDX + 1;
+
+               IF V_CNT = V_MONTHS_TO_UPDATE
+               THEN
+                  -- For incremental runs only ... exit before we loop all the way back
+                  -- to the first week in NBI_DIM_CALENDAR_TIME
+
+                  EXIT;
+               END IF;
+               
+               V_CNT := V_CNT + 1;
+            END IF;
+
+            IF C_MONTH_REC.MONTH_KEY = V_LAST_MONTH
+            THEN
+               P_TIME_SQL := '''' || C_MONTH_REC.MONTH_KEY || '''';
+               V_CNT := 1;
+               P_TIME_TAB (V_IDX) := C_MONTH_REC.MONTH_KEY;
+               V_IDX := V_IDX + 1;
+            END IF;
+         END LOOP;
+
+     V_STMT := 'Getting the process from date for MONTH type';
+     
+         SELECT   MIN (DAY)
+         INTO     P_PROCESS_FROM_DATE
+         FROM     NBI_DIM_CALENDAR_TIME
+         WHERE    HIERARCHY_LEVEL = 'DAY'
+         AND      MONTH_KEY = V_MONTH_KEY;
+      END IF;
+   ELSE
+      NULL;
+   END IF;
+
+   V_STMT := 'Flip P_TIME_TAB upside down because it was loaded in reverse order';
+   V_NEW_IDX := 0;
+
+   FOR V_IDX IN REVERSE 0 .. P_TIME_TAB.LAST
+   LOOP
+      V_TIME_TAB (V_NEW_IDX) := P_TIME_TAB (V_IDX);
+      V_NEW_IDX := V_NEW_IDX + 1;
+   END LOOP;
+
+   P_TIME_TAB := V_TIME_TAB;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error in NBI_GET_ROLLUP_TIME_INFO_SP - ' || V_STMT || ': ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

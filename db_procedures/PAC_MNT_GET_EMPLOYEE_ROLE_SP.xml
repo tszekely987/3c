@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_EMPLOYEE_ROLE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_EMPLOYEE_ROLE_SP" (
+  COMPANY_CODE  VARCHAR2 ,
+  PROJECT_CODE  VARCHAR2 ,
+  RESOURCE_CODE   VARCHAR2  DEFAULT NULL,
+  ROLE_CODE   VARCHAR2  DEFAULT NULL,
+  RC1   IN OUT PAC_MNT_GET_EMPLOYEE_ROLE_SPkg.RCT1)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  id    pac_mnt_projects.id%TYPE;
+BEGIN
+  SELECT ID
+    INTO PAC_MNT_GET_EMPLOYEE_ROLE_SP.id
+    FROM pac_mnt_projects
+   WHERE PROJECT_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.PROJECT_CODE;
+
+  OPEN RC1 FOR
+/*
+	SELECT 	COMPANY_CODE,
+		PROJECT_CODE,
+		RESOURCE_CODE,
+		ROLE_CODE,
+		RESOURCE_CODE "original_emplycode",
+		ROLE_CODE "original_employee_role",
+		PAC_MNT_GET_EMPLOYEE_ROLE_SP.id
+	FROM 	project_roles
+	WHERE 	RESOURCE_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.RESOURCE_CODE
+	AND 	ROLE_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.ROLE_CODE
+	AND 	PROJECT_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.PROJECT_CODE
+	AND 	COMPANY_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.COMPANY_CODE;
+*/
+  SELECT P.COMPANY_CODE, P.PROJECT_CODE, E.RESOURCE_CODE, R.UNIQUE_NAME "ROLE_CODE",
+         E.RESOURCE_CODE "original_emplycode", R.UNIQUE_NAME  "original_employee_role",
+         PAC_MNT_GET_EMPLOYEE_ROLE_SP.id
+    FROM PRTEAM T, PAC_MNT_PROJECTS P, PAC_MNT_RESOURCES E, SRM_RESOURCES R,PRJ_RESOURCES PR
+  WHERE P.ID = T.PRPROJECTID
+    AND T.PRRESOURCEID = E.ID
+    AND T.PRROLEID = R.ID
+    --AND R.PERSON_TYPE = 0
+    AND R.ID=PR.PRID
+    AND PR.PRISROLE=1
+    AND R.RESOURCE_TYPE = 0
+    AND E.RESOURCE_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.RESOURCE_CODE
+    AND R.UNIQUE_NAME = PAC_MNT_GET_EMPLOYEE_ROLE_SP.ROLE_CODE
+    AND P.PROJECT_CODE = PAC_MNT_GET_EMPLOYEE_ROLE_SP.PROJECT_CODE;
+
+END PAC_MNT_GET_EMPLOYEE_ROLE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

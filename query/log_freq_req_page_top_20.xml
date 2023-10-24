@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_freq_req_page_top_20" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Frequently Requests Pages Top 20"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT /*+ index(LOG_DETAILS, LOG_DETAILS_N5) */  @SELECT:DIM:USER_DEF:IMPLIED:RESOURCE:URL_ACTION:URL_ACTION@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:TRUNC(LOG_DATE):LOG_DATE@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:page_count:page_count@
+FROM
+(SELECT URL_ACTION, LOG_DATE, PAGE_COUNT FROM 
+(SELECT   URL_SHORT url_action,
+         LOG_DATE LOG_DATE,
+         count(*) page_count,
+         RANK() OVER (ORDER BY count(*) DESC) count_rank
+FROM     LOG_DETAILS
+WHERE    LOG_DATE=CAST(@WHERE:PARAM:XML:DATE:/data/log_date/@value@ AS DATE)
+AND (@WHERE:PARAM:XML:STRING:/data/env/@value@ IS NULL OR @WHERE:PARAM:XML:STRING:/data/env/@value@=ENVIRONMENT)
+AND URL_SHORT NOT IN ('/niku/xog','/niku/soap')
+AND      @FILTER@
+GROUP BY LOG_DATE,URL_SHORT
+HAVING @HAVING_FILTER@)
+WHERE COUNT_RANK<=20 AND ROWNUM<=20)]]></nsql>
+            <attribute id="url_action" required="false"/>
+            <attribute id="log_date" required="false"/>
+            <attribute id="page_count" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

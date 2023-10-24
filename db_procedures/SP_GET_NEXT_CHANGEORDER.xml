@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_GET_NEXT_CHANGEORDER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_GET_NEXT_CHANGEORDER" (
+  COMPANY_CODE              VARCHAR2,
+  MASTER_PROJECT_CODE       VARCHAR2,
+  return_projid      IN OUT VARCHAR2,
+  return_changeorder IN OUT VARCHAR2,
+  RC1                IN OUT SP_GET_NEXT_CHANGEORDERPkg.RCT1)
+AS
+  item_exists     INTEGER;
+  PROJECT_CODE    GLOBALPKG.STRING;
+  changeorder     GLOBALPKG.STRING;
+  projchgordersep GLOBALPKG.STRING;
+BEGIN
+	BEGIN
+		item_exists := 0;
+
+    SELECT projchgordersep
+      INTO sp_get_next_changeorder.projchgordersep
+      FROM nameoptions;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				NULL;
+			WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20720, 'System setup is not found.');
+				RETURN;
+	END;
+
+  FOR seqno IN 1 .. 99
+	LOOP
+		sp_get_next_changeorder.changeorder := TO_CHAR(seqno);
+
+    IF seqno &lt; 10 THEN
+			sp_get_next_changeorder.changeorder := '0' || sp_get_next_changeorder.changeorder;
+		END IF;
+
+    sp_get_next_changeorder.PROJECT_CODE := RTRIM(sp_get_next_changeorder.MASTER_PROJECT_CODE) || sp_get_next_changeorder.projchgordersep || sp_get_next_changeorder.changeorder;
+
+    BEGIN
+      SELECT 1
+        INTO item_exists
+        FROM DUAL
+       WHERE EXISTS(SELECT 1
+                      FROM pac_mnt_projects
+                     WHERE PROJECT_CODE = sp_get_next_changeorder.PROJECT_CODE);
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          item_exists := 1;
+        WHEN NO_DATA_FOUND THEN
+          item_exists := 0;
+		END;
+
+    EXIT WHEN item_exists = 0;
+  END LOOP;
+
+  sp_get_next_changeorder.return_projid      :=  sp_get_next_changeorder.PROJECT_CODE;
+	sp_get_next_changeorder.return_changeorder :=  sp_get_next_changeorder.changeorder;
+END sp_get_next_changeorder;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

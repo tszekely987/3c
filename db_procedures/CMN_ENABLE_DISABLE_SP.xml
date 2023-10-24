@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ENABLE_DISABLE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ENABLE_DISABLE_SP" (P_OBJECT IN VARCHAR2, P_MODE IN VARCHAR2)
+IS
+   CURSOR C_TRIGGERS
+   IS
+      -- Filter out BIN$ (10g recycle bin) triggers
+      SELECT   TRIGGER_NAME
+      FROM     USER_TRIGGERS
+      WHERE TRIGGER_NAME NOT LIKE 'BIN$%';
+
+   CURSOR C_FKS
+   IS
+      SELECT   TABLE_NAME,
+               CONSTRAINT_NAME
+      FROM     USER_CONSTRAINTS
+      WHERE    CONSTRAINT_TYPE = 'R';
+
+   V_SQL                         VARCHAR2 (100);
+   E_WRONG_MODE                  EXCEPTION;
+   E_WRONG_OBJECT                EXCEPTION;
+BEGIN
+   IF P_MODE NOT IN ('ENABLE', 'DISABLE')
+   THEN
+      RAISE E_WRONG_MODE;
+   END IF;
+
+   IF P_OBJECT NOT IN ('ALL', 'TRG', 'FK')
+   THEN
+      RAISE E_WRONG_OBJECT;
+   END IF;
+
+   IF P_OBJECT IN ('ALL', 'TRG')
+   THEN
+      FOR C_TRIGGER_REC IN C_TRIGGERS
+      LOOP
+         V_SQL := 'ALTER TRIGGER ' || C_TRIGGER_REC.TRIGGER_NAME || ' ' || P_MODE;
+         EXECUTE IMMEDIATE V_SQL;
+      END LOOP;
+   END IF;
+
+   IF P_OBJECT IN ('ALL', 'FK')
+   THEN
+      FOR C_FK_REC IN C_FKS
+      LOOP
+         IF P_MODE = 'DISABLE'
+         THEN
+            V_SQL :=
+              'ALTER TABLE ' || C_FK_REC.TABLE_NAME || ' DISABLE CONSTRAINT ' ||
+                 C_FK_REC.CONSTRAINT_NAME;
+         ELSE-- MODE IS ENABLE
+            V_SQL :=
+              'ALTER TABLE ' || C_FK_REC.TABLE_NAME || ' ENABLE VALIDATE CONSTRAINT ' ||
+                 C_FK_REC.CONSTRAINT_NAME;
+         END IF;
+
+         EXECUTE IMMEDIATE V_SQL;
+      END LOOP;
+   END IF;
+EXCEPTION
+   WHEN E_WRONG_OBJECT
+   THEN
+      RAISE_APPLICATION_ERROR (-20002, 'OBJECT needs to be either ALL, TRG or FK');
+   WHEN E_WRONG_MODE
+   THEN
+      RAISE_APPLICATION_ERROR (-20001, 'MODE needs to be either ENABLE or DISABLE');
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (-20000, 'Error: ' || SQLERRM);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

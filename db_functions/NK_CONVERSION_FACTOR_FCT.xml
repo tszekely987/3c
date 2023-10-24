@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_CONVERSION_FACTOR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_CONVERSION_FACTOR_FCT" (p_unit_of_work VARCHAR, p_start TIMESTAMP DEFAULT NULL, p_finish TIMESTAMP DEFAULT NULL)
+  RETURN NUMBER RESULT_CACHE RELIES_ON (PRCALENDAR,PRSITE)
+ IS
+  V_RETURN NUMBER := 1.0;
+  V_START DATE;
+  V_FINISH DATE;
+
+BEGIN
+
+  IF( p_unit_of_work IS NOT NULL ) THEN
+    IF( INSTR( upper( p_unit_of_work ), 'HOURS', 1 ) &gt; 0 ) THEN
+      V_RETURN := 3600;
+    ELSIF( INSTR( upper( p_unit_of_work ), 'DAYS', 1 ) &gt; 0 ) THEN
+      SELECT C.HOURS_PER_DAY * 3600.0 INTO V_RETURN FROM PRCalendar c, PRSITE s WHERE c.prID = s.prCalendarID AND s.prCalendarID IS NOT NULL;
+    ELSIF( INSTR( upper( p_unit_of_work ), 'FTE', 1 ) &gt; 0 OR INSTR( upper( p_unit_of_work ), 'PCT', 1 ) &gt; 0 ) THEN
+
+      IF(P_START IS NOT NULL) THEN
+        V_START := TRUNC(P_START,'DDD');
+      ELSE
+        V_START := TO_DATE('1900-01-01','yyyy-mm-dd');
+      END IF;
+
+      IF(P_FINISH IS NOT NULL) THEN
+        IF(EXTRACT(HOUR FROM P_FINISH) &gt; 0) THEN
+          V_FINISH := TRUNC(P_FINISH, 'DDD') + 1;
+        ELSE
+          V_FINISH := TRUNC(P_FINISH, 'DDD');
+        END IF;
+      ELSE
+        V_FINISH := TO_DATE('2079-06-03', 'yyyy-mm-dd');
+      END IF;
+
+      IF(INSTR( upper( p_unit_of_work ), 'FTE', 1 ) &gt; 0) THEN
+        SELECT nk_sum_fct( odf_nk_calendar, v_start, v_finish) into v_return from prcalendar where prid = (select prcalendarid from prsite);
+      ELSE
+        -- get pct avail by using the site calendar
+        SELECT nk_sum_fct( odf_nk_calendar, v_start, v_finish)/100.0 into v_return from prcalendar where prid = (select prcalendarid from prsite);
+      END IF;
+
+      IF( v_return is null or v_return = 0 ) THEN
+        v_return := 1;
+      END IF;
+
+    ELSE
+      V_RETURN := 1;
+    END IF;
+  END IF;
+  return v_return;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

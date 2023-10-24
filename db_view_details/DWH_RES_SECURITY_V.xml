@@ -1,0 +1,25 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RES_SECURITY_V">
+    <indexes/>
+    <text_length>517</text_length>
+    <text>SELECT 	 0 RESOURCE_KEY,
+		u.id USER_KEY,
+		u.USER_NAME,
+		u.USER_UID,
+		1 GLOBAL_VIEW_RIGHT
+FROM   	cmn_sec_users u
+JOIN    DWH_RES_SEC_GBL_PERMS_V s ON u.id = s.user_key
+WHERE  u.user_status_id = 200
+UNION  
+SELECT 	 s.object_instance_id RESOURCE_KEY,
+		u.id USER_KEY,
+		u.USER_NAME,
+		u.USER_UID,
+		0 GLOBAL_VIEW_RIGHT
+FROM   	cmn_sec_users u
+JOIN    DWH_RES_SEC_EXTRACT_V0 s ON  (u.id = s.user_id
+and not exists ( select 1 from DWH_RES_SEC_GBL_PERMS_V b where b.user_key=s.user_id)
+)
+WHERE  u.user_status_id = 200</text>
+  </QueryResult>
+</ClarityDBViewQuery>

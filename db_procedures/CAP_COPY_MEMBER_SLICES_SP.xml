@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_COPY_MEMBER_SLICES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_COPY_MEMBER_SLICES_SP" (
+  P_TABLE             IN      VARCHAR2,
+  P_SRC_SCENARIO_ID       IN      NUMBER,
+  P_TRGT_SCENARIO_ID      IN      NUMBER
+  )
+AS
+  V_SQLString        VARCHAR2(500);
+  V_SQLWhereString   VARCHAR2(500);
+
+BEGIN
+
+  IF P_SRC_SCENARIO_ID = 0 THEN
+    RAISE_APPLICATION_ERROR (-20006, 'INVALID SOURCE SCENARIO ID');
+  END IF;
+
+  IF P_TRGT_SCENARIO_ID = 0 THEN
+    RAISE_APPLICATION_ERROR (-20006, 'INVALID TARGET SCENARIO ID');
+  END IF;
+
+
+  V_SQLString :=  'INSERT INTO ' || P_TABLE ||
+      '( slice_request_id, scenario_id, prj_object_id, investment_id, resource_id, ' ||
+      'role_id, slice_date, slice, created_date ) ' || 
+      '( SELECT slice_request_id, ' || 
+      TO_CHAR(P_TRGT_SCENARIO_ID) ||
+      ', prj_object_id, investment_id, resource_id, role_id, slice_date, slice, created_date FROM ' ||
+      P_TABLE || ' WHERE SCENARIO_ID = ' || TO_CHAR(P_SRC_SCENARIO_ID) || ')';
+
+  EXECUTE IMMEDIATE V_SQLString;
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

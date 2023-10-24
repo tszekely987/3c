@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PRTF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PRTF_SP" 
+AS
+V_STMT            VARCHAR2 (200);
+v_n1_index_ts_name VARCHAR2(255);
+v_n2_index_ts_name VARCHAR2(255);
+v_n3_index_ts_name VARCHAR2(255);
+v_n4_index_ts_name VARCHAR2(255);
+v_u2_index_ts_name VARCHAR2(255);
+v_default_ts_name VARCHAR2(255);
+v_indexes_exists	number;
+
+  TYPE NBI_PRT_FACTS_ARRAY IS TABLE OF NBI_PRT_FACTS_V%ROWTYPE  INDEX BY BINARY_INTEGER;
+
+  NBI_PRT_FACTS_DATA NBI_PRT_FACTS_ARRAY;
+
+
+	CURSOR NBI_PRT_FACTS_CURSOR IS
+    SELECT PROJECT_ID, RESOURCE_ID, TEAM_ID,TASK_ID, PRJ_OBJECT_ID, FACT_DATE, ALLOCATED_QTY, ETC_QTY, ACTUAL_QTY, BASE_QTY
+    FROM   NBI_PRT_FACTS_V;
+
+
+
+BEGIN
+EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_PRT_FACTS';
+select DEFAULT_TABLESPACE INTO v_default_ts_name from user_users;
+
+-- Do this check to avoid no_data_found error is indexes don't exist.
+SELECT COUNT(1) INTO v_indexes_exists FROM user_indexes   WHERE  table_name = 'NBI_PRT_FACTS' AND index_name IN ('NBI_PRT_FACTS_N1','NBI_PRT_FACTS_N2','NBI_PRT_FACTS_N3','NBI_PRT_FACTS_N4','NBI_PRT_FACTS_U2');
+IF v_indexes_exists =5 THEN
+SELECT NVL(tablespace_name,'')  into v_n1_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N1';
+SELECT NVL(tablespace_name,'')  into v_n2_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N2';
+SELECT NVL(tablespace_name,'')  into v_n3_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N3';
+SELECT NVL(tablespace_name,'')  into v_n4_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_N4';
+SELECT NVL(tablespace_name,'')  into v_u2_index_ts_name FROM   user_indexes   WHERE      table_name = 'NBI_PRT_FACTS' AND index_name='NBI_PRT_FACTS_U2';
+ELSE
+v_n1_index_ts_name :=v_default_ts_name;
+v_n2_index_ts_name :=v_default_ts_name;
+v_n3_index_ts_name :=v_default_ts_name;
+v_n4_index_ts_name :=v_default_ts_name;
+v_u2_index_ts_name :=v_default_ts_name;
+END IF;
+
+CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N1');
+CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N2');
+CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N3');
+CMN_DROP_INDEX_SP('NBI_PRT_FACTS_N4');
+
+-- CLRT 72144
+-- Oracle decided to change the default behavior when dropping function-based indexes and unique indexes
+-- all PL/SQL objects referencing a table that owned such an index were automatically invalidated.
+-- Dropping of unique index caused ORA-04068: existing state of packages has been discarded,ORA-04065 in RAC instances only.
+-- SR Number: 3-71236988291 Bug Number:16748831 
+-- Setting Event 10624 prevents the view from being invalidated when the index is dropped.
+-- GRANT ALTER SESSION TO CLARIY is a required previlege and documented in 13.2 installation guide.
+
+EXECUTE IMMEDIATE ' ALTER SESSION SET EVENTS ''10624 trace name context forever, level 12''';
+CMN_DROP_INDEX_SP('NBI_PRT_FACTS_U2');
+EXECUTE IMMEDIATE ' ALTER SESSION SET EVENTS ''10624 trace name context off''';
+
+V_STMT := 'DONE DROPPING INDEXES';
+DBMS_OUTPUT.PUT_LINE (V_STMT);
+--
+-- Use APPEND_VALUES as part of INSERT with BULK Operation.
+OPEN NBI_PRT_FACTS_CURSOR;
+  LOOP
+    FETCH NBI_PRT_FACTS_CURSOR
+    BULK COLLECT INTO NBI_PRT_FACTS_DATA LIMIT 50000;
+    FORALL I IN 1..NBI_PRT_FACTS_DATA.COUNT
+    INSERT /*+ APPEND_VALUES */ INTO NBI_PRT_FACTS VALUES NBI_PRT_FACTS_DATA(I);
+    COMMIT;
+    EXIT WHEN NBI_PRT_FACTS_CURSOR%NOTFOUND;
+END LOOP;
+CLOSE NBI_PRT_FACTS_CURSOR;
+COMMIT;
+--
+--UPDATE NBI_RUN_LOGS SET INFO='AFTER INSERT', START_DATE=SYSDATE WHERE INFO LIKE 'BEFORE INSERT%';
+DBMS_OUTPUT.PUT_LINE (V_STMT);
+
+V_STMT := 'CREATING INDICES on NBI_PRT_FACTS';
+DBMS_OUTPUT.PUT_LINE (V_STMT);
+CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N1','','PROJECT_ID, FACT_DATE',v_n1_index_ts_name);
+CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N2','','RESOURCE_ID, FACT_DATE',v_n2_index_ts_name);
+CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N3','','PRJ_OBJECT_ID, FACT_DATE',v_n3_index_ts_name);
+CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_N4','','PROJECT_ID, RESOURCE_ID, FACT_DATE, TASK_ID',v_n4_index_ts_name);
+CMN_CREATE_INDEX_SP('NBI_PRT_FACTS','NBI_PRT_FACTS_U2','UNIQUE','PROJECT_ID, TEAM_ID, FACT_DATE, TASK_ID',v_u2_index_ts_name);
+
+
+V_STMT := 'DONE with Index Creationon NBI_PRT_FACTS';
+DBMS_OUTPUT.PUT_LINE (V_STMT);
+
+EXCEPTION   
+   WHEN OTHERS  THEN
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_PRTF_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

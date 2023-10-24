@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>GLD_VALIDATELOGIN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."GLD_VALIDATELOGIN" 
+(
+  cUserID   VARCHAR2 ,
+  cPassword   VARCHAR2 ,
+  iSkipPassword   INTEGER DEFAULT 0,
+  RC1   IN OUT GLD_VALIDATELOGINPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iVal  INTEGER;
+  iRetval   INTEGER;
+  cErrMsg   GLOBALPKG.STRING;
+  cVersion  GLOBALPKG.STRING;
+  cMinVer   GLOBALPKG.STRING;
+  iPostAccess   NUMBER(5,0);
+/* postaccess no longer determined from login, but
+  was moved to get integration info instead but
+  here for backward compatability for now */
+BEGIN
+	gld_ValidateLogin.iRetval :=  0;
+	gld_ValidateLogin.cErrMsg :=  '';
+	gld_ValidateLogin.iPostAccess :=  0;
+	gld_ValidateLogin.iVal :=  gld_ValidateLogin.iSkipPassword;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT COMPONENT_VERSION,  COMPONENT_VERSION
+    INTO gld_ValidateLogin.cVersion, gld_ValidateLogin.cMinVer
+    FROM CMN_COMPONENTS
+    WHERE COMPONENT_CODE = 'PAC';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF  gld_ValidateLogin.iSkipPassword = 0 THEN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+      SELECT   COUNT(*)
+      INTO gld_ValidateLogin.iVal FROM CMN_SEC_USERS
+      WHERE USER_NAME = gld_ValidateLogin.cUserID
+       AND PWD = gld_ValidateLogin.cPassword;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF  gld_ValidateLogin.iVal = 0 THEN
+		gld_ValidateLogin.iRetval :=  1;
+		gld_ValidateLogin.cErrMsg :=  'This RESOURCE_CODE code and password
+		   was not found!
+		Make sure that the password was typed in using
+		the correct case.';
+	ELSE
+	BEGIN
+
+    gld_ValidateLogin.iVal := 0;
+    BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+      SELECT 1
+      INTO gld_ValidateLogin.iVal
+      FROM DUAL
+      WHERE EXISTS (SELECT 1
+        FROM CMN_SEC_USERS
+        WHERE USER_NAME = gld_ValidateLogin.cUserID
+          AND USER_STATUS_ID = 200);
+      StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+
+    IF  gld_ValidateLogin.iVal = 0 THEN
+			gld_ValidateLogin.iRetval :=  2;
+			gld_ValidateLogin.cErrMsg :=  'You must be an active RESOURCE_CODE
+			   to use this application!';
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+
+        SELECT 0  -- Must use new security scheme
+          INTO gld_ValidateLogin.iVal
+          FROM DUAL;
+/*
+        SELECT   COUNT(*)
+				INTO gld_ValidateLogin.iVal FROM employee_access
+				WHERE RESOURCE_CODE = gld_ValidateLogin.cUserID
+				 AND application = 'GL Distributor';
+*/
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  gld_ValidateLogin.iVal = 0 THEN
+				gld_ValidateLogin.iRetval :=  3;
+				gld_ValidateLogin.cErrMsg :=  'You have not been granted access
+				   to this application!';
+			ELSE
+			BEGIN
+/*
+        BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+
+          SELECT
+					INTO gld_ValidateLogin.iVal FROM projectaccounting;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+*/
+        gld_ValidateLogin.iVal := 0;
+				IF  gld_ValidateLogin.iVal = 1 THEN
+					gld_ValidateLogin.iRetval :=  4;
+					gld_ValidateLogin.cErrMsg :=  'A database update of is in progress:
+					   please try again later.';
+				ELSE
+					BEGIN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error  := 0;
+
+            SELECT 0 -- must use new security model
+              INTO gld_ValidateLogin.iPostAccess
+              FROM DUAL;
+/*
+            SELECT   S.query
+						INTO gld_ValidateLogin.iPostAccess FROM security S, employees E
+						WHERE S.menuclass = 'DISTRIBUTOR'
+						 AND S.menuitem = 'POST TRANSACTIONS'
+						 AND S.accesslevel = E.accesslevel
+						 AND E.RESOURCE_CODE = gld_ValidateLogin.cUserID;
+*/
+            StoO_rowcnt := SQL%ROWCOUNT;
+						EXCEPTION
+							WHEN TOO_MANY_ROWS THEN
+								StoO_rowcnt := 2;
+							WHEN NO_DATA_FOUND THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+							WHEN OTHERS THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+			END;
+			END IF;
+		END;
+		END IF;
+	END;
+	END IF;
+
+  StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+
+  OPEN RC1 FOR
+	SELECT  gld_ValidateLogin.iRetval,  gld_ValidateLogin.cVersion,  gld_ValidateLogin.cMinVer,  gld_ValidateLogin.cErrMsg,  gld_ValidateLogin.iPostAccess
+	FROM DUAL;
+END gld_ValidateLogin;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

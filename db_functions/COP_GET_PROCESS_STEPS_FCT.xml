@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_GET_PROCESS_STEPS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_GET_PROCESS_STEPS_FCT" (
+  pProcVer_Id IN NUMBER,
+  pRunPro_Id IN NUMBER,
+  pDefStep_Id IN NUMBER,
+  pReturnDuration IN INTEGER
+)
+ RETURN VARCHAR2 IS
+
+   /* The main cursor loops through the steps for a process...*/
+   CURSOR c_steps
+   IS
+      -- Loop Thru Steps --
+      SELECT RunSteps.id,
+       NVL(COP_Process_Loop_Count_Fct(RunPro.id, DefSteps.Id, RunSteps.id),1) Loops,
+
+       ((NVL(RunSteps.End_Date,SYSDATE) - RunSteps.Start_date) * 24*60*60 ) Duration,
+
+       COP_Convert_Seconds_Fct(  ((NVL(RunSteps.End_Date,SYSDATE) - RunSteps.Start_date) * 24*60*60 )  ,2)
+
+       --DefSteps.id,
+      FROM BPM_Def_Stages DefStages
+       INNER JOIN BPM_DEF_Steps DefSteps ON DefSTeps.Stage_Id = DefStages.id
+
+       INNER JOIN BPM_Run_Processes RunPro ON RunPro.Process_Version_Id = DefStages.Process_Version_Id
+
+       LEFT OUTER JOIN CMN_CAPTIONS_NLS StageName ON StageName.language_code = 'en' AND StageName.pk_id = DefStages.id AND StageName.Table_Name = 'BPM_DEF_STAGES'
+
+       LEFT OUTER JOIN CMN_CAPTIONS_NLS descStep ON descStep.language_Code = 'en' AND descStep.Table_Name = 'BPM_DEF_STEPS' AND descStep.Pk_Id = DefSteps.Id
+
+       LEFT OUTER JOIN bpm_run_objects RunObj ON RunObj.pk_id = RunPro.Id AND RunObj.type_code = 'BPM_POT_PRIMARY'
+
+
+       LEFT OUTER JOIN bpm_Run_Steps RunSteps ON RunSteps.Step_Id = DefSteps.Id AND RunSteps.Process_Instance_Id = RunPro.id
+
+       LEFT OUTER JOIN CMN_LOOKUPS_V descStepStat ON descStepStat.language_Code= 'en' AND descStepStat.Lookup_Type = 'BPM_STEP_INSTANCE_STATES' AND descStepStat.Lookup_Code = RunSteps.Status_code
+
+       LEFT OUTER JOIN CMN_LOOKUPS_V descProStat ON descProStat.language_Code ='en' AND descProStat.Lookup_Type = 'BPM_PROCESS_INSTANCE_STATES' AND descProStat.Lookup_Code = RunPro.Status_code
+
+      WHERE DefStages.Process_Version_Id = pProcVer_Id
+       AND descStepStat.name IS NOT NULL
+
+       AND RunPro.Id = pRunPro_Id
+       AND DefSteps.Id = pDefStep_Id
+      ORDER BY CASE WHEN DefSteps.Step_Code = 'Finish' THEN 999 ELSE DefStages.sequence_no END,
+
+       DefSteps.Sequence_No ;
+
+      v_id NUMBER;
+      v_return VARCHAR2(4000);
+      v_counter NUMBER;
+      v_StepCount NUMBER;
+      v_runStepId NUMBER;
+      v_runStepLoops NUMBER;
+
+      v_ThisStep VARCHAR2(100);     
+      v_ThisAction VARCHAR2(200);
+      v_ThisAssignee VARCHAR2(4000);
+      v_CounterText VARCHAR2(12);
+      v_DurationSum NUMBER;
+      v_ThisDuration NUMBER;
+      v_Junk VARCHAR2(200);
+      v_AssigneeHit INTEGER;
+    
+BEGIN   
+
+       v_DurationSum :=0 ;
+       v_ThisDuration:=0;
+
+       v_AssigneeHit:=0;
+    
+       OPEN c_steps;
+       FETCH c_steps INTO v_runStepId, v_runStepLoops, v_ThisDuration, v_Junk;
+
+       v_ThisStep := '' ;
+       v_CounterText:= ' ';
+       v_AssigneeHit:=1;
+    
+       -- Loop through each step... 
+       WHILE (c_steps%FOUND)
+     LOOP       
+            IF v_StepCount IS NULL THEN
+
+              v_StepCount := 1;
+            END IF;
+            IF v_StepCount &gt; 1 THEN
+              v_CounterText:= ' (' || REPLACE(TO_CHAR(v_StepCount,'9'),' ','')  || ') ';
+            END IF;
+            v_DurationSum:= v_DurationSum + v_ThisDuration;
+
+            
+            /* INNER ACTION LOOP ...... */
+            DECLARE
+        CURSOR c_action
+        IS  
+           SELECT
+
+        DefStepAct.id DefStepAct_Id
+           FROM BPM_Def_Stages DefStages
+        INNER JOIN BPM_DEF_Steps DefSteps ON DefSTeps.Stage_Id = DefStages.id
+
+        INNER JOIN BPM_Run_Processes RunPro ON RunPro.Process_Version_Id = DefStages.Process_Version_Id
+
+        LEFT OUTER JOIN bpm_Run_Steps RunSteps ON RunSteps.Process_Instance_id = RunPro.id AND RunSteps.Step_Id = DefSteps.Id
+
+        LEFT OUTER JOIN bpm_Def_Step_actions DefStepAct ON DefStepAct.Step_Id = DefSteps.Id
+
+
+        LEFT OUTER JOIN BPM_RUN_STEP_ACTION_RESULTS ActResults ON ActResults.Step_Action_Id = DefStepAct.Id AND ActResults.Step_Instance_id = RunSteps.id
+
+        LEFT OUTER JOIN bpm_run_objects RunObj ON RunObj.pk_id = RunPro.Id AND RunObj.type_code = 'BPM_POT_PRIMARY'
+
+        LEFT OUTER JOIN CMN_CAPTIONS_NLS descAct ON descAct.language_Code = 'en' AND descAct.Table_Name = 'BPM_DEF_STEP_ACTIONS' AND descAct.pk_id = DefStepAct.id
+
+        LEFT OUTER JOIN CMN_LOOKUPS_V ActType ON ActType.language_code = 'en' AND ActType.LOOKUP_CODE = DefStepAct.Type_Code
+
+        LEFT OUTER JOIN CMN_LOOKUPS_V ActStatus ON ActStatus.language_Code = 'en' AND ActStatus.Lookup_Code = ActResults.Status_Code AND ActStatus.lookup_type = 'BPM_STEP_ACTION_STATES'
+
+        LEFT OUTER JOIN CMN_CAPTIONS_NLS stageName ON stageName.pk_id =DefStages.id AND stageName.language_code = 'en' AND stageName.table_name = 'BPM_DEF_STAGES'
+
+        LEFT OUTER JOIN CMN_LOOKUPS_V descProStat ON descProStat.language_Code = 'en' AND descProStat.Lookup_Type = 'BPM_PROCESS_INSTANCE_STATES' AND descProStat.Lookup_Code = RunPro.Status_code
+
+
+        LEFT OUTER JOIN ( SELECT X.id xid, X.process_version_Id xprocess_version_Id,
+
+                  X.src_step_Action_result_Id xsrc_step_Action_result_Id,
+
+                  INITCAP(Y.object_Type_code) xobject_Type_code
+
+
+                  FROM BPM_run_processes X INNER JOIN BPM_DEF_OBJECTS Y ON X.PROCESS_VERSION_ID = Y.pk_id
+
+
+                                  AND Y.Type_code = 'BPM_POT_PRIMARY'
+                 ) SUBP ON SUBP.xsrc_step_Action_result_Id = ActResults.id
+
+           WHERE DefStages.Process_Version_Id = pProcVer_Id
+        AND RunPro.Id = pRunPro_Id
+        AND DefSteps.Id = pDefStep_Id
+        AND RunSteps.id = v_runStepId
+           ORDER BY DefStages.Sequence_no, DefStepAct.SEQUENCE, DefSteps.Sequence_no ;
+
+
+        v_id2 NUMBER;   
+
+        v_ActionCount NUMBER;
+            v_ActionId NUMBER;          
+            
+        BEGIN   
+         OPEN c_action;
+         FETCH c_action INTO v_ActionId;
+         v_ThisAction := '' ; --'Action Info Here..if any' ;            
+         WHILE (c_action%FOUND)
+        LOOP        
+            IF v_ActionCount IS NULL THEN
+                   v_ActionCount := 1;
+                END IF; 
+
+
+
+                
+                /* INNER ASSIGNEE LOOP ...... */
+            DECLARE
+        CURSOR c_assign
+        IS
+         SELECT USR.First_Name || ' ' || USR.Last_Name,
+          ((NVL(ActResults.End_Date,SYSDATE) - ActResults.Start_date) *24*60*60 ) Duration,
+
+                  CASE WHEN ((NVL(ActResults.End_Date,SYSDATE) - ActResults.Start_date) * 24*60*60 ) &lt; 259200 THEN 1
+
+
+               WHEN ((NVL(ActResults.End_Date,SYSDATE) - ActResults.Start_date) * 24*60*60 ) BETWEEN 259200 AND 431999 THEN 2
+
+               WHEN ((NVL(ActResults.End_Date,SYSDATE) - ActResults.Start_date) * 24*60*60 ) &gt;= 432000 THEN 3
+
+               ELSE NULL
+          END Duration_Status,
+          COP_Convert_Seconds_Fct(  ((NVL(ActResults.End_Date,SYSDATE) - ActResults.Start_date) * 24*60*60 )  ,2) timer
+
+         FROM BPM_Def_Stages DefStages
+          INNER JOIN BPM_DEF_Steps DefSteps ON DefSTeps.Stage_Id = DefStages.id
+
+          INNER JOIN BPM_Run_Processes RunPro ON RunPro.Process_Version_Id = DefStages.Process_Version_Id
+
+          LEFT OUTER JOIN bpm_Run_Steps RunSteps ON RunSteps.Process_Instance_id = RunPro.id AND RunSteps.Step_Id = DefSteps.Id
+
+          LEFT OUTER JOIN bpm_Def_Step_actions DefStepAct ON DefStepAct.Step_Id = DefSteps.Id
+
+          LEFT OUTER JOIN BPM_RUN_STEP_ACTION_RESULTS ActResults ON ActResults.Step_Action_Id = DefStepAct.Id AND ActResults.Step_Instance_id = RunSteps.id
+
+          LEFT OUTER JOIN bpm_run_objects RunObj ON RunObj.pk_id = RunPro.Id AND RunObj.type_code = 'BPM_POT_PRIMARY'
+
+          LEFT OUTER JOIN CMN_CAPTIONS_NLS descAct ON descAct.language_Code = 'en' AND descAct.Table_Name = 'BPM_DEF_STEP_ACTIONS' AND descAct.pk_id = DefStepAct.id
+
+          LEFT OUTER JOIN CMN_LOOKUPS_V ActType ON ActType.language_code = 'en' AND ActType.LOOKUP_CODE = DefStepAct.Type_Code
+
+          LEFT OUTER JOIN CMN_LOOKUPS_V ActStatus ON ActStatus.language_Code = 'en' AND ActStatus.Lookup_Code = ActResults.Status_Code --'BPM_AIS_DONE'
+
+          LEFT OUTER JOIN CMN_CAPTIONS_NLS stageName ON stageName.pk_id= DefStages.id AND stageName.language_code = 'en' AND stageName.table_name = 'BPM_DEF_STAGES'
+
+          LEFT OUTER JOIN BPM_RUN_ASSIGNEES RunAss ON RunAss.pk_id = ActResults.id
+
+          LEFT OUTER JOIN CMN_SEC_USERS USR ON USR.Id = RunAss.User_Id
+          LEFT OUTER JOIN CMN_LOOKUPS_V ActDesc ON ActDesc.language_code = 'en' AND ActDesc.LOOKUP_TYPE = RunAss.Ai_Status_Type_code AND ActDesc.LOOKUP_CODE = RunAss.Ai_Status_code
+
+
+          LEFT OUTER JOIN CMN_LOOKUPS_V descProStat ON descProStat.language_Code = 'en' AND descProStat.Lookup_Type = 'BPM_PROCESS_INSTANCE_STATES' AND descProStat.Lookup_Code = RunPro.Status_code
+
+         WHERE DefStages.Process_Version_Id = pProcVer_Id
+          AND RunPro.Id = pRunPro_Id
+          AND DefSteps.Id = pDefStep_Id
+          AND RunSteps.id = v_runStepId
+          AND DefStepAct.id = v_ActionId
+                 ORDER BY DefStages.Sequence_no, DefStepAct.SEQUENCE, USR.First_Name || ' '|| USR.Last_Name ;
+
+
+
+    
+             v_AssiCount NUMBER;
+                 v_AssiId NUMBER;
+         v_Name VARCHAR2(60);
+                 v_Dur NUMBER;
+                 v_DurStatus NUMBER;
+                 v_Time VARCHAR2(30);
+
+         BEGIN  
+          OPEN c_assign;
+          FETCH c_assign INTO v_Name, v_Dur, v_DurStatus, v_Time ;          
+
+
+          --  Loop through each assignee ...    
+              WHILE (c_assign%FOUND)
+            LOOP        
+                IF v_AssiCount IS NULL THEN
+                   v_AssiCount := 1;
+                END IF;         
+
+            IF INSTR(v_ThisAssignee,v_name) &gt; 1 THEN
+                      v_name:='';
+                    END IF;
+                    IF v_AssigneeHit &gt; 1  AND  LENGTH(v_name) &gt; 1 THEN
+                       v_ThisAssignee:= RTRIM(v_ThisAssignee) || ', ';
+                    END IF;                 
+
+                    v_ThisAssignee:= v_ThisAssignee || ' ' || v_name  || ' ' ;
+                    
+
+            -- Process next Assignee
+                v_AssiCount := v_AssiCount + 1;         
+            v_AssigneeHit:=v_AssigneeHit + 1;
+
+                    FETCH c_assign INTO v_Name, v_Dur, v_DurStatus, v_Time;
+          END LOOP;
+         CLOSE c_assign;
+                END;
+                
+
+
+                
+
+        -- Process next Action
+                v_ActionCount := v_ActionCount + 1;
+                
+        FETCH c_action INTO v_ActionId;
+         END LOOP;
+         CLOSE c_action;
+             v_ActionCount:=0;
+            END;
+            
+            
+        -- Process next Step
+
+            v_StepCount := v_StepCount + 1;
+            
+      FETCH c_steps INTO v_runStepId, v_runStepLoops, v_ThisDuration, v_Junk;
+
+     END LOOP;
+       CLOSE c_steps;
+
+
+  IF pReturnDuration = 1 THEN
+     v_return:=0;
+     IF v_DurationSum &lt; 259200 THEN
+        v_return := 1;
+
+     END IF;
+     IF v_DurationSum &gt;= 259200 AND v_DurationSum &lt;=431999 THEN
+        v_return :=2;
+     END IF;
+     IF v_DurationSum &gt;= 432000 THEN
+        v_return:=3;
+     END IF;
+
+  ELSE
+     v_return := COP_Convert_Seconds_Fct( v_DurationSum ,2) || ' ' || v_ThisStep
+ || v_ThisAction || '(' || v_ThisAssignee || ')';
+
+  END IF;
+
+
+
+  IF RTRIM(v_return) LIKE '%()' THEN
+     v_return := REPLACE(v_return,'()','') ;
+  END IF;
+
+
+   RETURN v_return;
+        
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

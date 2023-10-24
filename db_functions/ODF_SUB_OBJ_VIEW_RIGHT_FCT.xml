@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>ODF_SUB_OBJ_VIEW_RIGHT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."ODF_SUB_OBJ_VIEW_RIGHT_FCT" (
+   P_USER_ID IN NUMBER,
+   P_OBJECT_CODE IN VARCHAR2,
+   P_PARENT_OBJECT_CODE IN VARCHAR2,
+   P_PARENT_INSTANCE_ID IN NUMBER,
+   P_GRAND_PARENT_OBJECT_CODE IN VARCHAR2,
+   P_GRAND_PARENT_INSTANCE_ID IN NUMBER
+)
+   RETURN NUMBER
+IS
+   V_RESULT NUMBER := 0;
+   V_is_custom number := 0;
+   V_GRAND_PARENT_INSTANCE_ID NUMBER := P_GRAND_PARENT_INSTANCE_ID;
+BEGIN
+
+   -- Do we have global view rights to P_OBJECT_CODE?
+   V_RESULT := CMN_SEC_CHECK_RIGHT_FCT(P_USER_ID,'CMN','odf_cst_' || P_OBJECT_CODE,'RECORD','READ');
+
+   -- OK, so we do not have global view rights but maybe we have context of a parent instance ID.
+   -- Let's see if we have the pseudo global view right given to the parent instance.
+   IF ((V_RESULT = 0) AND (P_PARENT_OBJECT_CODE IS NOT NULL) AND (P_PARENT_INSTANCE_ID IS NOT NULL)) THEN
+
+     V_RESULT := CMN_SEC_CHECK_RIGHT_FCT(P_USER_ID,'CMN','odf_cst_' || P_OBJECT_CODE || '_parent','RECORD','READ', P_PARENT_INSTANCE_ID);
+
+     -- Hmm, no such luck. But hang on, we have the parent instance ID...if the parent object is also a sub object
+     -- we can actally derive the grand parent instance ID and see if we have read access based on the grand parent
+     -- pseudo global right
+     IF ((V_RESULT = 0) AND (P_GRAND_PARENT_OBJECT_CODE IS NOT NULL) and (P_GRAND_PARENT_INSTANCE_ID is null)) THEN
+       
+       select is_custom into v_is_custom
+       from   odf_objects
+       where  code = P_PARENT_OBJECT_CODE;
+       
+       if( v_is_custom = 1) THEN
+         EXECUTE IMMEDIATE 'SELECT odf_parent_id FROM odf_ca_' ||
+                           P_PARENT_OBJECT_CODE || ' WHERE  id = ' ||
+                           TO_CHAR(P_PARENT_INSTANCE_ID)
+         INTO V_GRAND_PARENT_INSTANCE_ID;
+       END IF;
+     END IF;
+   END IF;
+
+   -- Last chance. Let's see if we have the pseudo global view right granted to the grand parent instance
+   IF ((V_RESULT = 0) AND (P_GRAND_PARENT_OBJECT_CODE IS NOT NULL) AND (V_GRAND_PARENT_INSTANCE_ID IS NOT NULL)) THEN
+
+     V_RESULT := CMN_SEC_CHECK_RIGHT_FCT(P_USER_ID,'CMN','odf_cst_' || P_OBJECT_CODE || '_grandparent','RECORD','READ', V_GRAND_PARENT_INSTANCE_ID);
+
+   END IF;
+
+   RETURN V_RESULT;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

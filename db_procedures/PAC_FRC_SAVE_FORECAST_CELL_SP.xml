@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_SAVE_FORECAST_CELL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_SAVE_FORECAST_CELL_SP" 
+(
+  PROJECT_ID         NUMBER,
+  REVISION_NO        NUMBER,
+  P_FORECAST_TYPE	 NUMBER,
+  P_DETAIL      	 VARCHAR2,  
+  P_PERIOD          VARCHAR2,
+  UNITS              NUMBER,
+  COST               NUMBER,
+  REVENUE            NUMBER,
+  CURRENCY_CODE      VARCHAR2,
+  RESOURCE_CODE      NUMBER,
+  ACTUAL_BENEFITS    NUMBER,
+  P_DETAIL2      	 VARCHAR2 DEFAULT NULL
+)
+AS
+  V_STATUS           INTEGER;
+  V_USE_REVISION     NUMBER;
+  V_USER_ID          NUMBER;
+  V_RESOURCE_CODE    NUMBER;
+  V_FORECAST_DETAIL_ID  NUMBER;
+  V_SYSDATE          DATE;
+  V_FORECAST_ID      NUMBER;
+  V_TRANSTYPE        VARCHAR2(2);
+  V_IS_INSERT        NUMBER := 0;
+  V_COUNT            NUMBER;
+  V_FINANCIALPROJECT INTEGER := 0;
+
+  V_CURRENCY_CODE    VARCHAR2(30);  
+  V_BILLING_CURRENCY VARCHAR2(30);
+  V_BILLING_COST     NUMBER(32,6);
+  V_BILLING_REVENUE  NUMBER(32,6);
+  V_BILLING_ACTUAL_BENEFITS NUMBER(32,6);
+  V_EXCHANGE_RATES   Cmn_Exchangerate_Pkg.exchangeRateTAB;
+  V_START_DATE       DATE;
+  V_EXCHANGE_TYPE    VARCHAR2(30);
+  V_DETAIL_TYPE		 NUMBER;
+  V_DETAIL_ID NUMBER;
+  V_DETAIL2_ID NUMBER;
+  V_PERIOD_ID NUMBER;
+  V_PERIOD_TYPE VARCHAR2(30);
+  V_PROJECT_START_PERIOD_ID NUMBER;
+  V_PROJECT_END_PERIOD_ID NUMBER;
+  V_UNITS_FACTOR		  NUMBER(32,6) := 1;
+
+  StoO_selcnt        INTEGER;
+  StoO_error         INTEGER;
+  StoO_rowcnt        INTEGER;
+  StoO_crowcnt       INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg        VARCHAR2(255);
+  StoO_sqlstatus     INTEGER;
+BEGIN
+
+  V_CURRENCY_CODE := Pac_Frc_Save_Forecast_Cell_Sp.CURRENCY_CODE;   
+  V_USER_ID := RESOURCE_CODE;
+  
+  -- Get the units factor
+  V_UNITS_FACTOR := PRJ_HPD_FACTOR_FCT();
+
+  BEGIN
+  	-- get our forecast id, status, and a system date to use for timestamps
+	StoO_errmsg := 'Error retrieving the forecast properties for this cell';
+	StoO_error := -20950;
+    SELECT STATUS,
+           ID,
+           SYSDATE,
+		   USE_DETAIL_TYPE,
+		   PERIOD_TYPE,
+		   START_PERIOD,
+		   END_PERIOD
+      INTO V_STATUS,
+           V_FORECAST_ID,
+           V_SYSDATE,
+		   V_DETAIL_TYPE,
+		   V_PERIOD_TYPE,
+		   V_PROJECT_START_PERIOD_ID,
+		   V_PROJECT_END_PERIOD_ID
+      FROM PAC_FRC_FORECAST_PROPERTIES
+     WHERE PROJECT_ID = Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID
+       AND REVISION = Pac_Frc_Save_Forecast_Cell_Sp.REVISION_NO
+	   AND FORECAST_TYPE = P_FORECAST_TYPE;
+
+    EXCEPTION
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+      RETURN;
+  END;
+
+  -- If plan revision is approved then raise an error that plan has been approved
+  IF V_STATUS = 2 THEN
+    RAISE_APPLICATION_ERROR(-20931, 'This plan has been approved.');
+  END IF;
+
+  -- get the  type for the detail
+  BEGIN
+  	IF V_DETAIL_TYPE = 0 THEN
+	 	SELECT T.ID, T.TRANSTYPE
+	    INTO V_DETAIL_ID,V_TRANSTYPE
+	    FROM TRANSCLASS T,PAC_FRC_PROJ_ASSOC P
+	    WHERE T.ID = P.DETAIL_ID
+		AND P.FORECAST_ID = V_FORECAST_ID
+		AND T.TRANSCLASS = P_DETAIL;
+	ELSIF V_DETAIL_TYPE = 1 THEN
+		SELECT S.ID, DECODE(RESOURCE_TYPE,0,'L',1,'Q',2,'M',3,'X')
+		INTO V_DETAIL_ID,V_TRANSTYPE
+		FROM SRM_RESOURCES S,PAC_FRC_PROJ_ASSOC P
+	    WHERE S.ID = P.DETAIL_ID
+		AND P.FORECAST_ID = V_FORECAST_ID
+		AND UNIQUE_NAME = P_DETAIL;
+	ELSIF V_DETAIL_TYPE = 2 THEN
+	    SELECT C.PRID, 'L'
+	    INTO V_DETAIL_ID,V_TRANSTYPE
+	    FROM PRCHARGECODE C,PAC_FRC_PROJ_ASSOC P
+	    WHERE C.PRID = P.DETAIL_ID
+		AND P.FORECAST_ID = V_FORECAST_ID
+		AND C.PREXTERNALID = P_DETAIL;
+	ELSE
+	 	SELECT T.ID, C.PRID, T.TRANSTYPE
+	    INTO V_DETAIL_ID, V_DETAIL2_ID, V_TRANSTYPE
+	    FROM TRANSCLASS T,PAC_FRC_PROJ_ASSOC P, PRCHARGECODE C
+	    WHERE T.ID = P.DETAIL_ID
+		AND C.PRID = P.DETAIL2_ID
+		AND P.FORECAST_ID = V_FORECAST_ID
+		AND T.TRANSCLASS = P_DETAIL
+		AND C.PREXTERNALID = P_DETAIL2;	    
+    END IF;
+    EXCEPTION
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(-20952, 'Invalid detail level for this cell' || V_DETAIL_TYPE ||V_FORECAST_ID);
+      RETURN;
+  END;
+
+  -- make sure the Period_id is valid for the period type
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    SELECT B.ID
+      INTO V_PERIOD_ID
+      FROM BIZ_COM_PERIODS B
+     WHERE B.PERIOD_TYPE = V_PERIOD_TYPE
+       AND B.PERIOD_NAME = P_PERIOD
+	   AND B.START_DATE &gt;=( SELECT BS.start_date FROM BIZ_COM_PERIODS BS WHERE BS.ID = V_PROJECT_START_PERIOD_ID)
+	   AND B.END_DATE &lt;= (SELECT BE.end_date FROM BIZ_COM_PERIODS BE WHERE BE.ID = V_PROJECT_END_PERIOD_ID);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20975, 'Invalid period specified for this forecast');
+    	RETURN;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+  
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+	-- see if we already have a row for this record
+	StoO_errmsg := 'Error checking if the cell already exists';
+	StoO_error := -20954;
+    SELECT ID
+      INTO V_FORECAST_DETAIL_ID
+      FROM PAC_FRC_FORECAST_DETAILS
+     WHERE FORECAST_ID = Pac_Frc_Save_Forecast_Cell_Sp.V_FORECAST_ID
+       AND PERIOD_ID = Pac_Frc_Save_Forecast_Cell_Sp.V_PERIOD_ID
+       AND DETAIL_ID = V_DETAIL_ID
+	   AND (V_DETAIL_TYPE != 3 or DETAIL2_ID = V_DETAIL2_ID);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(-20954, 'Error checking if the cell already exists');
+      RETURN;
+  END;
+  --  Insert into the details table if it does not exists.
+  BEGIN
+	  IF Pac_Frc_Save_Forecast_Cell_Sp.V_FORECAST_DETAIL_ID IS NULL THEN
+	    StoO_errmsg := 'Error inserting the cell details';
+		StoO_error := -20955;
+		INSERT INTO PAC_FRC_FORECAST_DETAILS
+	       (
+	         ID,
+	         FORECAST_ID,
+	         PERIOD_ID,
+	         DETAIL_ID,
+			 DETAIL2_ID,
+	         UNITS,
+	         CREATED_DATE,
+	         CREATED_BY,
+	         LAST_UPDATED_DATE,
+	         LAST_UPDATED_BY
+	       )
+	       SELECT PAC_FRC_FORECAST_DETAILS_S1.NEXTVAL,
+	              Pac_Frc_Save_Forecast_Cell_Sp.V_FORECAST_ID,
+	              Pac_Frc_Save_Forecast_Cell_Sp.V_PERIOD_ID,
+	              V_DETAIL_ID,
+				  V_DETAIL2_ID,
+	              (Pac_Frc_Save_Forecast_Cell_Sp.UNITS * V_UNITS_FACTOR),
+	              V_SYSDATE,
+	              V_USER_ID,
+	              V_SYSDATE,
+	              V_USER_ID
+	         FROM DUAL;
+		
+		StoO_errmsg := 'Error retrieving the new cell detail id';
+		StoO_error := -20956;
+	       SELECT PAC_FRC_FORECAST_DETAILS_S1.CURRVAL
+	         INTO V_FORECAST_DETAIL_ID
+	         FROM DUAL;
+	
+	    Pac_Frc_Save_Forecast_Cell_Sp.V_IS_INSERT := 1;
+	  ELSE
+	  	StoO_errmsg := 'Error updating the cell details';
+		StoO_error := -20957;
+		UPDATE PAC_FRC_FORECAST_DETAILS
+	    SET UNITS = NVL(Pac_Frc_Save_Forecast_Cell_Sp.UNITS * V_UNITS_FACTOR, PAC_FRC_FORECAST_DETAILS.UNITS) ,
+	             LAST_UPDATED_DATE = Pac_Frc_Save_Forecast_Cell_Sp.V_SYSDATE,
+	             LAST_UPDATED_BY = Pac_Frc_Save_Forecast_Cell_Sp.V_USER_ID
+	    WHERE ID = V_FORECAST_DETAIL_ID;
+	  END IF;
+	  EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+      	   NULL;
+	  WHEN OTHERS THEN
+	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+	    RAISE_APPLICATION_ERROR(StoO_errmsg, StoO_error);
+	    RETURN;
+  END;
+  
+
+  /* If we have a financial project then get the billing currency. Otherwise we will use the System or default Currency */
+  BEGIN
+    StoO_selcnt := 0;
+	BEGIN
+	  StoO_errmsg := 'Error retrieving the billing currency information';
+	  StoO_error := -20958;
+      SELECT 1
+        INTO StoO_selcnt
+        FROM DUAL
+        WHERE EXISTS (SELECT 1
+                      FROM PAC_MNT_PROJECTS
+                      WHERE ID = Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID );
+	  EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+          RETURN;
+	END;
+	  IF StoO_selcnt &gt; 0 THEN
+		  V_FINANCIALPROJECT := 1;
+	
+	      SELECT BILLING_CURRENCY_CODE,
+	             DECODE(Pac_Frc_Save_Forecast_Cell_Sp.V_TRANSTYPE,
+	                    'L', LABOR_EXCHANGE_RATE_TYPE,
+	                    'M', MATERIALS_EXCHANGE_RATE_TYPE,
+	                    'Q', EQUIPMENT_EXCHANGE_RATE_TYPE,
+	                    'X', EXPENSE_EXCHANGE_RATE_TYPE)	  
+	        INTO Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_CURRENCY,
+	             Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_TYPE
+	        FROM PAC_MNT_PROJECTS P
+	        WHERE P.ID = Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID ;
+	  ELSE
+	      V_FINANCIALPROJECT := 0;
+	
+		  SELECT cov.value,
+		         cov.value
+	        INTO Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_CURRENCY,
+			     Pac_Frc_Save_Forecast_Cell_Sp.V_CURRENCY_CODE
+		    FROM CMN_OPTIONS CO,
+			     CMN_OPTION_VALUES COV
+			WHERE CO.ID = COV.OPTION_ID AND
+			      CO.OPTION_CODE = 'CMN_SYSTEM_CURRENCY';	
+	  END IF;
+      
+    -- get other information we need to call the exchange rate function
+    SELECT I.SCHEDULE_START
+        INTO Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE
+        FROM INV_INVESTMENTS I
+       WHERE I.ID = Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID ;
+
+	
+	IF Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE IS NULL THEN
+        SELECT START_DATE
+          INTO Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE
+          FROM BIZ_COM_PERIODS B,
+		       PAC_FRC_FORECAST_PROPERTIES P
+          WHERE PROJECT_ID = Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID
+            AND REVISION = Pac_Frc_Save_Forecast_Cell_Sp.REVISION_NO
+			AND FORECAST_TYPE = P_FORECAST_TYPE
+			AND B.ID = P.START_PERIOD ;
+	END IF;
+	EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+          RETURN;
+  END;  
+
+	IF V_FINANCIALPROJECT = 1 THEN
+	     BEGIN  
+	       -- get the billing cost
+	       IF Pac_Frc_Save_Forecast_Cell_Sp.COST IS NOT NULL THEN
+	         Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES :=
+	           Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+	                               Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_CURRENCY_CODE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.COST,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_TYPE);
+	           Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_COST := Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+	       END IF;
+	
+	       -- get the billing cost
+	       IF Pac_Frc_Save_Forecast_Cell_Sp.REVENUE IS NOT NULL THEN
+	         Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES :=
+	           Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+	                               Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_CURRENCY_CODE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.REVENUE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_TYPE);
+	           Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_REVENUE := Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+	       END IF;
+		
+	       -- get the billing for Actual Benefits
+	       IF Pac_Frc_Save_Forecast_Cell_Sp.ACTUAL_BENEFITS IS NOT NULL THEN
+	         Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES :=
+	           Cmn_Exchangerate_Pkg.CMN_GET_CONVERTED_VALUES_FCT(
+	                               Pac_Frc_Save_Forecast_Cell_Sp.PROJECT_ID,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_START_DATE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_CURRENCY_CODE,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.ACTUAL_BENEFITS,
+	                               Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_TYPE);
+	           Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_ACTUAL_BENEFITS := Pac_Frc_Save_Forecast_Cell_Sp.V_EXCHANGE_RATES(3).convertedAmount;
+	       END IF;		
+	  END ;
+	ELSE
+	  BEGIN
+	    Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_COST := Pac_Frc_Save_Forecast_Cell_Sp.COST ;
+		Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_REVENUE := Pac_Frc_Save_Forecast_Cell_Sp.REVENUE ;
+		Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_ACTUAL_BENEFITS := Pac_Frc_Save_Forecast_Cell_Sp.ACTUAL_BENEFITS ;		
+	  END;   	
+	END IF;		
+  -- now we need to insert/update 2 rows into the VALUES table
+  BEGIN
+	  IF Pac_Frc_Save_Forecast_Cell_Sp.V_IS_INSERT = 1 THEN
+	    BEGIN
+			StoO_errmsg := 'Error inserting the cell home currency values';
+			StoO_error := -20959;
+			-- Insert the cell home currency value
+	        INSERT INTO PAC_FRC_FORECAST_VALUES (
+	          ID,
+	          FORECAST_DETAILS_ID,
+	          CURRENCY_TYPE,
+	          CURRENCY_CODE,
+	          COST,
+	          REVENUE,
+			  ACTUAL_BENEFITS
+	        )
+	        SELECT PAC_FRC_FORECAST_VALUES_S1.NEXTVAL,
+	               V_FORECAST_DETAIL_ID,
+	               'HOME',
+	               Pac_Frc_Save_Forecast_Cell_Sp.V_CURRENCY_CODE,
+	               Pac_Frc_Save_Forecast_Cell_Sp.COST,
+	               Pac_Frc_Save_Forecast_Cell_Sp.REVENUE,
+				   Pac_Frc_Save_Forecast_Cell_Sp.ACTUAL_BENEFITS
+	          FROM DUAL;
+			-- Insert the cell billing currency value
+			StoO_errmsg := 'Error inserting the cell billing currency values';
+			StoO_error := -20960;
+	        INSERT INTO PAC_FRC_FORECAST_VALUES (
+	          ID,
+	          FORECAST_DETAILS_ID,
+	          CURRENCY_TYPE,
+	          CURRENCY_CODE,
+	          COST,
+	          REVENUE,
+			  ACTUAL_BENEFITS
+	        )
+	        SELECT PAC_FRC_FORECAST_VALUES_S1.NEXTVAL,
+	               V_FORECAST_DETAIL_ID,
+	               'BILLING',
+	               Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_CURRENCY,
+	               Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_COST,
+	               Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_REVENUE,
+				   Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_ACTUAL_BENEFITS
+	          FROM DUAL;
+	    END;
+	  ELSE
+	    BEGIN
+			StoO_errmsg := 'Error updating the cell home currency values';
+			StoO_error := -20961;		 
+			UPDATE PAC_FRC_FORECAST_VALUES
+	               SET COST = NVL(Pac_Frc_Save_Forecast_Cell_Sp.COST, PAC_FRC_FORECAST_VALUES.COST),
+	               REVENUE = NVL(Pac_Frc_Save_Forecast_Cell_Sp.REVENUE, PAC_FRC_FORECAST_VALUES.REVENUE),
+				   ACTUAL_BENEFITS = NVL( Pac_Frc_Save_Forecast_Cell_Sp.ACTUAL_BENEFITS, PAC_FRC_FORECAST_VALUES.ACTUAL_BENEFITS)
+	        WHERE FORECAST_DETAILS_ID = V_FORECAST_DETAIL_ID
+	        AND CURRENCY_TYPE = 'HOME';
+			
+			StoO_errmsg := 'Error updating the cell billing currency values';
+			StoO_error := -20962;
+	        UPDATE PAC_FRC_FORECAST_VALUES
+	               SET COST = NVL(Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_COST, PAC_FRC_FORECAST_VALUES.COST),
+	               REVENUE = NVL(Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_REVENUE, PAC_FRC_FORECAST_VALUES.REVENUE),
+				   ACTUAL_BENEFITS = NVL( Pac_Frc_Save_Forecast_Cell_Sp.V_BILLING_ACTUAL_BENEFITS, PAC_FRC_FORECAST_VALUES.ACTUAL_BENEFITS)			   
+	         WHERE FORECAST_DETAILS_ID = V_FORECAST_DETAIL_ID
+	           AND CURRENCY_TYPE = 'BILLING';
+	    END;
+	  END IF; 
+      EXCEPTION
+      WHEN OTHERS THEN
+      	   RAISE_APPLICATION_ERROR(StoO_error, SQLERRM ||StoO_errmsg);
+      	   RETURN;
+  END;
+  -- Stub stored procedure to be used to do after the fact processes.
+  BEGIN
+     StoO_errmsg := 'Error while executing PAC_FRC_POST_SAVE_FORECAST_SP';
+  	 PAC_FRC_POST_SAVE_FORECAST_SP(
+		  PROJECT_ID,
+		  REVISION_NO,
+		  P_FORECAST_TYPE,
+		  V_DETAIL_ID,  
+		  V_PERIOD_ID,
+		  (UNITS * V_UNITS_FACTOR),
+		  COST,
+		  REVENUE,
+		  CURRENCY_CODE,
+		  RESOURCE_CODE,
+		  ACTUAL_BENEFITS,
+		  V_DETAIL2_ID);
+	 EXCEPTION
+     WHEN OTHERS THEN
+    	  RAISE_APPLICATION_ERROR(SQLCODE, SQLERRM ||StoO_errmsg);
+    	  RETURN;
+  END;
+END Pac_Frc_Save_Forecast_Cell_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

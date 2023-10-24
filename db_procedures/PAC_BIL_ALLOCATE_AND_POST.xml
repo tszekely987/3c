@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_ALLOCATE_AND_POST</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_ALLOCATE_AND_POST" (
+cUserID   VARCHAR2 ,
+iBillSessionKey   NUMBER ,
+cCOMPANY_CODE   VARCHAR2 ,
+cPROJECT_CODE   VARCHAR2 ,
+cTransType  VARCHAR2 ,
+nBillAmount NUMBER ,
+nAdjAmount  NUMBER ,
+nAmtRemaining NUMBER,
+cBillFlags  VARCHAR2  DEFAULT 'N',
+bHasDetails INTEGER DEFAULT 0,
+bCallGenerateProc INTEGER DEFAULT 0,
+bBillandApprove   INTEGER DEFAULT 0,
+dBillDate DATE)
+AS
+StoO_selcnt INTEGER;
+StoO_error  INTEGER := 0;
+StoO_rowcnt INTEGER;
+StoO_crowcnt  INTEGER := 0;
+StoO_fetchstatus  INTEGER := 0;
+StoO_errmsg VARCHAR2(255);
+StoO_sqlstatus  INTEGER;
+bApprove    INTEGER;
+cUser     VARCHAR2(30);
+BillAmount      NUMBER (32,6);
+AdjustAmount    NUMBER (32,6);
+bSkipAllocations INTEGER := 0;
+v_dBillDate DATE;
+iAllowNegativeIvoices NUMBER;
+iRetainPrecisionMode NUMBER; -- retain precision change
+
+BEGIN
+  IF cTransType IS NULL OR RTRIM(cTransType) = '' THEN
+     RETURN;
+  END IF;
+
+    IF NVL( nAmtRemaining, 0) &gt; 0 Then
+    IF ( NVL( nBillAmount, 0 ) - NVL( nAdjAmount, 0 )) &gt; NVL( nAmtRemaining, 0 ) THEN
+    RAISE_APPLICATION_ERROR(-20908, 'You may not Bill + Adjust more than the amount remaining.');
+      RETURN;
+    END IF;
+
+    IF NVL( nBillAmount, 0 ) &lt; 0 THEN
+      RAISE_APPLICATION_ERROR(-20915, 'You may not bill a negative amount on a positive line.');
+      RETURN;
+    END IF;
+  ELSE  /* Add following logic for negative transactions */
+    IF ( NVL( nBillAmount, 0 ) - NVL( nAdjAmount, 0 )) &lt; NVL( nAmtRemaining, 0 ) THEN
+    RAISE_APPLICATION_ERROR(-20908, 'You may not Bill + Adjust more than the amount remaining.');
+      RETURN;
+    END IF;
+
+    IF NVL( nBillAmount, 0 ) &gt; 0 THEN
+      RAISE_APPLICATION_ERROR(-20916, 'You may not bill a positive amount on a negative line.');
+      RETURN;
+    END IF;
+  End If;
+
+  /* Can't let nBillAmount or nAdjAmount be NULL because of RollBack Issue when this proc is called from XDE.
+     So we'll just issue an error, and  require the user to enter a value */
+
+  IF nBillAmount IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20293, 'Bill amount must be entered.');
+      RETURN;
+  END IF;
+
+  IF nAdjAmount IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20294, 'Adjustment amount must be entered.');
+      RETURN;
+  END IF;
+  
+  iRetainPrecisionMode := CMN_GET_RETAIN_PRECISION_FCT(); -- retain precision change
+
+  PAC_BIL_ALLOCATE_AND_POST.v_dBillDate := PAC_BIL_ALLOCATE_AND_POST.dBillDate;
+
+  IF bHasDetails = 0 AND NVL( nBillAmount, 0) = 0 AND NVL( nAdjAmount, 0) = 0 THEN
+     bSkipAllocations := 1;
+  END IF;
+
+      BEGIN
+        StoO_selcnt := 0 ;
+
+        SELECT 1
+          INTO StoO_selcnt
+          FROM DUAL
+          WHERE EXISTS ( SELECT 1
+                           FROM pc_BillingSession
+                           WHERE BillingSessionKey = PAC_BIL_ALLOCATE_AND_POST.iBillSessionKey ) ;
+
+         EXCEPTION
+       WHEN NO_DATA_FOUND THEN
+     NULL;
+      END; 
+
+      IF StoO_selcnt = 0 Then
+        RAISE_APPLICATION_ERROR(-20295, 'Your billing session is no longer active. Please go to the Demand Billing query page and try again.');
+        RETURN;
+      END IF;
+
+  SAVEPOINT p1;
+
+  PAC_BIL_ALLOCATE_AND_POST.cUser := PAC_BIL_ALLOCATE_AND_POST.cUserID;
+  BEGIN
+  IF bSkipAllocations = 0 THEN
+      BEGIN
+    pc_BillingDetailAllocation(PAC_BIL_ALLOCATE_AND_POST.cUser,
+       PAC_BIL_ALLOCATE_AND_POST.iBillSessionKey,
+       PAC_BIL_ALLOCATE_AND_POST.cCOMPANY_CODE,
+       PAC_BIL_ALLOCATE_AND_POST.cPROJECT_CODE,
+       PAC_BIL_ALLOCATE_AND_POST.cTransType,
+       NVL( PAC_BIL_ALLOCATE_AND_POST.nBillAmount, 0),
+       NVL( PAC_BIL_ALLOCATE_AND_POST.nAdjAmount, 0),
+       nAmtRemaining,
+       PAC_BIL_ALLOCATE_AND_POST.cBillFlags);
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+    END;
+  END IF;
+  END;
+
+  IF bCallGenerateProc = 1 Then
+
+    SELECT SUM( BillAmount ),
+         SUM( AdjustAmount )
+      INTO BillAmount,
+         AdjustAmount
+      FROM PC_BILLINGDETAILALLOCATIONS
+      WHERE BILLINGSESSIONKEY = PAC_BIL_ALLOCATE_AND_POST.iBillSessionKey;
+
+    IF NVL( BillAmount, 0) = 0 AND NVL( AdjustAMount, 0) = 0 Then
+    RAISE_APPLICATION_ERROR(-20293, 'You have not entered an amount to bill or adjust.');
+      RETURN;
+    END IF;
+
+    SELECT ALLOW_NEGATIVE_INVOICES INTO iAllowNegativeIvoices
+     FROM NameOptions ;
+
+      IF iAllowNegativeIvoices = 0 Then
+      BEGIN
+      IF NVL( BillAmount, 0) &lt; 0 Then
+        BEGIN
+          RAISE_APPLICATION_ERROR(-20766, 'The total bill amount cannot be a negative amount.');
+          RETURN;
+            END;
+      END IF;
+    END;
+    END IF;
+  END IF;
+
+  IF bCallGenerateProc = 1 AND StoO_error = 0 THEN
+      BEGIN
+    IF PAC_BIL_ALLOCATE_AND_POST.bBillandApprove = 0 THEN
+      bApprove := 0;
+    ELSE
+      bApprove := 1;
+    END IF;
+
+    PAC_BIL_GENERATE(PAC_BIL_ALLOCATE_AND_POST.cUser,
+                     PAC_BIL_ALLOCATE_AND_POST.iBillSessionKey,
+             PAC_BIL_ALLOCATE_AND_POST.bApprove,
+             PAC_BIL_ALLOCATE_AND_POST.v_dBillDate,
+             iRetainPrecisionMode); -- retain precision mode
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+      StoO_error := SQLCODE;
+      StoO_errmsg := SQLERRM;
+      RAISE_APPLICATION_ERROR(StoO_error, StoO_errmsg);
+      END;
+  END IF;
+
+END PAC_BIL_ALLOCATE_AND_POST;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

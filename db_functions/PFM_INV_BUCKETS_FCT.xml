@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_INV_BUCKETS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_INV_BUCKETS_FCT" (p_id NUMBER, p_plan NUMBER, p_attr_name VARCHAR, p_object NUMBER, p_period_type VARCHAR, p_periods NUMBER, p_start DATE, p_cal_type VARCHAR DEFAULT 'DEFAULT', p_entity NUMBER DEFAULT 0 )
+   RETURN PFM_BUCKETS PIPELINED
+/*
+*/
+
+IS
+   v_slices PFM_SLICES;
+   v_calendar PFM_CALENDAR;
+   v_test INTEGER;
+BEGIN
+
+  v_calendar := PFM_CALENDAR_FCT( p_start, p_period_type, p_periods, p_cal_type, p_entity );
+  IF ( p_plan &gt; 0 ) THEN
+    v_test := 1;
+  ELSE
+    v_test := 0;
+  END IF;
+
+  -- query the curves in the clob table for investments in a portfolio and plan
+  -- since empty curves are not written to table, join against investments
+  FOR ao_rec IN (
+      select inv.id, NVL( pln.clob_curve, port.clob_curve ) clob_curve
+        from pfm_investments inv
+        left outer join pfm_clob_curves port on inv.id = port.id and inv.portfolio_id = port.portfolio_id and port.plan_id = 0 and port.attribute = p_attr_name and port.object_id = p_object and port.table_name = 'PFM_INVESTMENTS'
+        left outer join pfm_clob_curves pln on inv.id = pln.id and inv.portfolio_id = pln.portfolio_id and pln.plan_id = p_plan and pln.attribute = p_attr_name and pln.object_id = p_object and pln.table_name = 'PFM_INVESTMENTS' and 1 = v_test
+       where inv.id = p_id
+  )
+  LOOP
+    -- get the slices
+    IF( ao_rec.clob_curve IS NOT NULL ) THEN
+      v_slices := PFM_SLICES_FCT( ao_rec.id, ao_rec.clob_curve, v_calendar );
+      for i in  ( select * from (select slice_number, slice from table( v_slices ) )
+                  pivot
+              (
+                 sum(slice) SLICE
+                 for slice_number in (1 as TS1,2 as TS2,3 as TS3,4 as TS4, 5 as TS5 ,6 AS TS6, 7 AS TS7, 8 AS TS8, 9 AS TS9, 10 AS TS10, 11 AS TS11, 12 AS TS12, 13 AS TS13, 14 AS TS14, 15 AS TS15, 16 AS TS16)
+               )
+              )
+       loop
+       pipe row( PFM_BUCKET ( p_id, i.ts1_slice, i.ts2_slice, i.ts3_slice, i.ts4_slice, i.ts5_slice, i.ts6_slice, i.ts7_slice, i.ts8_slice
+                                  , i.ts9_slice, i.ts10_slice, i.ts11_slice, i.ts12_slice, i.ts13_slice, i.ts14_slice, i.ts15_slice, i.ts16_slice));
+     end loop;
+    END IF;
+  END LOOP;
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

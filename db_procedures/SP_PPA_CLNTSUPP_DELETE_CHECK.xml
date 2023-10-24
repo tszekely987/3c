@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_PPA_CLNTSUPP_DELETE_CHECK</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_PPA_CLNTSUPP_DELETE_CHECK" (
+in_clntcode 	IN VARCHAR2 ,
+error_message 	IN OUT VARCHAR2)
+AS
+COMPANY_CODE 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_ppa_clntsupp_delete_check.COMPANY_CODE := sp_ppa_clntsupp_delete_check.in_clntcode;
+	sp_ppa_clntsupp_delete_check.error_message :=  '';
+	sp_ppa_clntsupp_delete_check.COMPANY_CODE :=  UPPER(sp_ppa_clntsupp_delete_check.COMPANY_CODE);
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+     FROM pac_mnt_projects
+    WHERE pac_mnt_projects.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		 and status != 'C' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20833,'Open PROJECT_CODE(s) exist for this COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+
+/*  BEGIN
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  0 &lt; (
+        SELECT  integration_id
+        FROM projectaccounting );
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE invoiceheader.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+			 AND invoiceheader.arposted = 0 );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+			RAISE_APPLICATION_ERROR(-20834,'Unposted invoice(s) in invoiceheader');
+			RETURN ;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+	END;
+
+  BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM budgetcontrol
+		WHERE budgetcontrol.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		 AND EXISTS (
+		SELECT  *
+     FROM pac_mnt_projects
+		WHERE status = 'O'
+     AND pac_mnt_projects.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		   ) );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20835,'Budgets currently exist for this COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+*/
+
+  BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_TransControl
+		WHERE COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20836,'Trans Control transactions currently exist for this COMPANY_CODE.');
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_WIP
+		WHERE COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20837,'WIP transactions currently exist for COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_Billings
+		WHERE COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20838,'Billings transactions currently exist for COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_TransWIPAdjust
+		WHERE COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20839,'WIP Adjust transactions currently exist for COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+/*
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM togoheader
+		WHERE togoheader.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		 AND EXISTS (
+		SELECT  *
+     FROM pac_mnt_projects
+		WHERE status = 'O'
+     AND pac_mnt_projects.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		   ) );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20840,'Transactions currently exist for COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+*/
+  BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM billingschedule
+		WHERE billingschedule.COMPANY_CODE = sp_ppa_clntsupp_delete_check.COMPANY_CODE
+		 AND billingschedule.billed = 1 );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		sp_ppa_clntsupp_delete_check.error_message := 'ERROR';
+		RAISE_APPLICATION_ERROR(-20841,'Billed scheduled bills exist for COMPANY_CODE');
+		RETURN ;
+	END;
+	END IF;
+	END;
+	RETURN ;
+END sp_ppa_clntsupp_delete_check;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

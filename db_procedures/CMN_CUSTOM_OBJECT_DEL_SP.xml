@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_CUSTOM_OBJECT_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_CUSTOM_OBJECT_DEL_SP" (
+   p_object_code     odf_objects.code%type
+)
+is
+    v_lookup_type_code    varchar2(255);
+    v_parent_object_code  varchar2(255);
+    v_sql                 varchar2(255);
+    v_count               number;
+    v_id                  number;
+    v_slice_table_name    varchar(255);
+    
+   type t_cursor_type is ref cursor;
+   v_cursor_var   t_cursor_type;  -- declare cursor variable
+   TYPE t_idlist IS TABLE OF cmn_sec_assgnd_obj_perm.principal_id%TYPE;
+   v_permids  t_idlist;
+   
+   CURSOR c_perm_cursor 
+			is  
+				select perm.principal_id
+				from cmn_sec_assgnd_obj_perm perm, cmn_sec_objects obj
+				where obj.object_code in ('odf_cst_' || p_object_code, 'odf_cst_' || p_object_code || '_parent', 'odf_cst_' || p_object_code || '_grandparent')
+				and obj.id = perm.object_id
+				and perm.is_right_definition=1;
+
+begin
+  -- prevent deletion of stock objects.
+    select count(*)
+      into v_count
+      from odf_objects
+     where code = p_object_code
+       and is_custom = 0;
+
+    if v_count &gt; 0 then
+      raise_application_error (-20006, 'Deletion of stock object is not permitted.');
+    end if;
+
+    select count(*)
+      into v_count
+      from odf_objects
+     where code = p_object_code;
+    
+    if v_count != 0 then
+      --
+      --  Note that we don't bail here as all the queries below will still run
+      --  and may pickup some flotsam
+      --
+      select parent_object_code
+        into v_parent_object_code
+        from odf_objects
+       where code = p_object_code;
+    else
+      v_parent_object_code := 'none';
+    end if;
+	
+	OPEN c_perm_cursor;
+			
+		LOOP
+			FETCH c_perm_cursor BULK COLLECT INTO v_permids;
+			EXIT WHEN c_perm_cursor%notfound;
+		END LOOP;
+			
+	CLOSE c_perm_cursor;
+
+  -- Remove views
+  -- Remove links and link parameters
+    delete
+      from odf_view_attr_parameters
+     where view_attr_id in (
+           select id
+             from odf_view_attributes
+            where view_id in (
+                  select id
+                    from odf_views
+                   where object_code = p_object_code ));
+
+    delete
+      from odf_view_attributes
+     where view_id in (
+           select id
+             from odf_views where object_code = p_object_code );
+
+    delete
+      from odf_view_sections
+     where view_id in (
+           select id
+             from odf_views where object_code = p_object_code );
+
+    delete
+      from odf_subviews
+     where parent_view_id in (
+           select id
+             from odf_views where object_code = p_object_code );
+
+    delete
+      from odf_subviews
+     where child_view_id in (
+           select id
+             from odf_views where object_code = p_object_code );
+
+    delete
+      from odf_link_params
+     where link_id in (
+           select id
+             from odf_links
+            where target = p_object_code
+              and target_type = 'object');
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'ODF_LINKS'
+       and pk_id in (
+           select id
+             from odf_links
+            where target = p_object_code
+              and target_type = 'object');
+
+    delete
+      from odf_links
+     where target = p_object_code
+       and target_type = 'object';
+
+    --
+    --  Also need to remove the subObjectList link which is actually part of the 
+    --  parent object
+    --
+    delete
+      from odf_link_params
+     where link_id in (
+           select id
+             from odf_links l
+            where (target = v_parent_object_code
+                   or
+                   target in
+                      (select object_code 
+                       from   odf_object_extensions
+                       where  extension_code = v_parent_object_code)
+                  )          
+              and target_type = 'object'
+              and (code like v_parent_object_code || '.' || p_object_code || '.%.link'
+                   or
+                   exists 
+                      (select 'exists' extExists 
+                       from   odf_object_extensions oe
+                       where  oe.extension_code = v_parent_object_code
+                       and    l.code like oe.object_code || '.' || p_object_code || '.%.link')
+                      ));
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'ODF_LINKS'
+       and pk_id in (
+           select id
+             from odf_links l
+            where (target = v_parent_object_code
+                   or
+                   target in
+                      (select object_code 
+                       from   odf_object_extensions
+                       where  extension_code = v_parent_object_code)
+                  )          
+              and target_type = 'object'
+              and (code like v_parent_object_code || '.' || p_object_code || '.%.link'
+                   or
+                   exists 
+                      (select 'exists' extExists 
+                       from   odf_object_extensions oe
+                       where  oe.extension_code = v_parent_object_code
+                       and    l.code like oe.object_code || '.' || p_object_code || '.%.link')
+                      ));
+
+    delete
+      from cmn_action_params
+     where action_id in (
+           select a.id
+             from odf_links l, cmn_actions a
+            where (l.target = v_parent_object_code
+                   or
+                   l.target in
+                      (select object_code 
+                       from   odf_object_extensions
+                       where  extension_code = v_parent_object_code)
+                  )          
+              and target_type = 'object'
+              and a.action_code = l.action
+              and (code like v_parent_object_code || '.' || p_object_code || '.%.link'
+                   or
+                   exists 
+                      (select 'exists' extExists 
+                       from   odf_object_extensions oe
+                       where  oe.extension_code = v_parent_object_code
+                       and    l.code like oe.object_code || '.' || p_object_code || '.%.link')
+                      ));
+
+    delete
+      from cmn_actions
+     where id in (
+           select a.id
+             from odf_links l, cmn_actions a
+            where (l.target = v_parent_object_code
+                   or
+                   l.target in
+                      (select object_code 
+                       from   odf_object_extensions
+                       where  extension_code = v_parent_object_code)
+                  )          
+              and target_type = 'object'
+              and a.action_code = l.action
+              and (code like v_parent_object_code || '.' || p_object_code || '.%.link'
+                   or
+                   exists 
+                      (select 'exists' extExists 
+                       from   odf_object_extensions oe
+                       where  oe.extension_code = v_parent_object_code
+                       and    l.code like oe.object_code || '.' || p_object_code || '.%.link')
+                      ));
+
+    delete
+      from odf_links
+     where id in (
+           select id
+             from odf_links l
+            where (target = v_parent_object_code
+                   or
+                   target in
+                      (select object_code 
+                       from   odf_object_extensions
+                       where  extension_code = v_parent_object_code)
+                  )          
+              and target_type = 'object'
+              and (code like v_parent_object_code || '.' || p_object_code || '.%.link'
+                   or
+                   exists 
+                      (select 'exists' extExists 
+                       from   odf_object_extensions oe
+                       where  oe.extension_code = v_parent_object_code
+                       and    l.code like oe.object_code || '.' || p_object_code || '.%.link')
+                      ));
+
+     delete
+       from cmn_captions_nls
+      where table_name = 'ODF_VIEWS'
+        and pk_id in (
+            select id
+              from odf_views
+             where object_code = p_object_code);
+
+     delete
+       from odf_views
+      where object_code = p_object_code;
+
+    --
+    --  Also need to remove the subObjectList view which is actually part of the 
+    --  parent object
+    --
+     delete
+       from cmn_captions_nls
+      where table_name = 'ODF_VIEWS'
+        and pk_id in (
+            select id
+              from odf_views
+             where (object_code = v_parent_object_code
+                       or
+                       object_code in
+                          (select object_code 
+                           from   odf_object_extensions
+                           where  extension_code = v_parent_object_code)
+                      )          
+              and  code like '%.subObjList.' || p_object_code 
+              and  view_type = 'subObjectList');
+
+     delete
+       from odf_views
+      where (object_code = v_parent_object_code
+             or
+             object_code in
+                (select object_code 
+                 from   odf_object_extensions
+                 where  extension_code = v_parent_object_code)
+            )          
+    and     code like '%.subObjList.' || p_object_code
+       and  view_type = 'subObjectList';
+
+-- Remove 2 lookups
+    v_lookup_type_code := 'OBJECT_LOOKUP_' || upper(p_object_code);
+    cmn_lookup_types_del_sp(v_lookup_type_code);
+    v_lookup_type_code := 'ODF_CST_' || UPPER(p_object_code) || '_PAGE_LAYOUT';
+    cmn_lookup_types_del_sp(v_lookup_type_code);
+
+-- remove filters
+    delete
+      from cmn_filter_field_instances
+     where filter_instance_id in (
+           select pp.id
+             from cmn_page_portlets pp,
+                  cmn_pages p
+            where pp.page_id = p.id
+            and   (p.page_code like 'odf.' || p_object_code || '%'
+                   or   p.instance_type = p_object_code
+                  )
+            and   p.page_code not in (
+                  select p.page_code
+                  from cmn_pages p, odf_objects o
+                  where o.code like p_object_code || '%'
+                  and o.code != p_object_code
+                  and p.page_code like 'odf.' || o.code || '%' )
+            );
+
+     delete
+     from   cmn_filter_field_instances
+     where  filter_field_id in (
+            select  ff.id
+            from    cmn_portlets p, cmn_filters f, cmn_filter_fields ff
+            where   p.instance_type = p_object_code
+            and     p.id = f.portlet_id
+            and     f.id = ff.filter_id);
+
+     delete
+     from   cmn_filter_fields
+     where  filter_id in (
+            select  f.id
+            from    cmn_portlets p, cmn_filters f
+            where   p.instance_type = p_object_code
+            and     p.id = f.portlet_id);
+
+     delete
+     from   cmn_filters
+     where  portlet_id in (
+            select  id
+            from    cmn_portlets
+            where   instance_type = p_object_code);
+
+    delete
+      from cmn_filter_field_instances
+     where id in (
+          select  ffi.id 
+          from    cmn_filter_field_instances ffi, cmn_filter_fields ff,
+                  cmn_filters f, cmn_page_portlets ppp, cmn_page_portlets ppf,
+                  cmn_grids g, cmn_grid_cols gc, cmn_portlets p
+          where ppf.id = ffi.filter_instance_id
+          and   ffi.filter_field_id = ff.id
+          and   ffi.portlet_instance_id = ppp.id
+          and   ppf.page_id = ppp.page_id 
+          and   ff.filter_id = f.id
+          and   f.portlet_id = ppf.portlet_id
+          and   ppp.portlet_id = g.portlet_id
+          and   gc.grid_id = g.id 
+          and   ffi.dal_code = gc.col_code
+          and   p.id = g.portlet_id
+          and   p.instance_type = p_object_code);
+
+-- remove portlets
+    delete
+      from cmn_captions_nls
+     where id in (
+           select c.id
+             from cmn_page_portlets pp,
+                  cmn_captions_nls c,
+                  cmn_pages p,
+                  cmn_portlets port
+            where pp.page_id = p.id
+            and   port.id = pp.portlet_id
+            and   (p.page_code like 'odf.' || p_object_code || '%'
+                   or   p.instance_type = p_object_code
+                   or   port.instance_type = p_object_code
+                   or   port.id in (
+                      select  portlet_id id
+                      from    cmn_grids
+                      where   dal_code = p_object_code
+                      and     dal_type = 'object'
+                      union
+                      select  portlet_id id
+                      from    cmn_graphs
+                      where   dal_code = p_object_code
+                      and     dal_type = 'object')
+                  )
+            and   p.page_code not in (
+                  select p.page_code
+                  from cmn_pages p, odf_objects o
+                  where o.code like p_object_code || '%'
+                  and o.code != p_object_code
+                  and p.page_code like 'odf.' || o.code || '%' )
+            and   c.pk_id = pp.portlet_title_pk_id
+            and   c.table_name = 'CMN_PAGE_PORTLETS'
+            and   pp.portlet_title_table = c.table_name );
+
+     delete
+       from cmn_page_portlets
+      where page_id in (
+                select  id
+                from    cmn_pages
+                where   (page_code like 'odf.' || p_object_code || '%'
+                or      instance_type = p_object_code)
+                and     page_code not in (
+                        select p.page_code
+                        from cmn_pages p, odf_objects o
+                        where o.code like p_object_code || '%'
+                        and o.code != p_object_code
+                        and p.page_code like 'odf.' || o.code || '%' ))
+      or    portlet_id in (
+                select  id
+                from    cmn_portlets
+                where   instance_type = p_object_code
+                union
+                select  portlet_id id
+                from    cmn_grids
+                where   dal_code = p_object_code
+                and     dal_type = 'object'
+                union
+                select  portlet_id id
+                from    cmn_graphs
+                where   dal_code = p_object_code
+                and     dal_type = 'object');
+
+     delete from cmn_captions_nls
+      where table_name = 'CMN_PORTLETS'
+        and pk_id in (
+                select  id 
+                from    cmn_portlets
+                where   (portlet_code like 'odf.' || p_object_code || '%'
+                or      instance_type = p_object_code)
+                and     portlet_code not in (
+                        select p.portlet_code
+                        from cmn_portlets p, odf_objects o
+                        where o.code like p_object_code || '%'
+                        and o.code != p_object_code
+                        and p.portlet_code like 'odf.' || o.code || '%' )
+                union
+                select  portlet_id id
+                from    cmn_grids
+                where   dal_code = p_object_code
+                and     dal_type = 'object'
+                union
+                select  portlet_id id
+                from    cmn_graphs
+                where   dal_code = p_object_code
+                and     dal_type = 'object');
+
+     delete
+       from cmn_portlets
+      where (portlet_code like 'odf.' || p_object_code || '%'
+      or    instance_type = p_object_code)
+      and   portlet_code not in (
+            select p.portlet_code
+            from cmn_portlets p, odf_objects o
+            where o.code like p_object_code || '%'
+            and o.code != p_object_code
+            and p.portlet_code like 'odf.' || o.code || '%' )
+      or    id in (
+                select  portlet_id
+                from    cmn_grids
+                where   dal_code = p_object_code
+                and     dal_type = 'object'
+                union
+                select  portlet_id
+                from    cmn_graphs
+                where   dal_code = p_object_code
+                and     dal_type = 'object');
+
+-- Remove grids
+   delete
+     from cmn_grid_col_aggs
+    where col_id in (
+          select  gc.id
+          from    cmn_grids g, cmn_grid_cols gc
+          where   g.dal_code = p_object_code
+          and     g.dal_type = 'object'
+          and     gc.grid_id = g.id);
+
+   delete
+     from cmn_grid_col_config_params
+    where col_id in (
+          select  gc.id
+          from    cmn_grids g, cmn_grid_cols gc
+          where   g.dal_code = p_object_code
+          and     g.dal_type = 'object'
+          and     gc.grid_id = g.id);
+
+   delete
+     from cmn_grid_col_image_stmts
+    where cmn_grid_cols_id in (
+          select  gc.id
+          from    cmn_grids g, cmn_grid_cols gc
+          where   g.dal_code = p_object_code
+          and     g.dal_type = 'object'
+          and     gc.grid_id = g.id);
+
+   delete
+     from cmn_grid_col_link_params
+    where grid_col_id in (
+          select  gc.id
+          from    cmn_grids g, cmn_grid_cols gc
+          where   g.dal_code = p_object_code
+          and     g.dal_type = 'object'
+          and     gc.grid_id = g.id);
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_GRID_COLS'
+       and pk_id in (
+          select  gc.id
+          from    cmn_grids g, cmn_grid_cols gc
+          where   g.dal_code = p_object_code
+          and     g.dal_type = 'object'
+          and     gc.grid_id = g.id);
+
+   delete
+     from cmn_grid_cols
+    where grid_id in (
+          select id
+            from cmn_grids
+           where dal_code = p_object_code
+             and dal_type = 'object' );
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_GRIDS'
+       and pk_id in (
+           select id
+             from cmn_grids
+            where dal_code = p_object_code
+              and dal_type = 'object' );
+
+    delete
+      from cmn_grids
+     where dal_code = p_object_code
+       and dal_type = 'object';
+
+-- Remove Graphs
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_GRAPH_AXES'
+       and pk_id in (
+             select ga.id
+             from   cmn_graphs g, cmn_graph_axes ga
+             where  g.dal_code = p_object_code
+             and    g.dal_type = 'object'
+             and    ga.graph_id = g.id );
+
+    delete
+      from cmn_graph_axes
+     where graph_id in (
+           select id
+             from cmn_graphs
+            where dal_code = p_object_code
+              and dal_type = 'object' );
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_GRAPHS'
+       and pk_id in (
+           select id
+             from cmn_graphs
+            where dal_code = p_object_code
+              and dal_type = 'object' );
+
+    delete
+      from cmn_graphs
+     where dal_code = p_object_code
+       and dal_type = 'object';
+
+-- Remove menu items
+
+    delete
+      from cmn_captions_nls
+      where pk_id IN (
+            select m.id from cmn_menu_items m, cmn_actions a
+            where m.action_id = a.id
+            and a.action_code like 'odf.' || p_object_code || '%'
+            and a.action_code not in (
+                select a.action_code
+                from cmn_actions a, odf_objects o
+                where o.code like p_object_code || '%'
+                and o.code != p_object_code
+                and a.action_code like 'odf.' || o.code || '%' ))
+      and table_name = 'CMN_MENU_ITEMS';
+
+    delete
+      from cmn_menu_items
+     where action_id in (
+           select id
+            from cmn_actions
+            where action_code like 'odf.' || p_object_code || '%'
+            and   action_code not in (
+                  select a.action_code
+                  from cmn_actions a, odf_objects o
+                  where o.code like p_object_code || '%'
+                  and o.code !=  p_object_code
+                  and a.action_code like 'odf.' || o.code || '%' ));
+
+-- Remove actions
+    delete
+      from  cmn_action_params
+     where  action_id in (
+            select id
+            from cmn_actions
+            where action_code like 'odf.' || p_object_code || '%'
+            and   action_code not in (
+                  select a.action_code
+                  from CMN_ACTIONS a, ODF_OBJECTS o
+                  where o.code like p_object_code || '%'
+                  and o.code != p_object_code
+                  and a.action_code like 'odf.' || o.code || '%' ));
+
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_ACTIONS'
+       and pk_id in (
+           select id
+             from cmn_actions
+            where action_code like 'odf.' || p_object_code || '%'
+            and   action_code not in (
+                  select a.action_code
+                  from CMN_ACTIONS a, ODF_OBJECTS o
+                  where o.code like p_object_code || '%'
+                  and o.code != p_object_code
+                  and a.action_code like 'odf.' || o.code || '%' ));
+
+    delete
+      from  cmn_actions
+     where  action_code like 'odf.' || p_object_code || '%'
+     and    action_code not in (
+            select a.action_code
+            from CMN_ACTIONS a, ODF_OBJECTS o
+            where o.code like p_object_code || '%'
+            and o.code != p_object_code
+            and a.action_code like 'odf.' || o.code || '%' );
+
+-- Remove pages, tabs and subtabs
+    delete
+      from cmn_actions
+      where page_id in (select id from cmn_pages
+                        where (page_code like 'odf.' || p_object_code || '%'
+                        or    instance_type = p_object_code)
+                        and   page_code not in (
+                              select p.page_code
+                              from CMN_PAGES p, ODF_OBJECTS o
+                              where o.code like p_object_code || '%'
+                              and o.code != p_object_code
+                              and p.page_code like 'odf.' || o.code || '%' ) )
+      or alias_code in (select page_code from cmn_pages
+                        where instance_type = p_object_code
+                        and   page_code not in (
+                              select p.page_code
+                              from CMN_PAGES p, ODF_OBJECTS o
+                              where o.code like p_object_code || '%'
+                              and o.code != p_object_code
+                              and p.page_code like 'odf.' || o.code || '%' ) );
+                              
+    delete
+      from cmn_captions_nls
+     where table_name = 'CMN_PAGES'
+       and pk_id in (
+           select id
+             from cmn_pages
+            where (page_code like 'odf.' || p_object_code || '%'
+            or    instance_type = p_object_code)
+            and   page_code not in (
+                  select p.page_code
+                  from CMN_PAGES p, ODF_OBJECTS o
+                  where o.code like p_object_code || '%'
+                  and o.code != p_object_code
+                  and p.page_code like 'odf.' || o.code || '%' ));
+
+    delete
+      from cmn_pages
+      where (page_code like 'odf.' || p_object_code || '%'
+      or    instance_type = p_object_code)
+      and   page_code not in (
+            select p.page_code
+            from CMN_PAGES p, ODF_OBJECTS o
+            where o.code like p_object_code || '%'
+            and o.code != p_object_code
+            and p.page_code like 'odf.' || o.code || '%' );
+
+    delete  cmn_lookups
+    where   lookup_code = p_object_code
+    and     lookup_type = 'CMN_PAGE_INSTANCE_TYPE';
+
+    --
+    -- remove security
+    --
+
+    delete  cmn_sec_acl_definition
+    where   acl_id in (select id
+                       from   cmn_sec_acls
+                       where  acl_code = p_object_code || 'PageTabs');
+    delete  cmn_sec_acls
+    where   acl_code = p_object_code || 'PageTabs';
+    
+    delete  cmn_sec_policies
+    where   object_code = p_object_code;
+
+    delete  cmn_sec_objects
+    where   object_code = p_object_code;
+    
+    delete from cmn_sec_assgnd_right
+    where   right_id in (
+              select  id
+              from    cmn_sec_groups
+              where   group_code like 'odf_cst_' || p_object_code || '%'
+              and     group_code NOT IN (
+                      select g.group_code
+                      from cmn_sec_groups g, odf_objects o
+                      where o.code like '%' || p_object_code || '%'
+                      and o.code != p_object_code
+                      and g.group_code like 'odf_cst_' || o.code || '%'));
+             
+    delete from cmn_sec_assgnd_obj_perm
+    where   right_id in (
+              select  id
+              from    cmn_sec_groups
+              where   group_code like 'odf_cst_' || p_object_code || '%'
+              and     group_code NOT IN (
+                      select g.group_code
+                      from cmn_sec_groups g, odf_objects o
+                      where o.code like '%' || p_object_code || '%'
+                      and o.code != p_object_code
+                      and g.group_code like 'odf_cst_' || o.code || '%'));
+             
+    delete from cmn_sec_assgnd_obj_perm
+    where   principal_id in (
+              select  id
+              from    cmn_sec_groups
+              where   group_code like 'odf_cst_' || p_object_code || '%'
+              and     group_code NOT IN (
+                      select g.group_code
+                      from cmn_sec_groups g, odf_objects o
+                      where o.code like '%' || p_object_code || '%'
+                      and o.code != p_object_code
+                      and g.group_code like 'odf_cst_' || o.code || '%'))
+    and     principal_type = 'GROUP'
+    and     is_right_definition = 1;
+             
+    delete
+      from cmn_captions_nls
+     where pk_id in (
+           select id
+             from   cmn_sec_groups
+             where  group_code like 'odf_cst_' || p_object_code || '%'
+             and    group_code NOT IN (
+                    select g.group_code
+                    from cmn_sec_groups g, odf_objects o
+                    where o.code like '%' || p_object_code || '%'
+                    and o.code != p_object_code
+                    and g.group_code like 'odf_cst_' || o.code || '%'))
+       and table_name = 'CMN_SEC_GROUPS' ;
+
+    IF v_permids.count &lt;&gt; 0
+	THEN
+  
+	FORALL i IN v_permids.FIRST .. v_permids.LAST
+	
+		DELETE FROM cmn_sec_groups WHERE id = v_permids(i) AND group_code NOT LIKE 'odf_cst_' || p_object_code || '_parent%'
+		AND group_code NOT LIKE 'odf_cst_' || p_object_code || '_grandparent%';
+	
+	END IF;
+
+    --
+    --  Remove mapping lookups
+    --
+    open v_cursor_var for  
+      select  distinct lookup_type
+      from    cmn_lookups
+      where   lookup_type like 'ODF.OBJECT.' || UPPER(p_object_code) || '.%';
+    
+    loop
+    fetch v_cursor_var into v_lookup_type_code;
+      exit when v_cursor_var%notfound;
+
+      delete  odf_mappings
+      where   mapping_code in
+                (select lookup_code
+                 from   cmn_lookups
+                 where  lookup_type = v_lookup_type_code);
+                 
+      cmn_lookup_types_del_sp( v_lookup_type_code );
+
+    end loop;
+    close v_cursor_var; 
+
+    delete  odf_display_mappings
+    where   object = p_object_code;
+
+    --
+    --  object mapping
+    --
+    delete  odf_attribute_mapping 
+    where   object_mapping_code in 
+                (select object_mapping_code
+                 from   odf_object_mapping
+                 where  dest_object_code = p_object_code
+                 or     src_object_code = p_object_code);
+
+    delete  odf_object_mapping 
+    where   dest_object_code = p_object_code
+    or      src_object_code = p_object_code;
+
+    --
+    --  Default overrides
+    --
+    delete  odf_default_overrides
+    where   object_code = p_object_code ;
+
+    --
+    --  parameterized lookup values
+    --
+    delete  odf_lookup_parameters 
+    where   object_code = p_object_code;
+
+    --
+    --  Auditing
+    --
+    delete  odf_audited_attributes 
+    where   object_code = p_object_code;
+
+    delete  odf_aud_obj_inst_context 
+    where   object_code = p_object_code;
+
+    delete  odf_aud_multi_val_lovs 
+    where   object_code = p_object_code;
+
+    delete  odf_aud_obj_inst_mappings 
+    where   parent_object_code = p_object_code
+    or      child_object_code = p_object_code;
+
+    --
+    --  Autonumbering
+    --
+    delete  odf_attribute_autonumbering
+    where   upper(object_code) = upper(p_object_code);
+        
+    delete  cmn_autonum_scheme_segments
+    where   scheme_id in
+                (select id
+                 from   cmn_autonum_schemes
+                 where  object_code = p_object_code);
+    
+    delete  cmn_autonum_schemes
+    where   object_code = p_object_code;
+    
+    --
+    --  Filter Expressions
+    --
+    delete  odf_filter_expressions
+    where   object_code = p_object_code;
+    
+    --
+    --  Formula's
+    --
+    delete  odf_score_contributions
+    where   object = p_object_code;
+    
+    --
+    --  Remove slice tables and slice requests
+    --
+    open v_cursor_var for  
+      select  sr.id, sr.table_name
+      from    odf_custom_attributes oca, prj_blb_slicerequests dsr, 
+              prj_blb_slicerequests sr
+      where   object_name = 'tsvtest' and data_type = 'tsv'
+      and     dsr.request_name = object_name || '::' || internal_name ||'::default'
+      and     sr.field = dsr.id;
+    
+    loop
+    fetch v_cursor_var into v_id, v_slice_table_name;
+      exit when v_cursor_var%notfound;
+
+      delete  prj_blb_slicerequests
+      where   id = v_id;
+                 
+      select count(*)
+        into v_count
+        from user_tables
+       where upper(table_name) = upper(v_slice_table_name);
+
+      if v_count &gt; 0
+      then
+        v_sql := 'drop table ' || v_slice_table_name;
+        execute immediate v_sql;
+      end if;
+      
+    end loop;
+    close v_cursor_var; 
+            
+    -- Remove custom attributes
+    delete
+      from cmn_captions_nls
+     where pk_id in (
+           select id
+             from odf_custom_attributes
+            where object_name = p_object_code )
+       and table_name = 'ODF_CUSTOM_ATTRIBUTES';
+
+    delete
+      from odf_multi_valued_lookups
+     where object = p_object_code;
+
+    delete
+      from odf_locked_attributes
+     where object_code = p_object_code;
+
+    delete
+      from odf_custom_attributes
+     where object_name = p_object_code;
+
+    delete
+      from odf_object_extensions
+     where object_code = p_object_code;
+
+    delete
+      from odf_object_building_blocks
+     where object_code = p_object_code;
+
+    --
+    --  Slices - tables, requests
+    --
+
+    v_count := 0;
+    -- Drop database views
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'ODF_' || UPPER(p_object_code) || '_V';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW ODF_' || p_object_code || '_V';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop database views 2
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'ODF_' || UPPER(p_object_code) || '_V2';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW ODF_' || p_object_code || '_V2';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop database security view
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'ODFSEC_' || UPPER(p_object_code) || '_V';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW ODFSEC_' || p_object_code || '_V';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop database security view 2
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'ODFSEC_' || UPPER(p_object_code) || '_V2';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW ODFSEC_' || p_object_code || '_V2';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop Data Warehouse View
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'DWH_' || UPPER(p_object_code) || '_V';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW DWH_' || p_object_code || '_V';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop Data Warehouse FACT View
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_VIEWS
+     WHERE UPPER(view_name) = 'DWH_FCT_' || UPPER(p_object_code) || '_V';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP VIEW DWH_FCT_' || p_object_code || '_V';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    --
+    --  Clean up OBS's
+    --
+    delete  prj_obs_object_types
+    where   table_name = p_object_code;
+    
+    delete  prj_obs_associations
+    where   table_name = p_object_code;
+    
+    -- Drop odf_ca_ table; Check if this table exists first.
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_TABLES
+     WHERE UPPER(table_name) = 'ODF_CA_' || UPPER(p_object_code);
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP TABLE ODF_CA_' || p_object_code;
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Drop database sequence
+    SELECT COUNT(*)
+      INTO v_count
+      FROM USER_SEQUENCES
+     WHERE UPPER(sequence_name) = 'ODF_CA_' || UPPER(p_object_code) || '_S1';
+
+    IF v_count &gt; 0
+    THEN
+      v_sql := 'DROP SEQUENCE ODF_CA_' || p_object_code || '_S1';
+      EXECUTE IMMEDIATE v_sql;
+    END IF;
+
+    -- Remove entry from ODF_OBJECTS
+    DELETE
+      FROM ODF_OBJECTS
+     WHERE code = p_object_code;
+     
+    -- S222397: Remove any CMN_INSTANCE_PAGES with object_type of our custom object
+    delete from cmn_instance_pages where object_type=p_object_code;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

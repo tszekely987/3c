@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_slow_pages_by_period" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Slow page top 20"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:RESOURCE:MYTAB.URL_ACTION:URL_ACTION@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:MYTAB.PAGE_COUNT:PAGE_COUNT@,
+ @SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:CASE WHEN MYTAB.AVG_RESP<=3000 THEN 0 WHEN MYTAB.AVG_RESP BETWEEN 3000 and 10000 THEN 1 ELSE 2 END:INDICATOR@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:RESOURCE:MYTAB.LOG_DATE:LOG_DATE@,@SELECT:METRIC:USER_DEF:IMPLIED:ROUND((MYTAB.AVG_RESP/1000),1):AVG_RESP@
+FROM
+(SELECT   URL_SHORT url_action,
+         round(avg(elapsed_time),0) avg_resp,
+ log_date log_date,
+         count(*) page_count,
+         RANK() OVER (ORDER BY round(avg(elapsed_time),0) DESC) count_rank
+FROM     LOG_DETAILS
+WHERE    LOG_DATE=CAST(@WHERE:PARAM:USER_DEF:DATE:log_date@ AS DATE)
+AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+AND (@WHERE:PARAM:USER_DEF:INTEGER:responsecode@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:responsecode@=BROWSER_STATUS)
+AND (@WHERE:PARAM:USER_DEF:STRING:env@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT)
+AND 1=1
+GROUP BY log_date, URL_SHORT) MYTAB
+WHERE @FILTER@ AND COUNT_RANK<20]]></nsql>
+            <attribute id="url_action" required="false"/>
+            <attribute id="page_count" required="false"/>
+            <attribute id="indicator" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="indicator"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="FlagGreen" type="image">
+                <mapping hi="0" lo="0" mappingCode="mapping-1" typeCode="FlagGreen"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-2" typeCode="FlagFollowup"/>
+                <mapping hi="2" lo="2" mappingCode="mapping-3" typeCode="FlagRed"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="log_date" required="false"/>
+            <attribute id="avg_resp" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_responsecode" lookup="LOG_HTTP_RESPONSE_CODES" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_responsecode"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

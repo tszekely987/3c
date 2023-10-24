@@ -1,0 +1,987 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.projectKPIHierarchy" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project KPIs By OBS" languageCode="en" name="Project KPIs By OBS"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:obs_hierarchy:obs.int_id:obs_proj_int_id@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.name:obs_proj_name@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.is_project:is_project@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.is_project:email_column@,      
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.proj_int_id:project_int_id@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:@UPPER@(obs.odf_object_code):investment_type_upper@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.manager_id:manager_int_id@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.manager_email:manager_email@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.manager_name:manager_name@,
+       @select:metric:user_def:implied:obs.alignment:business_alignment_sl@,
+       @select:metric:user_def:implied:obs.days_late:schedule@,
+       @select:metric:user_def:implied:obs.days_late:schedule_sl@,
+       @select:metric:user_def:implied:obs.days_late_pct:schedule_pct@,
+       @select:metric:user_def:implied:obs.days_late_pct:schedule_pct_sl@,
+       @select:metric:user_def:implied:obs.effort_amt:effort@,
+       @select:metric:user_def:implied:obs.effort:effort_sl@,
+       @select:metric:user_def:implied:obs.cost_amt:cost@,
+       @select:metric:user_def:implied:obs.cost:cost_sl@,  
+       @select:metric:user_def:implied:obs.risk:risk_sl@,
+       @select:metric:user_def:implied:obs.issue:issue_sl@,
+       @select:metric:user_def:implied:obs.change:change_sl@,
+       @select:dim_prop:user_def:implied:obs_hierarchy:obs.hg_has_children:hg_has_children@       
+FROM  (
+-- Level 1 - OBS Level --
+SELECT @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99' int_id,
+       unit.name as name,
+       0 is_project,
+       NULL proj_int_id,
+       NULL odf_object_code,
+       0 manager_id,
+       null manager_email,
+       null manager_name,
+       MAX(CASE WHEN (SELECT count(DISTINCT associations.unit_id) 
+                      FROM   prj_obs_associations associations 
+                      WHERE  associations.unit_id = assoc.unit_id) > 0 
+                THEN  @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99' ELSE null 
+           END) hg_has_children,
+       AVG(odf_proj.obj_alignment) alignment,
+       AVG(inv_d.days_late) days_late,
+       AVG(inv_d.days_late_pct) days_late_pct,
+       AVG(odf_proj.obj_effort_amt_var) effort_amt,
+       AVG(odf_proj.obj_effort_var) effort,
+       AVG(odf_proj.obj_cost_amt_var) cost_amt,
+       AVG(odf_proj.obj_cost_pct_var) cost,
+       AVG(odf_proj.risk_score) risk,
+       MAX((SELECT issue_sl
+            FROM   cop_inv_rim_stoplights_v issue
+            WHERE  issue.investment_id = odf_proj.odf_pk)) issue,
+       MAX((SELECT COUNT(c.id) change_exists
+            FROM   rim_risks_and_issues c
+            WHERE  c.pk_id = odf_proj.odf_pk
+            AND    c.type_code = 'CHANGE'
+            AND    c.status_code NOT IN ('CLOSED','RESOLVED'))) change		
+FROM   prj_obs_units unit
+INNER  JOIN  prj_obs_object_types object_assoc
+             ON   unit.type_id = object_assoc.type_id
+             AND  object_assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  prj_obs_units_flat flat
+             ON   unit.id = flat.branch_unit_id
+INNER  JOIN  prj_obs_associations assoc
+             ON   flat.unit_id = assoc.unit_id
+             AND  assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  odf_project_v2 odf_proj
+             ON   assoc.record_id = odf_proj.odf_pk
+             AND  odf_proj.is_template <> 1
+             AND  odf_proj.is_program <> 1
+             AND  odf_proj.is_active <> 0
+INNER  JOIN  cop_inv_days_late_v inv_d
+             ON   odf_proj.odf_pk = inv_d.investment_id
+LEFT   OUTER JOIN srm_resources r
+             ON   odf_proj.manager_id = r.user_id
+WHERE  ( unit.id = @WHERE:PARAM:USER_DEF:INTEGER:obs_type_id@ AND @WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL ) 
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ = r.id)
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ = odf_proj.obj_stakeholder1)
+AND    @WHERE:SECURITY:PROJECT:odf_proj.odf_pk@
+GROUP  BY @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99', unit.name
+UNION
+-- Level 2 - OBS Level --
+SELECT @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99' int_id,
+       unit.name as name,
+       0 is_project,
+       NULL proj_int_id,
+       NULL odf_object_code,
+       0 manager_id,
+       null manager_email,
+       null manager_name,
+       MAX(CASE WHEN (SELECT count(DISTINCT associations.unit_id) 
+                      FROM   prj_obs_associations associations 
+                      WHERE  associations.unit_id = assoc.unit_id) > 0 
+                THEN  @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99' ELSE null 
+           END) hg_has_children,
+       AVG(odf_proj.obj_alignment) alignment,
+       AVG(inv_d.days_late) days_late,
+       AVG(inv_d.days_late_pct) days_late_pct,
+       AVG(odf_proj.obj_effort_amt_var) effort_amt,
+       AVG(odf_proj.obj_effort_var) effort,
+       AVG(odf_proj.obj_cost_amt_var) cost_amt,
+       AVG(odf_proj.obj_cost_pct_var) cost,
+       AVG(odf_proj.risk_score) risk,
+       MAX((SELECT issue_sl
+            FROM   cop_inv_rim_stoplights_v issue
+            WHERE  issue.investment_id = odf_proj.odf_pk)) issue,
+       MAX((SELECT COUNT(c.id) change_exists
+            FROM   rim_risks_and_issues c
+            WHERE  c.pk_id = odf_proj.odf_pk
+            AND    c.type_code = 'CHANGE'
+            AND    c.status_code NOT IN ('CLOSED','RESOLVED'))) change
+FROM   prj_obs_units unit
+INNER  JOIN  prj_obs_object_types object_assoc
+             ON   unit.type_id = object_assoc.type_id
+             AND  object_assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  prj_obs_units_flat flat
+             ON   unit.id = flat.branch_unit_id
+INNER  JOIN  prj_obs_associations assoc
+             ON   flat.unit_id = assoc.unit_id
+             AND  assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  odf_project_v2 odf_proj
+             ON   assoc.record_id = odf_proj.odf_pk
+             AND  odf_proj.is_template <> 1
+             AND  odf_proj.is_program <> 1
+             AND  odf_proj.is_active <> 0
+INNER  JOIN  cop_inv_days_late_v inv_d
+             ON   odf_proj.odf_pk = inv_d.investment_id
+LEFT   OUTER JOIN srm_resources r
+                  ON  odf_proj.manager_id = r.user_id
+WHERE  @DBUSER@.CMN_TO_CHAR_FCT(unit.parent_id) @+@ '-99' = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ = r.id)
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ = odf_proj.obj_stakeholder1)
+AND    @WHERE:SECURITY:PROJECT:odf_proj.odf_pk@
+GROUP  BY @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-99', unit.name
+UNION
+-- Level 3 - Project Level --
+SELECT @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(odf_proj.odf_pk) int_id,
+       odf_proj.name as name,
+       1 is_project,
+       odf_proj.odf_pk proj_int_id,
+       odf_proj.odf_object_code odf_object_code,
+       r.id manager_id,
+       r.email manager_email,
+       r.full_name manager_name,
+       CASE WHEN (SELECT count(*) 
+                  FROM   prj_obs_associations associations 
+                  WHERE  associations.record_id = assoc.record_id) < 0 
+            THEN @DBUSER@.CMN_TO_CHAR_FCT(unit.id) @+@ '-' @+@ @DBUSER@.CMN_TO_CHAR_FCT(odf_proj.odf_pk)
+            ELSE null 
+            END hg_has_children,
+       odf_proj.obj_alignment alignment,
+       inv_d.days_late days_late,
+       inv_d.days_late_pct days_late_pct,
+       odf_proj.obj_effort_amt_var effort_amt,
+       odf_proj.obj_effort_var effort,
+       odf_proj.obj_cost_amt_var cost_amt,
+       odf_proj.obj_cost_pct_var cost,
+       odf_proj.risk_score risk,
+       (SELECT issue_sl
+        FROM   cop_inv_rim_stoplights_v issue
+        WHERE  issue.investment_id = odf_proj.odf_pk) issue,
+       (SELECT COUNT(c.id) change_exists
+        FROM   rim_risks_and_issues c
+        WHERE  c.pk_id = odf_proj.odf_pk
+        AND    c.type_code = 'CHANGE'
+        AND    c.status_code NOT IN ('CLOSED','RESOLVED')) change
+FROM   prj_obs_units unit
+INNER  JOIN  prj_obs_object_types object_assoc
+             ON   unit.type_id = object_assoc.type_id
+             AND  object_assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  prj_obs_associations assoc
+             ON   unit.id = assoc.unit_id
+             AND  @DBUSER@.CMN_TO_CHAR_FCT(assoc.unit_id) @+@ '-99' = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@
+             AND  assoc.table_name = 'SRM_PROJECTS'
+INNER  JOIN  odf_project_v2 odf_proj
+             ON   assoc.record_id = odf_proj.odf_pk
+             AND  odf_proj.is_template <> 1
+             AND  odf_proj.is_program <> 1
+             AND  odf_proj.is_active <> 0
+INNER  JOIN  cop_inv_days_late_v inv_d
+             ON   odf_proj.odf_pk = inv_d.investment_id
+LEFT   OUTER JOIN srm_resources r
+             ON   odf_proj.manager_id = r.user_id
+WHERE  (@WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:manager_res_id@ = r.id)
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ is null OR @WHERE:PARAM:USER_DEF:INTEGER:bus_owner_res_id@ = odf_proj.obj_stakeholder1)
+AND    @WHERE:SECURITY:PROJECT:odf_proj.odf_pk@
+) obs
+WHERE  @FILTER@
+HAVING @HAVING_FILTER@]]></nsql>
+            <attribute id="obs_proj_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="obs_proj_name" required="false">
+              
+              
+              
+              
+              <nls description="OBS / Project" languageCode="en" name="OBS / Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_project" required="false">
+              
+              
+              
+              
+              <nls description="Project Dashboard" languageCode="en" name="Project Dashboard"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="2" lo="1" mappingCode="mapping-1" typeCode="IcoReportLibrary"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="email_column" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Email (Deprecated)" languageCode="en" name="Project Manager Email (Deprecated)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="2" lo="1" mappingCode="mapping-1" typeCode="WdgMailto"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_int_id" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Manager Internal ID" languageCode="en" name="Project Manager Internal ID"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_email" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Manager Email Address" languageCode="en" name="Project Manager Email Address"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_name" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="hg_has_children" required="false">
+              
+              
+              
+              
+              <nls description="Has Child Records (Internal)" languageCode="en" name="Has Child Records (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="business_alignment_sl" required="false">
+              
+              
+              
+              
+              <nls description="Business Alignment" languageCode="en" name="Business Alignment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="34" lo="0" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="68" lo="34" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="68" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule" required="false">
+              
+              
+              
+              
+              <nls description="Days Late" languageCode="en" name="Days Late"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule_pct" required="false">
+              
+              
+              
+              
+              <nls description="Days Late %" languageCode="en" name="Days Late %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_pct_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule %" languageCode="en" name="Schedule %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="effort" required="false">
+              
+              
+              
+              
+              <nls description="Projected Effort Variance" languageCode="en" name="Projected Effort Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="effort_sl" required="false">
+              
+              
+              
+              
+              <nls description="Projected Effort Variance %" languageCode="en" name="Projected Effort Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="cost" required="false">
+              
+              
+              
+              
+              
+              <nls description="Projected Cost Variance" languageCode="en" name="Projected Cost Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost_sl" required="false">
+              
+              
+              
+              
+              <nls description="Projected Cost Variance %" languageCode="en" name="Projected Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="risk_sl" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Risk Score" languageCode="en" name="Risk Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="34" lo="0" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="68" lo="34" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="68" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="issue_sl" required="false">
+              
+              
+              
+              
+              <nls description="Issue" languageCode="en" name="Issue"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="2" lo="2" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="3" lo="3" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="change_sl" required="false">
+              
+              
+              
+              
+              <nls description="Change" languageCode="en" name="Change"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1000" lo="1" mappingCode="mapping-1" typeCode="Checkmark"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_bus_owner_res_id" lookup="OBJ_PROJECT_STAKEHOLDER" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Sponsor Filter" languageCode="en" name="Sponsor Filter"/>
+              
+            </attribute>
+            <attribute id="param_manager_res_id" lookup="CSK_RESOURCE_BROWSE" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs_type_id" lookup="OBS_BROWSE_FLT_PRJ" required="true">
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hg_row_id" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Row ID (Internal)" languageCode="en" name="Row ID (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.teamMailTo" code="cop.link.managerEmail">
+                
+                
+                
+                
+                <nls description="Project Manager Email" languageCode="en" name="Project Manager Email"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="manager_email" dataSource="data" paramCode="~mailto~"/>
+              </link>
+              <link action="copProjectCostsLinkable" code="cop.link.projectCost">
+                
+                
+                
+                
+                <nls description="Project Costs by Phase" languageCode="en" name="Project Costs by Phase"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="ProjectID"/>
+              </link>
+              <link action="projmgr.editResource" code="cop.link.resourceProperties">
+                
+                
+                
+                
+                <nls description="Resource Properties" languageCode="en" name="Resource Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="/data/id/@value" dataSource="input" paramCode="return_id"/>
+                <linkParam dataRef="manager_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMS_ITEM_LAST_UPDATED_DATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMS_ITEM_LAST_UPDATED_DATE_FCT" (
+  p_odf_pk     in   number,
+  p_type       in   varchar2,
+  p_table_name      in   varchar2 default null
+ )
+ RETURN DATE
+IS
+  v_table_name varchar2(30);
+  v_dynamic_sql varchar2(500);
+  v_last_updated_date date;
+BEGIN
+
+  IF p_type = 'VIEW' THEN
+    v_table_name := p_table_name;
+  ELSE
+    BEGIN
+      SELECT table_name
+        INTO v_table_name
+        FROM cms_content_types
+       WHERE type = p_type;
+    EXCEPTION
+      WHEN OTHERS
+        THEN
+          v_table_name := '';
+    END;
+  END IF;
+
+  BEGIN
+    v_dynamic_sql := 'SELECT LAST_UPDATED_DATE FROM ' || v_table_name || ' WHERE id = ' || p_odf_pk;
+    EXECUTE IMMEDIATE v_dynamic_sql INTO v_last_updated_date;
+  END;
+
+  RETURN v_last_updated_date;
+
+EXCEPTION
+  WHEN OTHERS
+    THEN
+      RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

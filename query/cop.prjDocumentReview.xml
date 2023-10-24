@@ -1,0 +1,918 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.prjDocumentReview" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project Document Review" languageCode="en" name="Project Document Review"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:DOCUMENT:files.file_id:file_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files.name:file_name@,     
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:folders.id:file_folder_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:folders.name:file_folder_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:'Projects':file_folder_type@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:@SUBSTR@(folders.path_name,22,2000) @+@ '/' @+@ folders.name:file_folder_path@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:inv.id:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:inv.code:project_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:inv.name:project_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:@UPPER@(inv.odf_object_code):investment_type_upper@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:inv.manager_id:project_manager_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:mgr.full_name:project_manager@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.created_date:created_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.created_by:created_by_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:created.full_name:created_by_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.last_updated_date:updated_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.last_updated_by:updated_by_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:updated.full_name:updated_by_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:owner.id:owner_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:owner.full_name:owner_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.category:category_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:cat_cap.name:category_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.description:description@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files.check_in_comment:check_in_comment@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files.version_number:version_number@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files.status:status_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:status_cap.name:status_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.versioning_enabled:versioning_enabled@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:files_base.allow_non_participants:allow_non_participants@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:'filedownload':filedownload@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:DOCUMENT:'true':rhxm0r7tseuqer@   
+FROM   clb_dms_files_inst_v files
+       INNER  JOIN  clb_dms_folders folders ON  folders.id = files.parent_folder_id 
+                                            AND folders.folder_type IN ('ProjectFolder','StandardFolder')                                
+       INNER  JOIN  clb_dms_flat_hierarchy files_hier ON files_hier.child_id = folders.id
+       INNER  JOIN  clb_dms_folders top_folder ON  top_folder.id = files_hier.ancestor_id 
+                                               AND top_folder.folder_type IN ('ProjectFolder')
+       INNER  JOIN  inv_investments inv ON  inv.id = top_folder.assoc_obj_id 
+       INNER  JOIN  inv_projects p ON inv.id = p.prID
+       LEFT   OUTER JOIN clb_dms_files files_base ON  files_base.id = files.file_id
+       LEFT   OUTER JOIN cmn_lookups_v status_cap ON  status_cap.lookup_code = files.status 
+                                                  AND status_cap.lookup_type = 'DOC_STATUS' 
+                                                  AND status_cap.language_code = @WHERE:PARAM:LANGUAGE@
+       LEFT   OUTER JOIN cmn_lookups_v cat_cap ON  cat_cap.lookup_code = files_base.category 
+                                               AND cat_cap.lookup_type = 'DOC_CATEGORY' 
+                                               AND cat_cap.language_code = @WHERE:PARAM:LANGUAGE@
+       LEFT   OUTER JOIN srm_resources mgr     ON mgr.user_id = inv.manager_id 
+       LEFT   OUTER JOIN srm_resources owner   ON owner.user_id = files_base.owner_id 
+       LEFT   OUTER JOIN srm_resources created ON created.user_id = files_base.created_by
+       LEFT   OUTER JOIN srm_resources updated ON updated.user_id = files_base.last_updated_by
+WHERE  files.is_latest = 1
+AND    p.is_template = 0
+AND    inv.is_active = 1
+AND    @WHERE:PARAM:USER_DEF:INTEGER:p.is_program:program@
+AND    files.user_id = @WHERE:PARAM:USER_ID@
+AND   (@NVL@(@WHERE:PARAM:USER_DEF:INTEGER:obs@,0) = 0 OR
+       inv.id IN (SELECT obsa.record_id
+                  FROM   prj_obs_associations obsa, prj_obs_units_flat obsf
+                  WHERE  obsa.unit_id = obsf.unit_id
+                  AND    obsa.table_name  = 'SRM_PROJECTS'
+                  AND    obsf.branch_unit_id = @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:obs@,0)))
+AND    @WHERE:SECURITY:PROJECT:inv.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="file_id" required="false">
+              
+              
+              
+              
+              <nls description="Document Internal ID" languageCode="en" name="Document Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="file_name" required="false">
+              
+              
+              
+              
+              <nls description="Document" languageCode="en" name="Document"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="file_folder_id" required="false">
+              
+              
+              
+              
+              <nls description="Folder Internal ID" languageCode="en" name="Folder Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="file_folder_name" required="false">
+              
+              
+              
+              
+              <nls description="Folder" languageCode="en" name="Folder"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="file_folder_type" required="false">
+              
+              
+              
+              
+              <nls description="Folder Type" languageCode="en" name="Folder Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="file_folder_path" required="false">
+              
+              
+              
+              
+              <nls description="Location" languageCode="en" name="Location"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_id" required="false">
+              
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager_int_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_date" required="false">
+              
+              <nls description="Created Date" languageCode="en" name="Created Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_by_id" lookup="SCH_BROWSE_RESOURCE" required="false">
+              
+              
+              
+              
+              <nls description="Created By Filter" languageCode="en" name="Created By Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_by_name" required="false">
+              
+              
+              
+              
+              <nls description="Created By" languageCode="en" name="Created By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="updated_date" required="false">
+              
+              
+              
+              
+              <nls description="Last Updated Date" languageCode="en" name="Last Updated Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="updated_by_id" lookup="SCH_BROWSE_RESOURCE" required="false">
+              
+              
+              
+              
+              <nls description="Last Updated By Filter" languageCode="en" name="Last Updated By Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="updated_by_name" required="false">
+              
+              
+              
+              
+              <nls description="Last Updated By" languageCode="en" name="Last Updated By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="owner_id" lookup="SCH_BROWSE_RESOURCE" required="false">
+              
+              
+              
+              
+              <nls description="Owner Filter" languageCode="en" name="Owner Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="owner_name" required="false">
+              
+              
+              
+              
+              <nls description="Owner" languageCode="en" name="Owner"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="category_id" lookup="DOC_CATEGORY" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Category Filter" languageCode="en" name="Category Filter"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="category_name" required="false">
+              
+              
+              
+              
+              <nls description="Category" languageCode="en" name="Category"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="description" required="false">
+              
+              
+              
+              
+              <nls description="Description" languageCode="en" name="Description"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="check_in_comment" required="false">
+              
+              
+              
+              
+              <nls description="Last Revision Comments" languageCode="en" name="Last Revision Comments"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="version_number" required="false">
+              
+              
+              
+              
+              <nls description="Version Number" languageCode="en" name="Version Number"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_id" lookup="DOC_STATUS" required="false">
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="APPROVED"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="SUBMITTED"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="REJECTED"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="status_name" required="false">
+              
+              
+              
+              
+              <nls description="Status Name" languageCode="en" name="Status Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="versioning_enabled" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              <nls description="Versioning Enabled" languageCode="en" name="Versioning Enabled"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping mappingCode="mapping-1" typeCode="Checkmark" value="1"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="allow_non_participants" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Non-participants Allowed Access" languageCode="en" name="Non-participants Allowed Access"/>
+              <displayMapping type="image">
+                <mapping mappingCode="mapping-1" typeCode="Checkmark" value="1"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="filedownload" required="false">
+              
+              
+              
+              
+              <nls description="File Download (Internal)" languageCode="en" name="File Download (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="rhxm0r7tseuqer" required="false">
+              
+              
+              
+              
+              <nls description="Link (Internal)" languageCode="en" name="Link (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_program" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Program Filter" languageCode="en" name="Program Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="dms.viewFile" code="openDocument">
+                
+                
+                
+                
+                <nls description="Open Document" languageCode="en" name="Open Document"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="file_name" dataSource="data" paramCode="fileName"/>
+                <linkParam dataRef="filedownload" dataSource="data" paramCode="filedownload"/>
+                <linkParam dataRef="rhxm0r7tseuqer" dataSource="data" paramCode="RhXm0r7tSeUqEr"/>
+                <linkParam dataRef="file_id" dataSource="data" paramCode="fileId"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>AGL_POSSIBLE_USER_MATCHES_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."AGL_POSSIBLE_USER_MATCHES_FCT" (
+        p_first_name VARCHAR2,
+        p_last_name VARCHAR2
+)
+RETURN VARCHAR2
+IS
+  v_email_id VARCHAR2(100);
+  v_first_name VARCHAR2(100);
+  v_last_name VARCHAR2(100);
+  v_match VARCHAR2(4000);
+  v_matches VARCHAR2(4000);
+BEGIN
+    v_email_id := NULL;
+    v_first_name := NULL;
+    v_last_name := NULL;
+    v_match := NULL;
+    v_matches := NULL;
+
+    DECLARE CURSOR cursor1 IS
+    SELECT email_address, first_name, last_name
+      FROM cmn_sec_users
+     WHERE UPPER(first_name) = UPPER(p_first_name)
+       AND UPPER(last_name) = UPPER(p_last_name)
+  ORDER BY user_name;
+
+    BEGIN
+        OPEN cursor1;
+        LOOP
+            FETCH cursor1 INTO v_email_id, v_first_name, v_last_name;
+            EXIT WHEN cursor1%NOTFOUND;
+            v_match := v_first_name || ' ' || v_last_name || ' (' || v_email_id || ')';
+            IF v_matches IS NOT NULL THEN
+                IF LENGTH(v_matches || '; ' || v_match) &lt;= 1000 THEN
+                    v_matches := v_matches || '; ' || v_match;
+                ELSE
+                    v_matches := SUBSTR(v_matches || '; ' || v_match, 1, 1000);
+                END IF;
+            ELSE
+                IF LENGTH(v_match) &lt;= 1000 THEN
+                    v_matches := v_match;
+                ELSE
+                    v_matches := SUBSTR(v_match, 1, 1000);
+                END IF;
+            END IF;
+        END LOOP;
+        CLOSE cursor1;
+    END;
+    RETURN v_matches;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

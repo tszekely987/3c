@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CRV_SEGMENTS_ROW_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CRV_SEGMENTS_ROW_FCT" ( ID NUMBER, p_field_id NUMBER, p_scenario_id NUMBER, p_start INTEGER DEFAULT 0, p_finish INTEGER DEFAULT 99999999, p_options VARCHAR DEFAULT NULL )
+  RETURN CRV_SEGMENTS PIPELINED
+/*
+*/
+IS
+BEGIN
+  FOR ao_rec IN (
+    with curves as (
+      select object_id, field_id, scenario_id, curve
+        from crv_sql_curves
+       where object_id = id and field_id = p_field_id and scenario_id = p_scenario_id
+    )
+    select * from table( crv_sql_curve_pkg.segments_table( cursor( select * from curves ), p_start, p_finish, p_options ) )
+  )
+  LOOP
+    pipe row( CRV_SEGMENT( ao_rec.id, ao_rec.field, ao_rec.scenario, ao_rec.segment_start, ao_rec.segment_finish, ao_rec.rate ) );
+  END LOOP;
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

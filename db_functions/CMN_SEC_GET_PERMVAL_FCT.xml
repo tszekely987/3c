@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_GET_PERMVAL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_SEC_GET_PERMVAL_FCT" (
+   P_USER_ID              IN   NUMBER,
+   P_OBJECT_ID            IN   NUMBER,
+   P_OBJECT_INSTANCE_ID   IN   NUMBER
+   )
+   RETURN NUMBER
+IS
+   V_PERMISSION   NUMBER;
+BEGIN
+   /* User/Group permission function to compute permission
+      value from individual permission element bit value
+      (e.g. for READ=1,WRITE=2,DELETE=4 the value is 7) */
+   SELECT SUM (DISTINCT PERMISSION_VALUE)
+     INTO V_PERMISSION
+     FROM CMN_SEC_ASSGND_OBJ_PERM_V0
+    WHERE USER_ID = P_USER_ID
+      AND OBJECT_ID = P_OBJECT_ID
+      AND OBJECT_INSTANCE_ID = P_OBJECT_INSTANCE_ID;
+   RETURN V_PERMISSION;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RETURN NULL;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="PARTITION_BROWSE_ROOT" displayAttributeName="partition_name" hiddenAttributeName="partition_code" objectCode="" sortAttributeName="partition_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Browse Partitions" languageCode="en" name="Browse Partition"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:v.partition_code:partition_code@,
+	            @SELECT:v.partition_name:partition_name@,
+	            @SELECT:v.partition_model_name:partition_model_name@,
+	            @SELECT:v.drillable:drillable@,
+	            @SELECT:v.LAST_UPDATED_DATE:LAST_UPDATED_DATE@,
+              @SELECT:v.ID:LANGUAGE_ID@,
+              @SELECT:v.LANGUAGE_CODE:LANGUAGE_CODE@
+
+	            FROM
+	            (
+	            SELECT p.code partition_code,
+	            n.name partition_name,
+	            n2.name partition_model_name,
+	            0 drillable,
+	            p.LAST_UPDATED_DATE,
+	            l.ID,
+              n.LANGUAGE_CODE
+	            FROM cmn_partitions p, cmn_captions_nls n,cmn_partition_models m, cmn_captions_nls n2, CMN_LANGUAGES l
+	            WHERE n.table_name = 'CMN_PARTITIONS'
+	            AND n.language_code = @WHERE:PARAM:LANGUAGE@
+	            AND n.pk_id = p.id
+	            AND p.model_code = m.code
+	            AND n2.table_name = 'CMN_PARTITION_MODELS'
+	            AND n2.language_code = @WHERE:PARAM:LANGUAGE@
+	            AND n2.pk_id = m.id
+	            AND n.LANGUAGE_CODE = n2.LANGUAGE_CODE
+	            AND n.LANGUAGE_CODE = l.LANGUAGE_CODE
+	            AND p.code NOT IN (SELECT pp.code FROM cmn_partitions pp, cmn_partitions cc
+	              WHERE pp.code = cc.parent_code)
+	            AND ( (@where:param:user_def:string:parent_id@ IS NOT NULL
+	                   AND p.parent_code = @where:param:user_def:string:parent_id@)
+	               OR (@where:param:user_def:string:parent_id@ IS NULL
+	                    AND p.parent_code = 'NIKU.ROOT'))
+	            UNION
+	            SELECT p.code partition_code,
+	            n.name partition_name,
+	            n2.name partition_model_name,
+	            1 drillable,
+	            p.LAST_UPDATED_DATE,
+	            l.ID,
+              n.LANGUAGE_CODE
+	            FROM cmn_partitions p, cmn_partitions c, cmn_captions_nls n,cmn_partition_models m, cmn_captions_nls n2, CMN_LANGUAGES l
+	            WHERE n.table_name = 'CMN_PARTITIONS'
+	            AND n.pk_id = p.id
+	            AND n.language_code = @WHERE:PARAM:LANGUAGE@
+	            AND p.code = c.parent_code
+	            AND p.model_code = m.code
+	            AND n2.table_name = 'CMN_PARTITION_MODELS'
+	            AND n2.language_code = @WHERE:PARAM:LANGUAGE@
+	            AND n2.pk_id = m.id
+	            AND n.LANGUAGE_CODE = n2.LANGUAGE_CODE
+	            AND n.LANGUAGE_CODE = l.LANGUAGE_CODE
+	            AND ( (@where:param:user_def:string:parent_id@ IS NOT NULL
+	                   AND p.parent_code = @where:param:user_def:string:parent_id@)
+	               OR (@where:param:user_def:string:parent_id@ IS NULL
+	                    AND p.parent_code = 'NIKU.ROOT'))
+	            UNION
+	              SELECT 'NIKU.ROOT' partition_code,
+	                n.name partition_name,
+	                null partition_model_name,
+	                0 drillable,
+	                n.LAST_UPDATED_DATE,
+    	            l.ID,
+                  n.LANGUAGE_CODE
+	              FROM CMN_CAPTIONS_NLS N, CMN_LANGUAGES l
+	              WHERE n.LANGUAGE_CODE = 'en'
+	              AND TABLE_NAME = 'CMN_PARTITIONS'
+	              AND n.LANGUAGE_CODE = l.LANGUAGE_CODE
+	              AND PK_ID = -1
+	            ) v WHERE 1=1]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="partition_name"/>
+              <displayedSuggestionAttribute value="partition_model_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="partition_name"/>
+              <searchedSuggestionAttribute value="partition_model_name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Partition" languageCode="en" name="Select Partition"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Partition" languageCode="en" name="Select Partition"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <listColumn code="partition_code" order="3" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: partition_code" languageCode="en" name="[hidden]: partition_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="partition_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Partition" languageCode="en" name="Partition"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="partition_model_name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Partition Model" languageCode="en" name="Partition Model"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="drillable" order="4" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="[hidden]: drillable" languageCode="en" name="[hidden]: drillable"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

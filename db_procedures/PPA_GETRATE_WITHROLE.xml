@@ -1,0 +1,1083 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_GETRATE_WITHROLE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_GETRATE_WITHROLE" 
+(
+  cClient                     VARCHAR2,
+  cProject                    VARCHAR2,
+  cCharge_Code                VARCHAR2 DEFAULT NULL,
+  cInput_Type                 VARCHAR2 DEFAULT NULL,
+  cResource_Code              VARCHAR2 DEFAULT NULL,
+  cLocation                   VARCHAR2 DEFAULT NULL,
+  cDepartCode                 VARCHAR2 DEFAULT NULL,
+  in_cTransType            IN VARCHAR2 DEFAULT NULL,
+  cTransDate                  VARCHAR2 DEFAULT NULL,
+  nQuantity                   NUMBER   DEFAULT NULL,
+  bAsResultSet                NUMBER   DEFAULT 1,
+  nAmount              IN OUT NUMBER,
+  nRate                IN OUT NUMBER,
+  nCost                IN OUT NUMBER,
+  nStdCost             IN OUT NUMBER,
+  nFactorAmt           IN OUT NUMBER,
+  nBurdenAmt           IN OUT NUMBER,
+  nOverheadAmt         IN OUT NUMBER,
+  cCostPlusCode        IN OUT VARCHAR2,
+  --cCostRuleCode      IN OUT VARCHAR2,
+  bRateFound           IN OUT NUMBER,
+  budgetcall                  NUMBER   DEFAULT 0,
+  bCostOverride               NUMBER   DEFAULT 0,
+  currencyCodeReturned IN OUT VARCHAR2,
+  costCurrencyCode     IN OUT VARCHAR2,
+  cRoleCode                   VARCHAR2 DEFAULT NULL,
+  cTransClass          IN VARCHAR2 DEFAULT NULL,
+  nTeamId                     NUMBER DEFAULT NULL,
+  RC1                  IN OUT Ppa_Getratepkg.RCT1,
+  cSystemCurrency  IN VARCHAR2 DEFAULT NULL,
+  cCost_type                VARCHAR2 DEFAULT NULL
+)
+AS
+  v_cClient                   Globalpkg.STRING;
+  cTransType                  Globalpkg.STRING;
+  StoO_selcnt                 INTEGER;
+  StoO_error                  INTEGER;
+  StoO_rowcnt                 INTEGER;
+  StoO_crowcnt                INTEGER := 0;
+  StoO_fetchstatus            INTEGER := 0;
+  StoO_errmsg                 Globalpkg.STRING;
+  StoO_sqlstatus              INTEGER;
+  cRateLocation               Globalpkg.STRING;
+  cRateDepartCode             Globalpkg.STRING;
+  iRateSource                 NUMBER;
+  iCostSource                 NUMBER;
+  iLocSource                  NUMBER;
+  cProjLocation               Globalpkg.STRING;
+  cProjDepartCode             Globalpkg.STRING;
+  bUseCostPlus                INTEGER;
+  bBudgeted                   NUMBER(10,0);
+  nDummy                      NUMBER(19,4);
+  iRateMatchRow               NUMBER;
+  iCostMatchRow               NUMBER;
+  cClientClass                Globalpkg.STRING;
+  cProjClass                  Globalpkg.STRING;
+  cResource_Class             Globalpkg.STRING;
+  cWipClass                   Globalpkg.STRING;
+  cEntity                     Globalpkg.STRING;
+  cRole                       Globalpkg.STRING;
+  cResource                   Globalpkg.STRING;
+  cTeamMember                 Globalpkg.STRING;
+  vInput_Type                 Globalpkg.STRING := cInput_Type;
+-- for CLRT-24204 fix: this variable is a holder to hold the Tx class info if needed to change the value, since IN parameter cannot be changed
+vTransClass     Globalpkg.STRING := cTransClass;
+  iBestMatchRowID             NUMBER;
+  iRequired                   NUMBER(5, 0);
+  nActualCost                 NUMBER(32, 6);
+  cActualCostCurrency         VARCHAR2(30);
+  cStdCostCurrency            VARCHAR2(30);
+  iAllowOverride              NUMBER(5, 0);
+  bCostFound                  NUMBER(5, 0);
+  cApplyTo                    Globalpkg.STRING;
+  BUDGETSOURCE                NUMBER(5, 0);
+  P_RC                        Ppa_Getmatrixmatchpkg.RCT1;
+  p_temp1                     NUMBER := NULL;
+  p_temp2                     Globalpkg.STRING := NULL;
+  dTransDate                  DATE;
+  V_EXCHANGE_RATE_TYPE        VARCHAR2(30);
+
+  
+  iXRateSource                 NUMBER;
+  iXCostSource                 NUMBER;
+  iXLocSource                  NUMBER;
+  iXAllowOverride              NUMBER(5, 0);
+  iLRateSource                 NUMBER;
+  iLCostSource                 NUMBER;
+  iLLocSource                  NUMBER;
+  iLAllowOverride              NUMBER(5, 0);
+  iMRateSource                 NUMBER;
+  iMCostSource                 NUMBER;
+  iMLocSource                  NUMBER;
+  iMAllowOverride              NUMBER(5, 0);
+  iQRateSource                 NUMBER;
+  iQCostSource                 NUMBER;
+  iQLocSource                  NUMBER;
+  iQAllowOverride              NUMBER(5, 0);
+  -- added for call from scheduler
+  cResourceExchangeTypeLabor     VARCHAR2(30);
+  cResourceExchangeTypeMaterials VARCHAR2(30);
+  cResourceExchangeTypeEquipment VARCHAR2(30);
+  cResourceExchangeTypeExpense   VARCHAR2(30);
+  cResourceExchangeType VARCHAR2(30);
+  cResourceLocation VARCHAR2(30);
+  cResourceDepartment VARCHAR2(30);
+  cRoleIsActive  NUMBER;
+  cResourceIsRole NUMBER;
+  
+  -- for location and department defaulting for baseline and PFRP
+  cObsDeptUnitCode Globalpkg.STRING := NULL;
+  cObsLocUnitCode  Globalpkg.STRING := NULL;
+  bResourceIsActive     INTEGER := 0; 
+  bResourceIsFinActive  INTEGER := 0;
+  
+BEGIN
+  /*
+    Procedure         :- This procedure is used accross the modules to compute rate, amount, factor etc.
+                         This procedure is one of the most important procedure
+  */
+
+  cTransType := in_cTransType;
+  BUDGETSOURCE := 0;
+  cRole := NVL(cRoleCode, '[N/A]');
+  cResource := cResource_Code;
+  
+  -- Assume resource is not a Role
+  cResourceIsRole := 0;
+  -- Now check if resourceId is not null or '[N/A]' and get the isRole from database. Otherwise its a Role.
+  IF (cResource_Code IS NOT NULL AND cResource_Code &lt;&gt; '[N/A]') THEN
+	  BEGIN
+	    StoO_rowcnt := 0;
+	    StoO_selcnt := 0;
+	    StoO_error  := 0;
+	
+        SELECT sr.is_active, nvl(pmr.active, 0), pr.prisrole
+        INTO bResourceIsActive, bResourceIsFinActive, cResourceIsRole
+        FROM srm_resources sr
+            LEFT OUTER JOIN pac_mnt_resources pmr ON sr.id = pmr.id,
+            prj_resources pr
+        WHERE sr.unique_name = cResource_Code AND sr.id = pr.prid;
+	
+	    StoO_rowcnt := SQL%ROWCOUNT;
+	    EXCEPTION
+	      WHEN NO_DATA_FOUND THEN
+	        StoO_rowcnt := 0;
+	        StoO_selcnt := 0;
+	      WHEN OTHERS THEN
+	        StoO_rowcnt := 0;
+	        StoO_selcnt := 0;
+	        StoO_error := SQLCODE;
+	        StoO_errmsg := SQLERRM;
+	  END;
+  ELSE
+    cResourceIsRole := 1;
+  END IF;
+  
+  -- preserve original values since this transaction may have been fed from
+  --   an external system whose value we should use
+  nActualCost := nCost;
+  cActualCostCurrency := costCurrencyCode;
+
+  -- init output vars
+  nAmount := 0;
+  nRate := 0;
+  nCost := 0;
+  nStdCost := 0;
+  nFactorAmt := 0;
+  nBurdenAmt := 0;
+  nOverheadAmt := 0;
+  nDummy := 0;
+  cCostPlusCode := NULL;
+  --cCostRuleCode := NULL;
+  iRateMatchRow := 0;
+  iCostMatchRow := 0;
+  bRateFound := 0;
+  cTransType := RTRIM(cTransType);
+  bCostFound := 0;
+  iAllowOverride := 0;
+  dTransDate := TO_DATE(RTRIM(cTransDate), 'mm/dd/yyyy');
+
+ -- Get the transaction information from the financial project
+ IF cProject &lt;&gt; '[N/A]' THEN
+ BEGIN
+    SELECT COMPANY_CODE,locationid, departcode, COSTPLUS, WIPCLASS,
+		   transratesourceexpenses,  transcostsourceexpenses, transratelocationexpenses,transrateoverrideexpenses,
+           transratesourcelabor, transcostsourcelabor,transratelocationlabor,  transrateoverridelabor,
+		   transratesourcematerials,  transcostsourcematerials,transratelocationmaterials,transrateoverridematerials ,
+		   transratesourceequipment,  transcostsourceequipment,transratelocationequipment,transrateoverrideequipment,
+		   PAC_MNT_PROJECTS.class, 0
+      INTO v_cClient,cProjLocation, cProjDepartCode, bUseCostPlus,cWipClass,
+	  	   iXRateSource, iXCostSource, iXLocSource,iXAllowOverride,
+	  	   iLRateSource, iLCostSource, iLLocSource,iLAllowOverride,		   
+		   iMRateSource, iMCostSource, iMLocSource,iMAllowOverride,
+		   iQRateSource, iQCostSource, iQLocSource,iQAllowOverride,	  	    
+		   cProjClass, bBudgeted
+      FROM PAC_MNT_PROJECTS
+     WHERE PROJECT_CODE = cProject;         
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+  END IF;
+
+  v_cClient := NVL(v_cClient,'[N/A]');
+
+   -- Get it from the project entity
+  IF cProjLocation IS NOT NULL THEN
+    BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+
+      SELECT NVL(iLRateSource, E.TRANS_RATE_SOURCE_LABOR),
+	  		 NVL(iLCostSource,E.TRANS_COST_SOURCE_LABOR),
+			 NVL(iLLocSource, E.TRANS_LOCATION_LABOR),
+			 NVL(iMLocSource, E.TRANS_LOCATION_MATERIAL),
+			 NVL(iQLocSource, E.TRANS_LOCATION_EQUIPMENT),
+			 NVL(iXLocSource, E.TRANS_LOCATION_EXPENSE),
+             NVL(iMRateSource, E.TRANS_RATE_SOURCE_MATERIALS),
+             NVL(iQRateSource,E.TRANS_RATE_SOURCE_EQUIPMENT),
+             NVL(iXRateSource,E.TRANS_RATE_SOURCE_EXPENSE),
+             E.EXCHANGE_RATE_TYPE_LABOR,
+             E.EXCHANGE_RATE_TYPE_MATERIALS,
+             E.EXCHANGE_RATE_TYPE_EQUIPMENT,
+             E.EXCHANGE_RATE_TYPE_EXPENSE,
+             NVL(cWipClass,E.WIP_CLASS),
+             NVL(cClientClass,E.CLIENT_CLASS),
+             NVL(cProjClass,E.PROJECT_CLASS),
+			 E.ENTITY
+        INTO iLRateSource, iLCostSource,iLLocSource,
+             iMLocSource,
+             iQLocSource,
+             iXLocSource,
+             iMRateSource,
+             iQRateSource,
+             iXRateSource,
+             cResourceExchangeTypeLabor,
+             cResourceExchangeTypeMaterials,
+             cResourceExchangeTypeEquipment,
+             cResourceExchangeTypeExpense,
+             cWipClass,
+             cClientClass,
+             cProjClass,
+			 cEntity
+        FROM ENTITY E,
+             LOCATIONS L
+       WHERE L.LOCATIONID = cProjLocation
+         AND L.ENTITY = E.ENTITY;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+
+  -- get the resource's entity defaults (if any)
+  -- when team member is a role, and teamRole is not same as 
+  -- the member role itself, get resClass and transClass for 
+  -- the team role if the teamRole is active and financially active 
+     
+  IF ( (cResourceIsRole = 1) AND (cRole IS NOT NULL AND cRole &lt;&gt; '[N/A]')  ) THEN
+     cTeamMember := cRole;
+  ELSE
+     cTeamMember := cResource_Code;
+  END IF;
+  
+  -- get department and location
+    BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+
+    SELECT LOCATIONID,
+           DEPARTCODE
+      INTO cResourceLocation,
+           cResourceDepartment
+     FROM PAC_MNT_RESOURCES
+     WHERE RESOURCE_CODE = cTeamMember;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+  
+  -- get Resource Class
+    BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+
+    SELECT pmr.RESOURCE_CLASS
+      INTO cResource_Class
+     FROM SRM_RESOURCES srm 
+          LEFT OUTER JOIN PAC_MNT_RESOURCES pmr ON pmr.ID = srm.ID
+          LEFT OUTER JOIN PAC_FOS_RESOURCE_CLASS pfrc ON pfrc.RESOURCE_CLASS = pmr.RESOURCE_CLASS
+     WHERE pmr.RESOURCE_CODE = cTeamMember;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+
+  -- Get it from the resource entity 
+  IF cResourceLocation IS NOT NULL THEN
+    BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+
+      SELECT NVL(iLRateSource, E.TRANS_RATE_SOURCE_LABOR),
+	  		 NVL(iLCostSource,E.TRANS_COST_SOURCE_LABOR),
+			 NVL(iLLocSource, E.TRANS_LOCATION_LABOR),
+			 NVL(iMLocSource, E.TRANS_LOCATION_MATERIAL),
+			 NVL(iQLocSource, E.TRANS_LOCATION_EQUIPMENT),
+			 NVL(iXLocSource, E.TRANS_LOCATION_EXPENSE),
+             NVL(iMRateSource, E.TRANS_RATE_SOURCE_MATERIALS),
+             NVL(iQRateSource,E.TRANS_RATE_SOURCE_EQUIPMENT),
+             NVL(iXRateSource,E.TRANS_RATE_SOURCE_EXPENSE),
+             E.EXCHANGE_RATE_TYPE_LABOR,
+             E.EXCHANGE_RATE_TYPE_MATERIALS,
+             E.EXCHANGE_RATE_TYPE_EQUIPMENT,
+             E.EXCHANGE_RATE_TYPE_EXPENSE,
+             NVL(cWipClass,E.WIP_CLASS),
+             NVL(cClientClass,E.CLIENT_CLASS),
+             NVL(cProjClass,E.PROJECT_CLASS),
+			 E.ENTITY
+        INTO iLRateSource, iLCostSource,iLLocSource,
+             iMLocSource,
+             iQLocSource,
+             iXLocSource,
+             iMRateSource,
+             iQRateSource,
+             iXRateSource,
+             cResourceExchangeTypeLabor,
+             cResourceExchangeTypeMaterials,
+             cResourceExchangeTypeEquipment,
+             cResourceExchangeTypeExpense,
+             cWipClass,
+             cClientClass,
+             cProjClass,
+			 cEntity
+        FROM ENTITY E,
+             LOCATIONS L
+       WHERE L.LOCATIONID = cResourceLocation
+         AND L.ENTITY = E.ENTITY;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+
+  -- Get the transaction information from the  admin default(nameoptions table)
+  BEGIN
+    SELECT NVL(iXRateSource, TRANSRATESRCEXPENSE),
+           NVL(NVL(iXCostSource,iXRateSource), TRANSCOSTSRCEXPENSE),
+		   NVL(iXLocSource,TRANSRATELOCEXPENSE),
+		   NVL(NVL(iXAllowOverride,TRANSRATEALLOWOVRDEEXPENSE), 1),
+		   NVL(iLRateSource, TRANSRATESRCLBR),
+           NVL(iLCostSource, TRANSCOSTSRCLBR),
+           NVL(iLLocSource, TRANSRATELOCLBR),
+		   NVL(NVL(iLAllowOverride,TRANSRATEALLOWOVRDLBR), 1),
+		   NVL(iMRateSource, TRANSRATESRCMTL),
+           NVL(NVL(iMCostSource,iMRateSource), TRANSCOSTSRCMTL),
+           NVL(iMLocSource,TRANSRATELOCMTL),
+		   NVL(NVL(iMAllowOverride,TRANSRATEALLOWOVRDMTL), 1),
+		   NVL(iQRateSource, TRANSRATESRCEQUIP),
+           NVL(NVL(iQCostSource,iQRateSource), TRANSCOSTSRCEQUIP),
+           NVL(iQLocSource,TRANSRATELOCEQUIP),
+		   NVL(NVL(iQAllowOverride,TRANSRATEALLOWOVRDEQUIP), 1) ,          
+           NVL(cResourceLocation, DEFAULTLOCATION),
+           NVL(cResourceDepartment, DEFAULTDEPARTMENT),
+           NVL(bUseCostPlus,1),
+           NVL(cWipClass, DEFAULTWIPCLASS),
+           NVL(cProjClass, DEFAULTPROJCLASS),
+           0,
+           NVL(cClientClass, DEFAULTCLNTCLASS)
+     INTO iXRateSource, iXCostSource, iXLocSource,iXAllowOverride,
+ 	   	  iLRateSource, iLCostSource, iLLocSource,iLAllowOverride,		   
+   		  iMRateSource, iMCostSource, iMLocSource,iMAllowOverride,
+   		  iQRateSource, iQCostSource, iQLocSource,iQAllowOverride,	  	    
+   		  cRateLocation, cRateDepartCode, bUseCostPlus, 
+		  cWipClass, cProjClass, bBudgeted,cClientClass
+     FROM NAMEOPTIONS;
+
+     StoO_rowcnt := SQL%ROWCOUNT;
+     EXCEPTION
+       WHEN TOO_MANY_ROWS THEN
+         StoO_rowcnt := 2;
+       WHEN NO_DATA_FOUND THEN
+         StoO_rowcnt := 0;
+         StoO_selcnt := 0;
+       WHEN OTHERS THEN
+         StoO_rowcnt := 0;
+         StoO_selcnt := 0;
+         StoO_error := SQLCODE;
+         StoO_errmsg := SQLERRM;
+   END;
+   
+  IF cTransType = 'L' THEN
+     iRateSource:= iLRateSource;
+	 iCostSource:= iLCostSource; 
+	 iLocSource := iLLocSource;
+	 cResourceExchangeType :=cResourceExchangeTypeLabor;
+	 iAllowOverride := iLAllowOverride;
+  ELSIF cTransType ='M' THEN
+  	 iRateSource:= iMRateSource;
+	 iCostSource:= iMCostSource; 
+	 iLocSource := iMLocSource;
+	 iAllowOverride := iMAllowOverride;
+	 cResourceExchangeType :=cResourceExchangeTypeMaterials;
+  ELSIF cTransType ='Q' THEN
+     iRateSource:= iQRateSource;
+	 iCostSource:= iQCostSource; 
+	 iLocSource := iQLocSource;
+	 iAllowOverride := iQAllowOverride;
+	 cResourceExchangeType :=cResourceExchangeTypeEquipment;
+  ELSIF cTransType ='X' THEN
+      iRateSource:= iXRateSource;
+	 iCostSource:= iXCostSource; 
+	 iLocSource := iXLocSource;
+	 iAllowOverride := iXAllowOverride;
+	 cResourceExchangeType :=cResourceExchangeTypeExpense;
+  END IF;
+     
+
+    IF iRateSource &lt;&gt; BUDGETSOURCE  AND cProject &lt;&gt; '[N/A]' THEN -- buget need to removed:1:2:3
+      /* determine rate location */
+      /* COMPANY_CODE */
+      IF iLocSource = 1 THEN
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          SELECT CS.locationid,  CS.departcode
+            INTO cRateLocation, cRateDepartCode
+            FROM CLNTSUPP CS, PAC_MNT_PROJECTS P
+           WHERE P.PROJECT_CODE = cProject
+             AND CS.COMPANY_CODE = P.COMPANY_CODE;
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      /* PROJECT_CODE */
+      ELSIF iLocSource = 2 THEN
+      BEGIN	    
+        -- Fix for 83484. When location source is project, use projects entity
+		BEGIN
+        SELECT l.entity INTO cEntity 
+        FROM pac_mnt_projects p, locations l
+        WHERE PROJECT_CODE = cProject
+        AND l.LOCATIONID = p.LOCATIONID;
+		StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+		END;
+        -- end fix
+      
+        cRateLocation := cProjLocation;
+        cRateDepartCode := cProjDepartCode;
+      END;
+      /* Cost Code */
+      /* if not supplied, default to PROJECT_CODE's loc/dept */
+      ELSIF iLocSource = 3 THEN
+      BEGIN
+        IF TRIM(cLocation) IS NULL OR TRIM(cDepartCode) IS NULL THEN
+          cRateLocation := cProjLocation;
+          cRateDepartCode := cProjDepartCode;
+        ELSE
+          cRateLocation := cLocation;
+          cRateDepartCode := cDepartCode;
+        END IF;
+      END;
+      /* RESOURCE_CODE */
+      ELSIF iLocSource = 4 THEN
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+
+          SELECT E.locationid,  E.departcode
+            INTO cRateLocation, cRateDepartCode
+            FROM PAC_MNT_RESOURCES E
+           WHERE E.RESOURCE_CODE = cResource_Code;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+    END IF;
+
+    -- added for when this is called with a resource that doesn't have financial properties enabled
+    IF ((cRateLocation IS NULL) OR (cRateDepartCode IS NULL)) THEN
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT NVL(NVL(cRateLocation, cResourceLocation), DEFAULTLOCATION),
+               NVL(NVL(cRateDepartCode, cResourceDepartment), DEFAULTDEPARTMENT)
+          INTO cRateLocation, cRateDepartCode
+          FROM NAMEOPTIONS;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END IF;
+
+    IF cProject &lt;&gt; '[N/A]' THEN
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT NVL(C.CLNTCLASS,cClientClass)
+          INTO cClientClass
+          FROM CLNTSUPP C,
+               PAC_MNT_PROJECTS P
+         WHERE P.PROJECT_CODE = cProject
+           AND C.COMPANY_CODE = P.COMPANY_CODE;
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+    END IF;
+
+	cEntity := NVL(cEntity,'[N/A]');
+	cResource_Class := NVL(cResource_Class,'[N/A]');
+	
+	-- if input type is not passed, use the resources input type if it is being passed.
+	IF vInput_Type IS NULL and cResource_Code IS NOT NULL THEN
+	BEGIN
+	  SELECT PREXTERNALID INTO vInput_Type
+	  FROM PRJ_RESOURCES PR, SRM_RESOURCES SR, PRTYPECODE T
+	  WHERE PR.PRID=SR.ID and PR.PRTYPECODEID=T.PRID and SR.UNIQUE_NAME=cResource_Code;
+	EXCEPTION
+	WHEN OTHERS THEN
+		 NULL;
+	END;	  
+	END IF;
+
+    --  fix for CLRT-22170 START
+    --  Since the vInput_Type can not be set for a ROLE. if it is null , it should be treated as [N/A]
+    vInput_Type := NVL(vInput_Type,'[N/A]');
+    --  fix for CLRT-22170 END
+    	 
+-- CLRT-24204 fix: look up transaction classes associated with resources so that corresponding values can be obtained from rate matrix
+-- The problem was that values were coming always from the 1st row of the rate matrix, but they need to be from the row for associated Tx class.
+-- Added SR.IS_ACTIVE = 1 as trans class should be null for inactive resource.
+    -- When team member is a named Resource
+    IF ( vTransClass IS NULL and ( cResource_Code IS NOT NULL AND cResource_Code &lt;&gt; '[N/A]' ) and cResourceIsRole &lt;&gt; 1 ) THEN
+  BEGIN
+    SELECT pr.TRANSCLASS INTO vTransClass
+    FROM PAC_MNT_RESOURCES PR, SRM_RESOURCES SR
+    WHERE PR.ID=SR.ID
+    and sr.unique_name=cResource_Code;
+	EXCEPTION
+	WHEN OTHERS THEN
+		 NULL;
+	END;
+   -- When team member is a Role
+   ELSIF ( vTransClass IS NULL AND (cRole IS NOT NULL AND cRole &lt;&gt; '[N/A]') ) THEN
+    BEGIN
+      SELECT pr.TRANSCLASS INTO vTransClass
+      FROM PAC_MNT_RESOURCES PR, SRM_RESOURCES SR
+      WHERE PR.ID=SR.ID and sr.unique_name=cRole;
+    EXCEPTION
+    WHEN OTHERS THEN
+       NULL;
+    END;
+	END IF;
+
+-- for CLRT-24204 fix
+        vTransClass := NVL(vTransClass,'[N/A]');
+
+  -- As of Clarity V 13.1, the only defaulting for Labor transaction rate source happens from 
+  -- investment entity's Labor source location ( 'Project'/'Resource'/null ) and in case of null,
+  -- project Transaction Entry defaults (nameoptions table)
+     IF cTransType = 'L' THEN
+       SELECT
+          NVL( ( SELECT TRANS_LOCATION_LABOR FROM ENTITY WHERE ENTITY = cEntity ), TRANSRATELOCLBR )
+          INTO iLocSource
+          FROM NAMEOPTIONS;
+     ELSIF cTransType ='M' THEN
+        SELECT
+          NVL( ( SELECT TRANS_LOCATION_MATERIAL FROM ENTITY WHERE ENTITY = cEntity ), TRANSRATELOCMTL )
+          INTO iLocSource
+          FROM NAMEOPTIONS;
+     ELSIF cTransType ='Q' THEN
+        SELECT
+          NVL( ( SELECT TRANS_LOCATION_EQUIPMENT FROM ENTITY WHERE ENTITY = cEntity ), TRANSRATELOCEQUIP )
+          INTO iLocSource
+          FROM NAMEOPTIONS;
+     ELSIF cTransType ='X' THEN
+        SELECT
+          NVL( ( SELECT TRANS_LOCATION_EXPENSE FROM ENTITY WHERE ENTITY = cEntity ), TRANSRATELOCEXPENSE )
+          INTO iLocSource
+          FROM NAMEOPTIONS;
+      END IF;
+
+      
+  /* If the team member is a role - if it is a labor role and it has the Loc/Dept Staff OBS Unit then 
+   * take that unit as either loc or dept, otherwise default values to investment's loc/dept (or N/A if 
+   * investment values are NULL). This is applicable regardless of status of role, i.e., 
+   * active/inactive/FinActive/FinInative
+   *
+   * If it's a resource - if the source location is 'investment', default location and department to
+   * investment loc and dept. Otherwise, if the source location is 'resource' and
+   *   - and resource is of  type 'labor'
+   *   - and resource is active 
+   *   - and resource is fin active
+   * then set department and location to resource's department and location
+   */
+   -- apply defaulting only when source is set to either 'resource' or 'investment'
+   IF(iLocSource = 4 OR iLocSource = 2) THEN
+   BEGIN 
+      -- start with defaulting to investment's location and department if - for both roles and resources
+      cRateLocation   := cProjLocation;
+      cRateDepartCode := cProjDepartCode;
+      
+      IF (cResourceIsRole = 1) THEN  -- it's a role
+      BEGIN
+         IF (iLocSource = 4 AND nTeamId IS NOT NULL AND nTeamId &lt;&gt; 0 ) THEN
+         BEGIN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+            
+            SELECT dept.departcode, loc.locationid
+            INTO  cObsDeptUnitCode, cObsLocUnitCode 
+            FROM prteam team
+                 LEFT OUTER JOIN departments dept ON team.RSF_OBSUNIT_ID = dept.OBS_UNIT_ID
+                 LEFT OUTER JOIN locations loc ON team.RSF_OBSUNIT_ID = loc.OBS_UNIT_ID
+            WHERE team.prid = nTeamId;
+
+            -- read dept or loc from staff obs unit, only if the corresponding staff obs unit is not null
+            IF (cObsDeptUnitCode IS NOT NULL) THEN
+               cRateDepartCode := cObsDeptUnitCode;
+            ELSIF (cObsLocUnitCode IS NOT NULL) THEN
+               cRateLocation   := cObsLocUnitCode;
+            END IF;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+               StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+               StoO_rowcnt := 0;
+               StoO_selcnt := 0;
+            WHEN OTHERS THEN
+               StoO_rowcnt := 0;
+               StoO_selcnt := 0;
+               StoO_error := SQLCODE;
+               StoO_errmsg := SQLERRM;
+         END;
+         END IF;
+      END;
+      ELSE  -- it's a resource
+      BEGIN
+         IF (iLocSource = 4) THEN
+         BEGIN
+             -- read resource's properties, if it's NULL then default to project's 
+             -- cResourceLocation/cResourceDepartment : read above from PAC_MNT_RESOURCES or NAMEOPTIONS
+             cRateLocation   := NVL(cResourceLocation,cProjLocation);
+             cRateDepartCode := NVL(cResourceDepartment,cProjDepartCode) ;
+         END;
+         END IF;
+      END;
+      END IF;
+   END;
+   END IF;
+  
+   -- Fix for CLRT-60210 - When Entity source location is to resource and resource is not fin enabled cost plan group by resource/transaction class/loc/dept does not give correct results.
+   cRateLocation := NVL(cRateLocation,'[N/A]');
+   cRateDepartCode := NVL(cRateDepartCode,'[N/A]');     
+
+-- In case resource is a role we should make resource '[N/A]'
+  IF cResourceIsRole = 1 THEN
+    cResource := '[N/A]';
+  END IF; 
+
+    BEGIN
+      BEGIN
+
+/*
+Start DEBUG LOGGING
+*/
+
+/* Remove this
+
+insert into TEMP_MATRIX_LOGS values (sysdate,'cTransDate='||cTransDate||',cEntity='||cEntity||',cLocationID='||cRateLocation||',cDepartCode='||cRateDepartCode||
+                                    ',cClient='||cClient||',cProject='||cProject||',cCharge_Code='||cCharge_Code||',cCost_type='||cCost_type||
+                                    ',cInput_Type='||vInput_Type||',cResource_Code='||cResource||',cClientClass='||cClientClass||',cProjClass='||cProjClass||
+                                    ',cResource_Class='||cResource_Class||',cWipClass='||cWipClass||',cRole='||cRole||',cTransType='||cTransType||',cTransClass='||vTransClass
+                                     );
+commit;
+
+
+-- till here ----------- */
+
+/*
+End DEBUG LOGGING
+*/
+
+        /* get rate matrix */
+        Ppa_Getmatrixmatch(iMatrixID=&gt;iRateSource,
+          bSuppressResultSet=&gt;1,
+          bReturnAllMatches=&gt;0,
+          nNumVal1=&gt;nRate,
+          nNumVal2=&gt;nStdCost,
+          nNumVal3=&gt;nCost,
+          cStrVal1=&gt;cCostPlusCode,
+          iBestMatchRowID=&gt;iRateMatchRow,
+          cTransDate=&gt;cTransDate,
+          cEntity=&gt;cEntity,
+          cLocationID=&gt;cRateLocation,
+          cDepartCode=&gt;cRateDepartCode,
+          cClient=&gt;v_cClient,
+          cProject=&gt;cProject,
+          cCharge_Code=&gt;cCharge_Code,
+          cInput_Type=&gt;vInput_Type,
+          cResource_Code=&gt;cResource,
+          cClientClass=&gt;cClientClass,
+          cProjClass=&gt;cProjClass,
+--          cCostClass=&gt;cCostClass,
+          cResource_Class=&gt;cResource_Class,
+          cWipClass=&gt;cWipClass,
+          cRole=&gt;cRole,
+          cTransType=&gt;cTransType,
+          cCurrencyCode=&gt;currencyCodeReturned,
+-- for CLRT-24204 fix: get rate values corresponding to resource's transaction class
+--cTransClass=&gt;cTransClass,
+          cTransClass=&gt;vTransClass,
+          RC1=&gt;P_RC,
+		  cCost_type=&gt;cCost_type);
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+      END;
+
+      IF iRateMatchRow &lt;&gt; 0 THEN
+        bRateFound := 1;
+      ELSE
+        nRate := NULL;
+      END IF;
+    END;
+	
+    BEGIN
+      IF iRateSource = iCostSource THEN
+      BEGIN
+        bCostFound := bRateFound;
+        iCostMatchRow := iRateMatchRow;
+        /* if cost and rate are selected from same matrix */
+        costCurrencyCode := currencyCodeReturned;
+        cStdCostCurrency := costCurrencyCode;
+      END;
+      ELSE
+      BEGIN
+        BEGIN
+          /* get cost currency code if required */
+          Ppa_Getmatrixmatch(
+            iMatrixID=&gt;iCostSource,
+            bSuppressResultSet=&gt;1,
+            bReturnAllMatches=&gt;0,
+            NNUMVAL1=&gt;P_TEMP1,
+            nNumVal2=&gt;nStdCost,
+            nNumVal3=&gt;nCost,
+            CSTRVAL1=&gt;P_TEMP2,
+            iBestMatchRowID=&gt;iCostMatchRow,
+            cTransDate=&gt;cTransDate,
+            cEntity=&gt;cEntity,
+            cLocationID=&gt;cRateLocation,
+            cDepartCode=&gt;cRateDepartCode,
+            cClient=&gt;v_cClient,
+            cProject=&gt;cProject,
+            cCharge_Code=&gt;cCharge_Code,
+            cInput_Type=&gt;vInput_Type,
+            cResource_Code=&gt;cResource,
+            cClientClass=&gt;cClientClass,
+            cProjClass=&gt;cProjClass,
+--            cCostClass=&gt;cCostClass,
+            cResource_Class=&gt;cResource_Class,
+            cWipClass=&gt;cWipClass,
+            cRole=&gt;cRole,
+            cTransType=&gt;cTransType,
+            cCurrencyCode=&gt;costCurrencyCode,
+-- for CLRT-24204 fix: get cost values corresponding to resource's transaction class
+            --cTransClass=&gt;cTransClass,
+            cTransClass=&gt;vTransClass,
+            RC1=&gt;P_RC,
+		  cCost_type=&gt;cCost_type);
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+          END;
+          IF iCostMatchRow &lt;&gt; 0 THEN
+            bCostFound := 1;
+            cStdCostCurrency := costCurrencyCode;
+          ELSE
+            nCost := NULL;
+          END IF;
+        END;
+      END IF;
+    END;
+--    END IF;
+
+    IF ( iRateSource &lt;&gt; BUDGETSOURCE OR bBudgeted = 0 OR cTransType = 'X') AND
+       (( bCostOverride &lt;&gt; 0) OR ((bUseCostPlus &lt;&gt; 0
+	   --AND TRIM(cCostRuleCode) IS NOT NULL
+	   )))
+    THEN
+    BEGIN
+	  nStdCost := NVL(nStdCost, 0);
+      IF bCostOverride &lt;&gt; 0 THEN
+      BEGIN
+        IF nStdCost = 0 THEN
+          nStdCost := nActualCost;
+          cStdCostCurrency := cActualCostCurrency;
+        END IF;
+        IF NVL(nActualCost, 0) &lt;&gt; 0 THEN
+          bRateFound := 1;
+        END IF;
+        nCost := nActualCost;
+        costCurrencyCode := cActualCostCurrency;  -- need to keep original currency with original cost
+      END;
+      END IF;
+      
+      IF ((bUseCostPlus = 1) AND cCostPlusCode IS NOT NULL) THEN
+      BEGIN
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+
+          SELECT applytoactualstdcost
+            INTO cApplyTo FROM COSTPLUS
+           WHERE costpluscode = cCostPlusCode;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        currencyCodeReturned := costCurrencyCode;  -- use cost currency if rate = cost or stdcost
+      END;
+      ELSE
+        IF (bCostOverride &lt;&gt; 0 AND (( iAllowOverride = 1) OR (bRateFound = 0 OR NVL(nRate, 0) = 0))) THEN
+          BEGIN
+            nRate := nCost;
+            currencyCodeReturned := costCurrencyCode;  -- use cost currency if rate = cost
+          END;
+        END IF;
+        END IF;
+      END;
+      END IF;
+
+      BEGIN
+    dTransDate := TO_DATE(RTRIM(cTransDate), 'mm/dd/yyyy');
+    IF nActualCost IS NOT NULL THEN
+			BEGIN
+				nCost := nActualCost;
+        costCurrencyCode := cActualCostCurrency;  -- need to keep original currency with original cost'
+			END;
+		END IF;
+
+      IF cStdCostCurrency &lt;&gt; costCurrencyCode THEN
+        BEGIN
+          BEGIN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+
+            SELECT DECODE(cTransType,
+                            'L', P.LABOR_EXCHANGE_RATE_TYPE,
+                            'X', P.EXPENSE_EXCHANGE_RATE_TYPE,
+                            'M', P.MATERIALS_EXCHANGE_RATE_TYPE,
+                            'Q', P.EQUIPMENT_EXCHANGE_RATE_TYPE,
+                             P.LABOR_EXCHANGE_RATE_TYPE)
+              INTO V_EXCHANGE_RATE_TYPE
+              FROM PAC_MNT_PROJECTS P
+             WHERE P.PROJECT_CODE = cProject;
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+                WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+          END;
+
+          IF V_EXCHANGE_RATE_TYPE IS NULL THEN
+            BEGIN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+
+              SELECT DECODE(cTransType,
+                            'L', NVL(cResourceExchangeTypeLabor, LABOR_EXCHANGE_RATE_TYPE),
+                            'X', NVL(cResourceExchangeTypeExpense, EXPENSE_EXCHANGE_RATE_TYPE),
+                            'M', NVL(cResourceExchangeTypeMaterials, MATERIALS_EXCHANGE_RATE_TYPE),
+                            'Q', NVL(cResourceExchangeTypeEquipment, EQUIPMENT_EXCHANGE_RATE_TYPE),
+                                 NVL(cResourceExchangeTypeLabor, LABOR_EXCHANGE_RATE_TYPE))
+                INTO V_EXCHANGE_RATE_TYPE
+                FROM NAMEOPTIONS;
+
+                StoO_rowcnt := SQL%ROWCOUNT;
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    StoO_error := SQLCODE;
+                    StoO_errmsg := SQLERRM;
+                  WHEN OTHERS THEN
+                    StoO_error := SQLCODE;
+                    StoO_errmsg := SQLERRM;
+            END;
+          END IF;
+
+
+
+          SELECT CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                      dTransDate,
+                      cStdCostCurrency,
+                      costCurrencyCode,
+                      nStdCost,
+                      NVL(V_EXCHANGE_RATE_TYPE, 'AVERAGE'))
+            INTO nStdCost
+            FROM DUAL;
+        END;
+      END IF;
+
+      /* calculate markups */
+        Ppa_Computemarkup(bUseCostPlus,
+          cCostPlusCode,
+          cCharge_Code,
+          vInput_Type,
+          cTransType,
+          nCost,
+          nQuantity,
+          nStdCost,
+          nRate,
+          nAmount,
+          nFactorAmt,
+          nBurdenAmt,
+          nOverheadAmt,
+          --cCostRuleCode,
+          currencyCodeReturned,
+          costCurrencyCode,
+          dTransDate,
+          cProject,
+          cSystemCurrency
+        );
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF bAsResultSet != 0 THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        OPEN RC1 FOR
+        SELECT nAmount "Amount", nRate "Rate", nCost "Cost", nStdCost "StdCost", nFactorAmt "FactorAmt", nBurdenAmt "BurdenAmt", nOverheadAmt "OverheadAmt", iRateMatchRow "RateMatchRow", iCostMatchRow "CostMatchRow", cCostPlusCode "CostPlusCode",
+		bRateFound "RateFound",currencyCodeReturned "cRateCurrencyCode", costCurrencyCode "cCostCurrencyCode", cResourceExchangeType "resourceExchangeType"
+        FROM DUAL;
+      END IF;
+END Ppa_Getrate_WithRole;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

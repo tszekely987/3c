@@ -1,0 +1,37 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RDM_PICKLIST_V">
+    <indexes/>
+    <text_length>1820</text_length>
+    <text>SELECT plc.object_code || pld.id || l.lookup_code AS picklist_key,
+       plc.id AS picklist_context_key,
+       plc.object_code AS object_code_key,
+      (SELECT nls.name
+              FROM cmn_captions_nls nls
+              WHERE nls.table_name = 'ODF_OBJECTS' AND nls.pk_id = o.id AND nls.language_code = lang.language_code) AS object_code,
+       plc.is_active,
+       pld.id AS picklist_def_key,
+       pld.name AS picklist,
+       lt.id AS lookup_type_key,
+      (SELECT cmn_captions_nls.name
+              FROM cmn_captions_nls
+              WHERE cmn_captions_nls.table_name = 'CMN_LOOKUP_TYPES' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = lt.id) AS lookup_type,
+       l.lookup_code AS lookup_code_key,
+      (SELECT cmn_captions_nls.name
+              FROM cmn_captions_nls
+              WHERE cmn_captions_nls.table_name = 'CMN_LOOKUPS' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = l.id) AS lookup_code,
+       lang.language_code_key,
+       lang.language_code,
+       GREATEST(plc.last_updated_date, pld.last_updated_date, l.last_updated_date) AS clarity_updated_date,
+       GREATEST(plc.created_date, pld.created_date, l.created_date) AS clarity_created_date
+FROM   odf_picklist_contexts plc
+       INNER JOIN (SELECT l_1.id AS language_code_key,
+                          l_1.language_code
+                   FROM   cmn_languages l_1
+                   WHERE  l_1.is_dw_enabled = 1) lang ON 1 = 1
+       INNER JOIN odf_objects o ON plc.object_code = o.code
+       INNER JOIN odf_picklist_defs pld ON plc.id = pld.context_id
+       INNER JOIN cmn_lookup_types lt ON pld.lookup_type = lt.lookup_type
+       INNER JOIN cmn_lookups l ON lt.lookup_type = l.lookup_type
+WHERE  plc.object_code IN ('rdm_roadmap_item','rdm_roadmap')</text>
+  </QueryResult>
+</ClarityDBViewQuery>

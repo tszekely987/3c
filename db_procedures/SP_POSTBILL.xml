@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_POSTBILL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_POSTBILL" (
+  COMPANY_CODE  VARCHAR2 ,
+  MASTER_PROJECT_CODE   VARCHAR2 ,
+  billdate  DATE ,
+  in_amount   IN NUMBER ,
+  invoiceno   VARCHAR2 ,
+  notes   VARCHAR2 ,
+  LASTUPDTDBY_RESOURCE_CODE   VARCHAR2 ,
+  emplevel  NUMBER ,
+  costlevel   NUMBER ,
+  changeorder   VARCHAR2  DEFAULT NULL ,
+  billingScheduleKey NUMBER )
+AS
+  amount  NUMBER(32,6);
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  projecttype   GLOBALPKG.STRING;
+  transtype   GLOBALPKG.STRING;
+  PROJECT_CODE  GLOBALPKG.STRING;
+  empval  GLOBALPKG.STRING;
+  costval   GLOBALPKG.STRING;
+  cklevel5  GLOBALPKG.STRING;
+  iBatchNo  NUMBER;
+  iNewTransNo   NUMBER;
+  v_atf 		 NUMBER(1);
+  /*** variables for multi currency changes ***/
+  projectId pac_mnt_projects.ID%TYPE;
+  laborExchRateType pac_mnt_projects.labor_exchange_rate_type%TYPE;
+  materialsExchRateType pac_mnt_projects.materials_exchange_rate_type%TYPE;
+  expenseExchRateType pac_mnt_projects.expense_exchange_rate_type%TYPE;
+  equipmentExchRateType pac_mnt_projects.equipment_exchange_rate_type%TYPE;
+  billingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  exr CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  currencyType VARCHAR2(30);
+  fromCurrency VARCHAR2(30);
+  toCurrency VARCHAR2(30);
+  exchangeRateId NUMBER;
+  exchangeRate NUMBER(32,6);
+  convertedAmount NUMBER(32,6);
+  exchangeRateType VARCHAR2(30);
+  masterTransNo NUMBER;
+  wip_class		pac_mnt_projects.wipclass%TYPE;
+  investment_class		pac_mnt_projects.class%TYPE;
+  location_id			pac_mnt_projects.locationid%TYPE;
+  depart_code			pac_mnt_projects.departcode%TYPE;
+  
+  /* LB 07/30/96  PTR #5158 Added WITH RECOMPILE */
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_postbill.amount := sp_postbill.in_amount;
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM billingschedule
+		WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+		 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+		 and NVL(changeorder, ' ') = NVL(sp_postbill.changeorder, ' ')
+		 and billdate = sp_postbill.billdate
+		 and billed = 1
+		 and billingschedulekey = sp_postbill.billingScheduleKey );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		raise_application_error(-20400, 'Scheduled bill has already been approved by another user.');
+		RETURN ;
+	END;
+	END IF;
+	sp_postbill.amount :=  ROUND(sp_postbill.amount, 2);
+/* LB  01/08/97 PTR 8410 */
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   type_,  PROJECT_CODE
+    INTO sp_postbill.projecttype, sp_postbill.PROJECT_CODE FROM pac_mnt_projects
+		WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+		 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+     and NVL(pac_mnt_projects.changeorder, ' ') = NVL(sp_postbill.changeorder, ' ');
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+		INTO sp_postbill.empval FROM default_costkey_values
+		WHERE costkey_level = 4;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+		INTO sp_postbill.costval FROM default_costkey_values
+		WHERE costkey_level = 3;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	BEGIN
+	commit;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE NOT EXISTS (
+		SELECT  1
+     FROM pac_mnt_resources
+		WHERE RESOURCE_CODE = sp_postbill.empval );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		raise_application_error(-20401, 'The value in the Default Value field in the Cost Key Definition page is missing or invalid.');
+		RETURN ;
+	END;
+	END IF;
+	END;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE NOT EXISTS (
+		SELECT  1
+     FROM prchargecode
+    WHERE prexternalid = sp_postbill.costval );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		raise_application_error(-20401, 'The value in the Default Value field in the Cost Key Definition page is missing or invalid.');
+		RETURN ;
+	END;
+	END IF;
+	END;
+
+ --validate to make sure there is department, location
+  --wipclass and investmentclass
+  SELECT WIPCLASS, CLASS, locationid, departcode
+  into wip_class, investment_class, location_id, depart_code
+   FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE;
+
+  IF location_id is null OR depart_code IS NULL THEN
+    BEGIN
+      raise_application_error(-20822, 'Project has invalid location/department.');
+      RETURN;
+    END;
+  END IF;
+
+  IF wip_class IS NULL THEN
+    BEGIN
+      raise_application_error(-20822, 'Project has no wip class.');
+      RETURN;
+    END;
+  END IF;
+
+  IF investment_class IS NULL THEN
+    BEGIN
+      raise_application_error(-20035, 'Project has no investment class.');
+      RETURN;
+    END;
+  END IF;
+
+  sp_postbill.transtype :=  'B' || RTRIM(sp_postbill.projecttype);
+	SAVEPOINT tran1;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)SELECT S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, sp_postbill.LASTUPDTDBY_RESOURCE_CODE, 'TB', 'Approve
+		   BP/BR'
+		FROM DUAL
+		;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		raise_application_error(-20404, 'Error inserting into ppa_PostingBatch');
+		RETURN ;
+	END;
+	END IF;
+
+	SELECT S_307_1_PPA_POSTINGBATCH.currval INTO sp_postbill.iBatchNo FROM dual;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+       INSERT INTO ppa_TransBill (TRANSNO, SourceModule, TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE, BillingDate, ApplyTo, InvoiceNo, Notes, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, ENTRY_RESOURCE_CODE, EntryDate, Quantity, BatchNo, ApplyToTransType)
+		   VALUES (S_395_1_PPA_TRANSBILL.nextval, 9, sp_postbill.transtype, sp_postbill.COMPANY_CODE, sp_postbill.MASTER_PROJECT_CODE,
+		   sp_postbill.costval, sp_postbill.empval,
+		   sp_postbill.billdate, 0, sp_postbill.invoiceno,
+		   decode(sp_postbill.notes,'NULL',' ',sp_postbill.notes), sp_postbill.LASTUPDTDBY_RESOURCE_CODE, SYSDATE, sp_postbill.LASTUPDTDBY_RESOURCE_CODE,
+		   SYSDATE, 1, sp_postbill.iBatchNo, sp_postbill.transtype);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		raise_application_error(-20405, 'Error inserting into ppa_TransBill');
+		RETURN ;
+	END;
+	END IF;
+        SELECT S_395_1_PPA_TRANSBILL.currval INTO sp_postbill.iNewTransNo  FROM dual;
+        masterTransNo := sp_postbill.iNewTransNo;
+
+	/*** MultiCurrency Changes - Insert into values table ppa_transbill_values. ***/
+	BEGIN
+
+       	--- get the exchange rate types ---
+		SELECT id, billing_currency_code,labor_exchange_rate_type, materials_exchange_rate_type, equipment_exchange_rate_type, expense_exchange_rate_type
+		INTO projectId, billingCurrencyCode, laborExchRateType, materialsExchRateType, equipmentExchRateType, expenseExchRateType
+		FROM pac_mnt_projects
+		WHERE pac_mnt_projects.project_code = sp_postbill.project_code;
+	END;
+
+	--- If it is a Contract or Retainer Project use LABOR exchange rate type.---
+	IF ( (sp_postbill.projecttype = 'P') OR (sp_postbill.projecttype = 'R') ) THEN
+		BEGIN
+		   exchangeRateType := laborExchRateType;
+		END;
+	END IF;
+
+	--- get the amount in differnt currency ---:
+		exr :=CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(sp_postbill.projectId, sp_postbill.billdate, sp_postbill.billingCurrencyCode,sp_postbill.amount,sp_postbill.exchangeRateType);
+	--- insert into ppa_transbill_values ---
+	BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			FOR i in 1  .. exr.count
+			LOOP
+				currencyType := exr(i).currencyType;
+		    	fromCurrency := exr(i).fromCurrencyCode;
+				toCurrency := exr(i).toCurrencyCode;
+		    	ConvertedAmount := NVL(exr(i).convertedAmount,0);
+		    	exchangeRateId := exr(i).exchangeRateId;
+		    	exchangeRate := NVL(exr(i).exchangeRate,0);
+				BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					INSERT INTO ppa_TransBill_values
+					  (id, transno, exchange_id, amount, billrate, currency_code, currency_type, exchange_rate)
+                    VALUES (ppa_transbill_values_S1.nextval, masterTransNo, exchangeRateId, NVL(convertedAmount,0), NVL(convertedAmount,0), toCurrency, currencyType, exchangeRate);
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				 END;
+			END LOOP;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		raise_application_error(-20405, 'Error inserting into ppa_TransBill_values');
+		RETURN ;
+	END;
+	END IF;
+	/***/
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_TransBill
+	SET ApplyTo = TransNo
+	WHERE TransNo = sp_postbill.iNewTransNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		raise_application_error(-20406, 'Error updating ppa_TransBill');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE billingschedule
+	SET billed = 1
+	WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+	 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+	 and NVL(changeorder, ' ') = NVL(sp_postbill.changeorder, ' ')
+	 and billdate = sp_postbill.billdate
+	 and billingschedulekey = sp_postbill.billingScheduleKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	SELECT atf into v_atf from billingschedule
+
+	WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+	 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+	 and NVL(changeorder, ' ') = NVL(sp_postbill.changeorder, ' ')
+	 and billdate = sp_postbill.billdate
+	 and billingschedulekey = sp_postbill.billingScheduleKey;
+
+	IF ( v_atf = 1 ) THEN
+	BEGIN
+	   UPDATE billingschedule
+	   SET billed = 1
+	   	WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+			 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+			 and NVL(changeorder, ' ') = NVL(sp_postbill.changeorder, ' ')
+			 and billdate = sp_postbill.billdate
+	 		 and billingschedulekey = sp_postbill.billingScheduleKey;
+			 StoO_rowcnt := SQL%ROWCOUNT;
+			 EXCEPTION
+			 	WHEN NO_DATA_FOUND THEN
+					 NULL;
+				WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	ELSE
+	BEGIN
+	   UPDATE billingschedule
+	   SET billed = 1, INVOICENO = sp_postbill.invoiceno
+	   	WHERE COMPANY_CODE = sp_postbill.COMPANY_CODE
+			 and MASTER_PROJECT_CODE = sp_postbill.MASTER_PROJECT_CODE
+			 and NVL(changeorder, ' ') = NVL(sp_postbill.changeorder, ' ')
+			 and billdate = sp_postbill.billdate
+	 		 and billingschedulekey = sp_postbill.billingScheduleKey;
+			 EXCEPTION
+			 	WHEN NO_DATA_FOUND THEN
+					 NULL;
+				WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	END IF;
+	END;
+
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT tran1;
+	END IF;
+END sp_postbill;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

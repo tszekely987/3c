@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="CSK_RPT_PORTFOLIO_MANAGER" displayAttributeName="resource_name" hiddenAttributeName="resource_key" objectCode="" sortAttributeName="resource_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Report (Portfolio Managers)" languageCode="en" name="Report (Portfolio Managers)"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT @SELECT:r.user_id:resource_key@,
+       @SELECT:r.unique_name:resource_id@,
+       @SELECT:r.full_name:resource_name@            
+FROM   odf_multi_valued_lookups l
+       INNER JOIN pfm_portfolios p ON l.pk_id = p.id
+       INNER JOIN srm_resources r ON @DBUSER@.cmn_to_number_fct(l.value) = r.user_id
+WHERE  l.object = 'pfm_portfolio'
+AND    l.attribute = 'owner'
+AND   (EXISTS (SELECT user_id
+               FROM   cmn_sec_assgnd_obj_perm_r_v
+               WHERE  object_type = 'RECORD'
+               AND    object_code = 'PRJ_RESOURCE'
+               AND    permission_code = 'ResourceViewManagement'
+               AND    component_code = 'PRJ' 
+               AND    user_id = @WHERE:PARAM:USER_ID@
+               UNION ALL
+               SELECT object_instance_id
+               FROM   cmn_sec_assgnd_obj_perm_v
+               WHERE  object_instance_id = r.id
+               AND    object_type = 'RECORD'
+               AND    object_code = 'PRJ_RESOURCE'
+               AND    permission_code = 'ResourceViewManagement'
+               AND    component_code = 'PRJ'
+               AND    user_id = @WHERE:PARAM:USER_ID@))
+AND    @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="resource_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="resource_name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Portfolio Manager"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Portfolio Managers"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="resource_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Resource Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="resource_key" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Resource Key"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="resource_id" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Resource ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="resource_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Resource Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

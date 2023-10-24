@@ -1,0 +1,1174 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.programCostDashboard" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Program Manager Cost Dashboard" languageCode="en" name="Program Manager Cost Dashboard"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT                                                        
+       @select:dim:user_def:implied:project:Project.odf_pk:project_int_id@,
+       @select:dim_prop:user_def:implied:project:Project.name:project_name@,
+       @select:dim_prop:user_def:implied:project:@UPPER@(Project.odf_object_code):investment_type_upper@,
+       @select:dim_prop:user_def:implied:project:r.user_id:proj_manager_int_id@, 
+       @select:dim_prop:user_def:implied:project:r.full_name:project_manager@,
+       @select:metric:user_def:implied:@NVL@(Project.planned_roi,0)*100:roi@,
+       @select:dim_prop:user_def:implied:project:Project.risk_score:risk@,
+       @select:dim_prop:user_def:implied:project:stage.name:stage_name@,
+       @select:dim_prop:user_def:implied:project:Project.schedule_start:start_date@,
+       @select:dim_prop:user_def:implied:project:@DBUSER@.cop_calc_finish_time_fct(Project.schedule_finish):finish_date@,
+       @select:metric:user_def:implied:Project.ev_bac:baseline_cost@,
+       @select:metric:user_def:implied:@NVL@(Project.ev_acwp,0) + @NVL@(Project.ev_etc,0):eac_cost@,
+       @select:metric:user_def:implied:Project.obj_cost_amt_var:cv_percent@, /* Projected Cost Variance Amount */
+       @select:metric:user_def:implied:Project.obj_cost_pct_var:cv_percent_sl@, /* Projected Cost Variance Percent */
+       @select:metric:user_def:implied:@NVL@(Program.budget_cst_total,0):program_budget_cost@,
+       /* NEW ATTRIBUTES V13 */
+       @select:metric:user_def:implied:@NVL@(Project.Planned_Irr,0)*100:Planned_Irr@,
+       @select:metric:user_def:implied:@NVL@(Project.Planned_mIrr,0)*100:Planned_mIrr@,
+       @select:metric:user_def:implied:@NVL@(Project.Planned_Payback_period,0):Planned_Payback_period@,
+       @select:metric:user_def:implied:@NVL@(Project.Planned_Cst_Total,0):Planned_Cst_Total@,
+       @select:metric:user_def:implied:@NVL@(Project.Planned_Ben_Total,0):Planned_Ben_Total@,
+       @select:metric:user_def:implied:@NVL@(Project.planned_cst_capital_total,0):planned_cst_capital_total@,
+       @select:metric:user_def:implied:@NVL@(Project.planned_cst_capital_pct,0):planned_cst_capital_pct@,	   
+	   @select:metric:user_def:implied:@NVL@(Project.planned_cst_operating_total,0):planned_cst_operating_total@,
+       @select:metric:user_def:implied:@NVL@(Project.planned_cst_operating_pct,0):planned_cst_operating_pct@,		   
+       @select:metric:user_def:implied:@NVL@(Project.Planned_NPV,0):Planned_NPV@,
+       @select:metric:user_def:implied:@DBUSER@.cop_calc_finish_time_fct(Project.Planned_Breakeven):Planned_Breakeven@,
+       @select:metric:user_def:implied:@NVL@(Project.etc,0):ETC_QTY@,
+       @select:metric:user_def:implied:@NVL@(Project.ev_etc,0):ETC_COST@,
+       @select:metric:user_def:implied:Project.baseline_usage:Base_Qty@,
+       @select:metric:user_def:implied:@NVL@(Project.actuals,0):Act_Qty@,
+       @select:metric:user_def:implied:@NVL@(Project.ev_acwp,0):Act_Cost_ACWP@,
+       @select:metric:user_def:implied:@NVL@(Project.labor_effort,0):EAC_QTY@,
+       @select:metric:user_def:implied:Project.obj_effort_amt_var:projected_effort_var@, /* Projected Effort Variance Amount */
+       @select:metric:user_def:implied:Project.obj_effort_var:projected_effort_var_pct_sl@, /* Projected Effort Variance Percent */
+       @select:metric:user_def:implied:@NVL@(Project.ev_BCWS,0):Planned_Value_BCWS@,
+       @select:metric:user_def:implied:@NVL@(Project.ev_BCWP,0):Earned_Value_BCWP@,
+       @select:metric:user_def:implied:@NVL@(Project.ev_sv,0):Sched_var_SV@,
+       @select:metric:user_def:implied:@NVL@(Project.obj_ev_sv_pct,0):Sched_var_pct@,
+       @select:metric:user_def:implied:Project.ev_spi:Sched_Perf_SPI@,
+       @select:metric:user_def:implied:Project.ev_cv:Cost_var_CV@,
+       @select:metric:user_def:implied:Project.obj_ev_cv_pct:Cost_var_pct@,
+       @select:metric:user_def:implied:Project.ev_cpi:Cost_perf_CPI@
+FROM   cop_program_v v
+LEFT   OUTER JOIN odf_project_v2 Program
+             ON   Program.odf_pk = v.program_id
+LEFT   OUTER JOIN odf_project_v2 Project
+             ON   Project.odf_pk = v.project_id
+LEFT   OUTER JOIN CMN_LOOKUPS_V stage
+             ON   stage.lookup_code = project.stage_code 
+             AND  stage.lookup_type = 'INV_STAGE_TYPE' 
+             AND  stage.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN SRM_RESOURCES r
+             ON   r.user_id = Project.Manager_id 
+WHERE  1=1
+AND    v.is_program <> 1
+AND    Program.is_active = 1
+AND    Project.is_active = 1
+AND    v.Program_id = @WHERE:PARAM:USER_DEF:INTEGER:PROGRAM@
+AND    @WHERE:SECURITY:PROJECT:v.Project_id@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+            </attribute>
+            <attribute id="proj_manager_int_id" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Project Manager Internal ID" languageCode="en" name="Project Manager Internal ID"/>
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="risk" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Risk Score" languageCode="en" name="Risk Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="34" lo="0" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="68" lo="34" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="68" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="stage_name" required="false">
+              
+              
+              
+              
+              <nls description="Stage" languageCode="en" name="Stage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="roi" required="false">
+              
+              
+              
+              
+              
+              <nls description="Planned ROI" languageCode="en" name="Planned ROI"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_cost" required="false">
+              
+              
+              
+              
+              <nls description="BAC Cost" languageCode="en" name="BAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="eac_cost" required="false">
+              
+              
+              
+              
+              <nls description="EAC Cost" languageCode="en" name="EAC Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cv_percent" required="false">
+              
+              
+              
+              <nls description="Projected Cost Variance" languageCode="en" name="Projected Cost Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cv_percent_sl" required="false">
+              
+              
+              
+              
+              <nls description="Projected Cost Variance %" languageCode="en" name="Projected Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="program_budget_cost" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Program Budget Cost" languageCode="en" name="Program Budget Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_irr" required="false">
+              
+              
+              
+              
+              <nls description="Planned IRR" languageCode="en" name="Planned IRR"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_mirr" required="false">
+              
+              
+              
+              
+              <nls description="Planned MIRR" languageCode="en" name="Planned MIRR"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_payback_period" required="false">
+              
+              
+              
+              
+              
+              <nls description="Planned Payback (Months)" languageCode="en" name="Planned Payback (Months)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_total" required="false">
+              
+              
+              
+              
+              <nls description="Planned Cost" languageCode="en" name="Planned Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_ben_total" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Planned Benefit" languageCode="en" name="Planned Benefit"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_capital_total" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Planned Capital Cost" languageCode="en" name="Planned Capital Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_capital_pct" required="false">
+              
+              <nls description="Planned Capital %" languageCode="en" name="Planned Capital %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_operating_total" required="false">
+              
+              
+              
+              
+              <nls description="Planned Operating Cost" languageCode="en" name="Planned Operating Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cst_operating_pct" required="false">
+              
+              
+              
+              
+              <nls description="Planned Operating %" languageCode="en" name="Planned Operating %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_npv" required="false">
+              
+              
+              
+              
+              <nls description="Planned NPV" languageCode="en" name="Planned NPV"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_breakeven" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Planned Breakeven" languageCode="en" name="Planned Breakeven"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_qty" required="false">
+              
+              
+              
+              
+              <nls description="ETC" languageCode="en" name="ETC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="etc_cost" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="ETC Cost" languageCode="en" name="ETC Cost"/>
+            </attribute>
+            <attribute id="base_qty" required="false">
+              
+              
+              
+              
+              <nls description="BAC" languageCode="en" name="BAC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_qty" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Actuals" languageCode="en" name="Actuals"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_cost_acwp" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Actual Cost (ACWP)" languageCode="en" name="Actual Cost (ACWP)"/>
+              
+            </attribute>
+            <attribute id="eac_qty" required="false">
+              
+              
+              
+              
+              <nls description="EAC" languageCode="en" name="EAC"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="projected_effort_var" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Projected Effort Variance" languageCode="en" name="Projected Effort Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="projected_effort_var_pct_sl" required="false">
+              
+              
+              
+              
+              
+              <nls description="Projected Effort Variance %" languageCode="en" name="Projected Effort Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="planned_value_bcws" required="false">
+              
+              
+              
+              
+              <nls description="Planned Value (BCWS)" languageCode="en" name="Planned Value (BCWS)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="earned_value_bcwp" required="false">
+              
+              
+              
+              
+              
+              
+              <nls description="Earned Value (BCWP)" languageCode="en" name="Earned Value (BCWP)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sched_var_sv" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Variance (SV)" languageCode="en" name="Schedule Variance (SV)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sched_var_pct" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Variance %" languageCode="en" name="Schedule Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sched_perf_spi" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Performance Index (SPI)" languageCode="en" name="Schedule Performance Index (SPI)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost_var_cv" required="false">
+              
+              
+              
+              
+              <nls description="Cost Variance (CV)" languageCode="en" name="Cost Variance (CV)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost_var_pct" required="false">
+              
+              
+              
+              
+              <nls description="Cost Variance %" languageCode="en" name="Cost Variance %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost_perf_cpi" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Cost Performance Index (CPI)" languageCode="en" name="Cost Performance Index (CPI)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_program" lookup="COP_PORTLET_PROGRAMS" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Program Filter" languageCode="en" name="Program Filter"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="copProjectCostsLinkable" code="project.costs">
+                
+                
+                
+                
+                <nls description="Project Costs" languageCode="en" name="Project Costs"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="ProjectID"/>
+              </link>
+              <link action="pma.investmentProperties" code="project.properties">
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_COLUMN_UPDT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_COLUMN_UPDT_SP" (
+  matrixKey          NUMBER,
+  columnKey          NUMBER,
+  in_columnName      VARCHAR2,
+  columnField        VARCHAR2,
+  columnType         NUMBER,
+  userId             NUMBER
+)
+AS
+  columnName         GLOBALPKG.STRING;
+  StoO_selcnt        INTEGER;
+  StoO_error         INTEGER;
+  StoO_rowcnt        INTEGER;
+  StoO_crowcnt       INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg        GLOBALPKG.STRING;
+  StoO_sqlstatus     INTEGER;
+  compareCol         NUMBER(1,0);
+  columnNumber       NUMBER(5,0);
+  prevColumnField    GLOBALPKG.STRING;
+  prevColumnDataType NUMBER(5,0);
+BEGIN
+	PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnName := PAC_MNT_MATRIX_COLUMN_UPDT_SP.in_columnName;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT ColumnNo, FieldName, DataType
+      INTO PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber, PAC_MNT_MATRIX_COLUMN_UPDT_SP.prevColumnField, PAC_MNT_MATRIX_COLUMN_UPDT_SP.prevColumnDataType
+      FROM ppa_MatrixColDef
+     WHERE MatrixColDefKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnKey
+       and MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnType = 7 THEN
+		PAC_MNT_MATRIX_COLUMN_UPDT_SP.compareCol := 0;
+	ELSE
+		PAC_MNT_MATRIX_COLUMN_UPDT_SP.compareCol := 1;
+	END IF;
+
+  PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnName := RTRIM(LTRIM(NVL(RTRIM(PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnName), ' ')));
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE ppa_MatrixColDef
+       SET ColumnName = PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnName,
+           FieldName = PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnField,
+           CompareOp = NVL(PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnType, CompareOp),
+           CompareCol = PAC_MNT_MATRIX_COLUMN_UPDT_SP.compareCol,
+           CREATED_DATE = SYSDATE,
+           CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+           LAST_UPDATED_DATE = SYSDATE,
+           LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+           WHERE MatrixColDefKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnKey
+       and MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  -- when the matrix changes, we need to update for the datamart...
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE ppa_Matrix
+       SET CREATED_DATE = SYSDATE,
+           CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+           LAST_UPDATED_DATE = SYSDATE,
+           LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+     WHERE MATRIXKEY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.prevColumnField != PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnField THEN
+    BEGIN
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 1 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value1 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+          WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 2 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value2 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 3 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value3 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 4 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value4 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 5 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value5 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 6 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value6 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 7 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value7 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 8 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value8 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 9 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value9 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+
+      IF PAC_MNT_MATRIX_COLUMN_UPDT_SP.columnNumber = 10 THEN
+        BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+
+          UPDATE ppa_MatrixValues
+            SET Value10 = NULL,
+            CREATED_DATE = SYSDATE,
+	          CREATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId,
+	          LAST_UPDATED_DATE = SYSDATE,
+            LAST_UPDATED_BY = PAC_MNT_MATRIX_COLUMN_UPDT_SP.userId
+            WHERE MatrixKey = PAC_MNT_MATRIX_COLUMN_UPDT_SP.matrixKey;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+      END IF;
+    END;
+	END IF;
+END PAC_MNT_MATRIX_COLUMN_UPDT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>INT_ASSIGNCREDITMEMONUMBER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."INT_ASSIGNCREDITMEMONUMBER" 
+(
+  cGroupNo  VARCHAR2 ,
+  cUserID   VARCHAR2 ,
+  RC1   IN OUT INT_ASSIGNCREDITMEMONUMBERPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  cClient   GLOBALPKG.STRING;
+  cProject  GLOBALPKG.STRING;
+  cInvoiceDate  GLOBALPKG.STRING;
+  cBillTo   GLOBALPKG.STRING;
+  cCreditMemoNo   GLOBALPKG.STRING;
+  cInvoiceNo  GLOBALPKG.STRING;
+  iPrinted  NUMBER(5,0);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM invoiceheader
+		WHERE invtype = 'C'
+		 AND printed = 1
+		 AND invoiceno = int_AssignCreditMemoNumber.cGroupNo );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   int_AssignCreditMemoNumber.cGroupNo,  invoiceno_applyto,  1
+			INTO int_AssignCreditMemoNumber.cCreditMemoNo, int_AssignCreditMemoNumber.cInvoiceNo, int_AssignCreditMemoNumber.iPrinted FROM invoiceheader
+			WHERE invoiceno = int_AssignCreditMemoNumber.cGroupNo
+			 AND invtype = 'C';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	ELSE
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE printed = 1
+			 AND cmsgroupno = int_AssignCreditMemoNumber.cGroupNo
+			 AND invtype = 'C' );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   invoiceno,  invoiceno,  1
+				INTO int_AssignCreditMemoNumber.cCreditMemoNo, int_AssignCreditMemoNumber.cInvoiceNo, int_AssignCreditMemoNumber.iPrinted FROM invoiceheader
+				WHERE printed = 1
+				 AND cmsgroupno = int_AssignCreditMemoNumber.cGroupNo
+				 AND invtype = 'C';
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   COMPANY_CODE,  RPAD(TO_CHAR(invoicedate,'mm/dd/yyyy'), 10, ' '),  0,
+				  invoiceno_applyto
+				INTO int_AssignCreditMemoNumber.cClient, int_AssignCreditMemoNumber.cInvoiceDate, int_AssignCreditMemoNumber.iPrinted,
+				 int_AssignCreditMemoNumber.cInvoiceNo FROM invoiceheader
+				WHERE invoiceno = int_AssignCreditMemoNumber.cGroupNo
+				 and invtype = 'C';
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MIN(PROJECT_CODE)
+				INTO int_AssignCreditMemoNumber.cProject FROM ppa_Billings
+				WHERE InvoiceNo = int_AssignCreditMemoNumber.cInvoiceNo
+				 AND TransType  IN ('B', 'BR', 'BP', 'BC');
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+			bb_AssignCreditMemoNumber(int_AssignCreditMemoNumber.cClient,
+			 int_AssignCreditMemoNumber.cProject,
+			 int_AssignCreditMemoNumber.cGroupNo,
+			 int_AssignCreditMemoNumber.cUserID,
+			 int_AssignCreditMemoNumber.cInvoiceDate,
+			 int_AssignCreditMemoNumber.cCreditMemoNo,
+			 int_AssignCreditMemoNumber.cBillTo);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	OPEN RC1 FOR
+	SELECT  NVL(int_AssignCreditMemoNumber.cCreditMemoNo, int_AssignCreditMemoNumber.cGroupNo) "CreditMemoNo",  int_AssignCreditMemoNumber.cInvoiceNo "InvoiceNo",  int_AssignCreditMemoNumber.iPrinted "Printed"
+	FROM DUAL;
+END int_AssignCreditMemoNumber;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

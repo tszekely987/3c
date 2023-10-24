@@ -1,0 +1,31 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_PRJ_Q_ALLOC_FTE_V">
+    <indexes/>
+    <text_length>1382</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TEAM_ID,
+       al_s.slice_date QUARTER_START_DATE,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN al_sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE'
+           THEN al_s.slice ELSE 0 END) / c.fte)*100 END,0)) ALLOC_L_PERCENT,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN al_sr.request_name = 'QUARTERLYRESOURCEALLOCCURVE'
+           THEN al_s.slice ELSE 0 END ) / c.fte) END,2)) ALLOC_L_FTE,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN al_sr.request_name = 'QUARTERLYRESOURCEHARDALLOC'
+           THEN al_s.slice ELSE 0 END ) / c.fte)*100 END,0)) HARD_ALLOC_L_PERCENT,
+       MAX(ROUND(CASE WHEN NVL(c.fte,0) = 0 THEN 0 ELSE ((CASE WHEN al_sr.request_name = 'QUARTERLYRESOURCEHARDALLOC'
+           THEN al_s.slice ELSE 0 END ) / c.fte) END,2)) HARD_ALLOC_L_FTE
+FROM   prteam t
+       INNER JOIN srm_resources r ON t.prResourceID = r.id
+       INNER JOIN prj_blb_slices al_s ON t.prID = al_s.prj_object_ID
+       INNER JOIN prj_blb_slicerequests al_sr ON al_s.slice_request_id = al_sr.id
+       INNER JOIN rpt_calendar c ON al_s.slice_date = c.start_date
+WHERE (r.resource_type = 0)
+AND   (al_sr.request_name IN ('QUARTERLYRESOURCEALLOCCURVE','QUARTERLYRESOURCEHARDALLOC'))
+AND   (c.period_type = 'QUARTERLY')
+GROUP BY t.prProjectID, t.prID, al_s.slice_date
+ 
+ 
+ 
+ 
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

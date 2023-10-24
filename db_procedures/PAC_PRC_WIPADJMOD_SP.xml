@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_WIPADJMOD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_WIPADJMOD_SP" 
+(
+  iTransaction             NUMBER,
+  in_cProjId            IN VARCHAR2,
+  in_cCharge_Code       IN VARCHAR2,
+
+  in_cResource_Code     IN VARCHAR2,
+  in_cCostKeyLevel6     IN VARCHAR2,
+  in_cCostKeyLevel7     IN VARCHAR2,
+
+  in_cInput_Type        IN VARCHAR2,
+  bOverrideDate            NUMBER,
+  dXferDate                DATE,
+
+  in_bChargeable        IN NUMBER DEFAULT NULL,
+  in_nUnitQty           IN NUMBER DEFAULT NULL,
+  --in_iHours           IN NUMBER DEFAULT NULL,
+  --in_iMinutes           IN NUMBER DEFAULT NULL,
+  in_nRate              IN NUMBER DEFAULT NULL,
+
+  in_cNotes             IN VARCHAR2 DEFAULT NULL,
+  in_cTransClass        IN VARCHAR2 DEFAULT NULL,
+  in_cMatlVendorCode    IN VARCHAR2 DEFAULT NULL,
+
+  in_cMatlPoNumber      IN VARCHAR2 DEFAULT NULL,
+  in_nActualCost        IN NUMBER DEFAULT NULL,
+  cAdjType                 VARCHAR2,
+
+  cUserId                  VARCHAR2 DEFAULT NULL,
+  in_bCalcNewRate       IN NUMBER DEFAULT NULL,
+  cLanguageCode            VARCHAR2 DEFAULT 'en',
+
+  in_rateCurrency       IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_ActualCostCurrency IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_roleCode           IN VARCHAR2 DEFAULT NULL,
+
+  in_TaskID             IN NUMBER DEFAULT NULL,
+  in_userLov1           IN VARCHAR2 DEFAULT NULL,
+  in_userLov2           IN VARCHAR2 DEFAULT NULL,
+  in_expenseType        IN VARCHAR2 DEFAULT NULL
+
+
+)
+AS
+ cWIPClntCode              Globalpkg.STRING := NULL;
+ cWIPProjId                Globalpkg.STRING := NULL;
+ cWIPCharge_Code           Globalpkg.STRING := NULL;
+ cWIPResource_Code         Globalpkg.STRING := NULL;
+ cTransTypeDesc            Globalpkg.STRING := NULL;
+ cWIPInputType             Globalpkg.STRING;
+ cWIPTransactionClass      Globalpkg.STRING;
+ iTransferStatus           NUMBER := 0;
+ iAdjustXactionNo          NUMBER := 0;
+ iAdjustNumber             NUMBER := 0;
+ cErrorMessage             Globalpkg.STRING := NULL;
+ dWIPTransDate             DATE;
+ v_PROJECT                 Globalpkg.STRING ;
+ v_TRANSTYPE               VARCHAR2(2);
+ StoO_selcnt INTEGER;
+ StoO_error  INTEGER;
+ StoO_rowcnt INTEGER;
+ v_reversedTransaction INTEGER;
+ StoO_errmsg GLOBALPKG.STRING;
+ v_isRole                      NUMBER;
+
+BEGIN
+ /* Check if the Role code is present in the Transaction*/
+  BEGIN
+  SELECT prj.prisrole
+  INTO v_isRole
+  FROM srm_resources s,
+    prj_resources prj
+  WHERE s.ID       = prj.prid
+  AND s.unique_name=in_cResource_Code;
+  IF v_isRole = 1 THEN
+        RAISE_APPLICATION_ERROR( -20901, 'Role is not allowed in Resource ID.' );
+  END IF;
+  END;
+
+
+ /* Get transtype*/
+	BEGIN
+		SELECT transtype
+      INTO v_TRANSTYPE
+      FROM TRANSCLASS
+     WHERE TRANSCLASS = in_cTransClass;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction class.' );
+      WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction Class.' );
+	END;
+
+  /*  VALIDATE TASK ======================================== */
+	BEGIN
+		StoO_selcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			FROM PRTASK PRT,PAC_MNT_PROJECTS INV
+			WHERE PRID = in_taskID
+			AND PRT.PRPROJECTID = INV.ID
+			AND INV.PROJECT_CODE = in_cProjId);
+		EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				RAISE_APPLICATION_ERROR(-20102, 'Invalid Task Entered.' );
+			WHEN OTHERS THEN
+				RAISE_APPLICATION_ERROR(-20103, 'Internal Server Error : Invalid Task.' );
+
+		IF StoO_selcnt = 0 THEN
+        RAISE_APPLICATION_ERROR( -20102, 'Invalid Task Entered' );
+    END IF;
+	END;
+
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	v_reversedTransaction := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		select 1 from PPA_TRANSWIPADJUST WHERE applyto = iTransaction and ADJTYPE ='M' and TRANSTYPE='A');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	select count(1) into v_reversedTransaction from ppa_wip 
+	where transno = iTransaction and status = 2;
+	IF v_reversedTransaction = 1 THEN
+    BEGIN
+      raise_application_error(-20114, 'A reveresed transaction can not be adjusted');
+      RETURN;
+    END;
+	END IF;
+
+	IF StoO_selcnt != 1 THEN
+
+   REV_PRC_ADJWIPMODXFERXACTION(
+    iTransaction, 
+    in_cProjId, 
+    in_cCharge_Code, 
+    in_cResource_Code,
+    in_cCostKeyLevel6, 
+    in_cCostKeyLevel7,
+    in_cInput_Type,
+    bOverrideDate,
+    dXferDate,
+    in_bChargeable,
+    in_nUnitQty,
+    --in_iHours, in_iMinutes,
+    in_nRate, 
+    in_cNotes, 
+    v_TRANSTYPE,
+    in_cTransClass,
+    in_cMatlVendorCode,
+    in_cMatlPoNumber,
+    in_nActualCost, 
+    cAdjType, 
+    cUserId,
+    in_bCalcNewRate,
+    dWIPTransDate, 
+    cWIPClntCode, 
+    cWIPProjId, 
+    cWIPCharge_Code, 
+    cWIPResource_Code,
+    cWIPInputType,
+    cWIPTransactionClass, 
+    iTransferStatus, 
+    iAdjustXactionNo,  
+    iAdjustNumber, 
+    cErrorMessage,
+    cLanguageCode, 
+    in_rateCurrency,
+    in_ActualCostCurrency, 
+	in_roleCode, 
+	1/* Change the role in this case as it comes from UI */, 
+	in_TaskID,
+    in_userLov1,
+    in_userLov2,
+	in_expenseType
+  );
+   END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

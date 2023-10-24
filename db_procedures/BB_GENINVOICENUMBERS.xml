@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_GENINVOICENUMBERS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_GENINVOICENUMBERS" 
+(
+  cUserID         VARCHAR2,
+  iBillRunKey     NUMBER,
+  cInvoiceDate    VARCHAR2,
+  bHighSpeedPrint NUMBER DEFAULT 0,
+  iHSDetailMode   NUMBER DEFAULT 0)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iLup  NUMBER;
+  iCount  NUMBER;
+  cGroupNo  GLOBALPKG.STRING;
+  cNextInvNo  GLOBALPKG.STRING;
+  cBillTo   GLOBALPKG.STRING;
+  cClient   GLOBALPKG.STRING;
+  cProject  GLOBALPKG.STRING;
+  seqOffset NUMBER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+
+	/*[SPCONV-ERR(18)]:(set NOCOUNT) Manual conversion required*/
+	/*[SPCONV-ERR(20)]:CREATE TABLE temp_InvAssignbb_GenInvoiceNum statement passed to ddl file*/
+
+	DELETE FROM TEMP_INVASSIGNBB_GENINVOICENUM;
+-- Added following line to compensate for growing sequence value
+    SELECT TEMP_INVASSIGNBB_GENINVOIC_SEQ.NEXTVAL INTO seqOffset FROM DUAL;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO TEMP_INVASSIGNBB_GENINVOICENUM (SEQNO, GroupNo, COMPANY_CODE, PROJECT_CODE)SELECT  temp_InvAssignbb_GenInvoic_SEQ.nextval, I.invoiceno, I.COMPANY_CODE, BT.PROJECT_CODE
+		 FROM BB_BILLTRACKING BT, INVOICEHEADER I
+		WHERE BT.BillingRunKey = Bb_Geninvoicenumbers.iBillRunKey
+		 AND BT.ActionType = 'B'
+		 AND I.cmsgroupno = BT.InvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	NULL;
+	/*[SPCONV-ERR(51)]:CREATE INDEX  statement ignored*/
+	Bb_Geninvoicenumbers.iLup :=  1;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(*)
+		INTO Bb_Geninvoicenumbers.iCount FROM TEMP_INVASSIGNBB_GENINVOICENUM;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+-- Added following 2 lines to compensate for growing sequence value
+	Bb_Geninvoicenumbers.iLup := seqOffset + 1;
+	Bb_Geninvoicenumbers.iCount := seqOffset + Bb_Geninvoicenumbers.iCount;
+	&lt;&lt;i_loop1&gt;&gt;
+	WHILE  Bb_Geninvoicenumbers.iLup &lt;= Bb_Geninvoicenumbers.iCount LOOP
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT DISTINCT  GroupNo,  COMPANY_CODE,  PROJECT_CODE
+			INTO Bb_Geninvoicenumbers.cGroupNo, Bb_Geninvoicenumbers.cClient, Bb_Geninvoicenumbers.cProject
+			FROM TEMP_INVASSIGNBB_GENINVOICENUM
+			WHERE SeqNo = Bb_Geninvoicenumbers.iLup;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		IF  Bb_Geninvoicenumbers.cProject IS NULL THEN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MIN(PROJECT_CODE)
+				INTO Bb_Geninvoicenumbers.cProject FROM PPA_BILLINGS
+				WHERE COMPANY_CODE = Bb_Geninvoicenumbers.cClient
+				 AND InvoiceNo = Bb_Geninvoicenumbers.cGroupNo;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END IF;
+		BEGIN
+		Bb_Assigninvoicenumber(Bb_Geninvoicenumbers.cClient,
+		 Bb_Geninvoicenumbers.cProject,
+		 Bb_Geninvoicenumbers.cGroupNo,
+		 Bb_Geninvoicenumbers.cUserID,
+		 Bb_Geninvoicenumbers.cInvoiceDate,
+		 Bb_Geninvoicenumbers.cNextInvNo,
+		 Bb_Geninvoicenumbers.cBillTo);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE TEMP_INVASSIGNBB_GENINVOICENUM
+		SET InvoiceNo = Bb_Geninvoicenumbers.cNextInvNo,
+		BILL_TO_COMPANY_CODE = NVL(Bb_Geninvoicenumbers.cBillTo, Bb_Geninvoicenumbers.cClient)
+		WHERE SeqNo = Bb_Geninvoicenumbers.iLup;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		Bb_Geninvoicenumbers.iLup :=  Bb_Geninvoicenumbers.iLup + 1;
+	END;
+	END LOOP;
+	IF  Bb_Geninvoicenumbers.iCount &gt; 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO BB_HSINVOICELIST (BillingRunKey, UserID, InvoiceNo)
+			   SELECT  Bb_Geninvoicenumbers.iBillRunKey, Bb_Geninvoicenumbers.cUserID, InvoiceNo
+			 FROM TEMP_INVASSIGNBB_GENINVOICENUM;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE BB_BILLINGRUN
+		SET InvNumbersGenerated = 1
+		WHERE BillingRunKey = Bb_Geninvoicenumbers.iBillRunKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END IF;
+END Bb_Geninvoicenumbers;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

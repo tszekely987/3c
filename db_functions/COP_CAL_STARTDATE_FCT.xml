@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_CAL_STARTDATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_CAL_STARTDATE_FCT" (
+    p_date_in DATE,
+    period_type VARCHAR
+)
+    RETURN DATE
+IS
+    v_date_out DATE;
+    v_day INTEGER;
+/***************************************************************************************************************************
+ * The starting date for the period is calculated from the date passed in                                                  *
+ * for period_type = 'MONTH', the first day of the month is returned                                                       *
+ *     Example: p_date_in = 3/5/2012, 3/1/2012 is returned                                                                 *
+ * for period_type = 'WEEK', the starting day of the week is retrieved from the table prSite                               *
+ *     Example: p_date_in = 3/21/2012, prSite.prWeekStart = 1, 3/19/2012 is returned since Monday is the week start date   *
+ *     if the starting day is a Monday then the Monday date is returned that contains the range of the passed in date      *
+ * for period_type = 'QUARTER', the starting date of the quarter is returned                                              *
+ *     Example: p_date_in = 2/3/2012, 1/1/2012 would be returned, p_date_in = 8/25/2012, 7/1/2012 would be returned        *
+ * for period_type = 'YEAR', the date returned would be the first day of the year                                         *
+ *     Example: p_date_in = 5/2/2012, 1/1/2012 is returned                                                                 *
+ ***************************************************************************************************************************/
+BEGIN
+    IF period_type = 'MONTH' THEN
+        v_date_out := TRUNC(p_date_in) - (TO_CHAR(p_date_in,'DD') -1);
+    ELSIF period_type = 'WEEK' THEN
+        SELECT prWeekStart + 1
+        INTO   V_DAY
+        FROM   prSite
+        WHERE  1=1;
+        IF TO_CHAR(v_day) &lt;= TO_CHAR(p_date_in,'D') THEN
+            v_date_out := TRUNC(p_date_in) - (TO_CHAR(p_date_in,'D') - v_day);
+        ELSE
+            v_date_out := (TRUNC(p_date_in) - (TO_CHAR(p_date_in,'D') - v_day)) - 7;
+        END IF;
+    ELSIF period_type = 'QUARTER' THEN
+        IF TO_CHAR(p_date_in,'Q') = 1 THEN
+            v_date_out := TO_DATE('01/01/' || TO_CHAR(p_date_in,'YYYY'),'MM/DD/YYYY');
+        ELSIF TO_CHAR(p_date_in,'Q') = 2 THEN
+            v_date_out := TO_DATE('04/01/' || TO_CHAR(p_date_in,'YYYY'),'MM/DD/YYYY');
+        ELSIF TO_CHAR(p_date_in,'Q') = 3 THEN
+            v_date_out := TO_DATE('07/01/' || TO_CHAR(p_date_in,'YYYY'),'MM/DD/YYYY');
+        ELSIF TO_CHAR(p_date_in,'Q') = 4 THEN
+            v_date_out := TO_DATE('10/01/' || TO_CHAR(p_date_in,'YYYY'),'MM/DD/YYYY');
+        END IF;
+    ELSIF period_type = 'YEAR' THEN
+        v_date_out := TRUNC(p_date_in) - (TO_CHAR(p_date_in,'DDD') - 1);
+    END IF;
+    RETURN v_date_out;
+END COP_CAL_STARTDATE_FCT;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

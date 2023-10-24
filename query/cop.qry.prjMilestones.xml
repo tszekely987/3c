@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.qry.prjMilestones" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Upcoming Project Milestones (Instance = Project)" languageCode="en" name="Upcoming Project Milestones"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:MILESTONE:t.prid:milestone_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prwbssequence:wbs_sequence@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prexternalid:milestone_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prid:taskid@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prprojectid:investment_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prname:milestone_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prismilestone:ismilestone@,   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:t.prstart:start_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:@DBUSER@.cop_calc_finish_time_fct(t.prfinish):finish_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:baseline.start_date:baseline_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:@DBUSER@.cop_calc_finish_time_fct(baseline.finish_date):baseline_finish@,    @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:tsk_d.days_late:lateness@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:tsk_d.days_late:lateness_sl@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:tsk_d.days_late_pct:days_late_pct@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:MILESTONE:tsk_d.days_late_pct:days_late_pct_sl@
+
+FROM   PRTASK t   
+INNER  JOIN  COP_TSK_DAYS_LATE_V tsk_d
+             ON   t.prid = tsk_d.task_id 
+LEFT   
+OUTER  JOIN  PRJ_BASELINE_DETAILS baseline 
+             ON   baseline.object_id = t.prid 
+             AND  @UPPER@(baseline.object_type) = 'TASK' 
+             AND  baseline.is_current = 1
+
+WHERE  t.prismilestone = 1
+AND    t.prstatus <> 2
+AND    t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND    @WHERE:SECURITY:PROJECT:t.prprojectid@
+AND    @FILTER@]]></nsql>
+            <attribute id="milestone_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Milestone Internal ID" languageCode="en" name="Milestone Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wbs_sequence" required="false">
+              
+              
+              
+              
+              <nls description="WBS Sequence" languageCode="en" name="WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="milestone_id" required="false">
+              
+              
+              
+              
+              <nls description="Milestone ID" languageCode="en" name="Milestone ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="taskid" required="false">
+              
+              
+              
+              
+              <nls description="Task Internal ID" languageCode="en" name="Task Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_id" required="false">
+              
+              
+              
+              
+              <nls description="Investment Internal ID" languageCode="en" name="Investment Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="milestone_name" required="false">
+              
+              
+              
+              
+              <nls description="Milestone" languageCode="en" name="Milestone"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="ismilestone" required="false">
+              
+              
+              
+              
+              <nls description="Is Milestone" languageCode="en" name="Is Milestone"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="Checkmark"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              <nls description="Start Date" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish Date" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_start" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Start Date" languageCode="en" name="Baseline Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="baseline_finish" required="false">
+              
+              
+              
+              
+              <nls description="Baseline Finish Date" languageCode="en" name="Baseline Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="lateness" required="false">
+              
+              
+              
+              
+              <nls description="Days Late" languageCode="en" name="Days Late"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="lateness_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="days_late_pct" required="false">
+              
+              
+              
+              
+              <nls description="Days Late %" languageCode="en" name="Days Late %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="days_late_pct_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule %" languageCode="en" name="Schedule %"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="0" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="1" lo="0" mappingCode="mapping-2" typeCode="green"/>
+                <mapping hi="11" lo="1" mappingCode="mapping-3" typeCode="yellow"/>
+                <mapping hi="100000" lo="11" mappingCode="mapping-4" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <links>
+              <link action="projmgr.taskProperties" code="Task">
+                
+                
+                
+                
+                <nls description="Milestone Properties" languageCode="en" name="Milestone Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_id" dataSource="data" paramCode="projectId"/>
+                <linkParam dataRef="taskid" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="returnAction"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

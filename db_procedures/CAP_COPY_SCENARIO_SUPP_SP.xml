@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_COPY_SCENARIO_SUPP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_COPY_SCENARIO_SUPP_SP" (
+  P_SRC_SCENARIO_ID         IN NUMBER,
+  P_TRGT_SCENARIO_ID        IN NUMBER
+    
+  )
+AS
+  V_ID                  NUMBER;
+  V_NEW_ID              NUMBER;
+  V_IS_EXPRESSION       NUMBER;
+  
+  CURSOR c_members IS
+    SELECT * FROM CAP_SCENARIO_MEMBERS WHERE SCENARIO_ID = P_SRC_SCENARIO_ID;
+
+BEGIN
+
+  -- This script is intended to copy the contents of a scenario (other that the
+  -- scenario object itself).
+       
+  INSERT INTO CAP_SCENARIO_TEAM
+    ( id, team_id, scenario_id, prprojectid, prresourceid, pravailstart, pravailfinish, prbooking, prroleid, prallocsum, hard_sum, hard_start, hard_finish, pralloccurve, hard_curve )
+    ( SELECT CAP_SCENARIO_TEAM_S1.NEXTVAL, team_id, P_TRGT_SCENARIO_ID, prprojectid, prresourceid, pravailstart, pravailfinish, prbooking, prroleid, prallocsum, hard_sum, hard_start, hard_finish, pralloccurve, hard_curve
+        FROM CAP_SCENARIO_TEAM
+       WHERE SCENARIO_ID = P_SRC_SCENARIO_ID);
+       
+  DBMS_OUTPUT.PUT_LINE('Copying tasks');
+  INSERT INTO CAP_SCENARIO_TASKS
+    ( ID, TASK_ID, SCENARIO_ID, PROJECT_ID, START_DATE, FINISH_DATE, EXTERNAL_ID, IS_TASK, IS_MILESTONE, PRIORITY, DURATION, IS_FIXED, IS_LOCKED, IS_EXTERNAL, 
+      TOTAL_FLOAT, EARLY_START_DATE, EARLY_FINISH_DATE, LATE_START_DATE, LATE_FINISH_DATE, WBS_SORT, PARTITION_CODE, 
+      WBS_LEVEL, WBS_SEQUENCE, WBS_PARSEQ, WBS_NNBSEQ, SLICE_STATUS)
+    ( SELECT CAP_SCENARIO_TASKS_S1.NEXTVAL, TASK_ID, P_TRGT_SCENARIO_ID, PROJECT_ID, START_DATE, FINISH_DATE, EXTERNAL_ID, IS_TASK, IS_MILESTONE, PRIORITY, DURATION, IS_FIXED, IS_LOCKED, IS_EXTERNAL, 
+      TOTAL_FLOAT, EARLY_START_DATE, EARLY_FINISH_DATE, LATE_START_DATE, LATE_FINISH_DATE, WBS_SORT, PARTITION_CODE, 
+      WBS_LEVEL, WBS_SEQUENCE, WBS_PARSEQ, WBS_NNBSEQ, SLICE_STATUS
+        FROM CAP_SCENARIO_TASKS
+       WHERE SCENARIO_ID = P_SRC_SCENARIO_ID);
+
+  DBMS_OUTPUT.PUT_LINE('Copying assignments');
+
+  INSERT INTO CAP_SCENARIO_ASSIGNMENTS
+    ( ID, ASSIGNMENT_ID, SCENARIO_ID, TASK_ID, RESOURCE_ID, TEAM_ID, START_DATE, FINISH_DATE, ESTIMATE_SUM, ACTUAL_SUM, PRACTTHRU, SLICE_STATUS, PREXTENSION )
+    ( SELECT CAP_SCENARIO_ASSIGNMENTS_S1.NEXTVAL, ASSIGNMENT_ID, P_TRGT_SCENARIO_ID, TASK_ID, RESOURCE_ID, TEAM_ID, START_DATE, FINISH_DATE, ESTIMATE_SUM, ACTUAL_SUM, PRACTTHRU, SLICE_STATUS, PREXTENSION
+        FROM CAP_SCENARIO_ASSIGNMENTS
+       WHERE SCENARIO_ID = P_SRC_SCENARIO_ID);
+
+  cap_copy_member_slices_sp( 'prj_blb_slices_d_cap_alc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_w_cap_alc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_m_cap_alc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_d_cap_hardalc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_w_cap_hardalc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_m_cap_hardalc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_d_cap_etc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_w_cap_etc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+  cap_copy_member_slices_sp( 'prj_blb_slices_m_cap_etc', P_SRC_SCENARIO_ID, P_TRGT_SCENARIO_ID);
+
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

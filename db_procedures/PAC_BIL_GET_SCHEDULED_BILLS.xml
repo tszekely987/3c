@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GET_SCHEDULED_BILLS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GET_SCHEDULED_BILLS" (
+cCOMPANY_CODE 	VARCHAR2 ,
+cPROJECT_CODE 	VARCHAR2 ,
+cLanguageCode VARCHAR2 ,
+RC1 	IN OUT PAC_BIL_GET_SCHEDULED_BILLSPkg.RCT1,
+RC2 	IN OUT PAC_BIL_GET_SCHEDULED_BILLSPkg.RCT2,
+RC3 	IN OUT PAC_BIL_GET_SCHEDULED_BILLSPkg.RCT3)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+cStatus 	VARCHAR2(24);
+BEGIN
+	/*[SPCONV-ERR(6)]:CREATE TABLE temp_tempolb_GetScheduledBills statement passed to ddl file*/
+	DELETE FROM temp_tempolb_GetScheduledBills;
+	-- PAC_BIL_GET_SCHEDULED_BILLS.cStatus :=  'Available Under bill';
+	SELECT LV.NAME
+		   INTO PAC_BIL_GET_SCHEDULED_BILLS.cStatus
+		   FROM CMN_LOOKUPS_V lv
+		   WHERE lv.LOOKUP_TYPE = 'PAC_BILL_LABELS' AND
+				 lv.LANGUAGE_CODE = RTRIM(PAC_BIL_GET_SCHEDULED_BILLS.cLanguageCode) AND
+				 lv.LOOKUP_CODE = 'AVAIL';
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempolb_GetScheduledBills
+	(TRANSDATE,INVOICENO,INVOICEAMT,AMTREMAIN,BILLSTATUS,NOTES)
+	SELECT  IH.invoicedate, IH.invoiceno, BV.Amount, BV.AmountRemaining,
+		   SUBSTR(PAC_BIL_GET_SCHEDULED_BILLS.cStatus, 1 + ( 10 * SIGN(BITAND(B.Status,8))
+		   ), 10), NVL(B.Notes, '')
+		 FROM ppa_Billings B, ppa_Billing_values BV, invoiceheader IH
+		WHERE B.COMPANY_CODE = PAC_BIL_GET_SCHEDULED_BILLS.cCOMPANY_CODE
+		 and B.PROJECT_CODE = PAC_BIL_GET_SCHEDULED_BILLS.cPROJECT_CODE
+		 and B.TransType  IN ('BR', 'BP')
+		 and B.Status = 0
+		 and IH.invoiceno = B.InvoiceNo
+		 and IH.invtype = 'I'
+		 and B.TRANSNO=BV.TRANSNO
+		 and BV.CURRENCY_TYPE='BILLING';
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE temp_tempolb_GetScheduledBills
+	SET BillStatus = ( SELECT LV.NAME
+				   		   FROM CMN_LOOKUPS_V lv
+						   WHERE lv.LOOKUP_TYPE = 'PAC_BILL_LABELS' AND
+						   		 lv.LANGUAGE_CODE = RTRIM(PAC_BIL_GET_SCHEDULED_BILLS.cLanguageCode) AND
+								 lv.LOOKUP_CODE = 'MATCHED'),
+	AmtRemain = 0
+	WHERE AmtRemain &lt;= 0;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	OPEN RC1 FOR
+	SELECT TransDate,  InvoiceNo,  InvoiceAmt,  AmtRemain,  BillStatus,  Notes FROM temp_tempolb_GetScheduledBills
+	ORDER BY 1 , 2 ;
+
+	OPEN RC2 FOR
+	SELECT SUM(InvoiceAmt),  SUM(AmtRemain) FROM temp_tempolb_GetScheduledBills;
+
+	OPEN RC3 FOR
+	SELECT BILLING_CURRENCY_CODE
+		   FROM PAC_MNT_PROJECTS
+		   WHERE COMPANY_CODE = cCOMPANY_CODE AND
+		   		 PROJECT_CODE = cPROJECT_CODE;
+
+	NULL;
+END PAC_BIL_GET_SCHEDULED_BILLS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

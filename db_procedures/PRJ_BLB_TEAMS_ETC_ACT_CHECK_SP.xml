@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_BLB_TEAMS_ETC_ACT_CHECK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_BLB_TEAMS_ETC_ACT_CHECK_SP" 
+	AS
+	BEGIN
+		LOOP
+			UPDATE PRTEAM
+			   SET ODF_SS_ASSGNS_CURVE = 1
+			WHERE PRID IN
+			(
+              SELECT t.prID
+				FROM PRTeam t, PRASSIGNMENT a
+			   WHERE t.prid = a.team_id
+                 and a.slice_status = 1
+                 and t.odf_ss_assgns_curve is null
+			)
+            AND ROWNUM &lt;= 10000;
+
+			EXIT WHEN SQL%ROWCOUNT = 0;
+			COMMIT;
+		END LOOP;
+	END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

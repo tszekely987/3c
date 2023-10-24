@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXTRACT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXTRACT_SP" 
+AS
+   V_NUM_OF_CALENDAR_DAYS        INTEGER := 730;   /* Loading 2 yrs worth of calendar days */
+   V_LAST_CURVE_DATE             DATE;
+   V_CURRENCY_CODE               VARCHAR2(3);
+   V_STMT                        VARCHAR2(100);
+   V_LOG                         VARCHAR2(100);
+   V_START_TIME                  DATE;
+   V_START_TIME1                 DATE;
+   V_START_LOOP_TIME             DATE;
+   V_DURATION                    NUMBER;
+   V_RUN_DATE                    DATE;
+   V_EVENTS_TO_PROCESS           INTEGER;
+   V_IS_INIT_EXTRACT             INTEGER;
+   V_TTL_PROJECTS                INTEGER;
+BEGIN
+   V_RUN_DATE := SYSDATE;
+   DBMS_OUTPUT.ENABLE (1000000);
+   -- The Datamart job always does a full refresh as the full refresh has been optimized to run faster than incremental.
+   -- The Datamart job should be run during off peak hours.
+   NBI_CLEAN_DATAMART_SP;
+   NBI_VALIDATE_SETTINGS_SP;
+   
+   V_STMT := 'Select currency code';
+   SELECT NVL (MAX (VALUE), NULL)
+   INTO   V_CURRENCY_CODE
+   FROM   CMN_OPTIONS O,
+          CMN_OPTION_VALUES V
+   WHERE  O.OPTION_CODE = 'NBI_CURRENCY_CODE'
+      AND V.OPTION_ID = O.ID;
+   DBMS_OUTPUT.PUT_LINE ('V_CURRENCY_CODE: ' || V_CURRENCY_CODE);
+   
+   V_STMT := 'Select last curve date';
+   SELECT MAX (TRUNC (FROM_DATE) + NUM_PERIODS)
+   INTO   V_LAST_CURVE_DATE
+   FROM   PRJ_BLB_SLICEREQUESTS
+   WHERE  REQUEST_NAME IN ('DAILYRESOURCEACTCURVE','DAILYRESOURCEBASECURVE','DAILYRESOURCEESTCURVE','DAILYRESOURCEAVAILCURVE','DAILYRESOURCEALLOCCURVE')
+      AND PERIOD = 0;
+   DBMS_OUTPUT.PUT_LINE ('V_LAST_CURVE_DATE: ' || V_LAST_CURVE_DATE);
+	
+   IF V_LAST_CURVE_DATE &gt; SYSDATE
+   THEN
+      V_NUM_OF_CALENDAR_DAYS := V_LAST_CURVE_DATE - TRUNC (SYSDATE);
+   END IF;
+   DBMS_OUTPUT.PUT_LINE ('V_NUM_OF_CALENDAR_DAYS: ' || V_NUM_OF_CALENDAR_DAYS);
+   
+-----------------------------------------------------------------
+-- Truncate NBI_RUN_LOGS
+-----------------------------------------------------------------
+   V_STMT := 'Truncating NBI_RUN_LOGS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_RUN_LOGS';
+
+   -- Place the Datamart tables in NOLOGGING mode to reduce Redo Logs	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRT_FACTS NOLOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_R_FACTS NOLOGGING';	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJECT_CURRENT_FACTS NOLOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_RESOURCE_CURRENT_FACTS NOLOGGING';	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJECT_FORECAST NOLOGGING';	  
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRTF_FM NOLOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_DIM_OBS NOLOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_DIM_OBS_FLAT NOLOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_RUN_LOGS NOLOGGING';	
+	
+	
+   -- Initialize state
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=INIT',SYSDATE); COMMIT;
+   
+-----------------------------------------------------------------
+-- Extract Dimensions
+-----------------------------------------------------------------
+   V_STMT := 'Truncating NBI_DIM_OBS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_DIM_OBS';
+   V_STMT := 'Truncating NBI_DIM_OBS_FLAT';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_DIM_OBS_FLAT';
+
+   V_STMT := 'Populating OBS dimension';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=NBI_POPULATE_OBS_DIM_SP',SYSDATE); COMMIT;
+   --COMMIT;
+   NBI_POPULATE_OBS_DIM_SP;
+   UPDATE NBI_RUN_LOGS SET END_DATE=SYSDATE WHERE INFO='STATE=NBI_POPULATE_OBS_DIM_SP';
+
+   V_STMT := 'Populating calendar dimension';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=NBI_POPULATE_CAL_DIM_SP',SYSDATE); COMMIT;
+   --COMMIT;
+   NBI_POPULATE_CAL_DIM_SP (V_NUM_OF_CALENDAR_DAYS);
+   UPDATE NBI_RUN_LOGS SET END_DATE=SYSDATE WHERE INFO='STATE=NBI_POPULATE_CAL_DIM_SP';
+
+   V_STMT := 'Populating fiscal calendar dimension';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=NBI_POPULATE_FISCAL_DIM_SP',SYSDATE); COMMIT;
+   --COMMIT;
+   NBI_POPULATE_FISCAL_DIM_SP;
+   UPDATE NBI_RUN_LOGS SET END_DATE=SYSDATE WHERE INFO='STATE=NBI_POPULATE_FISCAL_DIM_SP';
+
+-----------------------------------------------------------------
+-- Extract NBI_RESSOURCE_CURRENT_FACTS
+-----------------------------------------------------------------
+   V_STMT := 'Extracting NBI_RESOURCE_CURRENT_FACTS';
+   V_START_TIME := SYSDATE;
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=NBI_RESOURCE_CURRENT_FACTS_SP',SYSDATE);
+   --COMMIT;
+   NBI_RESOURCE_CURRENT_FACTS_SP;
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time NBI_RESOURCE_CURRENT_FACTS_SP: ' || V_DURATION);
+   UPDATE NBI_RUN_LOGS SET INFO='STATE=NBI_RESOURCE_CURRENT_FACTS_SP:' || V_DURATION, END_DATE=SYSDATE WHERE INFO LIKE 'STATE=NBI_RESOURCE_CURRENT_FACTS_SP%';COMMIT;
+
+-----------------------------------------------------------------
+-- Extract NBI_PRT_FACTS, NBI_R_FACTS
+-----------------------------------------------------------------
+
+   V_STMT := 'Checking if there are any events to process';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   SELECT COUNT (1)
+   INTO   V_EVENTS_TO_PROCESS
+   FROM   NBI_EVENTS
+   WHERE  STATUS IS NOT NULL;
+   DBMS_OUTPUT.PUT_LINE ('V_EVENTS_TO_PROCESS=' || V_EVENTS_TO_PROCESS);
+   
+   V_STMT := 'CHECKING IF THIS IS THE FIRST RUN';
+   SELECT COUNT (1)
+   INTO   V_IS_INIT_EXTRACT
+   FROM   NBI_PROJECT_CURRENT_FACTS
+   WHERE  ROWNUM = 1;
+   DBMS_OUTPUT.PUT_LINE ('V_IS_INIT_EXTRACT=' || V_IS_INIT_EXTRACT);
+ 
+   IF V_IS_INIT_EXTRACT = 0 -- Ignore and Truncate NBI_EVENTS and do a Full Refresh
+   THEN
+      EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_EVENTS';
+      V_EVENTS_TO_PROCESS := 1; --Run the Loop Once to refresh the data
+   END IF;
+   DBMS_OUTPUT.PUT_LINE ('V_EVENTS_TO_PROCESS:=' || V_EVENTS_TO_PROCESS);
+   
+   V_STMT := 'Inserting ttl_events into nbi_run_logs';
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE, 'TTL_EVENTS=' || V_EVENTS_TO_PROCESS,SYSDATE);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=EVENTS:PREPARE',SYSDATE);
+
+   -- Process NBI_EVENTS only if there are any records populated to NBI_EVENTS by TimeSlice and needs to be 
+   -- picked up for Datamart processing AND if this not the first time Datamart is run.
+   IF  V_IS_INIT_EXTRACT =1 AND V_EVENTS_TO_PROCESS &lt;&gt; 0 THEN
+   BEGIN
+	   V_STMT := 'Change the processing status to not_processed'; 
+	   DBMS_OUTPUT.PUT_LINE (V_STMT);
+	   -- no need to force the index as INDEX SKIP SCAN will kick in.
+	   UPDATE NBI_EVENTS
+	   SET STATUS = 'NOT_PROCESSED'
+	   WHERE STATUS = 'PROCESSING';
+
+	   V_STMT := 'Deleting duplicate events';
+	   -- no need to force the index as INDEX SKIP SCAN will kick in.
+	   LOOP
+		  DELETE 
+			FROM NBI_EVENTS A
+		   WHERE ROWNUM &lt; 25000
+			 AND EXISTS (SELECT 'EXISTS'
+						 FROM   NBI_EVENTS B
+						 WHERE  A.PRJ_OBJECT_ID = B.PRJ_OBJECT_ID
+							AND A.PRJ_OBJECT_TYPE = B.PRJ_OBJECT_TYPE
+							AND A.STATUS = B.STATUS
+							AND A.STATUS IS NOT NULL
+							AND A.ID &gt; B.ID);
+		  EXIT WHEN SQL%ROWCOUNT = 0;
+		  COMMIT;
+	   END LOOP;
+   END;
+  END IF;
+  
+-----------------------------------------------------------------
+-- Event processing main loop
+-----------------------------------------------------------------
+   V_START_TIME := SYSDATE;
+   WHILE V_EVENTS_TO_PROCESS &gt; 0
+   LOOP
+      V_START_LOOP_TIME := SYSDATE;
+      V_STMT := 'Updating nbi_events set status to processing';
+	  DBMS_OUTPUT.PUT_LINE (V_STMT);
+      UPDATE NBI_EVENTS
+         SET STATUS = 'PROCESSING',
+             LAST_UPDATED_DATE = SYSDATE
+       WHERE STATUS = 'NOT_PROCESSED';
+
+	  
+      V_STMT := 'Checking if there are any more events to process';
+	  DBMS_OUTPUT.PUT_LINE (V_STMT);
+      IF V_IS_INIT_EXTRACT = 0 THEN 
+		 V_EVENTS_TO_PROCESS := 0;
+      ELSE
+        SELECT COUNT (1)
+        INTO   V_EVENTS_TO_PROCESS
+        FROM   NBI_EVENTS
+        WHERE  STATUS IS NOT NULL
+          AND  STATUS != 'PROCESSING'
+          AND  ROWNUM = 1;
+      END IF;
+	  DBMS_OUTPUT.PUT_LINE ('V_EVENTS_TO_PROCESS INSIDE LOOP=' || V_EVENTS_TO_PROCESS);
+
+      V_STMT := 'Commit nbi_events status changes to processing';
+      
+      
+      V_STMT := 'Calling NBI_PURGE_PROJECTS_SP';
+	  DBMS_OUTPUT.PUT_LINE (V_STMT);
+      UPDATE NBI_RUN_LOGS SET INFO='STATE=EVENTS:NBI_PURGE_PROJECTS_SP', START_DATE=SYSDATE WHERE INFO LIKE 'STATE=EVENTS:%';
+	  
+	  
+      V_START_TIME1 := SYSDATE;
+	  --Delete rows from Datamart tables, that are available in NBI_EVENTS for re-processing.
+	  -- PRJ_OBJECT_TYPE='PROJECT'
+      NBI_PURGE_PROJECTS_SP;
+      V_LOG := 'EVENT_LOOP:PURGE=' || ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+      
+      V_STMT := 'Calling NBI_EXTR_PRTF_SP';
+      UPDATE NBI_RUN_LOGS SET INFO='STATE=EVENTS:NBI_EXTR_PRTF_SP', START_DATE=SYSDATE WHERE INFO LIKE 'STATE=EVENTS:%';
+	  
+      V_START_TIME1 := SYSDATE;
+      NBI_EXTR_PRTF_SP;
+      V_LOG := V_LOG || ':PRTF=' || ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+      
+      V_STMT := 'Calling NBI_EXTR_RF_SP';
+      UPDATE NBI_RUN_LOGS SET INFO='STATE=EVENTS:NBI_EXTR_RF_SP', START_DATE=SYSDATE WHERE INFO LIKE 'STATE=EVENTS:%';
+	  
+      V_START_TIME1 := SYSDATE;
+      NBI_EXTR_RF_SP;
+      V_LOG := V_LOG || ':RF=' || ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+      
+      V_STMT := 'Updating NBI_EVENTS where status is processing';
+      UPDATE NBI_EVENTS
+         SET STATUS = NULL, LAST_UPDATED_DATE = SYSDATE
+       WHERE STATUS IN ('PROCESSING', 'PRTF_PROCESSED');
+	  
+	  
+      -- Log the times for each part of the event loop instance
+      V_LOG := V_LOG || ':TTL=' || ROUND ((SYSDATE - V_START_LOOP_TIME) * 24 * 60, 2);
+      INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE,END_DATE) VALUES (V_RUN_DATE,V_LOG,V_START_LOOP_TIME,SYSDATE );
+   END LOOP;
+   
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Event Processing Time: ' || V_DURATION);
+   UPDATE NBI_RUN_LOGS SET INFO='STATE=EVENTS:DONE:' || V_DURATION, END_DATE=SYSDATE WHERE INFO LIKE 'STATE=EVENTS:%';
+   
+   V_STMT := 'Deleting NBI_EVENTS processed before 25 days';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=PURGE_EVENTS',SYSDATE); COMMIT;
+   LOOP
+      DELETE
+        FROM NBI_EVENTS
+       WHERE STATUS IS NULL
+         AND LAST_UPDATED_DATE &lt; (SYSDATE - 25)
+         AND ROWNUM &lt;= 5000;
+      EXIT WHEN SQL%ROWCOUNT = 0;
+      COMMIT;
+   END LOOP;
+   UPDATE NBI_RUN_LOGS SET END_DATE=SYSDATE WHERE INFO='STATE=PURGE_EVENTS';
+
+-----------------------------------------------------------------
+-- Analyze tables
+-----------------------------------------------------------------
+   V_START_TIME := SYSDATE;
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=ANALYZE_TABLES',SYSDATE); COMMIT;
+
+   V_STMT := 'Analyzing NBI_RESOURCE_CURRENT_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME1 := SYSDATE;
+   CMN_GATHER_TABLE_STATS_SP('NBI_RESOURCE_CURRENT_FACTS');
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+
+    V_STMT := 'Analyzing NBI_PRT_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME1 := SYSDATE;
+   CMN_GATHER_TABLE_STATS_SP('NBI_PRT_FACTS');
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION); 
+
+   V_STMT := 'Analyzing NBI_R_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME1 := SYSDATE;
+   CMN_GATHER_TABLE_STATS_SP('NBI_R_FACTS');
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME1) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Analyze Time: ' || V_DURATION);
+   UPDATE NBI_RUN_LOGS SET INFO='STATE=ANALYZE_TABLES:' || V_DURATION, END_DATE=SYSDATE WHERE INFO LIKE 'STATE=ANALYZE_TABLES%';COMMIT;
+
+-----------------------------------------------------------------
+-- Extract NBI_PROJECT_CURRENT_FACTS
+-----------------------------------------------------------------
+   V_STMT := 'Calling NBI_EXTR_PCF_SP';
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=NBI_EXTR_PCF_SP',SYSDATE); COMMIT;
+   -- Get total count of projects for status checking
+/*    select count(1) into V_TTL_PROJECTS
+   from(
+      SELECT ID PROJECT_ID
+        FROM INV_INVESTMENTS, INV_PROJECTS
+       WHERE IS_ACTIVE &lt;&gt; 0
+         AND INV_INVESTMENTS.ID = INV_PROJECTS.PRID(+)
+         AND NVL(INV_PROJECTS.IS_TEMPLATE,0) = 0
+      UNION
+       SELECT NBI_PROJECTS.PROJECT_ID PROJECT_ID
+         FROM NBI_PROJECT_CURRENT_FACTS NBI_PROJECTS,
+              INV_INVESTMENTS INV_INVESTMENTS,
+              INV_PROJECTS INVP
+        WHERE NBI_PROJECTS.PROJECT_ID = INV_INVESTMENTS.ID
+          AND INV_INVESTMENTS.IS_ACTIVE = 0
+          AND NBI_PROJECTS.IS_ACTIVE &lt;&gt; 0
+          AND INV_INVESTMENTS.ID = INVP.PRID(+)
+          AND NVL(INVP.IS_TEMPLATE,0) = 0
+      UNION
+       SELECT ID PROJECT_ID
+         FROM INV_INVESTMENTS INV, INV_PROJECTS IP
+        WHERE IS_ACTIVE = 0
+          AND INV.ID = IP.PRID (+)
+          AND NVL(IP.IS_TEMPLATE,0) = 0
+          AND NOT EXISTS (SELECT 'NOT EXISTS'
+                            FROM NBI_PROJECT_CURRENT_FACTS NPCF
+                           WHERE NPCF.PROJECT_ID = INV.ID)
+      ORDER BY 1 ASC
+   ); */
+    -- Do not reprocess projects that have already been captured.
+	SELECT COUNT(1) INTO V_TTL_PROJECTS 
+	FROM NBI_PROJECT_CURRENT_FACTS_V 
+	WHERE 
+	NOT EXISTS (SELECT 'NOT EXISTS'
+                            FROM NBI_PROJECT_CURRENT_FACTS NPCF
+                           WHERE NPCF.PROJECT_ID = PROJECT_ID);
+						   
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'EXTR_PCF_TTL_PROJECTS='||V_TTL_PROJECTS,SYSDATE); COMMIT;
+
+   V_STMT := 'Executing  NBI_EXTR_PCF_SP';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME := SYSDATE;
+   NBI_EXTR_PCF_SP (V_CURRENCY_CODE);
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time NBI_EXTR_PCF_SP: ' || V_DURATION);
+   
+   UPDATE NBI_RUN_LOGS SET INFO='STATE=NBI_EXTR_PCF_SP:' || V_DURATION, END_DATE=SYSDATE WHERE INFO LIKE 'STATE=NBI_EXTR_PCF_SP%';COMMIT;
+   
+    -- Place the Datamart tables in LOGGING mode back	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRT_FACTS LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_R_FACTS LOGGING';	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJECT_CURRENT_FACTS LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_RESOURCE_CURRENT_FACTS LOGGING';	
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PROJECT_FORECAST LOGGING';	  
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_PRTF_FM LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_DIM_OBS LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_DIM_OBS_FLAT LOGGING';
+	EXECUTE IMMEDIATE 'ALTER TABLE NBI_RUN_LOGS LOGGING';	
+	
+   V_DURATION := ROUND ((SYSDATE - V_RUN_DATE) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('====================');
+   DBMS_OUTPUT.PUT_LINE ('Total Time: ' || V_DURATION);
+   INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=DONE:' || V_DURATION,SYSDATE); COMMIT;
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS THEN
+      INSERT INTO NBI_RUN_LOGS (RUN_DATE,INFO,START_DATE) VALUES (V_RUN_DATE,'STATE=ERROR:' || V_STMT,SYSDATE);
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_EXTRACT_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

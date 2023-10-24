@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CAP_DELETE_SCENARIO_MEMBER_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CAP_DELETE_SCENARIO_MEMBER_SP" (
+  P_INV_ID         IN NUMBER,
+  P_SCENARIO_ID    IN NUMBER,
+  P_MEMBER_ID      IN NUMBER DEFAULT 0
+  )
+AS
+  V_SQLString   VARCHAR2(500);
+  V_MEMBER_TYPE VARCHAR2(32);
+  V_OBJECT_CODE VARCHAR(100);
+  V_SCENARIO_ID NUMBER;
+  V_INV_ID      NUMBER;
+  V_MEMBER_ID   NUMBER;
+  V_IS_EXPRESSION NUMBER;
+
+BEGIN
+
+  -- This script is intended to delete an investment, team members, tasks, assignments
+  -- from the context of a scenario
+  V_INV_ID := P_INV_ID;
+  V_SCENARIO_ID := P_SCENARIO_ID;
+  V_MEMBER_ID := P_MEMBER_ID;
+
+  -- if a member id was not passed, figure out what it should be.  Always deleting by member id
+  IF P_MEMBER_ID = 0 THEN
+    BEGIN
+      SELECT ID INTO V_MEMBER_ID
+        FROM CAP_SCENARIO_MEMBERS
+       WHERE SCENARIO_ID = V_SCENARIO_ID
+         AND OBJECT_ID = V_INV_ID;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+          RAISE_APPLICATION_ERROR (-20006, 'Scenario Member does not exist');
+    END;
+  END IF;
+
+  DECLARE CURSOR c_members IS
+    SELECT ID, SCENARIO_ID, OBJECT_ID, IS_EXPRESSION, MEMBER_TYPE
+      FROM CAP_SCENARIO_MEMBERS
+     WHERE ID = V_MEMBER_ID
+        OR SELECTED_BY_EXPRESSION_ID = V_MEMBER_ID;
+
+  BEGIN
+    FOR src_rec IN c_members LOOP
+      V_SCENARIO_ID := src_rec.SCENARIO_ID;
+      V_INV_ID      := src_rec.OBJECT_ID;
+      V_IS_EXPRESSION := src_rec.IS_EXPRESSION;
+      V_MEMBER_TYPE := src_rec.MEMBER_TYPE;
+
+      DBMS_OUTPUT.PUT_LINE('Deleting scenario member');
+      DELETE
+        FROM CAP_SCENARIO_MEMBERS
+       WHERE SCENARIO_ID = V_SCENARIO_ID
+         AND OBJECT_ID = V_INV_ID
+         AND MEMBER_TYPE = V_MEMBER_TYPE;
+
+      -- clear out any power filters set by the expression
+      IF V_IS_EXPRESSION = 1 THEN
+        V_OBJECT_CODE := 'SCENARIO_' || V_MEMBER_TYPE;
+        DELETE
+          FROM ODF_FILTER_EXPRESSIONS
+         WHERE OBJECT_CODE = V_OBJECT_CODE
+           AND OBJECT_INSTANCE_ID = V_MEMBER_ID;
+      END IF;
+
+      IF V_IS_EXPRESSION = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('Deleting assignments');
+        DELETE FROM cap_scenario_assignments
+         WHERE scenario_id = V_SCENARIO_ID
+           AND task_id in (SELECT task_id FROM cap_scenario_tasks WHERE project_id = V_INV_ID);
+
+        DBMS_OUTPUT.PUT_LINE('Deleting teams');
+        DELETE FROM cap_scenario_team where scenario_id = V_SCENARIO_ID and prprojectid = V_INV_ID;
+        DBMS_OUTPUT.PUT_LINE('Deleting tasks');
+        DELETE FROM cap_scenario_tasks where scenario_id = V_SCENARIO_ID and project_id = V_INV_ID;
+
+        DBMS_OUTPUT.PUT_LINE('Deleting blobs');
+        cap_delete_member_slices_sp( 'prj_blb_slices_d_cap_alc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_w_cap_alc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_m_cap_alc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_d_cap_hardalc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_w_cap_hardalc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_m_cap_hardalc', V_INV_ID, V_SCENARIO_ID, 'ALC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_d_cap_etc', V_INV_ID, V_SCENARIO_ID, 'ETC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_w_cap_etc', V_INV_ID, V_SCENARIO_ID, 'ETC');
+        cap_delete_member_slices_sp( 'prj_blb_slices_m_cap_etc', V_INV_ID, V_SCENARIO_ID, 'ETC');
+      END IF;
+
+    END LOOP;
+  END;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

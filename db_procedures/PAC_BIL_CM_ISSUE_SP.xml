@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_CM_ISSUE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_CM_ISSUE_SP" 
+(
+  userid       VARCHAR2 DEFAULT NULL,
+  invoiceno    VARCHAR2 ,
+  vInvamt      varchar2,
+  newinvoiceno VARCHAR2 DEFAULT NULL
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  testcode  GLOBALPKG.STRING;
+  returncode  GLOBALPKG.STRING;
+  invoiceamount   NUMBER(32,6);
+  in_invoiceno    VARCHAR2(16);
+BEGIN
+	 /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+    in_invoiceno := PAC_BIL_CM_ISSUE_SP.invoiceno;
+
+	invoiceamount :=  TO_NUMBER(vInvamt, '999999999999.99');
+	BEGIN
+	PAC_BIL_CM_VALDINVAMT_SP(in_invoiceno,invoiceamount,returncode);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	IF  returncode = '21000' THEN
+		raise_application_error (-20706, 'To credit the invoice, restore the transactions and change the PROJECT_CODE (or is it transaction?) status to Open or Hold.');
+	ELSE
+		IF  returncode = '23000' THEN
+		raise_application_error (-20707, 'Cannot issue credit memo because the associated PROJECT_CODE is closed. To credit this invoice, change the PROJECT_CODE status to Open or On Hold.');
+	ELSE
+		IF  returncode = '24000' THEN
+		raise_application_error (-20708, 'The selected invoice was an advance billing with Matching entries. To issue a credit memo, you must first reverse these entries.');
+	ELSE
+		IF  returncode = '25000' THEN
+				raise_application_error (-20709, 'A credit memo was already issued for the selected invoice.');
+	ELSE
+		IF  returncode = '20421' THEN
+				raise_application_error (-20421, 'COMPANY_CODE is currently being billed. Credit Memo cannot be performed at this time.');				
+	ELSE
+		BEGIN
+			 BEGIN
+
+			 DELETE FROM TEMP_BIL_CREDIT_MEMO_GENERATE ;
+
+             INSERT INTO TEMP_BIL_CREDIT_MEMO_GENERATE
+	  		        ( APPLYTO, TRANSTYPE, COMPANY_CODE,PROJECT_CODE,
+            CHARGE_CODE, RESOURCE_CODE, BILLINGDATE, INPUT_TYPE,ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+   			          LASTUPDATEDATE, INVOICENO,NOTES, QUANTITY, WORKINT, WORKBUF, APPLYTOTRANSTYPE)
+				    SELECT  TransNo, SUBSTR('BCADAUMR', INSTR( 'B AUADAY', TransType), 2), COMPANY_CODE, PROJECT_CODE,
+              Charge_Code, RESOURCE_CODE, BillingDate, INPUT_TYPE, userid, SYSDATE, userid,
+			   		  SYSDATE, newinvoiceno, Notes, Quantity, WorkInt, WorkBuf, TransType
+				    FROM ppa_Billings
+				    WHERE InvoiceNo = in_invoiceno AND
+				  	      TransType  IN ('B', 'AU', 'AD', 'AY') AND
+			  			  Status = 0 ;
+
+
+  			 EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			 END;
+
+			 BEGIN
+			 	StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				sp_creditmemo (in_invoiceno,newinvoiceno,userid);
+		 	  	StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		END;
+				END IF;
+			END IF;
+		END IF;
+	END IF;
+  END IF;
+END PAC_BIL_CM_ISSUE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

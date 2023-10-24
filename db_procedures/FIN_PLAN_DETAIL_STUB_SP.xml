@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>FIN_PLAN_DETAIL_STUB_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."FIN_PLAN_DETAIL_STUB_SP" (p_plan_detail_id NUMBER)
+AS
+  stoo_rowcnt              INTEGER;
+  stoo_selcnt              INTEGER;
+  v_id                     NUMBER;
+  v_gl_account_id          NUMBER;
+  v_planby_combo           VARCHAR2 (48);
+  v_plan_detail_1_key      VARCHAR2 (48);  
+  v_planby_combo_id        NUMBER;
+  -- Holds the new value of plan_by_2_code
+  v_existing_combo_count   NUMBER;
+  v_plan_id                NUMBER;
+
+BEGIN
+
+/*
+    FIN_PLAN_DETAIL_STUB_SP
+
+    Purpose.
+    This is a sample stub used to find and save the encoded value
+    for USER LOV 1 for each cost plan detail line item. This allows multiple
+    plan-by's to be storen in one field.
+    The current implementation is to find the unique combination of
+    'GL Account' and 'Cost Center' (custom attribute for demo purpose) and
+    store as a User LOV 1.
+
+    Assumptions:
+        - A custom lookup 'COSTCENTER' has been created.
+        - The created lookup has been added to the object costplandetail.
+        - the table odf_ca_costplandetail has a column named 'COSTCENTER' .
+        - Plans created will be planned by Roles, Cost Center and GL Accounts
+
+    Stub outline
+
+    1)  Find the row id of the custom lookup.
+    2) Retrieve plan_id and gl_account_id and plan_detail_1_key Store them in v_plan_id
+           , v_gl_account_id  and v_plan_detail_1_key  respectively
+            * Retrieving the plan id. This recomended as the plan id is used
+              often in the stub.
+            * gl_account_id is the row id of the GL account used. This value
+              is retrieved only for the purpose of this example and is not
+              necessary for the stub to work.
+            * plan_detail_1_key is to verify that there is no other plan detail with the
+            same plan-by/sub plan by.
+    3)  If Any plan by's is null, Populate the values v_planby_combo and 
+        v_planby_combo_id for NA-NA. NA-NA will be updated the Utility Code in step 6 
+            * This validation should include all plan-by's implemented
+    4)  if Plan bys are not null then Populate the values v_planby_combo and v_planby_combo_id with
+        the concatenation (encoded value) of 'FIN_BROWSE_USER_LOV1' + plan-by row ids and
+        a concatenation of the ids respectively
+            * It is important to note, that the order of id concatenation in
+              v_planby_combo and v_planby_combo_id should match.
+    5)  Assert there is no other plan detail with the same plan-by/sub plan by combo.
+        Throw error message if so.
+    6)  If none of the plan-by ids are null, update the plan detail row with
+        v_planby_combo and v_planby_combo_id. Otherwise, throw an error.
+*/
+
+  BEGIN
+
+     stoo_rowcnt := 0;
+     stoo_selcnt := 0;
+
+/*
+     BEGIN
+
+        -- 1)  Find the row id of the custom lookup.
+         SELECT cml.ID
+         INTO v_id
+           FROM cmn_lookups cml, odf_ca_costplandetail cpd
+          WHERE cml.lookup_code = cpd.costcenter
+          AND   cpd.id = p_plan_detail_id;
+
+     EXCEPTION
+        WHEN NO_DATA_FOUND
+        THEN
+           stoo_rowcnt := 0;
+           stoo_selcnt := 0;
+     END;
+
+     BEGIN
+
+        -- 2) Retrieve plan_id and gl_account_id and plan_detail_1_key Store them in v_plan_id
+        --    , v_gl_account_id  and v_plan_detail_1_key  respectively     
+
+        SELECT d.gl_account_id, d.plan_id , d.plan_detail_1_key
+          INTO v_gl_account_id, v_plan_id  , v_plan_detail_1_key
+          FROM fin_cost_plan_details d
+         WHERE d.ID = p_plan_detail_id;
+     EXCEPTION
+        WHEN NO_DATA_FOUND
+        THEN
+           stoo_rowcnt := 0;
+           stoo_selcnt := 0;
+     END;
+
+     -- 3) If Any plan by's are null, Populate the values v_planby_combo and 
+     --v_planby_combo_id by NA-NA. These value will be used to update the Utility Code 
+      IF     v_gl_account_id IS NULL
+        OR v_id IS NULL
+     THEN
+     
+          SELECT ('FIN_BROWSE_USER_LOV1:' || (select ID from user_lov1_all_v where lookup_code='NA-NA'))
+         INTO v_planby_combo
+       FROM DUAL;
+
+        select ID 
+        INTO v_planby_combo_id
+       from user_lov1_all_v where lookup_code='NA-NA';        
+        
+       
+     ELSE 
+     -- 4) OR Else Populate the values v_planby_combo and v_planby_combo_id with 
+     --Concatenated values of plan by attributes
+     SELECT ('FIN_BROWSE_USER_LOV1:' || v_id || v_gl_account_id)
+         INTO v_planby_combo
+       FROM DUAL;
+     SELECT TO_NUMBER (v_id || v_gl_account_id)
+        INTO v_planby_combo_id
+       FROM DUAL;
+	END IF;
+
+    -- 5) Assert there is no other plan detail with the same plan-by/Sub plan by combo
+     SELECT COUNT (*)
+         INTO v_existing_combo_count
+         FROM fin_cost_plan_details
+        WHERE plan_id = v_plan_id
+          AND plan_detail_2_key = v_planby_combo
+          AND plan_detail_1_key = v_plan_detail_1_key                                   
+          AND ID != p_plan_detail_id;
+       IF v_existing_combo_count &gt; 0
+       THEN
+          raise_application_error (-20043,'The changes to the cost plan cannot be saved because the system cannot update Utility Code 1');
+           RETURN;
+        END IF;
+
+      -- 6)  If none of the plan-by ids are null, update the plan detail row
+
+          UPDATE fin_cost_plan_details
+             SET plan_detail_2_key = v_planby_combo,
+                 lov1_id = v_planby_combo_id
+           WHERE ID = p_plan_detail_id;
+*/
+     END;
+  END FIN_PLAN_DETAIL_STUB_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

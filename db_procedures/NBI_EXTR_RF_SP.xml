@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXTR_RF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXTR_RF_SP" 
+AS
+   V_STMT                        VARCHAR2(1000);
+   V_START_TIME                  DATE;
+   V_DURATION                    NUMBER;
+   V_PROJECTS_CNT                INTEGER;
+
+BEGIN
+   V_STMT := 'Extracting NBI_R_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME := SYSDATE;
+   
+   V_STMT := 'SELECTING PROJECTS COUNT';
+   SELECT COUNT (1)
+     INTO V_PROJECTS_CNT
+     FROM NBI_PROJECT_CURRENT_FACTS
+    WHERE ROWNUM = 1;
+
+   IF V_PROJECTS_CNT = 0
+   THEN
+     EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_R_FACTS';
+	 NBI_RF_SP;
+   ELSE
+	V_STMT := 'CALLING NBI_RF_EVENTS_SP';
+    NBI_RF_EVENTS_SP;
+   END IF;
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('NBI_EXTR_RF_SP Time: ' || V_DURATION);
+EXCEPTION
+   WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_EXTR_RF_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

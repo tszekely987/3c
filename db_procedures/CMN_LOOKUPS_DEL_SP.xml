@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUPS_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUPS_DEL_SP" (P_LOOKUP_TYPE IN VARCHAR2, P_LOOKUP_CODE IN VARCHAR2)
+IS
+   CURSOR C_LOOKUP_CODES (CP_LOOKUP_TYPE VARCHAR2)
+   IS
+      SELECT   LOOKUP_CODE,
+               ID
+      FROM     CMN_LOOKUPS
+      WHERE    NLS_UPPER(LOOKUP_TYPE) = NLS_UPPER(CP_LOOKUP_TYPE);
+   V_ID                          NUMBER;
+BEGIN
+   IF (P_LOOKUP_CODE IS NULL)/* delete all lookups */
+   THEN
+      FOR C_LOOKUP_CODE_REC IN C_LOOKUP_CODES (P_LOOKUP_TYPE)
+      LOOP
+         /* Delete captions for this lookup value */
+         CMN_CAPTIONS_NLS_DEL_SP ('CMN_LOOKUPS', C_LOOKUP_CODE_REC.ID);
+         /* Delete from the flat hierarchy */
+         DELETE
+             FROM CMN_LOOKUP_FLAT_HIERS
+             WHERE LOOKUP_ID = C_LOOKUP_CODE_REC.ID;
+         /* Delete lookup value */
+         DELETE
+           FROM CMN_LOOKUPS
+          WHERE ID = C_LOOKUP_CODE_REC.ID;
+      END LOOP;
+   ELSE/* lookup code is not null */
+      SELECT   NVL (MAX (ID), -9)
+      INTO     V_ID
+      FROM     CMN_LOOKUPS
+      WHERE   NLS_UPPER(LOOKUP_TYPE) = NLS_UPPER(P_LOOKUP_TYPE)
+      AND      NLS_UPPER(LOOKUP_CODE) = NLS_UPPER(P_LOOKUP_CODE);
+      IF (V_ID != -9)
+      THEN
+         /* Delete captions */
+         CMN_CAPTIONS_NLS_DEL_SP ('CMN_LOOKUPS', V_ID);
+         /* Delete from the flat hierarchy */
+         DELETE
+             FROM CMN_LOOKUP_FLAT_HIERS
+             WHERE LOOKUP_ID = V_ID;
+         /* Delete lookup value */
+         DELETE
+           FROM CMN_LOOKUPS
+          WHERE ID = V_ID;
+      END IF;
+   END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

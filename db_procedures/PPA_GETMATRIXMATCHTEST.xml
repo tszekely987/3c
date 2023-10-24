@@ -1,0 +1,607 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_GETMATRIXMATCHTEST</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_GETMATRIXMATCHTEST" 
+(
+  iMatrixID              NUMBER,
+  bSuppressResultSet     NUMBER DEFAULT 0,
+  bReturnAllMatches      NUMBER DEFAULT 0,
+
+  nNumVal1        IN OUT NUMBER,
+  nNumVal2        IN OUT NUMBER,
+  nNumVal3        IN OUT NUMBER,
+  cStrVal1        IN OUT VARCHAR2,
+  iBestMatchRowID IN OUT NUMBER,
+
+  cTransDate             DATE DEFAULT NULL,
+  cEntity                VARCHAR2 DEFAULT NULL,
+  cLocationID            VARCHAR2 DEFAULT NULL,
+  cDepartCode            VARCHAR2 DEFAULT NULL,
+  cClient                VARCHAR2 DEFAULT NULL,
+  cProject               VARCHAR2 DEFAULT NULL,
+  cCharge_Code           VARCHAR2 DEFAULT NULL,
+  cInput_Type            VARCHAR2 DEFAULT NULL,
+  cResource_Code         VARCHAR2 DEFAULT NULL,
+  cClientClass           VARCHAR2 DEFAULT NULL,
+  cProjClass             VARCHAR2 DEFAULT NULL,
+  --cCostClass             VARCHAR2 DEFAULT NULL,
+  cResource_Class        VARCHAR2 DEFAULT NULL,
+  cWipClass              VARCHAR2 DEFAULT NULL,
+  cResourceRole          VARCHAR2 DEFAULT NULL,
+  cTransType             VARCHAR2 DEFAULT NULL,
+  --cCurrencyCode          VARCHAR2,
+  cUserName              VARCHAR2,
+  RC1             IN OUT PPA_GETMATRIXMATCHTESTPkg.RCT1)
+AS
+  StoO_selcnt            INTEGER;
+  StoO_error             INTEGER;
+  StoO_rowcnt            INTEGER;
+  StoO_crowcnt           INTEGER := 0;
+  StoO_fetchstatus       INTEGER := 0;
+  StoO_errmsg            GLOBALPKG.STRING;
+  StoO_sqlstatus         INTEGER;
+  cCompVal1              GLOBALPKG.STRING;
+  cCompVal2              GLOBALPKG.STRING;
+  cCompVal3              GLOBALPKG.STRING;
+  cCompVal4              GLOBALPKG.STRING;
+  cCompVal5              GLOBALPKG.STRING;
+  cCompVal6              GLOBALPKG.STRING;
+  cCompVal7              GLOBALPKG.STRING;
+  cCompVal8              GLOBALPKG.STRING;
+  cCompVal9              GLOBALPKG.STRING;
+  cCompVal10             GLOBALPKG.STRING;
+  cCompVal               GLOBALPKG.STRING;
+  cCompColArray          GLOBALPKG.STRING;
+  cModifiedColArray      GLOBALPKG.STRING;
+  cCompOpArray           GLOBALPKG.STRING;
+  cDataTypeArray         GLOBALPKG.STRING;
+  iColCount              INTEGER;
+  iLup                   INTEGER;
+  cFieldName             GLOBALPKG.STRING;
+  cCompareCol            GLOBALPKG.STRING;
+  cCompareOp             GLOBALPKG.STRING;
+  cOrigCompareOp         GLOBALPKG.STRING;
+  cDataType              GLOBALPKG.STRING;
+  iBestMatchWeight       INTEGER;
+  dTransDate             DATE;
+  temp_rc1               PPA_MATRIXGETEXTENDEDMATCHPkg.RCT1;
+  temp_rt1               PPA_MATRIXGETEXTENDEDMATCHPkg.RT1;
+/*
+ * NOTE:
+ *
+ * If you alter this stored procedure you _MUST_ make sure that you changes are mirrored
+ * in the procedure: ppa_GetMatrixMatch -- used by the Core system -- inorder to make
+ * sure that the two procedures are in sync.
+ *
+ */
+BEGIN
+  ppa_GetMatrixMatchTest.nNumVal1 := 0;
+  ppa_GetMatrixMatchTest.nNumVal2 := 0;
+  ppa_GetMatrixMatchTest.nNumVal3 := 0;
+  ppa_GetMatrixMatchTest.cStrVal1 := '';
+
+  ppa_GetMatrixMatchTest.iBestMatchRowID := 0;
+  ppa_GetMatrixMatchTest.iBestMatchWeight := 0;
+  IF ppa_GetMatrixMatchTest.cTransDate IS NULL THEN
+    ppa_GetMatrixMatchTest.dTransDate := SYSDATE;
+	ELSE
+		ppa_GetMatrixMatchTest.dTransDate := ppa_GetMatrixMatchTest.cTransDate;
+	END IF;
+
+	DELETE FROM temp_tempgmmppa_GetMMTest;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO temp_tempgmmppa_GetMMTest (SeqNo, FieldName, CompareCol, CompareOp, OrigCompareOp, DataType)
+    SELECT columnNo, FieldName, SUBSTR('01', 1 + ( CompareCol * 1 ), 1), SUBSTR(LTRIM(TO_CHAR(CompareOp
+           + ( 999 * ( 1 - CompareCol ) ))), 1, 1), LTRIM(TO_CHAR(CompareOp)),
+           LTRIM(TO_CHAR(DataType))
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error != 0 THEN
+		BEGIN
+			raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+      RETURN;
+		END;
+  END IF;
+
+  ppa_GetMatrixMatchTest.iColCount := StoO_rowcnt;
+  ppa_GetMatrixMatchTest.iLup := 1;
+
+	&lt;&lt;i_loop1&gt;&gt;
+  WHILE ppa_GetMatrixMatchTest.iLup &lt;= ppa_GetMatrixMatchTest.iColCount
+    LOOP
+      BEGIN
+        BEGIN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+
+          SELECT RTRIM(FieldName),  CompareCol,  CompareOp,  OrigCompareOp,  DataType
+            INTO ppa_GetMatrixMatchTest.cFieldName, ppa_GetMatrixMatchTest.cCompareCol, ppa_GetMatrixMatchTest.cCompareOp, ppa_GetMatrixMatchTest.cOrigCompareOp, ppa_GetMatrixMatchTest.cDataType
+            FROM temp_tempgmmppa_GetMMTest
+           WHERE SeqNo = ppa_GetMatrixMatchTest.iLup;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN TOO_MANY_ROWS THEN
+              StoO_rowcnt := 2;
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+				END;
+
+        IF StoO_error != 0 THEN
+          BEGIN
+            raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+            RETURN;
+          END;
+        END IF;
+
+        IF ppa_GetMatrixMatchTest.iLup = 1 THEN
+          ppa_GetMatrixMatchTest.cCompColArray := ppa_GetMatrixMatchTest.cCompareCol;
+          ppa_GetMatrixMatchTest.cModifiedColArray := ppa_GetMatrixMatchTest.cOrigCompareOp;
+          ppa_GetMatrixMatchTest.cCompOpArray := ppa_GetMatrixMatchTest.cCompareOp;
+          ppa_GetMatrixMatchTest.cDataTypeArray := ppa_GetMatrixMatchTest.cDataType;
+        ELSE
+          ppa_GetMatrixMatchTest.cCompColArray := ppa_GetMatrixMatchTest.cCompColArray
+                                                  || ppa_GetMatrixMatchTest.cCompareCol;
+          ppa_GetMatrixMatchTest.cCompOpArray := ppa_GetMatrixMatchTest.cCompOpArray
+                                                  || ppa_GetMatrixMatchTest.cCompareOp;
+          ppa_GetMatrixMatchTest.cDataTypeArray :=  ppa_GetMatrixMatchTest.cDataTypeArray
+                                                  || ppa_GetMatrixMatchTest.cDataType;
+          ppa_GetMatrixMatchTest.cModifiedColArray := ppa_GetMatrixMatchTest.cModifiedColArray
+                                                  || ppa_GetMatrixMatchTest.cOrigCompareOp;
+        END IF;
+
+        ppa_GetMatrixMatchTest.cCompVal := NULL;
+
+        IF ppa_GetMatrixMatchTest.cCompareCol = '1' THEN
+          BEGIN
+            IF ppa_GetMatrixMatchTest.cFieldName = 'entity' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cEntity;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'locationid' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cLocationID;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'departcode' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cDepartCode;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'company_code' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cClient;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'project_code' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cProject;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'chargecode' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cCharge_Code;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'inputtype' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cInput_Type;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'resource_code' THEN
+               ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cResource_Code;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'clntclass' THEN
+               ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cClientClass;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'projclass' THEN
+               ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cProjClass;
+            --ELSIF ppa_GetMatrixMatchTest.cFieldName = 'costclass' THEN
+            --  ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cCostClass;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'resource_class' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cResource_Class;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'wipclass' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cWipClass;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'resource_role' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cResourceRole;
+            ELSIF ppa_GetMatrixMatchTest.cFieldName = 'transclass' THEN
+              ppa_GetMatrixMatchTest.cCompVal := ppa_GetMatrixMatchTest.cTransType;
+            END IF;
+          END;
+				END IF;
+
+        IF ppa_GetMatrixMatchTest.iLup = 1 THEN
+          ppa_GetMatrixMatchTest.cCompVal1 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 2 THEN
+          ppa_GetMatrixMatchTest.cCompVal2 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 3 THEN
+          ppa_GetMatrixMatchTest.cCompVal3 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 4 THEN
+          ppa_GetMatrixMatchTest.cCompVal4 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 5 THEN
+          ppa_GetMatrixMatchTest.cCompVal5 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 6 THEN
+          ppa_GetMatrixMatchTest.cCompVal6 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 7 THEN
+          ppa_GetMatrixMatchTest.cCompVal7 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 8 THEN
+          ppa_GetMatrixMatchTest.cCompVal8 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 9 THEN
+          ppa_GetMatrixMatchTest.cCompVal9 := ppa_GetMatrixMatchTest.cCompVal;
+        ELSIF ppa_GetMatrixMatchTest.iLup = 10 THEN
+          ppa_GetMatrixMatchTest.cCompVal10 := ppa_GetMatrixMatchTest.cCompVal;
+        END IF;
+
+        ppa_GetMatrixMatchTest.iLup :=  ppa_GetMatrixMatchTest.iLup + 1;
+      END;
+    END LOOP;
+
+/*
+   NOTE: The 9 below was arbitrarily chosen as the comp value since it was not used and we
+   needed to be able to allow matrices with no columns but have a date range selection only
+*/
+  IF ppa_GetMatrixMatchTest.cCompOpArray = NVL(RPAD('9', LENGTH('9') *  ppa_GetMatrixMatchTest.iColCount, '9'), '') THEN
+    BEGIN
+      IF ppa_GetMatrixMatchTest.bReturnAllMatches != 0 THEN
+        BEGIN
+          IF ppa_GetMatrixMatchTest.bReturnAllMatches &gt; 0 THEN
+            OPEN RC1 FOR
+            SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,  Value8,
+                   Value9,  Value10,  NumVal1,  NumVal2,  NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL, matrix_currency_code
+              FROM ppa_MatrixValues
+             WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+               and ppa_GetMatrixMatchTest.dTransDate BETWEEN FromDate AND ToDate
+               and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+             ORDER BY Value1, Value2, Value3, Value4, Value5, Value6,
+                   Value7, Value8, Value9, Value10;
+          ELSE
+            OPEN RC1 FOR
+            SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,  Value8,
+                   Value9,  Value10,  NumVal1,  NumVal2,  NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL, matrix_currency_code
+              FROM ppa_MatrixValues
+             WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+               and ppa_GetMatrixMatchTest.dTransDate  BETWEEN FromDate AND ToDate
+               and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+             ORDER BY Value1 DESC, Value2 DESC, Value3 DESC, Value4 DESC, Value5
+                   DESC, Value6 DESC, Value7 DESC, Value8 DESC, Value9 DESC, Value10 DESC;
+
+            BEGIN
+              StoO_error := 0;
+
+              SELECT 1
+                INTO StoO_rowcnt
+                FROM DUAL
+               WHERE EXISTS (SELECT MatrixRowKey, FromDate, ToDate, Value1, Value2, Value3,
+                                    Value4, Value5, Value6, Value7, Value8, Value9, Value10, NumVal1,
+                                    NumVal2, NumVal3, StrVal1
+                               FROM ppa_MatrixValues
+                              WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+                                and ppa_GetMatrixMatchTest.dTransDate BETWEEN FromDate AND ToDate
+                                and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1);
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  StoO_rowcnt := 0;
+                 StoO_selcnt := 0;
+               WHEN OTHERS THEN
+                 StoO_rowcnt := 0;
+                 StoO_selcnt := 0;
+                 StoO_error := SQLCODE;
+                 StoO_errmsg := SQLERRM;
+            END;
+
+            IF StoO_error != 0 THEN
+              BEGIN
+                raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+                RETURN;
+              END;
+            END IF;
+          END IF;
+        END;
+      ELSE
+        BEGIN
+          BEGIN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error  := 0;
+
+            SELECT MatrixRowKey,  NumVal1,  NumVal2,  NumVal3,  StrVal1
+              INTO ppa_GetMatrixMatchTest.iBestMatchRowID, ppa_GetMatrixMatchTest.nNumVal1, ppa_GetMatrixMatchTest.nNumVal2, ppa_GetMatrixMatchTest.nNumVal3, ppa_GetMatrixMatchTest.cStrVal1
+              FROM ppa_MatrixValues
+             WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+               and ppa_GetMatrixMatchTest.dTransDate  BETWEEN FromDate AND ToDate
+               and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+             ORDER BY Value1, Value2, Value3, Value4, Value5, Value6,
+                   Value7, Value8, Value9, Value10;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+              WHEN NO_DATA_FOUND THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+              WHEN OTHERS THEN
+                StoO_rowcnt := 0;
+                StoO_selcnt := 0;
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+
+          IF StoO_error != 0 THEN
+            BEGIN
+              raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+              RETURN;
+            END;
+          END IF;
+
+          IF StoO_rowcnt &lt; 1 THEN
+            ppa_GetMatrixMatchTest.nNumVal1 := 0;
+            ppa_GetMatrixMatchTest.nNumVal2 := 0;
+            ppa_GetMatrixMatchTest.nNumVal3 := 0;
+            ppa_GetMatrixMatchTest.cStrVal1 := '';
+            ppa_GetMatrixMatchTest.iBestMatchRowID := 0;
+          END IF;
+        END;
+      END IF;
+    END;
+	ELSE
+    IF ppa_GetMatrixMatchTest.cModifiedColArray != NVL(RPAD('0', LENGTH('0') *  ppa_GetMatrixMatchTest.iColCount, '0'), 'UseExtended') THEN
+      BEGIN
+        DELETE FROM temp_tempResultsPAC_MNT_MATRIX;
+          BEGIN
+            ppa_MatrixGetExtendedMatch(ppa_GetMatrixMatchTest.iMatrixID,
+                                       ppa_GetMatrixMatchTest.bReturnAllMatches,
+                                       ppa_GetMatrixMatchTest.cCompColArray,
+                                       ppa_GetMatrixMatchTest.cModifiedColArray,
+                                       ppa_GetMatrixMatchTest.iColCount,
+                                       ppa_GetMatrixMatchTest.dTransDate,
+                                       ppa_GetMatrixMatchTest.iBestMatchRowID,
+                                       ppa_GetMatrixMatchTest.nNumVal1,
+                                       ppa_GetMatrixMatchTest.nNumVal2,
+                                       ppa_GetMatrixMatchTest.nNumVal3,
+                                       ppa_GetMatrixMatchTest.cStrVal1,
+                                       ppa_GetMatrixMatchTest.cCompVal1,
+                                       ppa_GetMatrixMatchTest.cCompVal2,
+                                       ppa_GetMatrixMatchTest.cCompVal3,
+                                       ppa_GetMatrixMatchTest.cCompVal4,
+                                       ppa_GetMatrixMatchTest.cCompVal5,
+                                       ppa_GetMatrixMatchTest.cCompVal6,
+                                       ppa_GetMatrixMatchTest.cCompVal7,
+                                       ppa_GetMatrixMatchTest.cCompVal8,
+                                       ppa_GetMatrixMatchTest.cCompVal9,
+                                       ppa_GetMatrixMatchTest.cCompVal10,
+                                       temp_rc1);
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+
+          BEGIN
+            FETCH temp_rc1 INTO temp_rt1;
+              LOOP
+                EXIT WHEN temp_rc1%NOTFOUND;
+
+                BEGIN
+                  StoO_error := 0;
+                  StoO_rowcnt  := 0;
+
+                  INSERT INTO temp_tempResultsPAC_MNT_MATRIX
+                  (ROWKEY, FROMDATE, TODATE, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7, DATA8, DATA9,  DATA10,
+                   NUMBER1, NUMBER2, NUMBER3, STRDATA1)
+                  VALUES
+                  (temp_rt1.MatrixRowKey,temp_rt1.FromDate,temp_rt1.ToDate,temp_rt1.Value1,temp_rt1.Value2,temp_rt1.Value3,
+						   		 temp_rt1.Value4,temp_rt1.Value5,temp_rt1.Value6,temp_rt1.Value7,temp_rt1.Value8,
+                   temp_rt1.Value9,temp_rt1.Value10,
+                   temp_rt1.NumVal1,temp_rt1.NumVal2,temp_rt1.NumVal3,temp_rt1.StrVal1);
+
+                  StoO_rowcnt := SQL%ROWCOUNT;
+                  EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                      NULL;
+                    WHEN OTHERS THEN
+                      StoO_error := SQLCODE;
+                      StoO_errmsg := SQLERRM;
+                END;
+
+                FETCH temp_rc1 INTO temp_rt1;
+              END LOOP;
+
+              EXCEPTION
+                WHEN NO_DATA_FOUND THEN
+                  NULL;
+                WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;
+          END;
+
+          OPEN RC1 FOR
+          SELECT ROWKEY, FROMDATE, TODATE, DATA1, DATA2, DATA3, DATA4, DATA5, DATA6, DATA7, DATA8, DATA9,  DATA10, NUMBER1, NUMBER2, NUMBER3, STRDATA1, null, null, null, null, null,matrix_currency_code
+            FROM temp_tempResultsPAC_MNT_MATRIX;
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          DELETE FROM temp_tempResultsPAC_MNT_MATRIX;
+      END;
+		ELSE
+      BEGIN
+        IF ppa_GetMatrixMatchTest.bReturnAllMatches != 0 THEN
+          BEGIN
+            IF ppa_GetMatrixMatchTest.bReturnAllMatches &gt; 0 THEN
+              OPEN RC1 FOR
+              SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,  Value8,  Value9,
+                     Value10,  NumVal1,  NumVal2,  NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL, matrix_currency_code
+                FROM ppa_MatrixValues
+               WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+                 and ppa_GetMatrixMatchTest.dTransDate  BETWEEN FromDate AND ToDate
+                 and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+                 and NVL(RTRIM(Value1), NVL(ppa_GetMatrixMatchTest.cCompVal1,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal1, NVL(RTRIM(Value1), ' '))
+                 and NVL(RTRIM(Value2), NVL(ppa_GetMatrixMatchTest.cCompVal2,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal2, NVL(RTRIM(Value2), ' '))
+                 and NVL(RTRIM(Value3), NVL(ppa_GetMatrixMatchTest.cCompVal3,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal3, NVL(RTRIM(Value3), ' '))
+                 and NVL(RTRIM(Value4), NVL(ppa_GetMatrixMatchTest.cCompVal4,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal4, NVL(RTRIM(Value4), ' '))
+                 and NVL(RTRIM(Value5), NVL(ppa_GetMatrixMatchTest.cCompVal5,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal5, NVL(RTRIM(Value5), ' '))
+                 and NVL(RTRIM(Value6), NVL(ppa_GetMatrixMatchTest.cCompVal6,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal6, NVL(RTRIM(Value6), ' '))
+                 and NVL(RTRIM(Value7), NVL(ppa_GetMatrixMatchTest.cCompVal7,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal7, NVL(RTRIM(Value7), ' '))
+                 and NVL(RTRIM(Value8), NVL(ppa_GetMatrixMatchTest.cCompVal8,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal8, NVL(RTRIM(Value8), ' '))
+                 and NVL(RTRIM(Value9), NVL(ppa_GetMatrixMatchTest.cCompVal9,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal9, NVL(RTRIM(Value9), ' '))
+                 and NVL(RTRIM(Value10), NVL(ppa_GetMatrixMatchTest.cCompVal10,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal10, NVL(RTRIM(Value10),' '))
+               ORDER BY Value1, Value2, Value3, Value4, Value5, Value6,
+                     Value7, Value8, Value9, Value10;
+/*
+             * The following conditions will cause the core system procedure problems and is
+             * why this procedure exists
+               NOTE: jeff moved this precise change into core, so can we eliminate test version:1:2:3 cdc 4/31
+             */
+            ELSE
+              OPEN RC1 FOR
+              SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,
+                     Value8,  Value9,  Value10,  NumVal1,  NumVal2,NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL,
+                     matrix_currency_code
+                FROM ppa_MatrixValues
+               WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+                 and ppa_GetMatrixMatchTest.dTransDate  BETWEEN FromDate AND ToDate
+                 and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+                 and NVL(RTRIM(Value1), NVL(ppa_GetMatrixMatchTest.cCompVal1, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal1, NVL(RTRIM(Value1), ' '))
+                 and NVL(RTRIM(Value2), NVL(ppa_GetMatrixMatchTest.cCompVal2, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal2, NVL(RTRIM(Value2), ' '))
+                 and NVL(RTRIM(Value3), NVL(ppa_GetMatrixMatchTest.cCompVal3, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal3, NVL(RTRIM(Value3), ' '))
+                 and NVL(RTRIM(Value4), NVL(ppa_GetMatrixMatchTest.cCompVal4, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal4, NVL(RTRIM(Value4), ' '))
+                 and NVL(RTRIM(Value5), NVL(ppa_GetMatrixMatchTest.cCompVal5, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal5, NVL(RTRIM(Value5), ' '))
+                 and NVL(RTRIM(Value6), NVL(ppa_GetMatrixMatchTest.cCompVal6, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal6, NVL(RTRIM(Value6), ' '))
+                 and NVL(RTRIM(Value7), NVL(ppa_GetMatrixMatchTest.cCompVal7, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal7, NVL(RTRIM(Value7), ' '))
+                 and NVL(RTRIM(Value8), NVL(ppa_GetMatrixMatchTest.cCompVal8, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal8, NVL(RTRIM(Value8), ' '))
+                 and NVL(RTRIM(Value9), NVL(ppa_GetMatrixMatchTest.cCompVal9, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal9, NVL(RTRIM(Value9), ' '))
+                 and NVL(RTRIM(Value10), NVL(ppa_GetMatrixMatchTest.cCompVal10, ' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal10, NVL(RTRIM(Value10), ' '))
+               ORDER BY Value1 DESC, Value2 DESC, Value3 DESC, Value4 DESC, Value5 DESC,
+                     Value6 DESC, Value7 DESC, Value8 DESC, Value9 DESC, Value10 DESC;
+
+              BEGIN
+                StoO_error := 0;
+
+                SELECT 1
+                  INTO StoO_rowcnt
+                  FROM DUAL
+                 WHERE EXISTS (SELECT 1
+                                 FROM ppa_MatrixValues
+                                WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+                                  and ppa_GetMatrixMatchTest.dTransDate BETWEEN FromDate AND ToDate
+                                  and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+                                  and NVL(RTRIM(Value1), NVL(ppa_GetMatrixMatchTest.cCompVal1,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal1, NVL(RTRIM(Value1),' '))
+                                  and NVL(RTRIM(Value2), NVL(ppa_GetMatrixMatchTest.cCompVal2,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal2, NVL(RTRIM(Value2),' '))
+                                  and NVL(RTRIM(Value3), NVL(ppa_GetMatrixMatchTest.cCompVal3,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal3, NVL(RTRIM(Value3),' '))
+                                  and NVL(RTRIM(Value4), NVL(ppa_GetMatrixMatchTest.cCompVal4,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal4, NVL(RTRIM(Value4),' '))
+                                  and NVL(RTRIM(Value5), NVL(ppa_GetMatrixMatchTest.cCompVal5,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal5, NVL(RTRIM(Value5),' '))
+                                  and NVL(RTRIM(Value6), NVL(ppa_GetMatrixMatchTest.cCompVal6,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal6, NVL(RTRIM(Value6),' '))
+                                  and NVL(RTRIM(Value7), NVL(ppa_GetMatrixMatchTest.cCompVal7,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal7, NVL(RTRIM(Value7),' '))
+                                  and NVL(RTRIM(Value8), NVL(ppa_GetMatrixMatchTest.cCompVal8,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal8, NVL(RTRIM(Value8),' '))
+                                  and NVL(RTRIM(Value9), NVL(ppa_GetMatrixMatchTest.cCompVal9,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal9, NVL(RTRIM(Value9),' '))
+                                  and NVL(RTRIM(Value10), NVL(ppa_GetMatrixMatchTest.cCompVal10,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal10, NVL(RTRIM(Value10), ' ')) );
+
+                EXCEPTION
+                  WHEN NO_DATA_FOUND THEN
+                    StoO_rowcnt := 0;
+                    StoO_selcnt := 0;
+                  WHEN OTHERS THEN
+                    StoO_rowcnt := 0;
+                    StoO_selcnt := 0;
+                    StoO_error := SQLCODE;
+                    StoO_errmsg := SQLERRM;
+              END;
+
+              IF StoO_error != 0 THEN
+                BEGIN
+                  raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+                  RETURN;
+                END;
+              END IF;
+            END IF;
+/*
+             * The following conditions will cause the core system procedure problems and is
+             * why this procedure exists
+             */
+          END;
+        ELSE
+          BEGIN
+            BEGIN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error  := 0;
+
+              OPEN RC1 FOR
+              SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,  Value5,  Value6,  Value7,  Value8,  Value9,
+                     Value10,  NumVal1,  NumVal2,  NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL, matrix_currency_code
+                FROM ppa_MatrixValues
+               WHERE MatrixKey = ppa_GetMatrixMatchTest.iMatrixID
+                 and ppa_GetMatrixMatchTest.dTransDate  BETWEEN FromDate AND ToDate
+                 and PAC_FOS_VALID_MATRIX_ROW_FCT(cUserName, MatrixRowKey) = 1
+                 and NVL(RTRIM(Value1), NVL(ppa_GetMatrixMatchTest.cCompVal1,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal1, NVL(RTRIM(Value1), ' '))
+                 and NVL(RTRIM(Value2), NVL(ppa_GetMatrixMatchTest.cCompVal2,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal2, NVL(RTRIM(Value2), ' '))
+                 and NVL(RTRIM(Value3), NVL(ppa_GetMatrixMatchTest.cCompVal3,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal3, NVL(RTRIM(Value3), ' '))
+                 and NVL(RTRIM(Value4), NVL(ppa_GetMatrixMatchTest.cCompVal4,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal4, NVL(RTRIM(Value4), ' '))
+                 and NVL(RTRIM(Value5), NVL(ppa_GetMatrixMatchTest.cCompVal5,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal5, NVL(RTRIM(Value5), ' '))
+                 and NVL(RTRIM(Value6), NVL(ppa_GetMatrixMatchTest.cCompVal6,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal6, NVL(RTRIM(Value6), ' '))
+                 and NVL(RTRIM(Value7), NVL(ppa_GetMatrixMatchTest.cCompVal7,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal7, NVL(RTRIM(Value7), ' '))
+                 and NVL(RTRIM(Value8), NVL(ppa_GetMatrixMatchTest.cCompVal8,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal8, NVL(RTRIM(Value8), ' '))
+                 and NVL(RTRIM(Value9), NVL(ppa_GetMatrixMatchTest.cCompVal9,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal9, NVL(RTRIM(Value9), ' '))
+                 and NVL(RTRIM(Value10), NVL(ppa_GetMatrixMatchTest.cCompVal10,' ')) = NVL(ppa_GetMatrixMatchTest.cCompVal10, NVL(RTRIM(Value10),' '))
+               ORDER BY Value1 DESC, Value2 DESC, Value3 DESC, Value4 DESC, Value5 DESC, Value6 DESC, Value7 DESC, Value8 DESC, Value9 DESC, Value10 DESC;
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+                EXCEPTION
+                  WHEN TOO_MANY_ROWS THEN
+                    StoO_rowcnt := 2;
+                  WHEN NO_DATA_FOUND THEN
+                    StoO_rowcnt := 0;
+                    StoO_selcnt := 0;
+                  WHEN OTHERS THEN
+                    StoO_rowcnt := 0;
+                    StoO_selcnt := 0;
+                    StoO_error := SQLCODE;
+                    StoO_errmsg := SQLERRM;
+            END;
+
+            IF StoO_error != 0 THEN
+              BEGIN
+                raise_application_error(-20089, 'Error! StoO_error = ' || StoO_error || ' StoO_errmsg = ' || StoO_errmsg );
+                RETURN;
+              END;
+            END IF;
+/*
+             * The following conditions will cause the core system procedure problems and is
+             * why this procedure exists
+             */
+            IF StoO_rowcnt &lt; 1 THEN
+              ppa_GetMatrixMatchTest.nNumVal1 := 0;
+              ppa_GetMatrixMatchTest.nNumVal2 := 0;
+              ppa_GetMatrixMatchTest.nNumVal3 := 0;
+              ppa_GetMatrixMatchTest.cStrVal1 := '';
+              ppa_GetMatrixMatchTest.iBestMatchRowID := 0;
+            END IF;
+          END;
+        END IF;
+      END;
+		END IF;
+  END IF;
+
+  IF ppa_GetMatrixMatchTest.bSuppressResultSet = 0 and ppa_GetMatrixMatchTest.bReturnAllMatches = 0 THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+	END IF;
+END ppa_GetMatrixMatchTest;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

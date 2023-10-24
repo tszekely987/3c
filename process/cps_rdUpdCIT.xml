@@ -1,0 +1,2433 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="cps_rdUpdCIT" createdBy="admin" endStep="Finish" source="customer" startEvent="update" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls description="Update the Linked Custom Investment Type (CIT) from the Roadmap Items (dates, Agile metrics). Syncs just one type of CIT based on a script parameter. Duplicate the GEL step with a different script parameter if more than one CIT is needed." languageCode="en" name="Roadmap CIT Update"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <StartCondition><![CDATA[(rdm_roadmap.clr_upd_linkedcit != rdm_roadmap.clr_upd_linkedcit__oldValue) && (rdm_roadmap.clr_upd_linkedcit == 1)]]></StartCondition>
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisRoadmap" objectType="rdm_roadmap" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="runGEL"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="runGEL" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="run the GEL" languageCode="en" name="Update CIT"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="runGEL" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Run GEL"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:file="jelly:com.niku.union.gel.FileTagLibrary" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:u="jelly:util" xmlns:xog="http://www.niku.com/xog" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <!-- Copyright 2020 Broadcom. All Rights Reserved.  -->
+                          <!-- Clarity Roadmap Sync back to linked Business Outcomes
+
+    06/26/2020 - Matt Schulze - Cleanup Logging messages, added Verbose Log Messages parameter
+    05/28/2020 - Matt Schulze - Better Null field handling
+    05/13/2020 - Matt Schulze - Cleaned up logging
+    05/13/2020 - Matt Schulze - Added pagination to Roadmap Item calls to handle the _next attribute
+    05/04/2020 - Matt Schulze - Added the remainder of the Agile Metrics
+    05/04/2020 - Matt Schulze - Refactor REST calls using org.apache.http vs java.net.URL
+    04/30/2020 - Matt Schulze - Code cleanup, log and error messages added
+    04/29/2020 - Matt Schulze - Added date formatting required for scheduleDates in CIO objects
+    04/27/2020 - Matt Schulze - Initial Build
+
+    Notes: 
+      ClarityUser: admin
+      RI_Linked_ObjectId: clr_epic
+      RI_Linked_Object_AttrId: custClrEpics
+
+      Pushes Roadmap Item attributes to the originating linked Business Outcome object
+      Only uses the POR Roadmap Items
+      Should be run as a process from a Roadmap, processes only that single Roadmap
+      Should be run based as part of a process based on a boolean (visible on the Roadmap). The process will uncheck the boolean.
+
+    Processing parameters - Optional
+      RI_Linked_ObjectId      - Specifies the Object ID of the linked CIO to the Roadmap Item. Default is "clr_epic"
+      RI_Linked_Object_AttrId - Specifies the API Attribute ID of the linked CIO to the Roadmap Item. Default is "custClrEpics"
+
+    Testing / Debugging variables
+      bSkipRESTUpdate     = if true, then we run through everything but do not update the BO. Used for looking at the debug output without updating.
+    -->
+                          <!-- Debug Flags, which get disabled when running in a PPM process -->
+                          <core:set value="true" var="bDebug"/>
+                          <core:set value="true" var="bDebugREST"/>
+                          <core:set value="true" var="bDebugJSON"/>
+                          <core:set value="true" var="bDebugVerLog"/>
+                          <core:if test="${gel_processId != null}">
+                            <core:set value="Xtrue" var="bDebug"/>
+                            <core:set value="Xtrue" var="bDebugREST"/>
+                            <core:set value="Xtrue" var="bDebugJSON"/>
+                            <core:set value="Xtrue" var="bDebugVerLog"/>
+                          </core:if>
+                          <!-- This is just for Debugging. true will skip updates to the target linked CIO (Business Outcomes) -->
+                          <core:set value="Xtrue" var="bSkipRESTUpdate"/>
+                          <core:if test="${bSkipRESTUpdate}">
+                            <core:set value="bSkipRESTUpdate: ${bSkipRESTUpdate}" var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log>${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <!-- ___ Specify which demo dataset we are using, for field names  ___ -->
+                          <gel:parameter default="Klean" var="DemoDataset"/>
+                          <core:set value="false" var="bCustomFieldsKleanOOB"/>
+                          <core:set value="false" var="bCustomFieldsKleanXtra"/>
+                          <core:set value="false" var="bCustomFieldsKurt"/>
+                          <core:set value="false" var="bCustomFieldsFIS"/>
+                          <core:if test="${(DemoDataset != null)}">
+                            <core:choose>
+                              <core:when test="${DemoDataset.equalsIgnoreCase('Klean')}">
+                                <core:set value="true" var="bCustomFieldsKleanOOB"/>
+                                <core:set value="true" var="bCustomFieldsKleanXtra"/>
+                              </core:when>
+                              <core:when test="${DemoDataset.equalsIgnoreCase('Kurt')}">
+                                <core:set value="true" var="bCustomFieldsKurt"/>
+                              </core:when>
+                              <core:when test="${DemoDataset.equalsIgnoreCase('FIS')}">
+                                <core:set value="true" var="bCustomFieldsFIS"/>
+                              </core:when>
+                              <core:otherwise>
+                                <!-- default to Klean for presales -->
+                                <core:set value="true" var="bCustomFieldsKleanOOB"/>
+                                <core:set value="true" var="bCustomFieldsKleanXtra"/>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <core:if test="${bDebugVerLog}">
+                            <core:set value="DemoDataset(${DemoDataset})  KleanOOB(${bCustomFieldsKleanOOB}) KleanXtra(${bCustomFieldsKleanXtra}) Kurt(${bCustomFieldsKurt}) FIS(${bCustomFieldsFIS}) " var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <!-- Set some defaults or get parameters from the system -->
+                          <gel:parameter default="admin" var="ClarityUser"/>
+                          <!-- ___ Push T-Shirt Size to CIT ___ -->
+                          <gel:parameter default="" var="PushTShirtSizeToCIT"/>
+                          <core:set value="false" var="bPushTShirtSizeToCIT"/>
+                          <core:if test="${(PushTShirtSizeToCIT != null)}">
+                            <!-- AND -->
+                            <core:if test="${(PushTShirtSizeToCIT.equalsIgnoreCase('Yes') || PushTShirtSizeToCIT.equalsIgnoreCase('true'))}">
+                              <core:set value="true" var="bPushTShirtSizeToCIT"/>
+                              <core:if test="${bDebug}">
+                                <gel:out/>
+                                <gel:out>Setting to True: Push T-Shirt Size to CIT</gel:out>
+                              </core:if>
+                            </core:if>
+                          </core:if>
+                          <core:if test="${bDebugVerLog}">
+                            <core:set value="Push T-Shirt Size to CIT: ${bPushTShirtSizeToCIT} " var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <!-- ___ Specify the Object ID of the linked CIO to the Roadmap Item ___ -->
+                          <gel:parameter default="clr_epic" var="RI_Linked_ObjectId"/>
+                          <!-- defaults to clr_epic -->
+                          <core:if test="${(RI_Linked_ObjectId != null)}">
+                            <core:set value="${RI_Linked_ObjectId}" var="sRIlinkedObjectId"/>
+                          </core:if>
+                          <!-- ___Specify the API Attribute ID of the linked CIO to the Roadmap Item ___ -->
+                          <gel:parameter default="custClrEpics" var="RI_Linked_Object_AttrId"/>
+                          <!-- defaults to custClrEpics -->
+                          <core:if test="${(RI_Linked_Object_AttrId != null)}">
+                            <core:set value="${RI_Linked_Object_AttrId}" var="sRIlinkedObjectAttrId"/>
+                          </core:if>
+                          <!-- ___ Verbose Log Messages  ___ -->
+                          <gel:parameter default="" var="VerboseLogMessages"/>
+                          <core:set value="false" var="bVerboseLogMessages"/>
+                          <core:if test="${(VerboseLogMessages != null)}">
+                            <!-- AND -->
+                            <core:if test="${(VerboseLogMessages.equalsIgnoreCase('Yes') || VerboseLogMessages.equalsIgnoreCase('true'))}">
+                              <core:set value="true" var="bVerboseLogMessages"/>
+                              <core:if test="${bDebug}">
+                                <gel:out/>
+                                <gel:out>Setting to True: Verbose Log Messages</gel:out>
+                              </core:if>
+                              <core:set value="true" var="bDebugVerLog"/>
+                            </core:if>
+                          </core:if>
+                          <core:if test="${bDebugVerLog}">
+                            <core:set value="Verbose Log Messages: ${bDebugVerLog} " var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <!-- Basic Rally Variables -->
+                          <core:set value="/slm/webservice/v2.0" var="RallyUrlPath"/>
+                          <!-- becomes: ${RallyHost}${RallyUrlPath}  -->
+                          <core:set value="/ppm/rest/v1" var="PPMUrlPath"/>
+                          <!-- becomes: ${XOGURL}${PPMUrlPath}  -->
+                          <!-- CA PPM XOG URL Settings -->
+                          <core:invokeStatic className="com.niku.union.config.ConfigurationManager" method="getInstance" var="config"/>
+                          <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getId()}" var="WebServerid"/>
+                          <core:if test="${WebServerid == 'app'}">
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(0).getEntryUrl()}" var="EntryURL"/>
+                          </core:if>
+                          <core:if test="${WebServerid != 'app'}">
+                            <!-- Try the second entry to see if it is the app definition -->
+                            <core:set value="${config.getProperties().getWebServer().getWebServerInstance(1).getId()}" var="WebServerid"/>
+                            <core:if test="${WebServerid == 'app'}">
+                              <core:set value="${config.getProperties().getWebServer().getWebServerInstance(1).getEntryUrl()}" var="EntryURL"/>
+                            </core:if>
+                          </core:if>
+                          <!-- XOGURL can be used for debugging to override local URL -->
+                          <core:if test="${XOGURL == null || XOGURL.length() == 0}">
+                            <core:set value="${EntryURL}" var="XOGURL"/>
+                          </core:if>
+                          <core:if test="${bDebugVerLog}">
+                            <core:set value="Clarity URL: ${XOGURL}" var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                          </core:if>
+                          <!--Get sessionID by Username-->
+                          <!-- <gel:parameter default="admin" var="username"/> -->
+                          <core:new className="com.niku.union.security.DefaultSecurityIdentifier" var="secId"/>
+                          <core:invokeStatic className="com.niku.union.security.UserSessionControllerFactory" method="getInstance" var="userSessionCtrl"/>
+                          <core:set value="${userSessionCtrl.init(ClarityUser,secId)}" var="secId"/>
+                          <core:set value="${secId.getSessionId()}" var="sessionID"/>
+                          <core:set value="authToken" var="h_authToken"/>
+                          <core:set value="${sessionID}" var="v_authToken"/>
+                          <!-- ___ Use the Roadmap Internal ID from the Object Id tied to the process. Can optionally set it for debugging  ___ -->
+                          <core:choose>
+                            <core:when test="${gel_objectInstanceId == null}">
+                              <!-- only add the specific Project Id if one was given -->
+                              <core:if test="${(v_PPMRoadmapIntId != null)}">
+                                <!-- AND -->
+                                <core:if test="${(v_PPMRoadmapIntId.length() &gt; 0)}">
+                                  <core:set value="${v_PPMRoadmapIntId}" var="v_RoadmapIntId"/>
+                                </core:if>
+                              </core:if>
+                            </core:when>
+                            <core:otherwise>
+                              <core:set value="${gel_objectInstanceId}" var="v_RoadmapIntId"/>
+                            </core:otherwise>
+                          </core:choose>
+                          <core:set value="Using Roadmap Int Id: ${v_RoadmapIntId}" var="logMessage"/>
+                          <core:choose>
+                            <core:when test="${gel_processId == null}">
+                              <gel:out>${logMessage}</gel:out>
+                            </core:when>
+                            <core:otherwise>
+                              <gel:log level="INFO">${logMessage}</gel:log>
+                            </core:otherwise>
+                          </core:choose>
+                          <core:if test="${(v_RoadmapIntId == null)}">
+                            <core:set value="ERROR: Roadmap Internal Id is missing. This script runs for only a single Roadmap as part of a Roadmap object process." var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="ERROR">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                            <core:if test="${bDebug}">
+                              <gel:out>Breaking out of GEL... ERROR: Roadmap Internal Id is missing. </gel:out>
+                            </core:if>
+                            <core:break/>
+                          </core:if>
+                          <!-- This is outbound Apache HttpClient class for the REST calls to Clarity -->
+                          <core:invokeStatic className="org.apache.http.impl.client.HttpClients" method="createDefault" var="client"/>
+                          <!-- ________________________ -->
+                          <!-- ___ Get the list of the POR Scenarios (Plan of Record) for just this Roadmap, which should just be one. :-)   ___ -->
+                          <core:catch var="exvar5">
+                            <!--
+    /ppm/rest/v1/scenarios?
+    fields: name,type,associatedObjectID,isPlanOfRecord,code
+    filter: (type = 'rdm_roadmap') and (associatedObjectID = 5004001) and (isPlanOfRecord = 'true')
+    -->
+                            <core:set var="httpRESTURL">${XOGURL}${PPMUrlPath}/scenarios</core:set>
+                            <core:new className="org.apache.http.client.utils.URIBuilder" var="httpURI">
+                              <core:arg type="java.lang.String" value="${httpRESTURL}"/>
+                            </core:new>
+                            <core:expr value="${httpURI.setParameter(&quot;fields&quot;, &quot;name,type,associatedObjectID,isPlanOfRecord,code&quot;)}"/>
+                            <core:expr value="${httpURI.setParameter(&quot;limit&quot;, &quot;200&quot;)}"/>
+                            <core:if test="${v_RoadmapIntId != null}">
+                              <core:if test="${v_RoadmapIntId.length() &gt; 0}">
+                                <core:set value="((type = 'rdm_roadmap') and (associatedObjectID = ${v_RoadmapIntId}) and (isPlanOfRecord = 'true'))" var="z_filter"/>
+                                <core:expr value="${httpURI.setParameter(&quot;filter&quot;, z_filter)}"/>
+                              </core:if>
+                            </core:if>
+                            <core:if test="${bDebugREST}">
+                              <gel:out>httpRESTURL: ${httpURI}</gel:out>
+                            </core:if>
+                            <core:new className="org.apache.http.client.methods.HttpGet" var="httpget">
+                              <core:arg type="java.net.URI" value="${httpURI.build()}"/>
+                            </core:new>
+                            <core:if test="${bDebugREST}">
+                              <gel:out>httpget.getURI():  ${httpget.getURI()}</gel:out>
+                            </core:if>
+                            <core:expr value="${httpget.setHeader(&quot;Content-type&quot;, &quot;application/json&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(&quot;Accept&quot;, &quot;application/json&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(&quot;Connection&quot;, &quot;keep-alive&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(h_authToken, v_authToken)}"/>
+                            <!-- Should be just client.execute(httpget), but we need to identify the httpget class by specifying it using the core:arg parameter -->
+                            <core:invoke method="execute" on="${client}" var="response">
+                              <core:arg type="org.apache.http.client.methods.HttpGet" value="${httpget}"/>
+                            </core:invoke>
+                            <core:set value="${response.getStatusLine().getStatusCode()}" var="response_code"/>
+                            <core:set value="${response.getStatusLine().getReasonPhrase()}" var="response_msg"/>
+                            <!-- this is usually empty, pointless -->
+                            <core:if test="${bDebugREST}">
+                              <gel:out>getStatusLine():  ${response.getStatusLine()}</gel:out>
+                            </core:if>
+                            <core:set value="${null}" var="httpInputStream"/>
+                            <core:set value="${response.getEntity()}" var="entity"/>
+                            <core:if test="${entity != null}">
+                              <core:set value="${entity.getContent()}" var="httpInputStream"/>
+                            </core:if>
+                            <core:if test="${response_code != null}">
+                              <core:if test="${(response_code != 200)}">
+                                <core:set value="ERROR on REST. response_code(${response_code}) response_msg: ${response_msg} " var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:if test="${httpInputStream == null}">
+                                <core:set value="httpInputStream == NULL, getHeaderField(0): ${response_hdr} response_code(${response_code}) response_msg: ${response_msg}  httpRESTURL: ${httpRESTURL}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <!-- OR -->
+                              <core:if test="${httpInputStream != null}">
+                                <core:new className="java.io.InputStreamReader" var="v_Input">
+                                  <core:arg type="java.io.InputStream" value="${httpInputStream}"/>
+                                </core:new>
+                                <core:new className="java.io.BufferedReader" var="v_InputData">
+                                  <core:arg type="java.io.InputStreamReader" value="${v_Input}"/>
+                                </core:new>
+                                <core:set value="${v_InputData.readLine()}" var="httpData"/>
+                                <core:if test="${bDebugREST}">
+                                  <gel:out>httpData: ${httpData}</gel:out>
+                                </core:if>
+                                <!-- free up some resources -->
+                                <core:set value="${httpInputStream.close()}" var="dummy"/>
+                                <core:if test="${(response_code == 200) }">
+                                  <core:if test="${bDebug}">
+                                    <core:set value="Getting list of POR Scenarios..." var="logMessage"/>
+                                    <core:choose>
+                                      <core:when test="${gel_processId == null}">
+                                        <gel:out>${logMessage}</gel:out>
+                                      </core:when>
+                                      <core:otherwise>
+                                        <gel:log level="INFO">${logMessage}</gel:log>
+                                      </core:otherwise>
+                                    </core:choose>
+                                  </core:if>
+                                </core:if>
+                                <!-- (response_code == 200) -->
+                                <!-- JSON Response -->
+                                <core:new className="org.json.JSONObject" var="jsonResp">
+                                  <core:arg type="java.lang.String" value="${httpData}"/>
+                                </core:new>
+                              </core:if>
+                              <!-- (httpInputStream != null) -->
+                            </core:if>
+                            <!-- (response_code != null) -->
+                            <core:if test="${jsonResp == null}">
+                              <core:if test="${bDebug}">
+                                <core:if test="${bDebug}">
+                                  <gel:out>jsonResp is null</gel:out>
+                                </core:if>
+                              </core:if>
+                            </core:if>
+                            <core:set value="" var="v_PORScenarios"/>
+                            <core:if test="${jsonResp != null}">
+                              <!-- Results, in a single entry array  -->
+                              <core:set value="${jsonResp.getJSONArray('_results')}" var="jarrRArray"/>
+                              <core:if test="${jarrRArray == null}">
+                                <core:if test="${bDebug}">
+                                  <core:if test="${bDebug}">
+                                    <gel:out>jarrRArray is null</gel:out>
+                                  </core:if>
+                                </core:if>
+                              </core:if>
+                              <core:if test="${jarrRArray != null}">
+                                <core:set value="${jarrRArray.length()}" var="len_jarrRArray"/>
+                                <core:if test="${bDebug}">
+                                  <gel:out>POR Scenarios # Results: ${len_jarrRArray}</gel:out>
+                                </core:if>
+                                <core:set value="0" var="i_jarrRArray"/>
+                                <!-- this is a String -->
+                                <core:set value="${i_jarrRArray+0}" var="i_jarrRArray"/>
+                                <!-- convert to numeric, but the default is a long -->
+                                <core:set value="${i_jarrRArray.intValue()}" var="i_jarrRArray"/>
+                                <!-- convert the long to an int, which we need for the json calls to work -->
+                                <core:while test="${i_jarrRArray lt len_jarrRArray}">
+                                  <!-- Get the JSON Object from the Array -->
+                                  <core:set value="${jarrRArray.get(i_jarrRArray)}" var="jsonRArray"/>
+                                  <!-- we add wrapper spaces, then remove them to make sure our datatype is a String, not a Long for comparison later -->
+                                  <core:set value=" ${jsonRArray.get('_internalId')} " var="sc_Id"/>
+                                  <core:set value="${sc_Id.trim()}" var="sc_Id"/>
+                                  <core:set value="${jsonRArray.getString('name')}" var="sc_Name"/>
+                                  <core:set value="${jsonRArray.getString('code')}" var="sc_Code"/>
+                                  <core:set value="${jsonRArray.get('isPlanOfRecord')}" var="sc_bPOR"/>
+                                  <core:set value="${jsonRArray.getString('type')}" var="sc_type"/>
+                                  <!-- Keep the running list of POR Scenarios to be used in our upcoming filter -->
+                                  <core:if test="${(v_PORScenarios.length() &gt; 0)}">
+                                    <core:set value="${v_PORScenarios}," var="v_PORScenarios"/>
+                                  </core:if>
+                                  <core:set value="${v_PORScenarios}${sc_Id}" var="v_PORScenarios"/>
+                                  <core:if test="${bDebugVerLog}">
+                                    <gel:out trim="false">Found Scenario: sc_Id[${sc_Id}] sc_Code[${sc_Code}] sc_Name[${sc_Name}] sc_bPOR[${sc_bPOR}] sc_type[${sc_type}]</gel:out>
+                                  </core:if>
+                                  <core:set value="${i_jarrRArray+1}" var="i_jarrRArray"/>
+                                  <core:set value="${i_jarrRArray.intValue()}" var="i_jarrRArray"/>
+                                  <!-- convert the long back to an int, which we need for the json calls -->
+                                </core:while>
+                                <!-- i_jarrRArray < len_jarrRArray -->
+                                <core:if test="${bDebug}">
+                                  <gel:out trim="false">Scenario List: [${v_PORScenarios}]</gel:out>
+                                </core:if>
+                              </core:if>
+                            </core:if>
+                            <!-- jsonResp != null -->
+                            <!-- ________________________ -->
+                            <!-- ___ Get the list of Roadmap Items in the POR Scenarios   ___ -->
+                            <core:if test="${bDebug}">
+                              <gel:out>Get the list of Roadmap Items for processing ...</gel:out>
+                            </core:if>
+                            <!--
+      /ppm/rest/v1/roadmaps/5004001
+      limit=100
+      fields: name, startDate, status
+      expand:
+      (roadmapItems = ( limit = 200, fields=(name, z_prelim_estimate, z_ag_plan_start, z_ag_plan_finish, scenarioId) , filter=(inPlan = 2) ) )
+      (roadmapItems = ( limit = 200, fields=(name, z_prelim_estimate, z_ag_plan_start, z_ag_plan_finish, scenarioId) , filter=((inPlan = 2) and (scenarioId in (5005001, 5006004))) ) )
+    
+    {
+      "roadmapItems": {
+        "_pageSize": 100,
+        "_self": "http://XXXXXXXXXX.bc.googleusercontent.com/ppm/rest/v1/roadmaps/5004001/roadmapItems?filter=%28%28inPlan+%3D+2%29+and+%28scenarioId+in+%285005001%2C+5006004%29%29%29&fields=name%2C+z_prelim_estimate%2C+z_ag_plan_start%2C+z_ag_plan_finish%2C+scenarioId&limit=100",
+        "_totalCount": 10,
+        "_results": [
+            {
+                "_internalId": 5010361,
+                "z_ag_plan_start": null,
+                "z_ag_plan_finish": null,
+                "z_prelim_estimate": 40,
+                "name": "Mobile Approvals - Time Entry",
+                "_self": "http://XXXXXXXXXX.bc.googleusercontent.com/ppm/rest/v1/roadmaps/5004001/roadmapItems/5010361",
+                "scenarioId": 5005001
+                "finish": "2020-06-12T17:00:00",
+                "start": "2020-03-09T08:00:00",
+
+                "linkedInternalId": 5002035,
+                "linkedToId": "EPI00000020",
+                "linkedToObjectCode": "clr_epic",
+                "linkedToType": "Business Outcomes",
+                "sync": true,
+                "code": "RI00315",
+            },    
+    }
+    -->
+                            <core:set var="httpRESTURL">${XOGURL}${PPMUrlPath}/roadmaps</core:set>
+                            <!-- we actually need the Roadmap Id, otherwise the JSON does not come back expanded down through the Roadmap Items -->
+                            <core:if test="${v_RoadmapIntId != null}">
+                              <!-- AND -->
+                              <core:if test="${v_RoadmapIntId.length() &gt; 0}">
+                                <core:set value="${httpRESTURL}/${v_RoadmapIntId}" var="httpRESTURL"/>
+                              </core:if>
+                            </core:if>
+                            <core:set value="name,code,start,finish,scenarioId" var="v_RIFldNamesStd"/>
+                            <core:set value=",sync,linkedInternalId,linkedToId,linkedToObjectCode,linkedToType" var="v_RIFldNamesLinkage"/>
+                            <core:set value="" var="v_RIFldNamesCustom"/>
+                            <core:set value="" var="v_RoadMapFldNames"/>
+                            <core:if test="${bCustomFieldsKleanOOB}">
+                              <core:set value=",z_agile_code,z_agile_int_id" var="v_RIFldNames"/>
+                              <core:set value=",agileAcceptedStoryPoints,agileAcceptedStoryCount,agilePlannedEndDate,agilePlannedStartDate,agileRelease,agileState,agileInvestmentCategory,agileRiskScore,agileValueScore,agileEstimatedStoryPoints,agileEstimatedStoryCount,agileWSJFScore,z_agile_state" var="v_RIFldNamesAgile"/>
+                            </core:if>
+                            <core:if test="${bCustomFieldsKleanXtra}">
+                              <core:set value=",z_agl_item_type" var="v_RoadMapFldNames"/>
+                              <core:set value="${v_RIFldNamesAgile},z_aglPercentDoneByStoryCount,z_aglPercentDoneByStoryPoints,z_aglActualEndDate,z_aglActualStartDate,z_t_shirt" var="v_RIFldNamesAgile"/>
+                            </core:if>
+                            <core:if test="${bCustomFieldsKurt || bCustomFieldsFIS}">
+                              <core:set value=",z_agile_id,z_external_id" var="v_RIFldNames"/>
+                              <core:set value=",z_per_sp,z_accepted_sp,z_ag_plan_est,z_est_storypoints,z_ag_plan_est,z_ag_plan_start,z_ag_plan_finish,z_ag_actual_start,z_agile_ac_finish,z_ag_state,z_accept_stories,z_agile_ac_finish,z_est_stories,z_est_storypoints,z_prelim_estimate,z_perc_sc,z_ag_release" var="v_RIFldNamesAgile"/>
+                            </core:if>
+                            <core:set value="" var="v_RIFilterInPlan"/>
+                            <core:set value="(inPlan = 2) and " var="v_RIFilterInPlan"/>
+                            <core:new className="org.apache.http.client.utils.URIBuilder" var="httpURI">
+                              <core:arg type="java.lang.String" value="${httpRESTURL}"/>
+                            </core:new>
+                            <core:set value="name,code,startDate,status${v_RoadMapFldNames}" var="v_RoadMapFldNamesAll"/>
+                            <core:set value="${httpURI.setParameter('fields', v_RoadMapFldNamesAll)}" var="void"/>
+                            <core:set value="${httpURI.setParameter('limit', '100')}" var="void"/>
+                            <core:set value="(roadmapItems=(limit=200,fields=(${v_RIFldNamesStd}${v_RIFldNames}${v_RIFldNamesAgile}${v_RIFldNamesCustom}${v_RIFldNamesLinkage}),filter=(${v_RIFilterInPlan}(scenarioId in (${v_PORScenarios})))))" var="z_expand"/>
+                            <core:set value="${httpURI.setParameter('expand', z_expand)}" var="void"/>
+                            <core:if test="${bDebugREST}">
+                              <gel:out>httpRESTURL: ${httpURI}</gel:out>
+                            </core:if>
+                            <core:new className="org.apache.http.client.methods.HttpGet" var="httpget">
+                              <core:arg type="java.net.URI" value="${httpURI.build()}"/>
+                            </core:new>
+                            <core:if test="${bDebugREST}">
+                              <gel:out>httpget.getURI():  ${httpget.getURI()}</gel:out>
+                            </core:if>
+                            <core:expr value="${httpget.setHeader(&quot;Content-type&quot;, &quot;application/json&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(&quot;Accept&quot;, &quot;application/json&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(&quot;Connection&quot;, &quot;keep-alive&quot;)}"/>
+                            <core:expr value="${httpget.setHeader(h_authToken, v_authToken)}"/>
+                            <!-- Should be just client.execute(httpget), but we need to identify the httpget class by specifying it using the core:arg parameter -->
+                            <core:invoke method="execute" on="${client}" var="response">
+                              <core:arg type="org.apache.http.client.methods.HttpGet" value="${httpget}"/>
+                            </core:invoke>
+                            <core:set value="${response.getStatusLine().getStatusCode()}" var="response_code"/>
+                            <core:set value="${response.getStatusLine().getReasonPhrase()}" var="response_msg"/>
+                            <!-- this is usually empty, pointless -->
+                            <core:if test="${bDebugREST}">
+                              <gel:out>getStatusLine():  ${response.getStatusLine()}</gel:out>
+                            </core:if>
+                            <core:set value="${null}" var="httpInputStream"/>
+                            <core:set value="${response.getEntity()}" var="entity"/>
+                            <core:if test="${entity != null}">
+                              <core:set value="${entity.getContent()}" var="httpInputStream"/>
+                            </core:if>
+                            <core:if test="${response_code != null}">
+                              <core:if test="${response_code == 400}">
+                                <core:set value="ERROR on REST: Probably a missing custom field on the Roadmap Item" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:if test="${response_code == 404}">
+                                <core:set value="ERROR: Roadmap Not found for RoadmapIntID: ${v_RoadmapIntId}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:if test="${(response_code != 200)}">
+                                <core:set value="ERROR on REST. response_code(${response_code}) response_msg: ${response_msg} " var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <core:if test="${httpInputStream == null}">
+                                <core:set value="httpInputStream == NULL, getHeaderField(0): ${response_hdr} response_code(${response_code}) response_msg: ${response_msg}  httpRESTURL: ${httpRESTURL}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                              </core:if>
+                              <!-- OR -->
+                              <core:if test="${httpInputStream != null}">
+                                <core:new className="java.io.InputStreamReader" var="v_Input">
+                                  <core:arg type="java.io.InputStream" value="${httpInputStream}"/>
+                                </core:new>
+                                <core:new className="java.io.BufferedReader" var="v_InputData">
+                                  <core:arg type="java.io.InputStreamReader" value="${v_Input}"/>
+                                </core:new>
+                                <core:set value="${v_InputData.readLine()}" var="httpData"/>
+                                <core:if test="${bDebugREST}">
+                                  <gel:out>httpData: ${httpData}</gel:out>
+                                </core:if>
+                                <!-- free up some resources -->
+                                <core:set value="${httpInputStream.close()}" var="dummy"/>
+                                <core:if test="${(response_code == 200) }">
+                                  <core:if test="${bDebug}">
+                                    <gel:out trim="false">Processing Roadmap and Roadmap Items...</gel:out>
+                                  </core:if>
+                                </core:if>
+                                <!-- (response_code == 200) -->
+                                <!-- JSON Response -->
+                                <core:new className="org.json.JSONObject" var="jsonResp">
+                                  <core:arg type="java.lang.String" value="${httpData}"/>
+                                </core:new>
+                                <!-- Get the Roadmap Name and code -->
+                                <core:set value="${jsonResp.getString('name')}" var="rd_Name"/>
+                                <core:set value="${jsonResp.getString('code')}" var="rd_Code"/>
+                                <core:set value="${jsonResp.getString('_internalId')}" var="rd_IntId"/>
+                                <core:set value="Roadmap (${rd_Code}.${rd_IntId}): ${rd_Name}" var="logMessage"/>
+                                <core:choose>
+                                  <core:when test="${gel_processId == null}">
+                                    <gel:out>${logMessage}</gel:out>
+                                  </core:when>
+                                  <core:otherwise>
+                                    <gel:log level="INFO">${logMessage}</gel:log>
+                                  </core:otherwise>
+                                </core:choose>
+                                <!-- Get the list of Roadmap Items, top level JSON object -->
+                                <core:set value="${jsonResp.getJSONObject('roadmapItems')}" var="jsonRI"/>
+                              </core:if>
+                              <!-- (httpInputStream != null) -->
+                            </core:if>
+                            <!-- (response_code != null) -->
+                            <core:if test="${jsonRI == null}">
+                              <core:if test="${bDebug}">
+                                <core:if test="${bDebug}">
+                                  <gel:out>jsonRI is null</gel:out>
+                                </core:if>
+                              </core:if>
+                            </core:if>
+                            <core:if test="${bDebugJSON}">
+                              <gel:out>jsonRI:</gel:out>
+                              <gel:out>${jsonRI.toString(1)}</gel:out>
+                              <gel:out>__________________</gel:out>
+                            </core:if>
+                            <core:if test="${jsonRI != null}">
+                              <core:set value="true" var="bProcessRIs"/>
+                              <core:while test="${(bProcessRIs)}">
+                                <!-- Results are in an array  -->
+                                <core:set value="${jsonRI.getJSONArray('_results')}" var="jarrRArray"/>
+                                <core:if test="${jarrRArray == null}">
+                                  <core:if test="${bDebug}">
+                                    <core:if test="${bDebug}">
+                                      <gel:out>jarrRArray is null</gel:out>
+                                    </core:if>
+                                  </core:if>
+                                </core:if>
+                                <core:if test="${jarrRArray != null}">
+                                  <core:set value="${jarrRArray.length()}" var="len_jarrRArray"/>
+                                  <core:if test="${bDebug}">
+                                    <gel:out>Roadmap Items # Results: ${len_jarrRArray}</gel:out>
+                                    <gel:out/>
+                                  </core:if>
+                                  <core:set value="0" var="i_jarrRArray"/>
+                                  <!-- this is a String -->
+                                  <core:set value="${i_jarrRArray+0}" var="i_jarrRArray"/>
+                                  <!-- convert to numeric, but the default is a long -->
+                                  <core:set value="${i_jarrRArray.intValue()}" var="i_jarrRArray"/>
+                                  <!-- convert the long to an int, which we need for the json calls to work -->
+                                  <core:while test="${i_jarrRArray lt len_jarrRArray}">
+                                    <!-- Get the JSON Object from the Array -->
+                                    <core:set value="${jarrRArray.get(i_jarrRArray)}" var="jsonRArray"/>
+                                    <!-- This is the main group of attributes that we need -->
+                                    <core:set value="${jsonRArray.getString('_internalId')}" var="ri_IntId"/>
+                                    <core:set value="${jsonRArray.getString('code')}" var="ri_Code"/>
+                                    <core:set value="${jsonRArray.getString('name')}" var="ri_Name"/>
+                                    <core:set value="${jsonRArray.get('start')}" var="ri_start"/>
+                                    <core:set value="${jsonRArray.get('finish')}" var="ri_finish"/>
+                                    <!-- These control attributes were moved to conditions based on which demo system we are using -->
+                                    <!-- <core:set var="ri_agile_id"         value="${jsonRArray.get('z_agile_id')}"/> -->
+                                    <!-- <core:set var="ri_agile_ext_id"     value="${jsonRArray.get('z_external_id')}"/> -->
+                                    <!-- Group of Agile metrics -->
+                                    <core:set value="" var="agileAcceptedStoryCount"/>
+                                    <core:set value="" var="agileAcceptedStoryPoints"/>
+                                    <core:set value="" var="agileEstimatedStoryCount"/>
+                                    <core:set value="" var="agileEstimatedStoryPoints"/>
+                                    <core:set value="" var="agilePlannedStartDate"/>
+                                    <core:set value="T" var="agilePlannedStartDateFmt"/>
+                                    <core:set value="" var="agilePlannedEndDate"/>
+                                    <core:set value="T" var="agilePlannedEndDateFmt"/>
+                                    <core:set value="" var="agileActualEndDate"/>
+                                    <core:set value="T" var="agileActualEndDateFmt"/>
+                                    <core:set value="" var="agileRelease"/>
+                                    <core:set value="" var="agileState"/>
+                                    <core:set value="" var="agileInvestmentCategory"/>
+                                    <core:set value="" var="agileRiskScore"/>
+                                    <core:set value="" var="agileValueScore"/>
+                                    <core:set value="" var="agileWSJFScore"/>
+                                    <core:set value="" var="z_aglState"/>
+                                    <core:set value="" var="z_aglPercentDoneByStoryCount"/>
+                                    <core:set value="" var="z_aglPercentDoneByStoryPoints"/>
+                                    <core:set value="" var="z_aglActualStartDate"/>
+                                    <core:set value="T" var="z_aglActualStartDateFmt"/>
+                                    <core:set value="" var="z_t_shirt"/>
+                                    <!-- Old Kurt -->
+                                    <core:set value="" var="z_accept_stories"/>
+                                    <core:set value="" var="z_accepted_sp"/>
+                                    <core:set value="" var="z_ag_plan_finish"/>
+                                    <core:set value="" var="z_ag_plan_start"/>
+                                    <core:set value="" var="z_ag_state"/>
+                                    <core:set value="" var="z_est_stories"/>
+                                    <core:set value="" var="z_est_storypoints"/>
+                                    <core:set value="" var="z_per_sp"/>
+                                    <core:set value="" var="z_perc_sc"/>
+                                    <!-- Kurt -->
+                                    <core:set value="" var="ri_accept_stories"/>
+                                    <core:set value="" var="ri_accepted_sp"/>
+                                    <core:set value="" var="ri_ag_actual_start"/>
+                                    <core:set value="" var="ri_agile_ac_finish"/>
+                                    <core:set value="" var="ri_ag_plan_est"/>
+                                    <core:set value="" var="ri_ag_plan_finish"/>
+                                    <core:set value="" var="ri_ag_plan_start"/>
+                                    <core:set value="" var="ri_ag_release"/>
+                                    <core:set value="" var="ri_ag_state"/>
+                                    <core:set value="" var="ri_est_stories"/>
+                                    <core:set value="" var="ri_est_storypoints"/>
+                                    <core:set value="" var="ri_per_sp"/>
+                                    <core:set value="" var="ri_perc_sc"/>
+                                    <core:set value="" var="ri_t_shirt"/>
+                                    <core:if test="${bCustomFieldsKleanOOB}">
+                                      <core:set value="${jsonRArray.get('agileAcceptedStoryCount')}" var="agileAcceptedStoryCount"/>
+                                      <core:if test="${agileAcceptedStoryCount.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileAcceptedStoryCount"/>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('agileAcceptedStoryPoints')}" var="agileAcceptedStoryPoints"/>
+                                      <core:if test="${agileAcceptedStoryPoints.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileAcceptedStoryPoints"/>
+                                      </core:if>
+                                      <core:set value="${0+agileAcceptedStoryPoints}" var="agileAcceptedStoryPoints"/>
+                                      <core:set value="${jsonRArray.get('agileEstimatedStoryCount')}" var="agileEstimatedStoryCount"/>
+                                      <core:if test="${agileEstimatedStoryCount.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileEstimatedStoryCount"/>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('agileEstimatedStoryPoints')}" var="agileEstimatedStoryPoints"/>
+                                      <core:if test="${agileEstimatedStoryPoints.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileEstimatedStoryPoints"/>
+                                      </core:if>
+                                      <core:set value="${0+agileEstimatedStoryPoints}" var="agileEstimatedStoryPoints"/>
+                                      <core:if test="${jsonRArray.has('agilePlannedStartDate')}">
+                                        <core:set value="${jsonRArray.get('agilePlannedStartDate')}" var="agilePlannedStartDate"/>
+                                        <core:set value="${agilePlannedStartDate.substring(0,10)}T08:00:00" var="agilePlannedStartDateFmt"/>
+                                        <core:if test="${agilePlannedStartDate.equals(null)}">
+                                          <core:set value="T" var="agilePlannedStartDateFmt"/>
+                                        </core:if>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('agilePlannedEndDate')}">
+                                        <core:set value="${jsonRArray.get('agilePlannedEndDate')}" var="agilePlannedEndDate"/>
+                                        <core:set value="${agilePlannedEndDate.substring(0,10)}T17:00:00" var="agilePlannedEndDateFmt"/>
+                                        <core:if test="${agilePlannedEndDate.equals(null)}">
+                                          <core:set value="T" var="agilePlannedEndDateFmt"/>
+                                        </core:if>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('agileRelease')}" var="agileRelease"/>
+                                      <core:set value="${jsonRArray.get('agileState')}" var="agileState"/>
+                                      <!--
+              <core:if test="${agileState.equals(null)}">
+                <core:set var="agileState"          value=""/>
+              </core:if>
+                -->
+                                      <core:set value="${jsonRArray.get('agileInvestmentCategory')}" var="agileInvestmentCategory"/>
+                                      <core:set value="${jsonRArray.get('agileRiskScore')}" var="agileRiskScore"/>
+                                      <core:if test="${agileRiskScore.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileRiskScore"/>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('agileValueScore')}" var="agileValueScore"/>
+                                      <core:if test="${agileValueScore.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileValueScore"/>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('agileWSJFScore')}" var="agileWSJFScore"/>
+                                      <core:if test="${agileWSJFScore.equals(null)}">
+                                        <core:set value="${(0+0)}" var="agileWSJFScore"/>
+                                      </core:if>
+                                    </core:if>
+                                    <core:if test="${bCustomFieldsKleanXtra}">
+                                      <core:set value="${jsonRArray.get('z_aglPercentDoneByStoryCount')}" var="z_aglPercentDoneByStoryCount"/>
+                                      <core:if test="${z_aglPercentDoneByStoryCount.equals(null)}">
+                                        <core:set value="${(0+0)}" var="z_aglPercentDoneByStoryCount"/>
+                                      </core:if>
+                                      <core:set value="${jsonRArray.get('z_aglPercentDoneByStoryPoints')}" var="z_aglPercentDoneByStoryPoints"/>
+                                      <core:if test="${z_aglPercentDoneByStoryPoints.equals(null)}">
+                                        <core:set value="${(0+0)}" var="z_aglPercentDoneByStoryPoints"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_aglActualStartDate')}">
+                                        <core:set value="${jsonRArray.get('z_aglActualStartDate')}" var="z_aglActualStartDate"/>
+                                        <core:set value="${z_aglActualStartDate.substring(0,10)}T08:00:00" var="z_aglActualStartDateFmt"/>
+                                        <core:if test="${z_aglActualStartDate.equals(null)}">
+                                          <core:set value="T" var="z_aglActualStartDateFmt"/>
+                                        </core:if>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_aglActualEndDate')}">
+                                        <core:set value="${jsonRArray.get('z_aglActualEndDate')}" var="z_aglActualEndDate"/>
+                                        <core:set value="${z_aglActualEndDate.substring(0,10)}T17:00:00" var="z_aglActualEndDateFmt"/>
+                                        <core:if test="${z_aglActualEndDate.equals(null)}">
+                                          <core:set value="T" var="z_aglActualEndDateFmt"/>
+                                        </core:if>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_t_shirt')}">
+                                        <core:set value="${jsonRArray.get('z_t_shirt')}" var="z_t_shirt"/>
+                                      </core:if>
+                                      <core:set value="" var="z_t_shirtFmt"/>
+                                      <core:if test="${(z_t_shirt != null)}">
+                                        <core:choose>
+                                          <core:when test="${(z_t_shirt &gt;= 0) &amp;&amp; (z_t_shirt le 20) }">
+                                            <core:set value="S" var="z_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(z_t_shirt &gt; 20) &amp;&amp; (z_t_shirt le 40) }">
+                                            <core:set value="M" var="z_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(z_t_shirt &gt; 40) &amp;&amp; (z_t_shirt le 80) }">
+                                            <core:set value="L" var="z_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(z_t_shirt &gt; 80)  }">
+                                            <core:set value="XL" var="z_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:otherwise/>
+                                        </core:choose>
+                                      </core:if>
+                                    </core:if>
+                                    <!-- Kurt Old -->
+                                    <core:if test="${bCustomFieldsKurt}">
+                                      <core:if test="${jsonRArray.has('z_accept_stories')}">
+                                        <core:set value="${jsonRArray.get('z_accept_stories')}" var="z_accept_stories"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_accepted_sp')}">
+                                        <core:set value="${jsonRArray.get('z_accepted_sp')}" var="z_accepted_sp"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_plan_start')}">
+                                        <core:set value="${jsonRArray.get('z_ag_plan_start')}" var="z_ag_plan_start"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_plan_finish')}">
+                                        <core:set value="${jsonRArray.get('z_ag_plan_finish')}" var="z_ag_plan_finish"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_state')}">
+                                        <core:set value="${jsonRArray.get('z_ag_state')}" var="z_ag_state"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_est_stories')}">
+                                        <core:set value="${jsonRArray.get('z_est_stories')}" var="z_est_stories"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_est_storypoints')}">
+                                        <core:set value="${jsonRArray.get('z_est_storypoints')}" var="z_est_storypoints"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_per_sp')}">
+                                        <core:set value="${jsonRArray.get('z_per_sp')}" var="z_per_sp"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_perc_sc')}">
+                                        <core:set value="${jsonRArray.get('z_perc_sc')}" var="z_perc_sc"/>
+                                      </core:if>
+                                    </core:if>
+                                    <core:if test="${bCustomFieldsKurt}">
+                                      <core:if test="${jsonRArray.has('z_accept_stories')}">
+                                        <core:set value="${jsonRArray.get('z_accept_stories')}" var="ri_accept_stories"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_accepted_sp')}">
+                                        <core:set value="${jsonRArray.get('z_accepted_sp')}" var="ri_accepted_sp"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_actual_start')}">
+                                        <core:set value="${jsonRArray.get('z_ag_actual_start')}" var="ri_ag_actual_start"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_agile_ac_finish')}">
+                                        <core:set value="${jsonRArray.get('z_agile_ac_finish')}" var="ri_agile_ac_finish"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_plan_est')}">
+                                        <core:set value="${jsonRArray.get('z_ag_plan_est')}" var="ri_ag_plan_est"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_plan_finish')}">
+                                        <core:set value="${jsonRArray.get('z_ag_plan_finish')}" var="ri_ag_plan_finish"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_plan_start')}">
+                                        <core:set value="${jsonRArray.get('z_ag_plan_start')}" var="ri_ag_plan_start"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_release')}">
+                                        <core:set value="${jsonRArray.get('z_ag_release')}" var="ri_ag_release"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_ag_state')}">
+                                        <core:set value="${jsonRArray.get('z_ag_state')}" var="ri_ag_state"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_est_stories')}">
+                                        <core:set value="${jsonRArray.get('z_est_stories')}" var="ri_est_stories"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_est_storypoints')}">
+                                        <core:set value="${jsonRArray.get('z_est_storypoints')}" var="ri_est_storypoints"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_per_sp')}">
+                                        <core:set value="${jsonRArray.get('z_per_sp')}" var="ri_per_sp"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_perc_sc')}">
+                                        <core:set value="${jsonRArray.get('z_perc_sc')}" var="ri_perc_sc"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_prelim_estimate')}">
+                                        <core:set value="${jsonRArray.get('z_prelim_estimate')}" var="ri_t_shirt"/>
+                                      </core:if>
+                                      <core:set value="" var="ri_t_shirtFmt"/>
+                                      <core:if test="${(ri_t_shirt != null)}">
+                                        <core:choose>
+                                          <core:when test="${(ri_t_shirt &gt;= 0) &amp;&amp; (ri_t_shirt le 20) }">
+                                            <core:set value="S" var="ri_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(ri_t_shirt &gt; 20) &amp;&amp; (ri_t_shirt le 40) }">
+                                            <core:set value="M" var="ri_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(ri_t_shirt &gt; 40) &amp;&amp; (ri_t_shirt le 80) }">
+                                            <core:set value="L" var="ri_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:when test="${(ri_t_shirt &gt; 80)  }">
+                                            <core:set value="XL" var="ri_t_shirtFmt"/>
+                                          </core:when>
+                                          <core:otherwise/>
+                                        </core:choose>
+                                      </core:if>
+                                    </core:if>
+                                    <!-- Also required fields for the link back to the originating linked CIO (Business Outcomes) -->
+                                    <core:set value="${jsonRArray.get('sync')}" var="ri_sync"/>
+                                    <core:set value="${jsonRArray.getString('linkedInternalId')}" var="ri_linkedInternalId"/>
+                                    <core:set value="${jsonRArray.get('linkedToId')}" var="ri_linkedToId"/>
+                                    <core:set value="${jsonRArray.get('linkedToObjectCode')}" var="ri_linkedToObjectCode"/>
+                                    <core:set value="${jsonRArray.get('linkedToType')}" var="ri_linkedToType"/>
+                                    <core:set value="${null}" var="ri_agile_id"/>
+                                    <core:set value="${null}" var="ri_agile_ext_id"/>
+                                    <core:if test="${bCustomFieldsKleanOOB}">
+                                      <core:if test="${jsonRArray.has('z_agile_code')}">
+                                        <core:set value="${jsonRArray.get('z_agile_code')}" var="ri_agile_id"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_agile_int_id')}">
+                                        <core:set value="${jsonRArray.get('z_agile_int_id')}" var="ri_agile_ext_id"/>
+                                      </core:if>
+                                    </core:if>
+                                    <core:if test="${bCustomFieldsKurt || bCustomFieldsFIS}">
+                                      <core:if test="${jsonRArray.has('z_agile_id')}">
+                                        <core:set value="${jsonRArray.get('z_agile_id')}" var="ri_agile_id"/>
+                                      </core:if>
+                                      <core:if test="${jsonRArray.has('z_external_id')}">
+                                        <core:set value="${jsonRArray.get('z_external_id')}" var="ri_agile_ext_id"/>
+                                      </core:if>
+                                    </core:if>
+                                    <!-- Also required fields for the link back to the originating linked Project or CIO (Project, Business Objectives, etc.) -->
+                                    <core:set value="${jsonRArray.get('sync')}" var="ri_sync"/>
+                                    <!-- convert to a numeric data type (Double) -->
+                                    <!-- Skip since both are Numeric Percentages now 
+            <core:set var="ri_per_spD"           value="${0.0+0}"/>
+            <core:if test="${!(ri_per_sp.equals(null))}">
+              <core:set var="ri_per_spD"           value="${(0.0+ri_per_sp)}"/>
+              <gel:out>ri_per_spD        : ${ri_per_spD}              (${ri_per_spD.getClass()})</gel:out>
+              <core:if test="${(ri_per_sp > 1.01)}">
+                <core:set var="ri_per_spD"           value="${ri_per_sp/100}"/>
+                <gel:out>ri_per_spD        : ${ri_per_spD}              (${ri_per_spD.getClass()})</gel:out>
+              </core:if>
+            </core:if>
+  
+            <core:set var="ri_perc_scD"           value="${0.0+0}"/>
+            <gel:out>ri_perc_scD        : ${ri_perc_scD}              (${ri_perc_scD.getClass()})</gel:out>
+            <core:if test="${!(ri_perc_sc.equals(null))}">
+              <core:set var="ri_perc_scD"           value="${(0.0+ri_perc_sc)}"/>
+              <gel:out>ri_perc_scD        : ${ri_perc_scD}              (${ri_perc_scD.getClass()})</gel:out>
+              <core:if test="${(ri_perc_sc > 1.01)}">
+                <core:set var="ri_perc_scD"           value="${ri_perc_sc/100}"/>
+                <gel:out>ri_perc_scD        : ${ri_perc_scD}              (${ri_perc_scD.getClass()})</gel:out>
+              </core:if>
+            </core:if>
+            -->
+                                    <!-- Format the date string to include the start/end of work day needed for the Investment Object schedule dates -->
+                                    <core:set value="${ri_start}" var="ri_start_dt"/>
+                                    <core:if test="${!(ri_start_dt.equals(null))}">
+                                      <core:set value="${ri_start_dt.substring(0,11)}08:00:00" var="ri_start_dt"/>
+                                    </core:if>
+                                    <!-- Format the date string to include the start/end of work day needed for the Investment Object schedule dates -->
+                                    <core:set value="${ri_finish}" var="ri_finish_dt"/>
+                                    <core:if test="${!(ri_finish_dt.equals(null))}">
+                                      <core:set value="${ri_finish_dt.substring(0,11)}17:00:00" var="ri_finish_dt"/>
+                                    </core:if>
+                                    <core:if test="${bDebug}">
+                                      <gel:out trim="false">Roadmap Item: Code:Id[${ri_Code}:${ri_IntId}] Name[${ri_Name}] linkedToType[${ri_linkedToType}]</gel:out>
+                                    </core:if>
+                                    <core:if test="${bDebug}">
+                                      <gel:out>___ Roadmap Item Attributes ___</gel:out>
+                                      <gel:out>ri_IntId            : ${ri_IntId}</gel:out>
+                                      <gel:out>ri_Code             : ${ri_Code}</gel:out>
+                                      <gel:out>ri_Name             : ${ri_Name}</gel:out>
+                                      <gel:out>ri_start            : ${ri_start}</gel:out>
+                                      <gel:out>ri_finish           : ${ri_finish}</gel:out>
+                                      <gel:out>ri_agile_id         : ${ri_agile_id} ${ri_agile_id.getClass()}</gel:out>
+                                      <gel:out>ri_agile_ext_id     : ${ri_agile_ext_id} ${ri_agile_ext_id.getClass()}</gel:out>
+                                      <gel:out>ri_agile_ext_id == null      : ${(ri_agile_ext_id == null)}</gel:out>
+                                      <gel:out>ri_agile_ext_id.equals(null) : ${(ri_agile_ext_id.equals(null))}</gel:out>
+                                      <gel:out>___ Agile Metrics ___</gel:out>
+                                      <core:if test="${bCustomFieldsKleanOOB}">
+                                        <gel:out>agileAcceptedStoryCount   : ${agileAcceptedStoryCount} ${agileAcceptedStoryCount.getClass()}</gel:out>
+                                        <gel:out>agileAcceptedStoryPoints  : ${agileAcceptedStoryPoints} ${agileAcceptedStoryPoints.getClass()}</gel:out>
+                                        <gel:out>agileEstimatedStoryCount  : ${agileEstimatedStoryCount} ${agileEstimatedStoryCount.getClass()}</gel:out>
+                                        <gel:out>agileEstimatedStoryPoints : ${agileEstimatedStoryPoints} ${agileEstimatedStoryPoints.getClass()}</gel:out>
+                                        <gel:out>agilePlannedStartDate     : ${agilePlannedStartDate} ${agilePlannedStartDate.getClass()}</gel:out>
+                                        <gel:out>agilePlannedStartDateFmt  : ${agilePlannedStartDateFmt}</gel:out>
+                                        <gel:out>agilePlannedEndDate       : ${agilePlannedEndDate} ${agilePlannedEndDate.getClass()}</gel:out>
+                                        <gel:out>agilePlannedEndDateFmt    : ${agilePlannedEndDateFmt}</gel:out>
+                                        <gel:out>agileRelease              : ${agileRelease} ${agileRelease.getClass()}</gel:out>
+                                        <gel:out>agileState                : ${agileState} ${agileState.getClass()}</gel:out>
+                                        <gel:out>agileInvestmentCategory   : ${agileInvestmentCategory} ${agileInvestmentCategory.getClass()}</gel:out>
+                                        <gel:out>agileRiskScore            : ${agileRiskScore} ${agileRiskScore.getClass()}</gel:out>
+                                        <gel:out>agileValueScore           : ${agileValueScore} ${agileValueScore.getClass()}</gel:out>
+                                        <gel:out>agileWSJFScore            : ${agileWSJFScore} ${agileWSJFScore.getClass()}</gel:out>
+                                      </core:if>
+                                      <core:if test="${bCustomFieldsKleanXtra}">
+                                        <gel:out>z_aglPercentDoneByStoryCount  : ${z_aglPercentDoneByStoryCount} ${z_aglPercentDoneByStoryCount.getClass()}</gel:out>
+                                        <gel:out>z_aglPercentDoneByStoryPoints : ${z_aglPercentDoneByStoryPoints} ${z_aglPercentDoneByStoryPoints.getClass()}</gel:out>
+                                        <gel:out>z_aglActualStartDate      : ${z_aglActualStartDate} ${z_aglActualStartDate.getClass()}</gel:out>
+                                        <gel:out>z_aglActualStartDateFmt   : ${z_aglActualStartDateFmt}</gel:out>
+                                        <gel:out>z_aglActualEndDate        : ${z_aglActualEndDate} ${z_aglActualEndDate.getClass()}</gel:out>
+                                        <gel:out>z_aglActualEndDateFmt     : ${z_aglActualEndDateFmt}</gel:out>
+                                        <gel:out>z_t_shirt                 : ${z_t_shirt}</gel:out>
+                                        <gel:out>z_t_shirtFmt              : ${z_t_shirtFmt}</gel:out>
+                                      </core:if>
+                                      <core:if test="${bCustomFieldsKurt}">
+                                        <gel:out>z_accept_stories          : ${z_accept_stories}</gel:out>
+                                        <gel:out>z_accepted_sp             : ${z_accepted_sp}</gel:out>
+                                        <gel:out>z_ag_plan_finish          : ${z_ag_plan_finish}</gel:out>
+                                        <gel:out>z_ag_plan_start           : ${z_ag_plan_start}</gel:out>
+                                        <gel:out>z_ag_state                : ${z_ag_state}</gel:out>
+                                        <gel:out>z_est_stories             : ${z_est_stories}</gel:out>
+                                        <gel:out>z_est_storypoints         : ${z_est_storypoints}</gel:out>
+                                        <gel:out>z_per_sp                  : ${z_per_sp}</gel:out>
+                                        <gel:out>z_perc_sc                 : ${z_perc_sc}</gel:out>
+                                        <gel:out>___ Old ___</gel:out>
+                                        <gel:out>ri_accept_stories         : ${ri_accept_stories}</gel:out>
+                                        <gel:out>ri_accepted_sp            : ${ri_accepted_sp}</gel:out>
+                                        <gel:out>ri_ag_actual_start        : ${ri_ag_actual_start}</gel:out>
+                                        <gel:out>ri_agile_ac_finish        : ${ri_agile_ac_finish}</gel:out>
+                                        <gel:out>ri_ag_plan_est            : ${ri_ag_plan_est}</gel:out>
+                                        <gel:out>ri_ag_plan_finish         : ${ri_ag_plan_finish}</gel:out>
+                                        <gel:out>ri_ag_plan_start          : ${ri_ag_plan_start}</gel:out>
+                                        <gel:out>ri_ag_release             : ${ri_ag_release}</gel:out>
+                                        <gel:out>ri_ag_state               : ${ri_ag_state}</gel:out>
+                                        <gel:out>ri_est_stories            : ${ri_est_stories}</gel:out>
+                                        <gel:out>ri_est_storypoints        : ${ri_est_storypoints}</gel:out>
+                                        <gel:out>ri_per_sp                 : ${ri_per_sp}</gel:out>
+                                        <gel:out>ri_perc_sc                : ${ri_perc_sc}</gel:out>
+                                        <gel:out>ri_t_shirt                : ${ri_t_shirt}</gel:out>
+                                        <gel:out>ri_t_shirtFmt             : ${ri_t_shirtFmt}</gel:out>
+                                      </core:if>
+                                    </core:if>
+                                    <!-- See if we have a linked object that we are familiar with. Should be clr_epic for demo -->
+                                    <core:if test="${!(ri_linkedToObjectCode.equals(sRIlinkedObjectId))}">
+                                      <core:if test="${bDebugVerLog}">
+                                        <core:set value="Skipping Roadmap Item: (${ri_Code}.${ri_IntId}): linkedTo(${ri_linkedToType}) ${ri_Name}" var="logMessage"/>
+                                        <core:choose>
+                                          <core:when test="${gel_processId == null}">
+                                            <gel:out>${logMessage}</gel:out>
+                                          </core:when>
+                                          <core:otherwise>
+                                            <gel:log level="INFO">${logMessage}</gel:log>
+                                          </core:otherwise>
+                                        </core:choose>
+                                      </core:if>
+                                    </core:if>
+                                    <core:if test="${ri_linkedToObjectCode.equals(sRIlinkedObjectId)}">
+                                      <core:if test="${bDebugVerLog}">
+                                        <core:set value="Roadmap Item (${ri_Code}.${ri_IntId}): linkedTo(${ri_linkedToType}) ${ri_Name}" var="logMessage"/>
+                                        <core:choose>
+                                          <core:when test="${gel_processId == null}">
+                                            <gel:out>${logMessage}</gel:out>
+                                          </core:when>
+                                          <core:otherwise>
+                                            <gel:log level="INFO">${logMessage}</gel:log>
+                                          </core:otherwise>
+                                        </core:choose>
+                                      </core:if>
+                                      <!-- <core:set var="logMessage" value="Roadmap Item: Code:Id[${ri_Code}:${ri_IntId}] Name[${ri_Name}] linkedToType[${ri_linkedToType}]" /><core:choose><core:when test="${gel_processId == null}"><gel:out>${logMessage}</gel:out></core:when><core:otherwise><gel:log level="INFO">${logMessage}</gel:log></core:otherwise></core:choose> -->
+                                      <!-- ________________________ -->
+                                      <!-- ___ Update the originating CIO Object (Business Outcomes) from the Roadmap Item   ___ -->
+                                      <core:if test="${bDebug}">
+                                        <gel:out>Update the originating linked CIO Object ...</gel:out>
+                                      </core:if>
+                                      <!--
+              http://XXXXXXXX.bc.googleusercontent.com/ppm/rest/v1/custClrEpics/5008029
+  
+              /custClrEpics/5008029
+    
+              PATCH
+              {
+                  "_internalId": 5008029,
+                  "z_est_stories": 42,
+              }
+  
+              -->
+                                      <!-- First, look to see if the linked CIO still exists -->
+                                      <core:set value="false" var="bFoundLinkedBO"/>
+                                      <core:if test="${!(ri_linkedInternalId.equals(null)) || ri_linkedInternalId.length() &gt; 0}">
+                                        <!-- Formate the URL. Add the Id to the URL for the specific object. Only get a few fields  -->
+                                        <core:set var="httpRESTURL">${XOGURL}${PPMUrlPath}/${sRIlinkedObjectAttrId}</core:set>
+                                        <core:set value="${httpRESTURL}/${ri_linkedInternalId}" var="httpRESTURL"/>
+                                        <!--
+                <core:set var="httpRESTURL" value="${httpRESTURL}?fields=name,code"/>
+                <core:set var="httpRESTURL" value="${httpRESTURL},z_percdonesp,z_accepted_sp,z_ag_plan_est,z_est_storypoints,scheduleStart,scheduleFinish"/>
+                <core:set var="httpRESTURL" value="${httpRESTURL},z_accept_stories,z_ag_actual_start,z_ag_plan_finish,z_ag_plan_start,z_ag_state,z_agile_act_finish,z_agile_release,z_est_stories,z_perc_sc,z_t_shirt"/>
+                  -->
+                                        <core:set value="name,code" var="v_CIOFldNamesStd"/>
+                                        <core:set value="" var="v_CIOFldNamesCustom"/>
+                                        <core:if test="${bCustomFieldsKleanOOB}">
+                                          <!-- <core:set var="v_CIOFldNames"        value=",z_agile_code,z_agile_int_id"/> -->
+                                          <core:set value=",scheduleStart,scheduleFinish" var="v_CIOFldNames"/>
+                                          <core:set value=",z_aglAcceptedStoryPoints,z_aglAcceptedStoryCount,z_aglPlannedEndDate,z_aglPlannedStartDate,z_aglRelease,z_aglState,z_aglInvestmentCategory,z_aglRiskScore,z_aglValueScore,z_aglEstimatedStoryPoints,z_aglEstimatedStoryCount,z_aglWSJFScore" var="v_CIOFldNamesAgile"/>
+                                        </core:if>
+                                        <core:if test="${bCustomFieldsKleanXtra}">
+                                          <core:set value="${v_CIOFldNamesAgile},z_aglPercentDoneByStoryCount,z_aglPercentDoneByStoryPoints,z_aglActualEndDate,z_aglActualStartDate,z_t_shirt" var="v_CIOFldNamesAgile"/>
+                                        </core:if>
+                                        <core:if test="${bCustomFieldsKurt || bCustomFieldsFIS}">
+                                          <core:set value=",scheduleStart,scheduleFinish" var="v_CIOFldNames"/>
+                                          <core:set value=",z_percdonesp,z_accepted_sp,z_ag_plan_est,z_est_storypoints,z_accept_stories,z_ag_actual_start,z_ag_plan_finish,z_ag_plan_start,z_ag_state,z_agile_act_finish,z_agile_release,z_est_stories,z_perc_sc,z_t_shirt" var="v_CIOFldNamesAgile"/>
+                                        </core:if>
+                                        <core:new className="org.apache.http.client.utils.URIBuilder" var="httpURI">
+                                          <core:arg type="java.lang.String" value="${httpRESTURL}"/>
+                                        </core:new>
+                                        <core:set value="${v_CIOFldNamesStd}${v_CIOFldNames}${v_CIOFldNamesAgile}${v_CIOFldNamesCustom}" var="v_CIOFldNamesAll"/>
+                                        <core:set value="${httpURI.setParameter('fields', v_CIOFldNamesAll)}" var="void"/>
+                                        <core:set value="${httpURI.setParameter('limit', '100')}" var="void"/>
+                                        <core:if test="${bDebugREST}">
+                                          <gel:out>httpRESTURL: ${httpURI}</gel:out>
+                                        </core:if>
+                                        <core:new className="org.apache.http.client.methods.HttpGet" var="httpget">
+                                          <core:arg type="java.net.URI" value="${httpURI.build()}"/>
+                                        </core:new>
+                                        <core:if test="${bDebugREST}">
+                                          <gel:out>httpget.getURI():  ${httpget.getURI()}</gel:out>
+                                        </core:if>
+                                        <core:expr value="${httpget.setHeader(&quot;Content-type&quot;, &quot;application/json&quot;)}"/>
+                                        <core:expr value="${httpget.setHeader(&quot;Accept&quot;, &quot;application/json&quot;)}"/>
+                                        <core:expr value="${httpget.setHeader(&quot;Connection&quot;, &quot;keep-alive&quot;)}"/>
+                                        <core:expr value="${httpget.setHeader(h_authToken, v_authToken)}"/>
+                                        <!-- Should be just client.execute(httpget), but we need to identify the httpget class by specifying it using the core:arg parameter -->
+                                        <core:invoke method="execute" on="${client}" var="response">
+                                          <core:arg type="org.apache.http.client.methods.HttpGet" value="${httpget}"/>
+                                        </core:invoke>
+                                        <core:set value="${response.getStatusLine().getStatusCode()}" var="response_code"/>
+                                        <core:set value="${response.getStatusLine().getReasonPhrase()}" var="response_msg"/>
+                                        <!-- this is usually empty, pointless -->
+                                        <core:if test="${bDebugREST}">
+                                          <gel:out>getStatusLine():  ${response.getStatusLine()}</gel:out>
+                                        </core:if>
+                                        <core:set value="${null}" var="httpInputStream"/>
+                                        <core:set value="${response.getEntity()}" var="entity"/>
+                                        <core:if test="${entity != null}">
+                                          <core:set value="${entity.getContent()}" var="httpInputStream"/>
+                                        </core:if>
+                                        <core:if test="${response_code != null}">
+                                          <core:if test="${response_code == 404}">
+                                            <core:set value="ERROR: Business Outcome Not found for linkedInternalId: ${ri_linkedInternalId}" var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="WARN">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                          </core:if>
+                                          <core:if test="${(response_code != 200)}">
+                                            <core:set value="ERROR on REST. response_code(${response_code}) response_msg: ${response_msg} " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="WARN">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                          </core:if>
+                                          <core:if test="${httpInputStream == null}">
+                                            <core:set value="httpInputStream == NULL, getHeaderField(0): ${response_hdr} response_code(${response_code}) response_msg: ${response_msg}  httpRESTURL: ${httpRESTURL}" var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="WARN">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                          </core:if>
+                                          <!-- OR -->
+                                          <core:if test="${httpInputStream != null}">
+                                            <core:new className="java.io.InputStreamReader" var="v_Input">
+                                              <core:arg type="java.io.InputStream" value="${httpInputStream}"/>
+                                            </core:new>
+                                            <core:new className="java.io.BufferedReader" var="v_InputData">
+                                              <core:arg type="java.io.InputStreamReader" value="${v_Input}"/>
+                                            </core:new>
+                                            <core:set value="${v_InputData.readLine()}" var="httpData"/>
+                                            <core:if test="${bDebugREST}">
+                                              <gel:out>httpData: ${httpData}</gel:out>
+                                            </core:if>
+                                            <!-- free up some resources -->
+                                            <core:set value="${httpInputStream.close()}" var="dummy"/>
+                                            <core:if test="${(response_code == 200) }">
+                                              <core:if test="${bDebug}">
+                                                <gel:out trim="false">Business Outcome Found</gel:out>
+                                              </core:if>
+                                              <core:set value="true" var="bFoundLinkedBO"/>
+                                            </core:if>
+                                            <!-- JSON Response -->
+                                            <core:new className="org.json.JSONObject" var="jsonRespBO">
+                                              <core:arg type="java.lang.String" value="${httpData}"/>
+                                            </core:new>
+                                            <core:if test="${bDebugJSON}">
+                                              <gel:out>jsonRespBO:</gel:out>
+                                              <gel:out>${jsonRespBO.toString(1)}</gel:out>
+                                              <gel:out>__________________</gel:out>
+                                            </core:if>
+                                            <!-- Get the Roadmap Name and code -->
+                                            <core:set value="${jsonRespBO.getString('name')}" var="bo_Name"/>
+                                            <core:set value="${jsonRespBO.getString('code')}" var="bo_Code"/>
+                                            <core:set value="${jsonRespBO.getString('_internalId')}" var="bo_IntId"/>
+                                            <core:set value="" var="bo_z_aglAcceptedStoryCount"/>
+                                            <core:set value="" var="bo_z_aglAcceptedStoryPoints"/>
+                                            <core:set value="" var="bo_z_aglEstimatedStoryCount"/>
+                                            <core:set value="" var="bo_z_aglEstimatedStoryPoints"/>
+                                            <core:set value="" var="bo_z_aglPlannedStartDate"/>
+                                            <core:set value="T" var="bo_z_aglPlannedStartDateFmt"/>
+                                            <core:set value="" var="bo_z_aglPlannedEndDate"/>
+                                            <core:set value="T" var="bo_z_aglPlannedEndDateFmt"/>
+                                            <core:set value="" var="bo_z_aglRelease"/>
+                                            <core:set value="" var="bo_z_aglState"/>
+                                            <core:set value="" var="bo_z_aglInvestmentCategory"/>
+                                            <core:set value="" var="bo_z_aglRiskScore"/>
+                                            <core:set value="" var="bo_z_aglValueScore"/>
+                                            <core:set value="" var="bo_z_aglWSJFScore"/>
+                                            <core:set value="" var="bo_z_aglPercentDoneByStoryCount"/>
+                                            <core:set value="" var="bo_z_aglPercentDoneByStoryPoints"/>
+                                            <core:set value="" var="bo_z_aglActualEndDate"/>
+                                            <core:set value="T" var="bo_z_aglActualEndDateFmt"/>
+                                            <core:set value="" var="bo_z_aglActualStartDate"/>
+                                            <core:set value="T" var="bo_z_aglActualStartDateFmt"/>
+                                            <core:set value="" var="bo_z_t_shirt"/>
+                                            <!-- Group of Agile metrics -->
+                                            <core:if test="${bCustomFieldsKleanOOB}">
+                                              <core:set value="${jsonRespBO.get('z_aglAcceptedStoryCount')}" var="bo_z_aglAcceptedStoryCount"/>
+                                              <core:if test="${bo_z_aglAcceptedStoryCount.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglAcceptedStoryCount"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglAcceptedStoryPoints')}" var="bo_z_aglAcceptedStoryPoints"/>
+                                              <core:if test="${bo_z_aglAcceptedStoryPoints.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglAcceptedStoryPoints"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglEstimatedStoryCount')}" var="bo_z_aglEstimatedStoryCount"/>
+                                              <core:if test="${bo_z_aglEstimatedStoryCount.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglEstimatedStoryCount"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglEstimatedStoryPoints')}" var="bo_z_aglEstimatedStoryPoints"/>
+                                              <core:if test="${bo_z_aglEstimatedStoryPoints.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglEstimatedStoryPoints"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglPlannedStartDate')}" var="bo_z_aglPlannedStartDate"/>
+                                              <core:if test="${jsonRespBO.has('z_aglPlannedStartDate')}">
+                                                <core:set value="${jsonRespBO.get('z_aglPlannedStartDate')}" var="bo_z_aglPlannedStartDate"/>
+                                                <core:set value="${bo_z_aglPlannedStartDate.substring(0,10)}T08:00:00" var="bo_z_aglPlannedStartDateFmt"/>
+                                                <core:if test="${bo_z_aglPlannedStartDate.equals(null)}">
+                                                  <core:set value="T" var="bo_z_aglPlannedStartDateFmt"/>
+                                                </core:if>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglPlannedEndDate')}" var="bo_z_aglPlannedEndDate"/>
+                                              <core:if test="${jsonRespBO.has('z_aglPlannedEndDate')}">
+                                                <core:set value="${jsonRespBO.get('z_aglPlannedEndDate')}" var="bo_z_aglPlannedEndDate"/>
+                                                <core:set value="${bo_z_aglPlannedEndDate.substring(0,10)}T17:00:00" var="bo_z_aglPlannedEndDateFmt"/>
+                                                <core:if test="${bo_z_aglPlannedEndDate.equals(null)}">
+                                                  <core:set value="T" var="bo_z_aglPlannedEndDateFmt"/>
+                                                </core:if>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglRelease')}" var="bo_z_aglRelease"/>
+                                              <core:set value="${jsonRespBO.get('z_aglState')}" var="bo_z_aglState"/>
+                                              <core:set value="${jsonRespBO.get('z_aglInvestmentCategory')}" var="bo_z_aglInvestmentCategory"/>
+                                              <core:set value="${jsonRespBO.get('z_aglRiskScore')}" var="bo_z_aglRiskScore"/>
+                                              <core:if test="${bo_z_aglRiskScore.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglRiskScore"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglValueScore')}" var="bo_z_aglValueScore"/>
+                                              <core:if test="${bo_z_aglValueScore.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglValueScore"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglWSJFScore')}" var="bo_z_aglWSJFScore"/>
+                                              <core:if test="${bo_z_aglWSJFScore.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglWSJFScore"/>
+                                              </core:if>
+                                            </core:if>
+                                            <core:if test="${bCustomFieldsKleanXtra}">
+                                              <core:set value="${jsonRespBO.get('z_aglPercentDoneByStoryCount')}" var="bo_z_aglPercentDoneByStoryCount"/>
+                                              <core:if test="${bo_z_aglPercentDoneByStoryCount.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglPercentDoneByStoryCount"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglPercentDoneByStoryPoints')}" var="bo_z_aglPercentDoneByStoryPoints"/>
+                                              <core:if test="${bo_z_aglPercentDoneByStoryPoints.equals(null)}">
+                                                <core:set value="${(0+0)}" var="bo_z_aglPercentDoneByStoryPoints"/>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglActualEndDate')}" var="bo_z_aglActualEndDate"/>
+                                              <core:if test="${jsonRespBO.has('z_aglActualEndDate')}">
+                                                <core:set value="${jsonRespBO.get('z_aglActualEndDate')}" var="bo_z_aglActualEndDate"/>
+                                                <core:set value="${bo_z_aglActualEndDate.substring(0,10)}T17:00:00" var="bo_z_aglActualEndDateFmt"/>
+                                                <core:if test="${bo_z_aglActualEndDate.equals(null)}">
+                                                  <core:set value="T" var="bo_z_aglActualEndDateFmt"/>
+                                                </core:if>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_aglActualStartDate')}" var="bo_z_aglActualStartDate"/>
+                                              <core:if test="${jsonRespBO.has('z_aglActualStartDate')}">
+                                                <core:set value="${jsonRespBO.get('z_aglActualStartDate')}" var="bo_z_aglActualStartDate"/>
+                                                <core:set value="${bo_z_aglActualStartDate.substring(0,10)}T08:00:00" var="bo_z_aglActualStartDateFmt"/>
+                                                <core:if test="${bo_z_aglActualStartDate.equals(null)}">
+                                                  <core:set value="T" var="bo_z_aglActualStartDateFmt"/>
+                                                </core:if>
+                                              </core:if>
+                                              <core:set value="${jsonRespBO.get('z_t_shirt')}" var="bo_z_t_shirt"/>
+                                              <core:set value="${jsonRespBO.get('scheduleStart')}" var="bo_scheduleStart"/>
+                                              <core:set value="${jsonRespBO.get('scheduleFinish')}" var="bo_scheduleFinish"/>
+                                            </core:if>
+                                            <core:if test="${bCustomFieldsKurt}">
+                                              <core:set value="${jsonRespBO.get('z_percdonesp')}" var="bo_z_percdonesp"/>
+                                              <core:set value="${jsonRespBO.get('z_accepted_sp')}" var="bo_z_accepted_sp"/>
+                                              <core:set value="${jsonRespBO.get('z_ag_plan_est')}" var="bo_z_ag_plan_est"/>
+                                              <core:set value="${jsonRespBO.get('z_est_storypoints')}" var="bo_z_est_storypoints"/>
+                                              <core:set value="${jsonRespBO.get('scheduleStart')}" var="bo_scheduleStart"/>
+                                              <core:set value="${jsonRespBO.get('scheduleFinish')}" var="bo_scheduleFinish"/>
+                                              <core:set value="${jsonRespBO.get('z_accept_stories')}" var="bo_z_accept_stories"/>
+                                              <core:set value="${jsonRespBO.get('z_ag_actual_start')}" var="bo_z_ag_actual_start"/>
+                                              <core:set value="${jsonRespBO.get('z_ag_plan_finish')}" var="bo_z_ag_plan_finish"/>
+                                              <core:set value="${jsonRespBO.get('z_ag_plan_start')}" var="bo_z_ag_plan_start"/>
+                                              <core:set value="${jsonRespBO.get('z_ag_state')}" var="bo_z_ag_state"/>
+                                              <core:set value="${jsonRespBO.get('z_agile_act_finish')}" var="bo_z_agile_act_finish"/>
+                                              <core:set value="${jsonRespBO.get('z_agile_release')}" var="bo_z_agile_release"/>
+                                              <core:set value="${jsonRespBO.get('z_est_stories')}" var="bo_z_est_stories"/>
+                                              <core:set value="${jsonRespBO.get('z_perc_sc')}" var="bo_z_perc_sc"/>
+                                              <core:set value="${jsonRespBO.get('z_t_shirt')}" var="bo_z_t_shirt"/>
+                                            </core:if>
+                                            <!-- convert to a numeric data type (Double) -->
+                                            <!-- Skip since both are Numeric Percentages now
+                    <core:set var="bo_z_percdonespD"           value="${0.0+0}"/>
+                    <core:if test="${!(bo_z_percdonesp.equals(null))}">
+                      <core:set var="bo_z_percdonespD"           value="${(0.0+bo_z_percdonesp)}"/>
+                    </core:if>
+  
+                    <core:set var="bo_z_perc_scD"           value="${0.0+0}"/>
+                    <core:if test="${!(bo_z_perc_sc.equals(null))}">
+                      <core:set var="bo_z_perc_scD"           value="${(0.0+bo_z_perc_sc)}"/>
+                    </core:if>
+                    -->
+                                            <core:if test="${bDebugVerLog}">
+                                              <core:set value="${ri_linkedToType} (${bo_Code}.${bo_IntId}): ${bo_Name}" var="logMessage"/>
+                                              <core:choose>
+                                                <core:when test="${gel_processId == null}">
+                                                  <gel:out>${logMessage}</gel:out>
+                                                </core:when>
+                                                <core:otherwise>
+                                                  <gel:log level="INFO">${logMessage}</gel:log>
+                                                </core:otherwise>
+                                              </core:choose>
+                                            </core:if>
+                                            <core:if test="${bDebug}">
+                                              <gel:out>___ Roadmap Item Attributes ___</gel:out>
+                                              <gel:out>bo_IntId            : ${bo_IntId}</gel:out>
+                                              <gel:out>bo_Code             : ${bo_Code}</gel:out>
+                                              <gel:out>bo_Name             : ${bo_Name}</gel:out>
+                                              <!--
+                      <gel:out>bo_agile_id         : ${bo_agile_id} ${bo_agile_id.getClass()}</gel:out>
+                      <gel:out>bo_agile_ext_id     : ${bo_agile_ext_id} ${bo_agile_ext_id.getClass()}</gel:out>
+                      <gel:out>bo_agile_ext_id == null      : ${(bo_agile_ext_id == null)}</gel:out>
+                      <gel:out>bo_agile_ext_id.equals(null) : ${(bo_agile_ext_id.equals(null))}</gel:out>
+                        -->
+                                              <gel:out>___ Agile Metrics ___</gel:out>
+                                              <core:if test="${bCustomFieldsKleanOOB}">
+                                                <gel:out>bo_z_aglAcceptedStoryCount   : ${bo_z_aglAcceptedStoryCount} ${bo_z_aglAcceptedStoryCount.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglAcceptedStoryPoints  : ${bo_z_aglAcceptedStoryPoints} ${bo_z_aglAcceptedStoryPoints.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglEstimatedStoryCount  : ${bo_z_aglEstimatedStoryCount} ${bo_z_aglEstimatedStoryCount.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglEstimatedStoryPoints : ${bo_z_aglEstimatedStoryPoints} ${bo_z_aglEstimatedStoryPoints.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglPlannedStartDate     : ${bo_z_aglPlannedStartDate} ${bo_z_aglPlannedStartDate.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglPlannedStartDateFmt  : ${bo_z_aglPlannedStartDateFmt}</gel:out>
+                                                <gel:out>bo_z_aglPlannedEndDate       : ${bo_z_aglPlannedEndDate} ${bo_z_aglPlannedEndDate.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglPlannedEndDateFmt    : ${bo_z_aglPlannedEndDateFmt}</gel:out>
+                                                <gel:out>bo_z_aglRelease              : ${bo_z_aglRelease} ${bo_z_aglRelease.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglState                : ${bo_z_aglState} ${bo_z_aglState.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglInvestmentCategory   : ${bo_z_aglInvestmentCategory} ${bo_z_aglInvestmentCategory.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglRiskScore            : ${bo_z_aglRiskScore} ${bo_z_aglRiskScore.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglValueScore           : ${bo_z_aglValueScore} ${bo_z_aglValueScore.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglWSJFScore            : ${bo_z_aglWSJFScore} ${bo_z_aglWSJFScore.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglPercentDoneByStoryCount  : ${bo_z_aglPercentDoneByStoryCount} ${bo_z_aglPercentDoneByStoryCount.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglPercentDoneByStoryPoints : ${bo_z_aglPercentDoneByStoryPoints} ${bo_z_aglPercentDoneByStoryPoints.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglActualStartDate      : ${bo_z_aglActualStartDate} ${bo_z_aglActualStartDate.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglActualStartDateFmt   : ${bo_z_aglActualStartDateFmt}</gel:out>
+                                                <gel:out>bo_z_aglActualEndDate        : ${bo_z_aglActualEndDate} ${bo_z_aglActualEndDate.getClass()}</gel:out>
+                                                <gel:out>bo_z_aglActualEndDateFmt     : ${bo_z_aglActualEndDateFmt}</gel:out>
+                                                <gel:out>bo_z_t_shirt                 : ${bo_z_t_shirt} ${bo_z_t_shirt.getClass()}</gel:out>
+                                                <gel:out>bo_z_t_shirtFmt              : ${bo_z_t_shirtFmt}</gel:out>
+                                              </core:if>
+                                              <core:if test="${bCustomFieldsKurt}">
+                                                <gel:out>bo_z_accept_stories          : ${bo_z_accept_stories}</gel:out>
+                                                <gel:out>bo_z_accepted_sp             : ${bo_z_accepted_sp}</gel:out>
+                                                <gel:out>bo_z_ag_plan_finish          : ${bo_z_ag_plan_finish}</gel:out>
+                                                <gel:out>bo_z_ag_plan_start           : ${bo_z_ag_plan_start}</gel:out>
+                                                <gel:out>bo_z_ag_state                : ${bo_z_ag_state}</gel:out>
+                                                <gel:out>bo_z_est_stories             : ${bo_z_est_stories}</gel:out>
+                                                <gel:out>bo_z_est_storypoints         : ${bo_z_est_storypoints}</gel:out>
+                                                <gel:out>bo_z_per_sp                  : ${bo_z_per_sp}</gel:out>
+                                                <gel:out>bo_z_perc_sc                 : ${bo_z_perc_sc}</gel:out>
+                                                <gel:out>___ Old ___</gel:out>
+                                                <gel:out>ri_accept_stories         : ${ri_accept_stories}</gel:out>
+                                                <gel:out>ri_accepted_sp            : ${ri_accepted_sp}</gel:out>
+                                                <gel:out>ri_ag_actual_start        : ${ri_ag_actual_start}</gel:out>
+                                                <gel:out>ri_agile_ac_finish        : ${ri_agile_ac_finish}</gel:out>
+                                                <gel:out>ri_ag_plan_est            : ${ri_ag_plan_est}</gel:out>
+                                                <gel:out>ri_ag_plan_finish         : ${ri_ag_plan_finish}</gel:out>
+                                                <gel:out>ri_ag_plan_start          : ${ri_ag_plan_start}</gel:out>
+                                                <gel:out>ri_ag_release             : ${ri_ag_release}</gel:out>
+                                                <gel:out>ri_ag_state               : ${ri_ag_state}</gel:out>
+                                                <gel:out>ri_est_stories            : ${ri_est_stories}</gel:out>
+                                                <gel:out>ri_est_storypoints        : ${ri_est_storypoints}</gel:out>
+                                                <gel:out>ri_per_sp                 : ${ri_per_sp}</gel:out>
+                                                <gel:out>ri_perc_sc                : ${ri_perc_sc}</gel:out>
+                                                <gel:out>ri_t_shirt                : ${ri_t_shirt}</gel:out>
+                                                <gel:out>ri_t_shirtFmt             : ${ri_t_shirtFmt}</gel:out>
+                                              </core:if>
+                                            </core:if>
+                                          </core:if>
+                                          <!-- (httpInputStream != null) -->
+                                        </core:if>
+                                        <!-- (response_code != null) -->
+                                        <core:if test="${(bFoundLinkedBO)}">
+                                          <core:set value="false" var="bBOChangesFound"/>
+                                          <core:set var="httpRESTURL">${XOGURL}${PPMUrlPath}/${sRIlinkedObjectAttrId}</core:set>
+                                          <!-- we need the Id in the URL to PATCH the specific instance -->
+                                          <core:if test="${ri_linkedInternalId != null}">
+                                            <!-- AND -->
+                                            <core:if test="${ri_linkedInternalId.length() &gt; 0}">
+                                              <core:set value="${httpRESTURL}/${ri_linkedInternalId}" var="httpRESTURL"/>
+                                            </core:if>
+                                          </core:if>
+                                          <core:set escapeText="false" var="patchBO">
+                    { "_internalId": "${ri_linkedInternalId}"
+                  </core:set>
+                                          <core:set value="" var="dbgMessage"/>
+                                          <core:set value="" var="chgMessage"/>
+                                          <core:if test="${bCustomFieldsKleanOOB}">
+                                            <!-- MJS - Continue Here, better comparisons -->
+                                            <core:set value="${dbgMessage}z_aglAcceptedStoryCount(${bo_z_aglAcceptedStoryCount} vs ${agileAcceptedStoryCount}) " var="dbgMessage"/>
+                                            <core:if test="${(agileAcceptedStoryCount != bo_z_aglAcceptedStoryCount)}">
+                                              <core:set value="${chgMessage}z_aglAcceptedStoryCount(${bo_z_aglAcceptedStoryCount} vs ${agileAcceptedStoryCount}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglAcceptedStoryCount":       "${agileAcceptedStoryCount}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglAcceptedStoryPoints(${bo_z_aglAcceptedStoryPoints} vs ${agileAcceptedStoryPoints}) " var="dbgMessage"/>
+                                            <core:if test="${(agileAcceptedStoryPoints != bo_z_aglAcceptedStoryPoints)}">
+                                              <core:set value="${chgMessage}z_aglAcceptedStoryPoints(${bo_z_aglAcceptedStoryPoints} vs ${agileAcceptedStoryPoints}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglAcceptedStoryPoints":      "${agileAcceptedStoryPoints}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglEstimatedStoryCount(${bo_z_aglEstimatedStoryCount} vs ${agileEstimatedStoryCount}) " var="dbgMessage"/>
+                                            <core:if test="${(agileEstimatedStoryCount != bo_z_aglEstimatedStoryCount)}">
+                                              <core:set value="${chgMessage}z_aglEstimatedStoryCount(${bo_z_aglEstimatedStoryCount} vs ${agileEstimatedStoryCount}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglEstimatedStoryCount":      "${agileEstimatedStoryCount}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglEstimatedStoryPoints(${bo_z_aglEstimatedStoryPoints} vs ${agileEstimatedStoryPoints}) " var="dbgMessage"/>
+                                            <core:if test="${(agileEstimatedStoryPoints != bo_z_aglEstimatedStoryPoints)}">
+                                              <core:set value="${chgMessage}z_aglEstimatedStoryPoints(${bo_z_aglEstimatedStoryPoints} vs ${agileEstimatedStoryPoints}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglEstimatedStoryPoints":     "${agileEstimatedStoryPoints}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglPlannedStartDateFmt(${bo_z_aglPlannedStartDateFmt} vs ${agilePlannedStartDateFmt}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agilePlannedStartDateFmt.equals(bo_z_aglPlannedStartDateFmt)))}">
+                                              <core:if test="${agilePlannedStartDateFmt.equals('T')}">
+                                                <core:set value="" var="agilePlannedStartDateFmt"/>
+                                              </core:if>
+                                              <core:set value="${chgMessage}z_aglPlannedStartDateFmt(${bo_z_aglPlannedStartDateFmt} vs ${agilePlannedStartDateFmt}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglPlannedStartDate":         "${agilePlannedStartDateFmt}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglPlannedEndDateFmt(${bo_z_aglPlannedEndDateFmt} vs ${agilePlannedEndDateFmt}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agilePlannedEndDateFmt.equals(bo_z_aglPlannedEndDateFmt)))}">
+                                              <core:if test="${agilePlannedEndDateFmt.equals('T')}">
+                                                <core:set value="" var="agilePlannedEndDateFmt"/>
+                                              </core:if>
+                                              <core:set value="${chgMessage}z_aglPlannedEndDateFmt(${bo_z_aglPlannedEndDateFmt} vs ${agilePlannedEndDateFmt}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglPlannedEndDate":           "${agilePlannedEndDateFmt}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglActualEndDateFmt(${bo_z_aglActualEndDateFmt} vs ${agileActualEndDateFmt}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agileActualEndDateFmt.equals(bo_z_aglActualEndDateFmt)))}">
+                                              <core:if test="${agileActualEndDateFmt.equals('T')}">
+                                                <core:set value="" var="agileActualEndDateFmt"/>
+                                              </core:if>
+                                              <core:set value="${chgMessage}z_aglActualEndDateFmt(${bo_z_aglActualEndDateFmt} vs ${agileActualEndDateFmt}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglActualEndDate":            "${agileActualEndDateFmt}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglRelease(${bo_z_aglRelease} vs ${agileRelease}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agileRelease.equals(bo_z_aglRelease)))}">
+                                              <core:set value="${chgMessage}z_aglRelease(${bo_z_aglRelease} vs ${agileRelease}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglRelease":                  "${agileRelease}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglState(${bo_z_aglState} vs ${agileState}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agileState.equals(bo_z_aglState)))}">
+                                              <core:set value="${chgMessage}z_aglState(${bo_z_aglState} vs ${agileState}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglState":                    "${agileState}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglInvestmentCategory(${bo_z_aglInvestmentCategory} vs ${agileInvestmentCategory}) " var="dbgMessage"/>
+                                            <core:if test="${(!(agileInvestmentCategory.equals(bo_z_aglInvestmentCategory)))}">
+                                              <core:set value="${chgMessage}z_aglInvestmentCategory(${bo_z_aglInvestmentCategory} vs ${agileInvestmentCategory}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglInvestmentCategory":       "${agileInvestmentCategory}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglRiskScore(${bo_z_aglRiskScore} vs ${agileRiskScore}) " var="dbgMessage"/>
+                                            <core:if test="${(agileRiskScore != bo_z_aglRiskScore)}">
+                                              <core:set value="${chgMessage}z_aglRiskScore(${bo_z_aglRiskScore} vs ${agileRiskScore}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglRiskScore":                "${agileRiskScore}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglValueScore(${bo_z_aglValueScore} vs ${agileValueScore}) " var="dbgMessage"/>
+                                            <core:if test="${(agileValueScore != bo_z_aglValueScore)}">
+                                              <core:set value="${chgMessage}z_aglValueScore(${bo_z_aglValueScore} vs ${agileValueScore}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglValueScore":               "${agileValueScore}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglWSJFScore(${bo_z_aglWSJFScore} vs ${agileWSJFScore}) " var="dbgMessage"/>
+                                            <core:if test="${(agileWSJFScore != bo_z_aglWSJFScore)}">
+                                              <core:set value="${chgMessage}z_aglWSJFScore(${bo_z_aglWSJFScore} vs ${agileWSJFScore}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglWSJFScore":                "${agileWSJFScore}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglPercentDoneByStoryCount(${bo_z_aglPercentDoneByStoryCount} vs ${z_aglPercentDoneByStoryCount}) " var="dbgMessage"/>
+                                            <core:if test="${(z_aglPercentDoneByStoryCount != bo_z_aglPercentDoneByStoryCount)}">
+                                              <core:set value="${chgMessage}z_aglPercentDoneByStoryCount(${bo_z_aglPercentDoneByStoryCount} vs ${z_aglPercentDoneByStoryCount}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglPercentDoneByStoryCount":  "${z_aglPercentDoneByStoryCount}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglPercentDoneByStoryPoints(${bo_z_aglPercentDoneByStoryPoints} vs ${z_aglPercentDoneByStoryPoints}) " var="dbgMessage"/>
+                                            <core:if test="${(z_aglPercentDoneByStoryPoints != bo_z_aglPercentDoneByStoryPoints)}">
+                                              <core:set value="${chgMessage}z_aglPercentDoneByStoryPoints(${bo_z_aglPercentDoneByStoryPoints} vs ${z_aglPercentDoneByStoryPoints}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglPercentDoneByStoryPoints": "${z_aglPercentDoneByStoryPoints}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_aglActualStartDateFmt(${bo_z_aglActualStartDateFmt} vs ${z_aglActualStartDateFmt}) " var="dbgMessage"/>
+                                            <core:if test="${(!(z_aglActualStartDateFmt.equals(bo_z_aglActualStartDateFmt)))}">
+                                              <core:if test="${z_aglActualStartDateFmt.equals('T')}">
+                                                <core:set value="" var="z_aglActualStartDateFmt"/>
+                                              </core:if>
+                                              <core:set value="${chgMessage}z_aglActualStartDateFmt(${bo_z_aglActualStartDateFmt} vs ${z_aglActualStartDateFmt}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_aglActualStartDate":          "${z_aglActualStartDateFmt}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}z_t_shirt(${bo_z_t_shirt} vs ${z_t_shirt}) " var="dbgMessage"/>
+                                            <core:if test="${(bPushTShirtSizeToCIT)}">
+                                              <core:if test="${(!(z_t_shirt.equals(bo_z_t_shirt)))}">
+                                                <core:set value="${chgMessage}z_t_shirt(${bo_z_t_shirt} vs ${z_t_shirt}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"z_t_shirt":                     "${z_t_shirt}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}scheduleStart(${bo_scheduleStart} vs ${ri_start_dt}) " var="dbgMessage"/>
+                                            <core:if test="${!(ri_start_dt.equals(null)) || ri_start_dt.length() &gt; 0}">
+                                              <core:set value="${ri_start_dt.substring(0,10)}" var="tmpStartRI"/>
+                                              <core:set value="${bo_scheduleStart.substring(0,10)}" var="tmpStartBO"/>
+                                              <core:if test="${!(tmpStartRI.equals(tmpStartBO))}">
+                                                <core:set value="${chgMessage}scheduleStart(${tmpStartBO} vs ${tmpStartRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"scheduleStart": "${ri_start_dt}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <core:set value="${dbgMessage}scheduleFinish(${bo_scheduleFinish} vs ${ri_finish_dt}) " var="dbgMessage"/>
+                                            <core:if test="${!(ri_finish_dt.equals(null)) || ri_finish_dt.length() &gt; 0}">
+                                              <core:set value="${ri_finish_dt.substring(0,10)}" var="tmpFinishRI"/>
+                                              <core:set value="${bo_scheduleFinish.substring(0,10)}" var="tmpFinishBO"/>
+                                              <core:if test="${!(tmpFinishRI.equals(tmpFinishBO))}">
+                                                <core:set value="${chgMessage}scheduleFinish(${tmpFinishBO} vs ${tmpFinishRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"scheduleFinish": "${ri_finish_dt}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                          </core:if>
+                                          <core:if test="${bCustomFieldsKurt}">
+                                            <!-- Old, when the datatypes did not match as Numeric Percentages
+                    <core:if test="${!(ri_per_sp.equals(null)) || ri_per_sp.length() > 0}">
+                      <core:if test="${!(ri_per_spD.equals(bo_z_percdonespD))}">
+                        <core:set var="chgMessage" value="${chgMessage}z_percdonesp(${bo_z_percdonespD} vs ${ri_per_spD}) " />
+                        <core:set var="bBOChangesFound"     value="true"/>
+                        <core:set var="patchBO" escapeText="false">${patchBO}
+                          ,"z_percdonesp": "${ri_per_spD}"
+                        </core:set>
+                      </core:if>
+                    </core:if>
+        
+                    <core:if test="${!(ri_perc_sc.equals(null)) || ri_perc_sc.length() > 0}">
+                      <core:if test="${!(ri_perc_scD.equals(bo_z_perc_scD))}">
+                        <core:set var="chgMessage" value="${chgMessage}z_perc_sc(${bo_z_perc_scD} vs ${ri_perc_scD}) " />
+                        <core:set var="bBOChangesFound"     value="true"/>
+                        <core:set var="patchBO" escapeText="false">${patchBO}
+                          ,"z_perc_sc": "${ri_perc_scD}"
+                        </core:set>
+                      </core:if>
+                    </core:if>
+                    -->
+                                            <!-- <core:if test="${(!(ri_per_sp.equals(null)) && !(ri_per_sp.equals(bo_z_percdonesp))) || (ri_per_sp.length() > 0)) || !(ri_per_sp.equals(bo_z_percdonesp))}"> -->
+                                            <core:if test="${(!(ri_per_sp.equals(bo_z_percdonesp)))}">
+                                              <core:set value="${chgMessage}z_percdonesp(${bo_z_percdonesp} vs ${ri_per_sp}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_percdonesp": "${ri_per_sp}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_perc_sc.equals(null)) || ri_perc_sc.length() > 0}">
+                      <core:if test="${!(ri_perc_sc.equals(bo_z_perc_sc))}">-->
+                                            <core:if test="${(!(ri_per_sp.equals(bo_z_percdonesp)))}">
+                                              <core:set value="${chgMessage}z_perc_sc(${bo_z_perc_sc} vs ${ri_perc_sc}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_perc_sc": "${ri_perc_sc}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_accepted_sp.equals(null)) || ri_accepted_sp.length() > 0}">-->
+                                            <core:if test="${!(ri_accepted_sp.equals(bo_z_accepted_sp))}">
+                                              <core:set value="${chgMessage}z_accepted_sp(${bo_z_accepted_sp} vs ${ri_accepted_sp}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_accepted_sp": "${ri_accepted_sp}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_ag_plan_est.equals(null)) || ri_ag_plan_est.length() > 0}">-->
+                                            <core:if test="${!(ri_ag_plan_est.equals(bo_z_ag_plan_est))}">
+                                              <core:set value="${chgMessage}z_ag_plan_est(${bo_z_ag_plan_est} vs ${ri_ag_plan_est}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_ag_plan_est": "${ri_ag_plan_est}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_est_storypoints.equals(null)) || ri_est_storypoints.length() > 0}">-->
+                                            <core:if test="${!(ri_est_storypoints.equals(bo_z_est_storypoints))}">
+                                              <core:set value="${chgMessage}z_est_storypoints(${bo_z_est_storypoints} vs ${ri_est_storypoints}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_est_storypoints": "${ri_est_storypoints}"
+                      </core:set>
+                                            </core:if>
+                                            <core:if test="${!(ri_start_dt.equals(null)) || ri_start_dt.length() &gt; 0}">
+                                              <core:set value="${ri_start_dt.substring(0,10)}" var="tmpStartRI"/>
+                                              <core:set value="${bo_scheduleStart.substring(0,10)}" var="tmpStartBO"/>
+                                              <core:if test="${!(tmpStartRI.equals(tmpStartBO))}">
+                                                <core:set value="${chgMessage}scheduleStart(${tmpStartBO} vs ${tmpStartRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"scheduleStart": "${ri_start_dt}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <core:if test="${!(ri_finish_dt.equals(null)) || ri_finish_dt.length() &gt; 0}">
+                                              <core:set value="${ri_finish_dt.substring(0,10)}" var="tmpFinishRI"/>
+                                              <core:set value="${bo_scheduleFinish.substring(0,10)}" var="tmpFinishBO"/>
+                                              <core:if test="${!(tmpFinishRI.equals(tmpFinishBO))}">
+                                                <core:set value="${chgMessage}scheduleFinish(${tmpFinishBO} vs ${tmpFinishRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"scheduleFinish": "${ri_finish_dt}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_accept_stories.equals(null)) || ri_accept_stories.length() > 0}">-->
+                                            <core:if test="${!(ri_accept_stories.equals(bo_z_accept_stories))}">
+                                              <core:set value="${chgMessage}z_accept_stories(${bo_z_accept_stories} vs ${ri_accept_stories}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_accept_stories": "${ri_accept_stories}"
+                      </core:set>
+                                            </core:if>
+                                            <core:if test="${!(ri_ag_actual_start.equals(null)) || ri_ag_actual_start.length() &gt; 0}">
+                                              <core:set value="${ri_ag_actual_start.substring(0,10)}" var="tmpStartRI"/>
+                                              <core:set value="${bo_z_ag_actual_start.substring(0,10)}" var="tmpStartBO"/>
+                                              <core:if test="${!(tmpStartRI.equals(tmpStartBO))}">
+                                                <core:set value="${chgMessage}z_ag_actual_start(${tmpStartBO} vs ${tmpStartRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"z_ag_actual_start": "${ri_ag_actual_start}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_ag_plan_finish.equals(null)) || ri_ag_plan_finish.length() > 0}">-->
+                                            <core:if test="${ri_ag_plan_finish.equals(null)}">
+                                              <core:set value="          " var="tmpFinishRI"/>
+                                            </core:if>
+                                            <core:if test="${!(ri_ag_plan_finish.equals(null))}">
+                                              <core:set value="${ri_ag_plan_finish.substring(0,10)}" var="tmpFinishRI"/>
+                                            </core:if>
+                                            <core:if test="${bo_z_ag_plan_finish.equals(null)}">
+                                              <core:set value="          " var="tmpFinishBO"/>
+                                            </core:if>
+                                            <core:if test="${!(bo_z_ag_plan_finish.equals(null))}">
+                                              <core:set value="${bo_z_ag_plan_finish.substring(0,10)}" var="tmpFinishBO"/>
+                                            </core:if>
+                                            <core:if test="${!(tmpFinishRI.equals(tmpFinishBO))}">
+                                              <core:set value="${chgMessage}z_ag_plan_finish(${tmpFinishBO} vs ${tmpFinishRI}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_ag_plan_finish": "${ri_ag_plan_finish.trim()}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="bo_z_ag_plan_finish(${bo_z_ag_plan_finish}) vs ri_ag_plan_finish(${ri_ag_plan_finish}) " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                            <core:set value="z_ag_plan_finish(${tmpFinishBO} vs ${tmpFinishRI}) " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                            <!--<core:if test="${!(ri_ag_plan_start.equals(null)) || ri_ag_plan_start.length() > 0}">-->
+                                            <core:if test="${ri_ag_plan_start.equals(null)}">
+                                              <core:set value="          " var="tmpStartRI"/>
+                                            </core:if>
+                                            <core:if test="${!(ri_ag_plan_start.equals(null))}">
+                                              <core:set value="${ri_ag_plan_start.substring(0,10)}" var="tmpStartRI"/>
+                                            </core:if>
+                                            <core:if test="${bo_z_ag_plan_start.equals(null)}">
+                                              <core:set value="          " var="tmpStartBO"/>
+                                            </core:if>
+                                            <core:if test="${!(bo_z_ag_plan_start.equals(null))}">
+                                              <core:set value="${bo_z_ag_plan_start.substring(0,10)}" var="tmpStartBO"/>
+                                            </core:if>
+                                            <core:if test="${!(tmpStartRI.equals(tmpStartBO))}">
+                                              <core:set value="${chgMessage}z_ag_plan_start(${tmpStartBO} vs ${tmpStartRI}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_ag_plan_start": "${ri_ag_plan_start.trim()}"
+                      </core:set>
+                                            </core:if>
+                                            <core:set value="bo_z_ag_plan_start(${bo_z_ag_plan_start}) vs ri_ag_plan_start(${ri_ag_plan_start}) " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                            <core:set value="z_ag_plan_start(${tmpStartBO} vs ${tmpStartRI}) " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                            <!--<core:if test="${!(ri_ag_state.equals(null)) || ri_ag_state.length() > 0}">-->
+                                            <core:if test="${!(ri_ag_state.equals(bo_z_ag_state))}">
+                                              <core:set value="${chgMessage}z_ag_state(${bo_z_ag_state} vs ${ri_ag_state}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_ag_state": "${ri_ag_state}"
+                      </core:set>
+                                            </core:if>
+                                            <core:if test="${!(ri_agile_ac_finish.equals(null)) || ri_agile_ac_finish.length() &gt; 0}">
+                                              <core:set value="${ri_agile_ac_finish.substring(0,10)}" var="tmpFinishRI"/>
+                                              <core:set value="${bo_z_agile_act_finish.substring(0,10)}" var="tmpFinishBO"/>
+                                              <core:if test="${!(tmpFinishRI.equals(tmpFinishBO))}">
+                                                <core:set value="${chgMessage}z_agile_act_finish(${tmpFinishBO} vs ${tmpFinishRI}) " var="chgMessage"/>
+                                                <core:set value="true" var="bBOChangesFound"/>
+                                                <core:set escapeText="false" var="patchBO">${patchBO}
+                          ,"z_agile_act_finish": "${ri_agile_ac_finish}"
+                        </core:set>
+                                              </core:if>
+                                            </core:if>
+                                            <!--<core:if test="${!(ri_est_stories.equals(null)) || ri_est_stories.length() > 0}">-->
+                                            <core:if test="${!(ri_est_stories.equals(bo_z_est_stories))}">
+                                              <core:set value="${chgMessage}z_est_stories(${bo_z_est_stories} vs ${ri_est_stories}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_est_stories": "${ri_est_stories}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${(ri_t_shirt != null)}">-->
+                                            <!--<core:if test="${!(ri_t_shirt != null) || !(ri_t_shirt.equals(null)) || ri_t_shirt.length() > 0}">-->
+                                            <core:if test="${!(ri_t_shirt.equals(bo_z_t_shirt))}">
+                                              <core:set value="${chgMessage}z_t_shirt(${bo_z_t_shirt} vs ${ri_t_shirt}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_t_shirt": "${ri_t_shirt}"
+                      </core:set>
+                                            </core:if>
+                                            <!--<core:if test="${(ri_ag_release != null)}">-->
+                                            <!-- <core:if test="${!(ri_ag_release.equals(null)) || ri_ag_release.length() > 0}">-->
+                                            <core:if test="${!(ri_ag_release.equals(bo_z_agile_release))}">
+                                              <core:set value="${chgMessage}z_agile_release(${bo_z_agile_release} vs ${ri_ag_release}) " var="chgMessage"/>
+                                              <core:set value="true" var="bBOChangesFound"/>
+                                              <core:set escapeText="false" var="patchBO">${patchBO}
+                        ,"z_agile_release": "${ri_ag_release}"
+                      </core:set>
+                                            </core:if>
+                                          </core:if>
+                                          <core:set escapeText="false" var="patchBO">${patchBO}
+                    }
+                  </core:set>
+                                          <core:if test="${bDebugREST}">
+                                            <core:set value="patchBO: ${patchBO} " var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                          </core:if>
+                                          <core:if test="${bDebugVerLog}">
+                                            <core:set value="Debug Compare: ${dbgMessage}" var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                          </core:if>
+                                          <core:if test="${!(bBOChangesFound)}">
+                                            <core:if test="${bDebugVerLog}">
+                                              <core:set value="No changes: (${bo_Code}.${bo_IntId})" var="logMessage"/>
+                                              <core:choose>
+                                                <core:when test="${gel_processId == null}">
+                                                  <gel:out>${logMessage}</gel:out>
+                                                </core:when>
+                                                <core:otherwise>
+                                                  <gel:log level="INFO">${logMessage}</gel:log>
+                                                </core:otherwise>
+                                              </core:choose>
+                                            </core:if>
+                                          </core:if>
+                                          <core:if test="${(bBOChangesFound)}">
+                                            <!-- PATCH the linked object -->
+                                            <core:set value="Updating (${bo_Code}.${bo_IntId}) ${bo_Name}" var="logMessage"/>
+                                            <core:choose>
+                                              <core:when test="${gel_processId == null}">
+                                                <gel:out>${logMessage}</gel:out>
+                                              </core:when>
+                                              <core:otherwise>
+                                                <gel:log level="INFO">${logMessage}</gel:log>
+                                              </core:otherwise>
+                                            </core:choose>
+                                            <core:if test="${chgMessage.length() &gt; 0}">
+                                              <core:set value="Changes: ${chgMessage}" var="logMessage"/>
+                                              <core:choose>
+                                                <core:when test="${gel_processId == null}">
+                                                  <gel:out>${logMessage}</gel:out>
+                                                </core:when>
+                                                <core:otherwise>
+                                                  <gel:log level="INFO">${logMessage}</gel:log>
+                                                </core:otherwise>
+                                              </core:choose>
+                                            </core:if>
+                                            <core:if test="${bDebugVerLog}">
+                                              <core:set value="patchBO: ${patchBO} " var="logMessage"/>
+                                              <core:choose>
+                                                <core:when test="${gel_processId == null}">
+                                                  <gel:out>${logMessage}</gel:out>
+                                                </core:when>
+                                                <core:otherwise>
+                                                  <gel:log level="INFO">${logMessage}</gel:log>
+                                                </core:otherwise>
+                                              </core:choose>
+                                            </core:if>
+                                            <core:if test="${bDebugREST}">
+                                              <gel:out>httpRESTURL: ${httpRESTURL}</gel:out>
+                                            </core:if>
+                                            <core:new className="org.apache.http.client.methods.HttpPatch" var="httppatch">
+                                              <core:arg type="java.lang.String" value="${httpRESTURL}"/>
+                                            </core:new>
+                                            <core:if test="${bDebugREST}">
+                                              <gel:out>httppatch.getURI():  ${httppatch.getURI()}</gel:out>
+                                            </core:if>
+                                            <core:new className="org.apache.http.entity.StringEntity" var="httpEntity">
+                                              <core:arg type="java.lang.String" value="${patchBO}"/>
+                                            </core:new>
+                                            <core:expr value="${httppatch.setEntity(httpEntity)}"/>
+                                            <core:expr value="${httppatch.setHeader(&quot;Content-type&quot;, &quot;application/json&quot;)}"/>
+                                            <core:expr value="${httppatch.setHeader(&quot;Accept&quot;, &quot;application/json&quot;)}"/>
+                                            <core:expr value="${httppatch.setHeader(&quot;Connection&quot;, &quot;keep-alive&quot;)}"/>
+                                            <core:expr value="${httppatch.setHeader(h_authToken, v_authToken)}"/>
+                                            <core:set value="Processing Roadmap Item (${ri_Code}:${ri_IntId}) Name[${ri_Name}] to (${ri_linkedToObjectCode}:${ri_linkedInternalId}) ${ri_linkedToType} " var="logMessage"/>
+                                            <core:if test="${!(bSkipRESTUpdate)}">
+                                              <core:if test="${bDebug}">
+                                                <gel:out trim="false">Patching Business Outcome...</gel:out>
+                                              </core:if>
+                                              <!-- Should be just client.execute(httppatch), but we need to identify the httppatch class by specifying it using the core:arg parameter -->
+                                              <core:invoke method="execute" on="${client}" var="response">
+                                                <core:arg type="org.apache.http.client.methods.HttpPatch" value="${httppatch}"/>
+                                              </core:invoke>
+                                              <core:set value="${response.getStatusLine().getStatusCode()}" var="response_code"/>
+                                              <core:set value="${response.getStatusLine().getReasonPhrase()}" var="response_msg"/>
+                                              <!-- this is usually empty, pointless -->
+                                              <core:if test="${bDebugREST}">
+                                                <gel:out>getStatusLine():  ${response.getStatusLine()}</gel:out>
+                                              </core:if>
+                                              <core:set value="${null}" var="jsonQR"/>
+                                              <core:set value="${null}" var="httpInputStream"/>
+                                              <core:set value="${response.getEntity()}" var="entity"/>
+                                              <core:if test="${entity != null}">
+                                                <core:set value="${entity.getContent()}" var="httpInputStream"/>
+                                              </core:if>
+                                              <core:if test="${response_code == null}">
+                                                <!-- There was not even a response code returned. This usually happens when the URL is incorrect. -->
+                                                <core:set value="ERROR on Connection: Reponse Code is 0. Check the URL or the firewall. ${v_RRname}(${v_PrjAglSys}): ${RallyHost}" var="logMessage"/>
+                                                <core:choose>
+                                                  <core:when test="${gel_processId == null}">
+                                                    <gel:out>${logMessage}</gel:out>
+                                                    <gel:out/>
+                                                  </core:when>
+                                                  <core:otherwise>
+                                                    <gel:log level="WARN">${logMessage}</gel:log>
+                                                  </core:otherwise>
+                                                </core:choose>
+                                              </core:if>
+                                              <core:if test="${response_code != null}">
+                                                <core:if test="${(response_code != 200)}">
+                                                  <core:set value="ERROR on PATCH. response_code(${response_code}) response_msg: ${response_msg} " var="logMessage"/>
+                                                  <core:choose>
+                                                    <core:when test="${gel_processId == null}">
+                                                      <gel:out>${logMessage}</gel:out>
+                                                    </core:when>
+                                                    <core:otherwise>
+                                                      <gel:log level="WARN">${logMessage}</gel:log>
+                                                    </core:otherwise>
+                                                  </core:choose>
+                                                </core:if>
+                                                <core:if test="${httpInputStream == null}">
+                                                  <core:set value="httpInputStream == NULL, getHeaderField(0): ${response_hdr} response_code(${response_code}) response_msg: ${response_msg}  httpRESTURL: ${httpRESTURL}" var="logMessage"/>
+                                                  <core:choose>
+                                                    <core:when test="${gel_processId == null}">
+                                                      <gel:out>${logMessage}</gel:out>
+                                                    </core:when>
+                                                    <core:otherwise>
+                                                      <gel:log level="WARN">${logMessage}</gel:log>
+                                                    </core:otherwise>
+                                                  </core:choose>
+                                                </core:if>
+                                                <!-- OR -->
+                                                <core:if test="${httpInputStream != null}">
+                                                  <core:new className="java.io.InputStreamReader" var="v_Input">
+                                                    <core:arg type="java.io.InputStream" value="${httpInputStream}"/>
+                                                  </core:new>
+                                                  <core:new className="java.io.BufferedReader" var="v_InputData">
+                                                    <core:arg type="java.io.InputStreamReader" value="${v_Input}"/>
+                                                  </core:new>
+                                                  <core:set value="${v_InputData.readLine()}" var="httpData"/>
+                                                  <core:if test="${bDebugREST}">
+                                                    <gel:out>httpData: ${httpData}</gel:out>
+                                                  </core:if>
+                                                  <!-- free up some resources -->
+                                                  <core:set value="${httpInputStream.close()}" var="dummy"/>
+                                                  <!-- JSON Response -->
+                                                  <core:new className="org.json.JSONObject" var="jsonResp">
+                                                    <core:arg type="java.lang.String" value="${httpData}"/>
+                                                  </core:new>
+                                                </core:if>
+                                                <!-- (httpInputStream != null) -->
+                                              </core:if>
+                                              <!-- (response_code != null) -->
+                                              <core:if test="${response_code == 200}">
+                                                <!-- Successful Update -->
+                                                <core:set value="Update of ${ri_linkedToType} (${ri_linkedToObjectCode}:${ri_linkedInternalId}) successful from Roadmap Item (${ri_Code}:${ri_IntId}) Name[${ri_Name}] " var="logMessage"/>
+                                              </core:if>
+                                            </core:if>
+                                            <!-- !(bSkipRESTUpdate) -->
+                                          </core:if>
+                                          <!-- bBOChangesFound -->
+                                        </core:if>
+                                        <!-- (bFoundLinkedBO) -->
+                                      </core:if>
+                                      <!-- !(ri_linkedInternalId.equals(null)) -->
+                                    </core:if>
+                                    <!-- ri_linkedToObjectCode.equals(sRIlinkedObjectId)  -->
+                                    <core:set value="${i_jarrRArray+1}" var="i_jarrRArray"/>
+                                    <core:set value="${i_jarrRArray.intValue()}" var="i_jarrRArray"/>
+                                    <!-- convert the long back to an int, which we need for the json calls -->
+                                  </core:while>
+                                  <!-- i_jarrRArray lt len_jarrRArray -->
+                                </core:if>
+                                <!-- jarrRArray != null -->
+                                <!-- Check to see if we have more RIs to process. Check for a _next tag  -->
+                                <core:set value="${jsonRI.get('_pageSize')}" var="z_pageSize"/>
+                                <core:set value="${jsonRI.get('_recordsReturned')}" var="z_recordsReturned"/>
+                                <core:set value="${jsonRI.get('_totalCount')}" var="z_totalCount"/>
+                                <core:set value="${null}" var="z_next"/>
+                                <core:if test="${jsonRI.has('_next')}">
+                                  <core:set value="${jsonRI.get('_next')}" var="z_next"/>
+                                </core:if>
+                                <core:if test="${bDebugREST}">
+                                  <gel:out>z_recordsReturned: ${z_recordsReturned} of totalCount: ${z_totalCount} with pageSize: ${z_pageSize}</gel:out>
+                                  <core:if test="${(z_next != null)}">
+                                    <gel:out>_next: ${z_next} </gel:out>
+                                  </core:if>
+                                </core:if>
+                                <core:set value="false" var="bProcessRIs"/>
+                                <core:if test="${(z_next != null)}">
+                                  <core:set value="true" var="bProcessRIs"/>
+                                  <!-- There are more RIs to process, so get the next batch of RIs -->
+                                  <core:set value="${z_next}" var="httpRESTURL"/>
+                                  <core:if test="${bDebugREST}">
+                                    <gel:out>httpRESTURL: ${httpRESTURL}</gel:out>
+                                  </core:if>
+                                  <core:new className="org.apache.http.client.methods.HttpGet" var="httpget">
+                                    <core:arg type="java.lang.String" value="${httpRESTURL}"/>
+                                  </core:new>
+                                  <core:expr value="${httpget.setHeader(&quot;Content-type&quot;, &quot;application/json&quot;)}"/>
+                                  <core:expr value="${httpget.setHeader(&quot;Accept&quot;, &quot;application/json&quot;)}"/>
+                                  <core:expr value="${httpget.setHeader(&quot;Connection&quot;, &quot;keep-alive&quot;)}"/>
+                                  <core:expr value="${httpget.setHeader(h_authToken, v_authToken)}"/>
+                                  <core:invoke method="execute" on="${client}" var="response">
+                                    <core:arg type="org.apache.http.client.methods.HttpGet" value="${httpget}"/>
+                                  </core:invoke>
+                                  <core:set value="${response.getStatusLine().getStatusCode()}" var="response_code"/>
+                                  <core:set value="${response.getStatusLine().getReasonPhrase()}" var="response_msg"/>
+                                  <!-- this is usually empty, pointless -->
+                                  <core:if test="${bDebugREST}">
+                                    <gel:out>getStatusLine():  ${response.getStatusLine()}</gel:out>
+                                  </core:if>
+                                  <core:set value="${null}" var="httpInputStream"/>
+                                  <core:set value="${response.getEntity()}" var="entity"/>
+                                  <core:if test="${entity != null}">
+                                    <core:set value="${entity.getContent()}" var="httpInputStream"/>
+                                  </core:if>
+                                  <core:if test="${response_code != null}">
+                                    <core:if test="${response_code == 400}">
+                                      <core:set value="ERROR on REST: Probably a missing custom field on the Roadmap Item" var="logMessage"/>
+                                      <core:choose>
+                                        <core:when test="${gel_processId == null}">
+                                          <gel:out>${logMessage}</gel:out>
+                                        </core:when>
+                                        <core:otherwise>
+                                          <gel:log level="WARN">${logMessage}</gel:log>
+                                        </core:otherwise>
+                                      </core:choose>
+                                    </core:if>
+                                    <core:if test="${response_code == 404}">
+                                      <core:set value="ERROR: Next set of Roadmap Items Not found for ${z_next}" var="logMessage"/>
+                                      <core:choose>
+                                        <core:when test="${gel_processId == null}">
+                                          <gel:out>${logMessage}</gel:out>
+                                        </core:when>
+                                        <core:otherwise>
+                                          <gel:log level="WARN">${logMessage}</gel:log>
+                                        </core:otherwise>
+                                      </core:choose>
+                                    </core:if>
+                                    <core:if test="${(response_code != 200)}">
+                                      <core:set value="ERROR on REST. response_code(${response_code}) response_msg: ${response_msg} " var="logMessage"/>
+                                      <core:choose>
+                                        <core:when test="${gel_processId == null}">
+                                          <gel:out>${logMessage}</gel:out>
+                                        </core:when>
+                                        <core:otherwise>
+                                          <gel:log level="WARN">${logMessage}</gel:log>
+                                        </core:otherwise>
+                                      </core:choose>
+                                    </core:if>
+                                    <core:if test="${httpInputStream == null}">
+                                      <core:set value="httpInputStream == NULL, getHeaderField(0): ${response_hdr} response_code(${response_code}) response_msg: ${response_msg}  httpRESTURL: ${httpRESTURL}" var="logMessage"/>
+                                      <core:choose>
+                                        <core:when test="${gel_processId == null}">
+                                          <gel:out>${logMessage}</gel:out>
+                                        </core:when>
+                                        <core:otherwise>
+                                          <gel:log level="WARN">${logMessage}</gel:log>
+                                        </core:otherwise>
+                                      </core:choose>
+                                    </core:if>
+                                    <!-- OR -->
+                                    <core:if test="${httpInputStream != null}">
+                                      <core:new className="java.io.InputStreamReader" var="v_Input">
+                                        <core:arg type="java.io.InputStream" value="${httpInputStream}"/>
+                                      </core:new>
+                                      <core:new className="java.io.BufferedReader" var="v_InputData">
+                                        <core:arg type="java.io.InputStreamReader" value="${v_Input}"/>
+                                      </core:new>
+                                      <core:set value="${v_InputData.readLine()}" var="httpData"/>
+                                      <core:if test="${bDebugREST}">
+                                        <gel:out>httpData: ${httpData}</gel:out>
+                                      </core:if>
+                                      <!-- free up some resources -->
+                                      <core:set value="${httpInputStream.close()}" var="dummy"/>
+                                      <core:if test="${(response_code == 200) }">
+                                        <core:if test="${bDebug}">
+                                          <gel:out trim="false">Processing Next set of Roadmap Items...</gel:out>
+                                        </core:if>
+                                      </core:if>
+                                      <!-- (response_code == 200) -->
+                                      <!-- JSON Response -->
+                                      <core:new className="org.json.JSONObject" var="jsonRI">
+                                        <core:arg type="java.lang.String" value="${httpData}"/>
+                                      </core:new>
+                                    </core:if>
+                                    <!-- (httpInputStream != null) -->
+                                  </core:if>
+                                  <!-- (response_code != null) -->
+                                  <core:if test="${jsonRI == null}">
+                                    <core:if test="${bDebug}">
+                                      <core:if test="${bDebug}">
+                                        <gel:out>Next call: jsonRI is null. We should have had another set of RIs to process.</gel:out>
+                                      </core:if>
+                                    </core:if>
+                                  </core:if>
+                                </core:if>
+                                <!-- (z_next != null) -->
+                              </core:while>
+                              <!-- More Roadmap Items to process -->
+                            </core:if>
+                            <!-- jsonRI != null -->
+                          </core:catch>
+                          <!-- ___ Error Exception processing  ___ -->
+                          <core:if test="${not empty exvar5}">
+                            <core:set value="EXCEPTION: ${exvar5.getMessage()}" var="logMessage"/>
+                            <core:choose>
+                              <core:when test="${gel_processId == null}">
+                                <gel:out>${logMessage}</gel:out>
+                              </core:when>
+                              <core:otherwise>
+                                <gel:log level="INFO">${logMessage}</gel:log>
+                              </core:otherwise>
+                            </core:choose>
+                            <core:if test="${bDebug}">
+                              <gel:out>exvar5.toString() ${exvar5.toString()}</gel:out>
+                              <gel:out>exvar5.getName() ${exvar5.getName()}</gel:out>
+                              <gel:out>ERROR - Exception: ${exvar5}</gel:out>
+                              <gel:out/>
+                            </core:if>
+                            <core:new className="org.apache.commons.jelly.JellyTagException" var="exTag">
+                              <core:arg type="java.lang.Throwable" value="${exvar5}"/>
+                            </core:new>
+                            <gel:out>ERROR - TAG Exception: ${exTag}</gel:out>
+                            <gel:out/>
+                          </core:if>
+                        </gel:script>
+                      </scriptText>
+                      <scriptParameter isSecure="false" name="DemoDataset" value="Klean"/>
+                      <scriptParameter isSecure="false" name="ClarityUser"/>
+                      <scriptParameter isSecure="false" name="PushTShirtSizeToCIT" value="false"/>
+                      <scriptParameter isSecure="false" name="RI_Linked_ObjectId" value="clr_epic"/>
+                      <scriptParameter isSecure="false" name="RI_Linked_Object_AttrId" value="custClrEpics"/>
+                      <scriptParameter isSecure="false" name="VerboseLogMessages"/>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="unchk_Bool"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="unchk_Bool" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="Uncheck the boolean that a started it all" languageCode="en" name="Uncheck Boolean"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="unchkBool" objectMethod="clr_upd_linkedcit" objectName="thisRoadmap" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Uncheck Bool"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="0"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

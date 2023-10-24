@@ -1,0 +1,567 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>GLD_DEFINECOLUMNHIERARCHY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."GLD_DEFINECOLUMNHIERARCHY" 
+(
+  cNewCol1  VARCHAR2,
+  cNewCol2  VARCHAR2,
+  cNewCol3  VARCHAR2,
+  cNewCol4  VARCHAR2,
+  cNewCol5  VARCHAR2,
+  cNewCol6  VARCHAR2
+)
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  cNewColName1     GLOBALPKG.STRING;
+  cNewColName2     GLOBALPKG.STRING;
+  cNewColName3     GLOBALPKG.STRING;
+  cNewColName4     GLOBALPKG.STRING;
+  cNewColName5     GLOBALPKG.STRING;
+  cNewColName6     GLOBALPKG.STRING;
+  cOrigColName1    GLOBALPKG.STRING;
+  cOrigColName2    GLOBALPKG.STRING;
+  cOrigColName3    GLOBALPKG.STRING;
+  cOrigColName4    GLOBALPKG.STRING;
+  cOrigColName5    GLOBALPKG.STRING;
+  cOrigColName6    GLOBALPKG.STRING;
+  iGLMatrixKey     NUMBER;
+  iNextColNo       NUMBER;
+  UF1_rowid        ROWID;
+  UF1_oval1        ppa_MatrixValues.Value3%TYPE;
+  UF1_oval2        ppa_MatrixValues.Value4%TYPE;
+  UF1_oval3        ppa_MatrixValues.Value5%TYPE;
+  UF1_oval4        ppa_MatrixValues.Value6%TYPE;
+  UF1_oval5        ppa_MatrixValues.Value7%TYPE;
+  UF1_oval6        ppa_MatrixValues.Value8%TYPE;
+
+  CURSOR UF1_cursor IS
+    SELECT ppa_MatrixValues.ROWID, T.Value3, T.Value4, T.Value5, T.Value6, T.Value7, T.Value8
+      FROM temp_tempgld_DefineColumnHiera T, ppa_MatrixValues
+     WHERE T.MatrixRowKey = ppa_MatrixValues.MatrixRowKey
+    FOR UPDATE OF ppa_MatrixValues.Value3, ppa_MatrixValues.Value4, ppa_MatrixValues.Value5, ppa_MatrixValues.Value6, ppa_MatrixValues.Value7, ppa_MatrixValues.Value8;
+
+BEGIN
+  SELECT DECODE(cNewCol1, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName1 FROM DUAL;
+    SELECT DECODE(cNewCol2, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName2 FROM DUAL;
+    SELECT DECODE(cNewCol3, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName3 FROM DUAL;
+    SELECT DECODE(cNewCol4, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName4 FROM DUAL;
+    SELECT DECODE(cNewCol5, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName5 FROM DUAL;
+    SELECT DECODE( cNewCol6, 'Entity', 'entity',
+      'Location', 'locationid', 'Department', 'departcode', 'Client Class',
+      'clntclass', 'Project Class', 'projclass', 'Resource Code',
+      'resource_code', 'Charge Code', 'chargecode', 'Input Type', 'inputtype',
+      'Resource Class', 'resource_class', 'WIP Class', 'wipclass' ,
+      'Resource Class', 'resource_class', NULL)
+      INTO  cNewColName6 FROM DUAL;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT MatrixKey
+      INTO iGLMatrixKey
+      FROM ppa_Matrix
+     WHERE MatrixType = 'G';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_rowcnt &lt; 1 THEN
+    BEGIN
+      raise_application_error(-20118, 'The GL Matrix was not found in your database!');
+      RETURN;
+    END;
+	END IF;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName1
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+       AND ColumnNo = 3;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName2
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+       AND ColumnNo = 4;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName3
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+       AND ColumnNo = 5;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName4
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+      AND ColumnNo = 6;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName5
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+       AND ColumnNo = 7;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT FieldName
+      INTO cOrigColName6
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey =  iGLMatrixKey
+       AND ColumnNo = 8;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	DELETE FROM temp_tempgld_DefineColumnHiera;
+
+  IF StoO_error &lt;&gt; 0 THEN
+    BEGIN
+      raise_application_error(-20119, 'Error creating temp table');
+      RETURN;
+    END;
+	END IF;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    INSERT INTO temp_tempgld_DefineColumnHiera (MatrixRowKey, Value3, Value4, Value5, Value6, Value7, Value8)
+    SELECT MatrixRowKey, DECODE( cNewColName1,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL), DECODE( cNewColName2,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL), DECODE( cNewColName3,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL), DECODE( cNewColName4,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL), DECODE( cNewColName5,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL), DECODE( cNewColName6,
+          cOrigColName1, Value3,  cOrigColName2,
+        Value4,  cOrigColName3, Value5,  cOrigColName4,
+        Value6,  cOrigColName5, Value7,  cOrigColName6,
+        Value8 , NULL)
+      FROM ppa_MatrixValues
+      WHERE MatrixKey =  iGLMatrixKey;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error &lt;&gt; 0 THEN
+    BEGIN
+      raise_application_error(-20120, 'Error inserting current distributions into temp table for conversion');
+      RETURN;
+    END;
+	END IF;
+
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2, UF1_oval3, UF1_oval4, UF1_oval5, UF1_oval6;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+        SET Value3 = UF1_oval1,
+            Value4 = UF1_oval2,
+            Value5 = UF1_oval3,
+            Value6 = UF1_oval4,
+            Value7 = UF1_oval5,
+            Value8 = UF1_oval6
+      WHERE ROWID = UF1_rowid;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+  CLOSE UF1_cursor;
+
+  IF StoO_error &lt;&gt; 0 THEN
+    BEGIN
+      raise_application_error(-20104, 'Error updating ppa_MatrixValues with the converted data');
+      RETURN;
+    END;
+	END IF;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    DELETE FROM ppa_MatrixColDef
+     WHERE MatrixKey = iGLMatrixKey
+       AND ColumnNo &gt;= 3;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error &lt;&gt; 0 THEN
+    BEGIN
+      raise_application_error(-20105, 'Error deleting the existing column definitions');
+      RETURN;
+    END;
+	END IF;
+
+  iNextColNo :=  3;
+  IF cNewColName1 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        VALUES ( S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol1, cNewColName1, 1, 0, 1);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20106, 'Error defining column 1 into ppa_MatrixColDef');
+          RETURN;
+        END;
+      END IF;
+
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+
+  IF cNewColName2 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+      INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+      VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol2, cNewColName2, 1, 0, 1);
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20107, 'Error defining column 2 into ppa_MatrixColDef');
+          RETURN;
+        END;
+      END IF;
+
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+
+  IF cNewColName3 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY,MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol3, cNewColName3, 1, 0, 1);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF  StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20108, 'Error defining column 3 into ppa_MatrixColDef');
+          RETURN;
+        END;
+      END IF;
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+
+  IF cNewColName4 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol4, cNewColName4, 1, 0, 1);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20109, 'Error defining column 4 into ppa_MatrixColDef');
+          RETURN;
+        END;
+      END IF;
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+
+  IF cNewColName5 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol5, cNewColName5, 1, 0, 1);
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20110, 'Error defining column 5 into ppa_MatrixColDef');
+          RETURN;
+        END;
+      END IF;
+
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+
+  IF cNewColName6 IS NOT NULL THEN
+    BEGIN
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+        INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType)
+        VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, iGLMatrixKey, iNextColNo, cNewCol6, cNewColName6, 1, 0, 1);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error &lt;&gt; 0 THEN
+        BEGIN
+          raise_application_error(-20111, 'Error defining column 6 into ppa_MatrixColDef');
+          RETURN ;
+        END;
+      END IF;
+
+      iNextColNo := iNextColNo + 1;
+    END;
+	END IF;
+	COMMIT WORK;
+END GLD_DEFINECOLUMNHIERARCHY;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,2181 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_ROW_VALIDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_ROW_VALIDATE_SP" (
+   iMatrixKey             NUMBER,
+   cFromDate              VARCHAR2,
+   cToDate                VARCHAR2,
+   cStrVal1               VARCHAR2,
+   in_cValue1    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue2    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue3    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue4    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue5    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue6    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue7    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue8    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue9    IN       VARCHAR2 DEFAULT NULL,
+   in_cValue10   IN       VARCHAR2 DEFAULT NULL,
+   LANGUAGE               VARCHAR2,
+   report        IN OUT   VARCHAR2,
+   p_username    IN       VARCHAR2
+)
+AS
+   cValue1            GLOBALPKG.STRING;
+   cValue2            GLOBALPKG.STRING;
+   cValue3            GLOBALPKG.STRING;
+   cValue4            GLOBALPKG.STRING;
+   cValue5            GLOBALPKG.STRING;
+   cValue6            GLOBALPKG.STRING;
+   cValue7            GLOBALPKG.STRING;
+   cValue8            GLOBALPKG.STRING;
+   cValue9            GLOBALPKG.STRING;
+   cValue10           GLOBALPKG.STRING;
+   StoO_selcnt        INTEGER;
+   StoO_error         INTEGER;
+   StoO_rowcnt        INTEGER;
+   StoO_crowcnt       INTEGER                             := 0;
+   StoO_fetchstatus   INTEGER                             := 0;
+   StoO_errmsg        GLOBALPKG.STRING;
+   StoO_sqlstatus     INTEGER;
+   dFromDate          DATE;
+   dToDate            DATE;
+   matrixType         GLOBALPKG.STRING;
+   cEntity            GLOBALPKG.STRING;
+   cLocationID        GLOBALPKG.STRING;
+   cDepartCode        GLOBALPKG.STRING;
+   cClient            GLOBALPKG.STRING;
+   cProject           GLOBALPKG.STRING;
+   cCharge_Code       GLOBALPKG.STRING;
+   cInput_Type        GLOBALPKG.STRING;
+   cResource_Code     GLOBALPKG.STRING;
+   cClientClass       GLOBALPKG.STRING;
+   cProjClass         GLOBALPKG.STRING;
+   cCostType          GLOBALPKG.STRING;
+   --cCostClass       GLOBALPKG.STRING;
+   cResource_Class    GLOBALPKG.STRING;
+   cWipClass          GLOBALPKG.STRING;
+   cRole              GLOBALPKG.STRING;
+   cTransType         GLOBALPKG.STRING;
+   msg                VARCHAR2 ( 256 );
+   bValid             NUMBER ( 1, 0 );
+   isValid            NUMBER;
+   isNotValidMsg      GLOBALPKG.STRING;
+   TEMP_RC            PAC_MNT_MATRIX_CEL_VALIDATEPkg.RCT1;
+BEGIN
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue1;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue2;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue3;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue4;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue5;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue6;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue7;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue8;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9 :=
+                                    PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue9;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10 :=
+                                   PAC_MNT_MATRIX_ROW_VALIDATE_SP.in_cValue10;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass := NULL;
+--  PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass :=  NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWipClass := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType := NULL;
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9 :=
+                    RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10 :=
+                   RTRIM ( LTRIM ( PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10 ));
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg := '';
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid := 0;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT NAME
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+        FROM CMN_LOOKUPS_V
+       WHERE LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+         AND LANGUAGE_CODE = PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+         AND LOOKUP_CODE = 'ISNOTVALID';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT MatrixType
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.matrixType
+        FROM ppa_Matrix
+       WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   /* -------- Set parameters to actual values ----------*/
+   DELETE FROM temp_tempPAC_MNT_MATRIX_ROW_VA;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      INSERT INTO temp_tempPAC_MNT_MATRIX_ROW_VA
+                  ( TEMPFIELDNAME, TEMPCOLUMNNO, TEMPDATA )
+         SELECT FieldName, ColumnNo, NULL
+           FROM ppa_MatrixColDef
+          WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1
+       WHERE tempColumnNo = 1;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2
+       WHERE tempColumnNo = 2;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3
+       WHERE tempColumnNo = 3;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4
+       WHERE tempColumnNo = 4;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5
+       WHERE tempColumnNo = 5;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6
+       WHERE tempColumnNo = 6;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7
+       WHERE tempColumnNo = 7;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8
+       WHERE tempColumnNo = 8;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9
+       WHERE tempColumnNo = 9;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      UPDATE temp_tempPAC_MNT_MATRIX_ROW_VA
+         SET tempData = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10
+       WHERE tempColumnNo = 10;
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         NULL;
+      WHEN OTHERS
+      THEN
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'entity';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'locationid';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'departcode';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'company_code';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'project_code';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'chargecode';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'inputtype';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'resource_code';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'clntclass';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'projclass';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+/*
+   BEGIN
+      StoO_rowcnt := 0;
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+
+    SELECT tempData
+      INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass
+      FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+     WHERE tempFieldName = 'costclass';
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+         WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+         WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+   END;
+ */
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'resource_class';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWipClass
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'wipclass';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'resource_role';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType
+         FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+         WHERE tempFieldName = 'cost_type';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt                := 2;
+         WHEN NO_DATA_FOUND   THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS   THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_rowcnt                := 0;
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+
+      SELECT tempData
+        INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType
+        FROM temp_tempPAC_MNT_MATRIX_ROW_VA
+       WHERE tempFieldName = 'transclass';
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN TOO_MANY_ROWS
+      THEN
+         StoO_rowcnt                := 2;
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   BEGIN
+      StoO_selcnt                := 0;
+      StoO_error                 := 0;
+      StoO_rowcnt                := 0;
+
+      SELECT 1
+        INTO StoO_selcnt
+        FROM DUAL
+       WHERE EXISTS (
+                SELECT 1
+                  FROM ppa_MatrixColDef
+                 WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                   AND ColumnNo = 1
+                   AND CompareCol = 1
+                   AND CompareOp = 0
+                   AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1 IS NOT NULL );
+
+      StoO_rowcnt                := SQL%ROWCOUNT;
+   EXCEPTION
+      WHEN NO_DATA_FOUND
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+      WHEN OTHERS
+      THEN
+         StoO_rowcnt                := 0;
+         StoO_selcnt                := 0;
+         StoO_error                 := SQLCODE;
+         StoO_errmsg                := SQLERRM;
+   END;
+
+   IF StoO_selcnt != 0
+   THEN
+      BEGIN
+         BEGIN
+            PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                             iColumnNo            =&gt; 1,
+                                             cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                             cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                             cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                             cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                             cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                             cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                             cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                             cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                             cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                             cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+                                             --     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                             cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                             cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                             cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                             cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                             cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                             bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                             RC1                  =&gt; TEMP_RC,
+                                             cUserName            =&gt; p_username
+                                           );
+/*        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;*/
+         END;
+
+         IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+         THEN
+            BEGIN
+               StoO_rowcnt                := 0;
+               StoO_selcnt                := 0;
+               StoO_error                 := 0;
+
+               SELECT (    ' '
+                        || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue1
+                        || ' '
+                        || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                        || ' '
+                        || NAME
+                      )
+                 INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                 FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                  AND ColumnNo = 1
+                  AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                  AND LANGUAGE_CODE = PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                  AND LOOKUP_CODE = UPPER ( FieldName );
+
+               StoO_rowcnt                := SQL%ROWCOUNT;
+            EXCEPTION
+               WHEN TOO_MANY_ROWS
+               THEN
+                  StoO_rowcnt                := 2;
+               WHEN NO_DATA_FOUND
+               THEN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  raise_application_error ( -20221, 'Error! NO Data' );
+                  RETURN;
+               WHEN OTHERS
+               THEN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := SQLCODE;
+                  StoO_errmsg                := SQLERRM;
+                  raise_application_error ( -20222,
+                                                'Error! StoO_error = '
+                                             || StoO_error
+                                             || ' StoO_errmsg = '
+                                             || StoO_errmsg
+                                          );
+                  RETURN;
+            END;
+         END IF;
+      END;
+   END IF;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 2
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 2,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+                                                --     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue2
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 2
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 3
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 3,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                 NULL;
+              WHEN OTHERS THEN
+                 StoO_error := SQLCODE;
+                 StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue3
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 3
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 4
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 4,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue4
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 4
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 5
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 5,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue5
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 5
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 6
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 6,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue6
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 6
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 7
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 7,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue7
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 7
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 8
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 8,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue8
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 8
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 9
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 9,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue9
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 9
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   BEGIN
+      BEGIN
+         StoO_selcnt                := 0;
+         StoO_error                 := 0;
+         StoO_rowcnt                := 0;
+
+         SELECT 1
+           INTO StoO_selcnt
+           FROM DUAL
+          WHERE EXISTS (
+                   SELECT 1
+                     FROM ppa_MatrixColDef
+                    WHERE MatrixKey =
+                                     PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                      AND ColumnNo = 10
+                      AND CompareCol = 1
+                      AND CompareOp = 0
+                      AND PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10 IS NOT NULL );
+
+         StoO_rowcnt                := SQL%ROWCOUNT;
+      EXCEPTION
+         WHEN NO_DATA_FOUND
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+         WHEN OTHERS
+         THEN
+            StoO_rowcnt                := 0;
+            StoO_selcnt                := 0;
+            StoO_error                 := SQLCODE;
+            StoO_errmsg                := SQLERRM;
+      END;
+
+      IF StoO_selcnt != 0
+      THEN
+         BEGIN
+            BEGIN
+               PAC_MNT_MATRIX_CEL_VALIDATE_SP ( iMatrixKey           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey,
+                                                iColumnNo            =&gt; 10,
+                                                cEntity              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cEntity,
+                                                cLocationID          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cLocationID,
+                                                cDepartCode          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cDepartCode,
+                                                cClient              =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClient,
+                                                cProject             =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProject,
+                                                cCharge_Code         =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCharge_Code,
+                                                cInput_Type          =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cInput_Type,
+                                                cResource_Code       =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Code,
+                                                cClntClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cClientClass,
+                                                cProjClass           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cProjClass,
+--     cCostClass=&gt;PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostClass,
+                                                cResource_Class      =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cResource_Class,
+                                                cWIPClass            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cWIPClass,
+                                                cRole                =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cRole,
+                                                cTransType           =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cTransType,
+                                                cCostType            =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.cCostType,
+                                                bValid               =&gt; PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid,
+                                                RC1                  =&gt; TEMP_RC,
+                                                cUserName            =&gt; p_username
+                                              );
+            /*EXCEPTION
+               WHEN NO_DATA_FOUND THEN
+                  NULL;
+               WHEN OTHERS THEN
+                  StoO_error := SQLCODE;
+                  StoO_errmsg := SQLERRM;*/
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.bValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cValue10
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM ppa_MatrixColDef, CMN_LOOKUPS_V
+                   WHERE MatrixKey = PAC_MNT_MATRIX_ROW_VALIDATE_SP.iMatrixKey
+                     AND ColumnNo = 10
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_FIELD_TYPE'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE
+                     AND LOOKUP_CODE = UPPER ( FieldName );
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      END IF;
+   END;
+
+   IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1 IS NOT NULL
+   THEN
+      IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.matrixType = 'A'
+      THEN
+         BEGIN
+            BEGIN
+               StoO_rowcnt                := 0;
+               StoO_selcnt                := 0;
+               StoO_error                 := 0;
+
+               SELECT COUNT ( * )
+                 INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid
+                 FROM taxcode
+                WHERE taxtype = 'ADM'
+                  AND code = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1;
+
+               StoO_rowcnt                := SQL%ROWCOUNT;
+            EXCEPTION
+               WHEN TOO_MANY_ROWS
+               THEN
+                  StoO_rowcnt                := 2;
+               WHEN NO_DATA_FOUND
+               THEN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+               WHEN OTHERS
+               THEN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := SQLCODE;
+                  StoO_errmsg                := SQLERRM;
+            END;
+
+            IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid = 0
+            THEN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1
+                           || ' '
+                           || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                           || ' '
+                           || NAME
+                         )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                    FROM CMN_LOOKUPS_V
+                   WHERE LOOKUP_CODE = 'ADMINCODE'
+                     AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+                     AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE;
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+            END IF;
+         END;
+      ELSE
+         IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.matrixType = 'T'
+         THEN
+            BEGIN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT COUNT ( * )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid
+                    FROM taxcode
+                   WHERE taxtype = 'TAX'
+                     AND code = PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1;
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+
+               IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid = 0
+               THEN
+                  BEGIN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := 0;
+
+                     SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                              || ' '
+                              || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1
+                              || ' '
+                              || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                              || ' '
+                              || NAME
+                            )
+                       INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                       FROM CMN_LOOKUPS_V
+                      WHERE LOOKUP_CODE = 'TAXCODE'
+                        AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+                        AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE;
+
+                     StoO_rowcnt                := SQL%ROWCOUNT;
+                  EXCEPTION
+                     WHEN TOO_MANY_ROWS
+                     THEN
+                        StoO_rowcnt                := 2;
+                     WHEN NO_DATA_FOUND
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                     WHEN OTHERS
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                        StoO_error                 := SQLCODE;
+                        StoO_errmsg                := SQLERRM;
+                  END;
+               END IF;
+            END;
+         ELSE
+            BEGIN
+               BEGIN
+                  StoO_rowcnt                := 0;
+                  StoO_selcnt                := 0;
+                  StoO_error                 := 0;
+
+                  SELECT COUNT ( * )
+                    INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid
+                    FROM costplus
+                   WHERE costpluscode =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1;
+
+                  StoO_rowcnt                := SQL%ROWCOUNT;
+               EXCEPTION
+                  WHEN TOO_MANY_ROWS
+                  THEN
+                     StoO_rowcnt                := 2;
+                  WHEN NO_DATA_FOUND
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                  WHEN OTHERS
+                  THEN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := SQLCODE;
+                     StoO_errmsg                := SQLERRM;
+               END;
+
+               IF PAC_MNT_MATRIX_ROW_VALIDATE_SP.isValid = 0
+               THEN
+			   	   raise_application_error (-20940, 'Cost Plus Code is not valid');
+    				   return;			   	   
+                  /*           
+                  BEGIN
+                     StoO_rowcnt                := 0;
+                     StoO_selcnt                := 0;
+                     StoO_error                 := 0;
+
+                     SELECT (    PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                              || ' '
+                              || PAC_MNT_MATRIX_ROW_VALIDATE_SP.cStrVal1
+                              || ' '
+                              || PAC_MNT_MATRIX_ROW_VALIDATE_SP.isNotValidMsg
+                              || ' '
+                              || NAME
+                            )
+                       INTO PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg
+                       FROM CMN_LOOKUPS_V
+                      WHERE LOOKUP_CODE = 'COSTPLUSCODE'
+                        AND LOOKUP_TYPE = 'PAC_MATRIX_LABELS'
+                        AND LANGUAGE_CODE =
+                                       PAC_MNT_MATRIX_ROW_VALIDATE_SP.LANGUAGE;
+
+                     StoO_rowcnt                := SQL%ROWCOUNT;
+                  EXCEPTION
+                     WHEN TOO_MANY_ROWS
+                     THEN
+                        StoO_rowcnt                := 2;
+                     WHEN NO_DATA_FOUND
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                     WHEN OTHERS
+                     THEN
+                        StoO_rowcnt                := 0;
+                        StoO_selcnt                := 0;
+                        StoO_error                 := SQLCODE;
+                        StoO_errmsg                := SQLERRM;
+                  END;
+                  */
+               END IF;
+            END;
+         END IF;
+      END IF;
+   END IF;
+
+   PAC_MNT_MATRIX_ROW_VALIDATE_SP.report := PAC_MNT_MATRIX_ROW_VALIDATE_SP.msg;
+END PAC_MNT_MATRIX_ROW_VALIDATE_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

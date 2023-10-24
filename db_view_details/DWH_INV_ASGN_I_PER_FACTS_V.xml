@@ -1,0 +1,183 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_ASGN_I_PER_FACTS_V">
+    <indexes/>
+    <text_length>9483</text_length>
+    <text>SELECT S.ASSIGNMENT_KEY,
+       S.PERIOD_KEY,
+       S.ACTUAL_HOURS,
+       S.ETC_HOURS,
+      (S.ACTUAL_HOURS + S.ETC_HOURS) EAC_HOURS,
+       S.BASE_HOURS,
+       S.ACTUAL_COST,
+       S.ETC_COST,
+      (S.ACTUAL_COST + S.ETC_COST) EAC_COST,
+       S.BASE_COST,
+       S.LAST_UPDATED_DATE CLARITY_UPDATED_DATE
+FROM  (
+       WITH slice_range AS
+           (SELECT MIN(from_date) from_date,
+                   MAX(num_periods) row_count
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    1 = (SELECT fiscal_slices FROM dwh_settings)
+            AND    request_name IN ('assignment::prestcurve::dwh_fiscal',  
+                                    'assignment::etccost_curve::dwh_fiscal',
+                                    'assignment::practcurve::dwh_fiscal',
+                                    'assignment::actcost_curve::dwh_fiscal')),
+            fiscal_periods AS
+           (SELECT d.period_key,
+                   d.period_start,
+                   d.row_key
+            FROM  (SELECT p.id period_key,
+                          p.start_date period_start,
+                          r.row_count,
+                          ROW_NUMBER() OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                   FROM   biz_com_periods p,
+                          dwh_settings s,
+                          slice_range r
+                   WHERE  s.fiscal_slices = 1
+                   AND    p.entity_id = s.entity_key
+                   AND    p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                   AND    p.start_date >= r.from_date) d
+            WHERE  d.row_key &lt;= d.row_count),
+            slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name IN ('WEEKLYRESOURCEACTCURVE','MONTHLYRESOURCEACTCURVE') THEN 1
+                        WHEN request_name IN ('WEEKLYRESOURCEESTCURVE','MONTHLYRESOURCEESTCURVE') THEN 2
+                        WHEN request_name LIKE 'assignment::actcost_curve%' THEN 3
+                        WHEN request_name LIKE 'assignment::etccost_curve%' THEN 4
+                    END field_type,
+                    CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+            FROM prj_blb_slicerequests
+            WHERE  ((SELECT monthly_slices FROM dwh_settings) = 1
+            AND      request_name IN ('MONTHLYRESOURCEESTCURVE',
+                                    'assignment::etccost_curve::dwh_month',
+                                    'MONTHLYRESOURCEACTCURVE',
+                                    'assignment::actcost_curve::dwh_month'))
+            OR     ((SELECT weekly_slices FROM dwh_settings) = 1
+            AND      request_name IN ('WEEKLYRESOURCEESTCURVE',  
+                                    'assignment::etccost_curve::dwh_week',
+                                    'WEEKLYRESOURCEACTCURVE',
+                                    'assignment::actcost_curve::dwh_week'))),
+            base_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name IN ('WEEKLYRESOURCEBASECURVE','MONTHLYRESOURCEBASECURVE') THEN 5
+                        WHEN request_name IN ('WEEKLYBASEASSIGNCOSTS','MONTHLYBASEASSIGNCOSTS') THEN 6
+                   END field_type,
+                   CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    is_active = 1
+            AND (((SELECT monthly_slices FROM dwh_settings) = 1
+            AND    request_name IN ('MONTHLYRESOURCEBASECURVE',
+                                    'MONTHLYBASEASSIGNCOSTS'))
+            OR   ((SELECT weekly_slices FROM dwh_settings) = 1
+            AND    request_name IN ('WEEKLYRESOURCEBASECURVE',  
+                                    'WEEKLYBASEASSIGNCOSTS')))),
+            fiscal_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name LIKE 'assignment::practcurve%' THEN 1
+                        WHEN request_name LIKE 'assignment::prestcurve%' THEN 2
+                        WHEN request_name LIKE 'assignment::actcost_curve%' THEN 3
+                        WHEN request_name LIKE 'assignment::etccost_curve%' THEN 4
+                    END field_type,
+                    period period_type
+            FROM    prj_blb_slicerequests
+            WHERE  (SELECT fiscal_slices FROM dwh_settings) = 1
+            AND     request_name IN ('assignment::prestcurve::dwh_fiscal',  
+                                     'assignment::etccost_curve::dwh_fiscal',
+                                     'assignment::practcurve::dwh_fiscal',
+                                     'assignment::actcost_curve::dwh_fiscal')),
+            fiscal_base_slice_keys AS
+           (SELECT id request_key,
+                   CASE WHEN request_name LIKE 'baseline::current_assignment_usage%' THEN 5
+                        WHEN request_name LIKE 'baseline::current_assignment_cost%' THEN 6
+                   END field_type,
+                   period period_type
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    is_active = 1
+            AND   (SELECT fiscal_slices FROM dwh_settings) = 1
+            AND    request_name IN ('baseline::current_assignment_usage::dwh_fiscal',  
+                                    'baseline::current_assignment_cost::dwh_fiscal'))
+            SELECT s.prj_object_id assignment_key,
+                   CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END actual_hours,
+                   CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END etc_hours,
+                   0 base_hours,
+                   CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END actual_cost,
+                   CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END etc_cost,
+                   0 base_cost,
+                   CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) 
+                        ELSE CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+                   a.last_updated_date
+            FROM   dwh_tmp_record_keys a,
+                   prj_blb_slices s,
+                   slice_keys sk,
+                   rpt_calendar c
+            WHERE  a.record_key = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.slice_date = c.start_date
+            AND    sk.period_type = c.period_type
+            UNION ALL
+            SELECT s.prj_object_id assignment_key,
+                   CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END actual_hours,
+                   CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END etc_hours,
+                   0 base_hours,
+                   CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END actual_cost,
+                   CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END etc_cost,
+                   0 base_cost,
+                   fp.period_key,
+                   a.last_updated_date
+            FROM   dwh_tmp_record_keys a,
+                   prj_fiscal_blb_slices s,
+                   fiscal_slice_keys sk,
+                   fiscal_periods fp
+            WHERE  a.record_key = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.period_id = fp.period_key
+            UNION ALL
+            SELECT bd.object_id assignment_key,
+                   0 actual_hours,
+                   0 etc_hours,
+                   CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+                   0 actual_cost,
+                   0 etc_cost,
+                   CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+                   CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) 
+                        ELSE CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+                   a.last_updated_date
+            FROM   dwh_tmp_record_keys a,
+                   prj_baseline_details bd,
+                   prj_blb_slices s,
+                   base_slice_keys sk,
+                   rpt_calendar c
+            WHERE  a.record_key = bd.object_id
+            AND    bd.object_type = 'ASSIGNMENT'
+            AND    bd.is_current = 1
+            AND    bd.id = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.slice_date = c.start_date
+            AND    sk.period_type = c.period_type
+            UNION ALL
+            SELECT bd.object_id assignment_key,
+                   0 actual_hours,
+                   0 etc_hours,
+                   CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+                   0 actual_cost,
+                   0 etc_cost,
+                   CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+                   fp.period_key,
+                   a.last_updated_date
+            FROM   dwh_tmp_record_keys a,
+                   prj_baseline_details bd,
+                   prj_fiscal_blb_slices s,
+                   fiscal_base_slice_keys sk,
+                   fiscal_periods fp
+            WHERE  a.record_key = bd.object_id
+            AND    bd.object_type = 'ASSIGNMENT'
+            AND    bd.is_current = 1
+            AND    bd.id = s.prj_object_id
+            AND    s.slice_request_id = sk.request_key
+            AND    s.period_id = fp.period_key) s</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_GETMATRIXMATCH</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_GETMATRIXMATCH" (
+iMatrixID 	NUMBER ,
+bSuppressResultSet 	NUMBER  DEFAULT 0,
+bReturnAllMatches 	NUMBER  DEFAULT 0,
+nNumVal1 	IN OUT NUMBER,
+nNumVal2 	IN OUT NUMBER,
+nNumVal3 	IN OUT NUMBER,
+cStrVal1 	IN OUT VARCHAR2,
+iBestMatchRowID 	IN OUT NUMBER,
+cTransDate 	VARCHAR2  DEFAULT NULL,
+cEntity 	VARCHAR2  DEFAULT NULL,
+cLocationID 	VARCHAR2  DEFAULT NULL,
+cDepartCode 	VARCHAR2  DEFAULT NULL,
+cClient 	VARCHAR2  DEFAULT NULL,
+cProject 	VARCHAR2  DEFAULT NULL,
+cCharge_Code   VARCHAR2  DEFAULT NULL,
+cInput_Type   VARCHAR2  DEFAULT NULL,
+cResource_Code  VARCHAR2  DEFAULT NULL,
+cClientClass 	VARCHAR2  DEFAULT NULL,
+cProjClass 	VARCHAR2  DEFAULT NULL,
+--cCostClass  VARCHAR2  DEFAULT NULL,
+cResource_Class   VARCHAR2  DEFAULT NULL,
+cWipClass 	VARCHAR2  DEFAULT NULL,
+cRole  VARCHAR2  DEFAULT NULL,
+cTransType 	VARCHAR2  DEFAULT NULL,
+cCurrencyCode IN OUT  VARCHAR2,
+cTransClass IN VARCHAR2,
+RC1 	IN OUT Ppa_Getmatrixmatchpkg.RCT1,
+cCost_type VARCHAR2  DEFAULT NULL)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+cCompVal1 	GLOBALPKG.STRING;
+cCompVal2 	GLOBALPKG.STRING;
+cCompVal3 	GLOBALPKG.STRING;
+cCompVal4 	GLOBALPKG.STRING;
+cCompVal5 	GLOBALPKG.STRING;
+cCompVal6 	GLOBALPKG.STRING;
+cCompVal7 	GLOBALPKG.STRING;
+cCompVal8 	GLOBALPKG.STRING;
+cCompVal9 	GLOBALPKG.STRING;
+cCompVal10 	GLOBALPKG.STRING;
+cCompVal 	GLOBALPKG.STRING;
+cCompColArray 	GLOBALPKG.STRING;
+cModifiedColArray 	GLOBALPKG.STRING;
+cCompOpArray 	GLOBALPKG.STRING;
+cDataTypeArray 	GLOBALPKG.STRING;
+iColCount   NUMBER;
+iLup  NUMBER;
+iRowCount NUMBER;
+cFieldName 	GLOBALPKG.STRING;
+cCompareCol 	GLOBALPKG.STRING;
+cCompareOp 	GLOBALPKG.STRING;
+cOrigCompareOp 	GLOBALPKG.STRING;
+cDataType 	GLOBALPKG.STRING;
+iBestMatchWeight  NUMBER;
+dTransDate 	DATE;
+transactioncurrencycode VARCHAR2(3);
+temp_rc1 Ppa_Matrixgetextendedmatchpkg.RCT1;
+
+CURSOR C1 IS
+SELECT  MatrixRowKey ,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,
+					       Value5,  Value6,  Value7,  Value8,  Value9,  Value10,  NumVal1,  NumVal2,
+						   NumVal3,  StrVal1, NULL NULL_1, NULL NULL_2, NULL NULL_3, NULL NULL_4, NULL NULL_5, matrix_currency_code
+					FROM PPA_MATRIXVALUES
+					WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+           --AND TO_DATE(TO_CHAR(Ppa_Getmatrixmatch.dTransDate))  BETWEEN FromDate AND ToDate
+           AND Ppa_Getmatrixmatch.dTransDate BETWEEN FromDate AND ToDate
+           AND NVL(RTRIM(Value1), NVL(Ppa_Getmatrixmatch.cCompVal1, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal1, NVL(RTRIM(Value1), ' '))
+					 AND NVL(RTRIM(Value2), NVL(Ppa_Getmatrixmatch.cCompVal2, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal2, NVL(RTRIM(Value2), ' '))
+					 AND NVL(RTRIM(Value3), NVL(Ppa_Getmatrixmatch.cCompVal3, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal3, NVL(RTRIM(Value3), ' '))
+					 AND NVL(RTRIM(Value4), NVL(Ppa_Getmatrixmatch.cCompVal4, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal4, NVL(RTRIM(Value4), ' '))
+					 AND NVL(RTRIM(Value5), NVL(Ppa_Getmatrixmatch.cCompVal5, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal5, NVL(RTRIM(Value5), ' '))
+					 AND NVL(RTRIM(Value6), NVL(Ppa_Getmatrixmatch.cCompVal6, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal6, NVL(RTRIM(Value6), ' '))
+					 AND NVL(RTRIM(Value7), NVL(Ppa_Getmatrixmatch.cCompVal7, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal7, NVL(RTRIM(Value7), ' '))
+					 AND NVL(RTRIM(Value8), NVL(Ppa_Getmatrixmatch.cCompVal8, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal8, NVL(RTRIM(Value8), ' '))
+					 AND NVL(RTRIM(Value9), NVL(Ppa_Getmatrixmatch.cCompVal9, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal9, NVL(RTRIM(Value9), ' '))
+					 AND NVL(RTRIM(Value10), NVL(Ppa_Getmatrixmatch.cCompVal10, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal10, NVL(RTRIM(Value10), ' '))
+					ORDER BY Value1 , Value2 , Value3 , Value4 , Value5 , Value6 ,
+					   Value7 , Value8 , Value9 , Value10 ;
+CURSOR C2 IS
+SELECT MatrixRowKey,  NumVal1,  NumVal2,  NumVal3,  StrVal1, matrix_currency_code
+					FROM PPA_MATRIXVALUES
+					WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+                                    AND FromDate &lt;= Ppa_Getmatrixmatch.dTransDate
+                                   AND ToDate &gt;= Ppa_Getmatrixmatch.dTransDate
+                                   AND NVL(Value1, NVL(Ppa_Getmatrixmatch.cCompVal1, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal1, NVL(Value1, ' '))
+					 AND NVL(Value2, NVL(Ppa_Getmatrixmatch.cCompVal2, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal2, NVL(Value2, ' '))
+					 AND NVL(Value3, NVL(Ppa_Getmatrixmatch.cCompVal3, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal3, NVL(Value3, ' '))
+					 AND NVL(Value4, NVL(Ppa_Getmatrixmatch.cCompVal4, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal4, NVL(Value4, ' '))
+					 AND NVL(Value5, NVL(Ppa_Getmatrixmatch.cCompVal5, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal5, NVL(Value5, ' '))
+					 AND NVL(Value6, NVL(Ppa_Getmatrixmatch.cCompVal6, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal6, NVL(Value6, ' '))
+					 AND NVL(Value7, NVL(Ppa_Getmatrixmatch.cCompVal7, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal7, NVL(Value7, ' '))
+					 AND NVL(Value8, NVL(Ppa_Getmatrixmatch.cCompVal8, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal8, NVL(Value8, ' '))
+					 AND NVL(Value9, NVL(Ppa_Getmatrixmatch.cCompVal9, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal9, NVL(Value9, ' '))
+					 AND NVL(Value10, NVL(Ppa_Getmatrixmatch.cCompVal10, ' '))
+					   = NVL(Ppa_Getmatrixmatch.cCompVal10, NVL(Value10, ' '))
+					ORDER BY Value1 , Value2 , Value3 , Value4 , Value5 , Value6 ,
+					   Value7 , Value8 , Value9 , Value10 ;
+
+  CURSOR COLS_CURSOR IS
+  		 SELECT  FieldName,
+	        SUBSTR('01', 1 + ( CompareCol * 1 ), 1) CompareCol,
+			SUBSTR(LTRIM(TO_CHAR(CompareOp + ( 999 * ( 1 - CompareCol ) ))), 1, 1) CompareOp,
+			LTRIM(TO_CHAR(CompareOp)) OrigCompareOp,
+		    LTRIM(TO_CHAR(DataType)) DataType
+	FROM PPA_MATRIXCOLDEF
+	WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+	ORDER BY ColumnNo;
+BEGIN
+
+	/*[SPCONV-ERR(57)]:(set NOCOUNT) Manual conversion required*/
+	Ppa_Getmatrixmatch.nNumVal1 :=  0;
+	Ppa_Getmatrixmatch.nNumVal2 :=  0;
+	Ppa_Getmatrixmatch.nNumVal3 :=  0;
+	Ppa_Getmatrixmatch.cStrVal1 :=  ' ';
+	Ppa_Getmatrixmatch.iBestMatchRowID :=  0;
+	Ppa_Getmatrixmatch.iBestMatchWeight :=  0;
+	IF  Ppa_Getmatrixmatch.cTransDate IS NULL THEN
+		Ppa_Getmatrixmatch.dTransDate :=  SYSDATE;
+	ELSE
+		Ppa_Getmatrixmatch.dTransDate :=  TO_DATE(Ppa_Getmatrixmatch.cTransDate, 'mm/dd/yyyy');
+	END IF;
+	/*DELETE FROM TEMP_TEMPGMMPPA_GETMATRIXMATCH;
+	BEGIN
+	StoO_rowcnt := 0;
+	FOR REC_MC IN (SELECT  FieldName,
+	        SUBSTR('01', 1 + ( CompareCol * 1 ), 1) CompareCol,
+			SUBSTR(LTRIM(TO_CHAR(CompareOp + ( 999 * ( 1 - CompareCol ) ))), 1, 1) CompareOp,
+			LTRIM(TO_CHAR(CompareOp)) OrigCompareOp,
+		    LTRIM(TO_CHAR(DataType)) DataType
+	FROM PPA_MATRIXCOLDEF
+	WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+	ORDER BY ColumnNo)
+
+	LOOP
+		INSERT INTO TEMP_TEMPGMMPPA_GETMATRIXMATCH
+       (SEQNO,
+       FieldName,
+			 CompareCol,
+			 CompareOp,
+			 OrigCompareOp,
+			 DataType)
+		VALUES
+        (temp_tempgmmppa_GetMatrixM_SEQ.nextval,
+         REC_MC.FieldName,
+			  REC_MC.CompareCol,
+			  REC_MC.CompareOp,
+			  REC_MC.OrigCompareOp,
+			  REC_MC.DataType);
+	StoO_rowcnt := StoO_rowcnt+1;
+	END LOOP;
+	END;*/
+/* order by ColumnNo  01/29/98  */
+	--Ppa_Getmatrixmatch.iColCount :=  StoO_rowcnt;
+	Ppa_Getmatrixmatch.iLup :=  1;
+ /* SELECT MIN(SEQNO) INTO Ppa_Getmatrixmatch.iRowCount
+    FROM TEMP_TEMPGMMPPA_GETMATRIXMATCH;*/
+	Ppa_Getmatrixmatch.cCompColArray :=  ' ';
+	Ppa_Getmatrixmatch.cCompOpArray :=  ' ';
+	Ppa_Getmatrixmatch.cDataTypeArray :=  ' ';
+	Ppa_Getmatrixmatch.cModifiedColArray :=  ' ';
+	&lt;&lt;i_loop1&gt;&gt;
+	FOR COLS_REC IN COLS_CURSOR
+	LOOP
+	--WHILE  Ppa_Getmatrixmatch.iLup &lt;= Ppa_Getmatrixmatch.iColCount LOOP
+	BEGIN
+		Ppa_Getmatrixmatch.cFieldName := COLS_REC.FieldName;
+		Ppa_Getmatrixmatch.cCompareCol :=COLS_REC.CompareCol;
+		IF  Ppa_Getmatrixmatch.iLup = 1 THEN
+			Ppa_Getmatrixmatch.cCompColArray :=  Ppa_Getmatrixmatch.cCompareCol;
+			Ppa_Getmatrixmatch.cModifiedColArray :=  COLS_REC.OrigCompareOp;
+			Ppa_Getmatrixmatch.cCompOpArray :=  COLS_REC.CompareOp;
+			Ppa_Getmatrixmatch.cDataTypeArray :=  COLS_REC.DataType;
+		ELSE
+			Ppa_Getmatrixmatch.cCompColArray :=  Ppa_Getmatrixmatch.cCompColArray
+			   || Ppa_Getmatrixmatch.cCompareCol;
+			Ppa_Getmatrixmatch.cCompOpArray :=  Ppa_Getmatrixmatch.cCompOpArray
+			   || COLS_REC.CompareOp;
+			Ppa_Getmatrixmatch.cDataTypeArray :=  Ppa_Getmatrixmatch.cDataTypeArray
+			   || COLS_REC.DataType;
+			Ppa_Getmatrixmatch.cModifiedColArray :=  Ppa_Getmatrixmatch.cModifiedColArray
+			   || COLS_REC.OrigCompareOp;
+		END IF;
+		Ppa_Getmatrixmatch.cCompVal :=  NULL;
+/* convert input (including data type conversion, if any) */
+		IF  Ppa_Getmatrixmatch.cCompareCol = '1' THEN
+		BEGIN
+			IF  Ppa_Getmatrixmatch.cFieldName = 'entity' THEN
+				Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cEntity);
+			ELSE
+				IF  Ppa_Getmatrixmatch.cFieldName = 'locationid' THEN
+					Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cLocationID);
+				ELSE
+					IF  Ppa_Getmatrixmatch.cFieldName = 'departcode' THEN
+						Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cDepartCode);
+					ELSE
+						IF  Ppa_Getmatrixmatch.cFieldName = 'company_code' THEN
+							Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cClient);
+						ELSE
+							IF  Ppa_Getmatrixmatch.cFieldName = 'project_code' THEN
+								Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cProject);
+							ELSE
+                IF  Ppa_Getmatrixmatch.cFieldName = 'chargecode' THEN
+                  Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cCharge_Code);
+								ELSE
+                  IF  Ppa_Getmatrixmatch.cFieldName = 'inputtype' THEN
+                    Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cInput_Type);
+									ELSE
+                    IF  Ppa_Getmatrixmatch.cFieldName = 'resource_code' THEN
+                      Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cResource_Code);
+										ELSE
+											IF  Ppa_Getmatrixmatch.cFieldName = 'clntclass' THEN
+												Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cClientClass);
+											ELSE
+												IF  Ppa_Getmatrixmatch.cFieldName = 'projclass' THEN
+													Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cProjClass);
+												ELSE
+												 IF  Ppa_Getmatrixmatch.cFieldName = 'transclass' THEN
+													 Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cTransClass);
+                          --IF  Ppa_Getmatrixmatch.cFieldName = 'costclass' THEN
+                          --  Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cCostClass);
+                          ELSE
+                            IF  Ppa_Getmatrixmatch.cFieldName = 'resource_class' THEN
+                              Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cResource_Class);
+														ELSE
+															IF  Ppa_Getmatrixmatch.cFieldName = 'wipclass' THEN
+																Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cWipClass);
+																ELSE
+                                  IF  Ppa_Getmatrixmatch.cFieldName = 'resource_role' THEN
+                                    Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cRole);
+																	ELSE
+																		IF  Ppa_Getmatrixmatch.cFieldName = 'transtype' THEN
+																			Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cTransType);
+																			ELSE
+																				IF  Ppa_Getmatrixmatch.cFieldName = 'cost_type' THEN
+																				  Ppa_Getmatrixmatch.cCompVal :=  RTRIM(Ppa_Getmatrixmatch.cCost_type);
+																				END IF;                                        
+																			END IF;
+																		END IF;
+																	END IF;
+																END IF;
+                          --  END IF;
+													END IF;
+												END IF;
+											END IF;
+										END IF;
+									END IF;
+								END IF;
+							END IF;
+						END IF;
+					END IF;
+				END IF;
+			END IF;
+		END;
+		END IF;
+		IF  Ppa_Getmatrixmatch.iLup = 1 THEN
+			Ppa_Getmatrixmatch.cCompVal1 :=  Ppa_Getmatrixmatch.cCompVal;
+		ELSE
+			IF  Ppa_Getmatrixmatch.iLup = 2 THEN
+				Ppa_Getmatrixmatch.cCompVal2 :=  Ppa_Getmatrixmatch.cCompVal;
+			ELSE
+				IF  Ppa_Getmatrixmatch.iLup = 3 THEN
+					Ppa_Getmatrixmatch.cCompVal3 :=  Ppa_Getmatrixmatch.cCompVal;
+				ELSE
+					IF  Ppa_Getmatrixmatch.iLup = 4 THEN
+						Ppa_Getmatrixmatch.cCompVal4 :=  Ppa_Getmatrixmatch.cCompVal;
+					ELSE
+						IF  Ppa_Getmatrixmatch.iLup = 5 THEN
+							Ppa_Getmatrixmatch.cCompVal5 :=  Ppa_Getmatrixmatch.cCompVal;
+						ELSE
+							IF  Ppa_Getmatrixmatch.iLup = 6 THEN
+								Ppa_Getmatrixmatch.cCompVal6 :=  Ppa_Getmatrixmatch.cCompVal;
+							ELSE
+								IF  Ppa_Getmatrixmatch.iLup = 7 THEN
+									Ppa_Getmatrixmatch.cCompVal7 :=  Ppa_Getmatrixmatch.cCompVal;
+								ELSE
+									IF  Ppa_Getmatrixmatch.iLup = 8 THEN
+										Ppa_Getmatrixmatch.cCompVal8 :=  Ppa_Getmatrixmatch.cCompVal;
+									ELSE
+										IF  Ppa_Getmatrixmatch.iLup = 9 THEN
+											Ppa_Getmatrixmatch.cCompVal9 :=  Ppa_Getmatrixmatch.cCompVal;
+										ELSE
+											IF  Ppa_Getmatrixmatch.iLup = 10 THEN
+												Ppa_Getmatrixmatch.cCompVal10 :=  Ppa_Getmatrixmatch.cCompVal;
+											END IF;
+										END IF;
+									END IF;
+								END IF;
+							END IF;
+						END IF;
+					END IF;
+				END IF;
+			END IF;
+		END IF;
+		Ppa_Getmatrixmatch.iLup :=  Ppa_Getmatrixmatch.iLup + 1;
+		-- Ppa_Getmatrixmatch.iRowCount := Ppa_Getmatrixmatch.iRowCount + 1;
+	END;
+	END LOOP;
+	Ppa_Getmatrixmatch.iColCount :=  Ppa_Getmatrixmatch.iLup-1;
+
+/*
+   NOTE: The 9 below was arbitrarily chosen as the comp value since it was not used and we
+   needed to be able to allow matrices with no columns but have a date range selection only
+*/
+
+	IF Ppa_Getmatrixmatch.cCompOpArray = NVL(RPAD('9', LENGTH('9') *  Ppa_Getmatrixmatch.iColCount, '9'), ' ') THEN
+	BEGIN
+		IF  Ppa_Getmatrixmatch.bReturnAllMatches != 0 THEN
+		BEGIN
+			IF  Ppa_Getmatrixmatch.bReturnAllMatches &gt; 0 THEN
+				OPEN RC1 FOR
+				SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,  Value4,
+				       Value5,  Value6,  Value7,  Value8,  Value9,  Value10,  NumVal1,  NumVal2,
+					   NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL, matrix_currency_code
+				FROM PPA_MATRIXVALUES
+				WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+					 --AND TO_DATE(TO_CHAR(Ppa_Getmatrixmatch.dTransDate))  BETWEEN FromDate AND ToDate
+					 AND Ppa_Getmatrixmatch.dTransDate  BETWEEN FromDate AND ToDate
+				ORDER BY Value1 , Value2 , Value3 , Value4 , Value5 , Value6 ,
+				   Value7 , Value8 , Value9 , Value10 ;
+			ELSE
+				OPEN RC1 FOR
+				SELECT MatrixRowKey,  FromDate,  ToDate,  Value1,  Value2,  Value3,
+				       Value4,  Value5,  Value6,  Value7,  Value8,  Value9,  Value10,
+					   NumVal1,  NumVal2,  NumVal3,  StrVal1, NULL, NULL, NULL, NULL, NULL,  matrix_currency_code
+				FROM PPA_MATRIXVALUES
+				WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+				 	--AND TO_DATE(TO_CHAR(Ppa_Getmatrixmatch.dTransDate))  BETWEEN FromDate AND ToDate
+					 AND Ppa_Getmatrixmatch.dTransDate  BETWEEN FromDate AND ToDate
+				ORDER BY Value1 DESC, Value2 DESC, Value3 DESC, Value4 DESC, Value5
+				   DESC, Value6 DESC, Value7 DESC, Value8 DESC, Value9 DESC, Value10
+				   DESC;
+			END IF;
+			END;
+			ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MatrixRowKey,  NumVal1,  NumVal2,  NumVal3,  StrVal1, matrix_currency_code
+				INTO Ppa_Getmatrixmatch.iBestMatchRowID, Ppa_Getmatrixmatch.nNumVal1, Ppa_Getmatrixmatch.nNumVal2,
+				     Ppa_Getmatrixmatch.nNumVal3, Ppa_Getmatrixmatch.cStrVal1, Ppa_Getmatrixmatch.cCurrencyCode
+				FROM PPA_MATRIXVALUES
+				WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+				 	-- AND TO_DATE(TO_CHAR(Ppa_Getmatrixmatch.dTransDate))  BETWEEN FromDate AND ToDate
+					AND Ppa_Getmatrixmatch.dTransDate  BETWEEN FromDate AND ToDate
+				ORDER BY Value1 , Value2 , Value3 , Value4 , Value5 , Value6 ,
+				   Value7 , Value8 , Value9 , Value10 ;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_rowcnt &lt; 1 THEN
+				Ppa_Getmatrixmatch.nNumVal1 :=  0;
+				Ppa_Getmatrixmatch.nNumVal2 :=  0;
+				Ppa_Getmatrixmatch.nNumVal3 :=  0;
+				Ppa_Getmatrixmatch.cStrVal1 :=  '';
+				Ppa_Getmatrixmatch.iBestMatchRowID :=  0;
+			END IF;
+		END;
+		END IF;
+	END;
+	ELSE
+	IF  Ppa_Getmatrixmatch.cModifiedColArray != NVL(RPAD('0', LENGTH('0') *  Ppa_Getmatrixmatch.iColCount, '0'), 'UseExtended') THEN
+		BEGIN
+			BEGIN
+             Ppa_Matrixgetextendedmatch(Ppa_Getmatrixmatch.iMatrixID,
+			 Ppa_Getmatrixmatch.bReturnAllMatches,
+			 Ppa_Getmatrixmatch.cCompColArray,
+			 Ppa_Getmatrixmatch.cModifiedColArray,
+			 Ppa_Getmatrixmatch.iColCount,
+			 Ppa_Getmatrixmatch.dTransDate,
+			 Ppa_Getmatrixmatch.iBestMatchRowID,
+			 Ppa_Getmatrixmatch.nNumVal1,
+			 Ppa_Getmatrixmatch.nNumVal2,
+			 Ppa_Getmatrixmatch.nNumVal3,
+			 Ppa_Getmatrixmatch.cStrVal1,
+			 Ppa_Getmatrixmatch.cCompVal1,
+			 Ppa_Getmatrixmatch.cCompVal2,
+			 Ppa_Getmatrixmatch.cCompVal3,
+			 Ppa_Getmatrixmatch.cCompVal4,
+			 Ppa_Getmatrixmatch.cCompVal5,
+			 Ppa_Getmatrixmatch.cCompVal6,
+			 Ppa_Getmatrixmatch.cCompVal7,
+			 Ppa_Getmatrixmatch.cCompVal8,
+			 Ppa_Getmatrixmatch.cCompVal9,
+			 Ppa_Getmatrixmatch.cCompVal10,
+			 temp_rc1);
+			 			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+				END;
+		ELSE
+		BEGIN
+			IF  Ppa_Getmatrixmatch.bReturnAllMatches != 0 THEN
+			BEGIN
+				IF  Ppa_Getmatrixmatch.bReturnAllMatches &gt; 0 THEN
+
+ FOR C1_REC IN C1
+ LOOP
+	OPEN RC1 FOR
+	SELECT
+	C1_REC.MatrixRowKey,  C1_REC.FromDate,  C1_REC.ToDate,  C1_REC.Value1,  C1_REC.Value2,  C1_REC.Value3,
+	C1_REC.Value4,C1_REC.Value5, C1_REC.Value6, C1_REC.Value7, C1_REC.Value8, C1_REC.Value9, C1_REC.Value10,
+	C1_REC.NumVal1, C1_REC.NumVal2, C1_REC.NumVal3,  C1_REC.StrVal1, NULL, NULL, NULL, NULL, NULL,
+	C1_REC.matrix_currency_code
+	FROM DUAL;
+	IF C1%ROWCOUNT = 1 THEN
+	  EXIT ;
+	END IF;
+ END LOOP;
+				ELSE
+
+					 FOR C1_REC IN C1
+					 LOOP
+						OPEN RC1 FOR
+						SELECT
+						C1_REC.MatrixRowKey,  C1_REC.FromDate,  C1_REC.ToDate,  C1_REC.Value1,  C1_REC.Value2,  C1_REC.Value3,
+						C1_REC.Value4,C1_REC.Value5, C1_REC.Value6, C1_REC.Value7, C1_REC.Value8, C1_REC.Value9, C1_REC.Value10,
+						C1_REC.NumVal1, C1_REC.NumVal2, C1_REC.NumVal3,  C1_REC.StrVal1, NULL, NULL, NULL, NULL, NULL, C1_REC.matrix_currency_code
+						FROM DUAL;
+						IF C1%ROWCOUNT = 1 THEN
+						  EXIT ;
+						END IF;
+					 END LOOP;
+					BEGIN
+						StoO_error   := 0;
+						SELECT 1 INTO StoO_rowcnt FROM DUAL
+						WHERE EXISTS
+						(
+							SELECT MatrixRowKey, FromDate, ToDate, Value1, Value2, Value3,
+								   Value4, Value5, Value6, Value7, Value8, Value9, Value10, NumVal1,
+							   	   NumVal2, NumVal3, StrVal1
+							FROM PPA_MATRIXVALUES
+							WHERE MatrixKey = Ppa_Getmatrixmatch.iMatrixID
+					 	    AND Ppa_Getmatrixmatch.dTransDate  BETWEEN FromDate AND ToDate
+							AND NVL(RTRIM(Value1), NVL(Ppa_Getmatrixmatch.cCompVal1, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal1, NVL(RTRIM(Value1), ' '))
+							AND NVL(RTRIM(Value2), NVL(Ppa_Getmatrixmatch.cCompVal2, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal2, NVL(RTRIM(Value2), ' '))
+							AND NVL(RTRIM(Value3), NVL(Ppa_Getmatrixmatch.cCompVal3, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal3, NVL(RTRIM(Value3), ' '))
+							AND NVL(RTRIM(Value4), NVL(Ppa_Getmatrixmatch.cCompVal4, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal4, NVL(RTRIM(Value4), ' '))
+							AND NVL(RTRIM(Value5), NVL(Ppa_Getmatrixmatch.cCompVal5, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal5, NVL(RTRIM(Value5), ' '))
+							AND NVL(RTRIM(Value6), NVL(Ppa_Getmatrixmatch.cCompVal6, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal6, NVL(RTRIM(Value6), ' '))
+							AND NVL(RTRIM(Value7), NVL(Ppa_Getmatrixmatch.cCompVal7, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal7, NVL(RTRIM(Value7), ' '))
+							AND NVL(RTRIM(Value8), NVL(Ppa_Getmatrixmatch.cCompVal8, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal8, NVL(RTRIM(Value8), ' '))
+							AND NVL(RTRIM(Value9), NVL(Ppa_Getmatrixmatch.cCompVal9, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal9, NVL(RTRIM(Value9), ' '))
+							AND NVL(RTRIM(Value10), NVL(Ppa_Getmatrixmatch.cCompVal10, ' '))
+							  = NVL(Ppa_Getmatrixmatch.cCompVal10, NVL(RTRIM(Value10), ' '))
+						)
+						AND rownum =1;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+				END;
+			ELSE
+			BEGIN
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+
+ FOR C2_REC IN C2
+ LOOP
+    Ppa_Getmatrixmatch.iBestMatchRowID :=  C2_REC.MatrixRowKey;
+	Ppa_Getmatrixmatch.nNumVal1 :=  C2_REC.NumVal1;
+	Ppa_Getmatrixmatch.nNumVal2 :=  C2_REC.NumVal2;
+	Ppa_Getmatrixmatch.nNumVal3 :=  C2_REC.NumVal3;
+	Ppa_Getmatrixmatch.cStrVal1 :=  C2_REC.StrVal1;
+	Ppa_Getmatrixmatch.cCurrencyCode := C2_REC.matrix_currency_code;
+	IF C2%ROWCOUNT = 1 THEN
+	  EXIT ;
+	END IF;
+ END LOOP;
+ 				StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+				IF  Ppa_Getmatrixmatch.iColCount &lt; 1 THEN
+				BEGIN
+					Ppa_Getmatrixmatch.nNumVal1 :=  0;
+					Ppa_Getmatrixmatch.nNumVal2 :=  0;
+					Ppa_Getmatrixmatch.nNumVal3 :=  0;
+					Ppa_Getmatrixmatch.cStrVal1 :=  '';
+					Ppa_Getmatrixmatch.iBestMatchRowID :=  0;
+				END;
+				END IF;
+			END;
+			END IF;
+		END;
+		END IF;
+		END IF;
+	IF  Ppa_Getmatrixmatch.bSuppressResultSet = 0 AND   Ppa_Getmatrixmatch.bReturnAllMatches = 0 THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+		        NULL, NULL, NULL, NULL, NULL, NULL, NULL, Ppa_Getmatrixmatch.nNumVal1,
+				Ppa_Getmatrixmatch.nNumVal2,
+				Ppa_Getmatrixmatch.nNumVal3,
+				Ppa_Getmatrixmatch.cStrVal1,
+				Ppa_Getmatrixmatch.iBestMatchRowID,
+				Ppa_Getmatrixmatch.cCurrencyCode
+		FROM DUAL;
+	END IF;
+/*
+ * NOTE:
+ *
+ * If you alter this stored procedure you _MUST_ make sure that you changes are mirrored
+ * in the procedure: ppa_GetMatrixMatchTest -- used by Matrix Manager -- in order to make
+ * sure that the two procedures are in sync.  ppa_GetMatrixMatchTest is used to test
+ * for values in the Matrix Manager but allows users to test for wildcards.
+ *
+ * And the change must be made to the mobile version of ppa_GetMatrixMatch
+ */
+END Ppa_Getmatrixmatch;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

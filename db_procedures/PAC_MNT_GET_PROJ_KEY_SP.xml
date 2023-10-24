@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_GET_PROJ_KEY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_GET_PROJ_KEY_SP" 
+(
+  id           VARCHAR2,
+  COMPANY_CODE pac_mnt_projects.COMPANY_CODE%TYPE,
+  PROJECT_CODE pac_mnt_projects.PROJECT_CODE%TYPE,
+  init         NUMBER,
+  RC1   IN OUT PAC_MNT_GET_PROJ_KEY_SPPkg.RCT1
+)
+AS
+  clntcode_int              pac_mnt_projects.COMPANY_CODE%TYPE;
+  projid_int                pac_mnt_projects.PROJECT_CODE%TYPE;
+  init_int                  NUMBER(1);
+  budgeted                  NUMBER(1);
+  budget_definition_entered NUMBER(1);
+  id_int                    pac_mnt_projects.ID%TYPE;
+  wipclass                  VARCHAR2(8);
+  project_allocations       NUMBER(1) := 0;
+  StoO_rowcnt               NUMBER := 0;
+  StoO_selcnt               NUMBER := 0;
+  StoO_error                NUMBER := 0;
+BEGIN
+  BEGIN
+    BEGIN
+      PAC_MNT_GET_PROJ_KEY_SP.id_int := TO_NUMBER(id);
+
+      SELECT id,
+             COMPANY_CODE,
+             PROJECT_CODE,
+             0,
+             budget,
+             SIGN(ABS(NVL(budgetlevellabor, 0))),
+             wipclass
+        INTO PAC_MNT_GET_PROJ_KEY_SP.id_int,
+             PAC_MNT_GET_PROJ_KEY_SP.clntcode_int,
+             PAC_MNT_GET_PROJ_KEY_SP.projid_int,
+             PAC_MNT_GET_PROJ_KEY_SP.init_int,
+             PAC_MNT_GET_PROJ_KEY_SP.budgeted,
+             PAC_MNT_GET_PROJ_KEY_SP.budget_definition_entered,
+             PAC_MNT_GET_PROJ_KEY_SP.wipclass
+        FROM pac_mnt_projects
+       WHERE id = PAC_MNT_GET_PROJ_KEY_SP.id;
+
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          PAC_MNT_GET_PROJ_KEY_SP.init_int := 1;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+    END;
+  END;
+
+  IF PAC_MNT_GET_PROJ_KEY_SP.wipclass IS NOT NULL THEN
+    BEGIN
+      SELECT 1
+        INTO PAC_MNT_GET_PROJ_KEY_SP.project_allocations
+        FROM DUAL
+       WHERE EXISTS (SELECT 1
+                       FROM WIPCLASS
+                      WHERE WIPCLASS = PAC_MNT_GET_PROJ_KEY_SP.wipclass
+                        AND ALLOCATION_TYPE = 'PROJECT_CHARGEBACKS');
+
+      EXCEPTION
+        WHEN TOO_MANY_ROWS THEN
+          StoO_rowcnt := 2;
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+    END;
+  END IF;
+
+  OPEN RC1 FOR
+  SELECT PAC_MNT_GET_PROJ_KEY_SP.id_int,
+         PAC_MNT_GET_PROJ_KEY_SP.clntcode_int,
+         PAC_MNT_GET_PROJ_KEY_SP.projid_int,
+         PAC_MNT_GET_PROJ_KEY_SP.init_int,
+         PAC_MNT_GET_PROJ_KEY_SP.budgeted,
+         PAC_MNT_GET_PROJ_KEY_SP.budget_definition_entered,
+         PAC_MNT_GET_PROJ_KEY_SP.project_allocations
+    FROM DUAL;
+END PAC_MNT_GET_PROJ_KEY_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

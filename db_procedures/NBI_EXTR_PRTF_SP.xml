@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXTR_PRTF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXTR_PRTF_SP" 
+AS
+   V_STMT                        VARCHAR2(2000);
+   V_START_TIME                  DATE;
+   V_DURATION                    NUMBER;  
+   V_PROJECTS_CNT                INTEGER;  
+   V_EVENTS_TO_PROCESS           INTEGER;   
+
+BEGIN
+   V_STMT := 'Extracting NBI_PRT_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME := SYSDATE;
+   
+    V_STMT := 'CHECKING IF THERE ARE ANY PROJECTS PROCESS';
+	DBMS_OUTPUT.PUT_LINE (V_STMT);
+	SELECT COUNT (1)
+	INTO V_PROJECTS_CNT
+	FROM NBI_PROJECT_CURRENT_FACTS
+	WHERE ROWNUM = 1;
+
+	V_STMT := 'CHECKING IF THERE ARE ANY EVENTS TO PROCESS';
+	DBMS_OUTPUT.PUT_LINE (V_STMT);
+	SELECT COUNT (1)
+	INTO   V_EVENTS_TO_PROCESS
+	FROM   NBI_EVENTS
+	WHERE  STATUS = 'PROCESSING'
+	AND PRJ_OBJECT_TYPE IN ('TEAM', 'ASSIGNMENT') AND ROWNUM = 1;
+		 
+	IF V_PROJECTS_CNT = 0 THEN 
+		-- Do a full refresh
+		NBI_PRTF_SP;
+	END IF;
+		 
+	IF V_EVENTS_TO_PROCESS = 1 THEN 	 
+		-- Do a Partial refresh based on records from NBI_EVENTS
+		NBI_PRTF_EVENTS_SP;
+		
+		V_STMT := 'CHANGING STATUS FROM PROCESSING TO PRTF_PROCESSED';
+		DBMS_OUTPUT.PUT_LINE (V_STMT);
+		UPDATE NBI_EVENTS
+		SET STATUS = 'PRTF_PROCESSED'
+		WHERE STATUS = 'PROCESSING'
+		AND PRJ_OBJECT_TYPE IN ('TEAM', 'ASSIGNMENT');
+		--COMMIT;
+    END IF;
+
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time NBI_PRT_FACTS: ' || V_DURATION);
+
+   V_STMT := 'Analyzing NBI_PRT_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME := SYSDATE;
+   CMN_GATHER_TABLE_STATS_SP('NBI_PRT_FACTS');
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time Analyzing NBI_PRT_FACTS: ' || V_DURATION);
+EXCEPTION
+   WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_EXTR_PRTF_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

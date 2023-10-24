@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NBI_COMMITMENTS_ROIDATE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NBI_COMMITMENTS_ROIDATE_FCT" (PROJECT_ID NUMBER)RETURN DATE
+IS
+  V_RETURN_VALUE DATE;
+  V_IS_XDM_INSTALLED CHAR(1);
+BEGIN
+  V_RETURN_VALUE:=NULL;
+  V_IS_XDM_INSTALLED:='N';
+
+SELECT NVL (MAX ('Y'), 'N')	INTO V_IS_XDM_INSTALLED FROM USER_TAB_COLUMNS WHERE TABLE_NAME = 'XDM_ACT_EST_BENEFITS' AND COLUMN_NAME = 'XDM_EST_ROI_DT';
+
+IF  V_IS_XDM_INSTALLED ='Y' THEN
+EXECUTE IMMEDIATE '
+SELECT   MAX (C.XDM_EST_ROI_DT)
+FROM     XDM_ACT_EST_BENEFITS C,
+		 CLB_DMS_FOLDERS D
+WHERE
+	 D.ASSOC_OBJ_ID  = ' || PROJECT_ID   || '
+AND      D.ID =C.PARENT_ID
+AND      D.FOLDER_TYPE = ''ActivityItemFolder''' INTO 	 V_RETURN_VALUE;
+ELSE
+V_RETURN_VALUE:=NULL;
+END IF;
+RETURN V_RETURN_VALUE;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

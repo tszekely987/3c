@@ -1,0 +1,19 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_HIERARCHY_V">
+    <indexes/>
+    <text_length>705</text_length>
+    <text>SELECT CAST (h.inv_hierarchies_id AS INTEGER) clarity_hierarchy_key,
+          CAST (h.parent_id AS INTEGER) parent_investment_key,
+          CAST (h.child_id AS INTEGER) child_investment_key,
+          h.alloc_pct child_alloc_pct,
+          h.the_level child_hierarchy_level,
+          NVL(pm.is_program,0) parent_is_program,
+          h.sequence_str order_by_sequence,
+          h.created_date clarity_created_date
+     FROM rpt_inv_hierarchy h
+          INNER JOIN inv_investments p ON h.parent_id = p.id
+          INNER JOIN inv_investments s ON h.child_id = s.id
+          LEFT OUTER JOIN inv_projects pm ON p.id = pm.prID
+    WHERE CASE WHEN pm.is_template IS NULL THEN 0 ELSE pm.is_template END = 0</text>
+  </QueryResult>
+</ClarityDBViewQuery>

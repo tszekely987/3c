@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SCH_JOB_DEF_UPDATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SCH_JOB_DEF_UPDATE_SP" (
+   P_ID                 IN   NUMERIC,
+   P_JOB_NAME           IN   VARCHAR2,
+   P_JOB_DESCRIPTION    IN   VARCHAR2,
+   P_JOB_TYPE           IN   VARCHAR2,
+   P_EXECUTABLE         IN   VARCHAR2,
+   P_OUTPUT_PATH        IN   VARCHAR2,
+   P_IS_CANCELLABLE     IN   INTEGER,
+   P_OUTPUT_ENABLED     IN   INTEGER DEFAULT 1,
+   P_LOG_ENABLED        IN   INTEGER DEFAULT 1,
+   P_IS_SYSTEM          IN   INTEGER DEFAULT 1,
+   P_IS_ADMIN_VISIBLE   IN   INTEGER DEFAULT 1,
+   P_IS_ACTIVE          IN   INTEGER DEFAULT 1,
+   P_UPDATED_BY         IN   NUMBER DEFAULT 1,
+   P_LANGUAGE_CODE      IN   VARCHAR2 DEFAULT 'en',
+   P_SOURCE              IN       VARCHAR2 DEFAULT NULL,
+   P_IS_SYSTEM_VISIBLE   IN       INTEGER DEFAULT 1,
+   P_JOB_EXTENDED_TYPE_CODE  IN   VARCHAR2 DEFAULT NULL
+)
+IS
+   V_STMT                        VARCHAR2(200);
+   V_JOB_TYPE                    NUMERIC;
+BEGIN
+   V_STMT := 'Selecting id for the job type lookup';
+   SELECT ID
+     INTO V_JOB_TYPE
+     FROM CMN_LOOKUPS
+    WHERE LOOKUP_TYPE = 'SCH_JOB_TYPE'
+      AND LOOKUP_CODE = P_JOB_TYPE;
+   V_STMT := 'Updating CMN_SCH_JOB_DEFINITIONS';
+
+   UPDATE CMN_SCH_JOB_DEFINITIONS
+      SET JOB_TYPE = V_JOB_TYPE,
+          EXECUTABLE = P_EXECUTABLE,
+          IS_SYSTEM = P_IS_SYSTEM,
+          IS_ADMIN_VISIBLE = P_IS_ADMIN_VISIBLE,
+          IS_LOG_ENABLED = P_LOG_ENABLED,
+          IS_CANCELLABLE = P_IS_CANCELLABLE,
+          OUTPUT_PATH = P_OUTPUT_PATH,
+          IS_OUTPUT_ENABLED = P_OUTPUT_ENABLED,
+          IS_ACTIVE = P_IS_ACTIVE,
+          IS_SYSTEM_VISIBLE = P_IS_SYSTEM_VISIBLE,
+          JOB_EXTENDED_TYPE_CODE = NVL(P_JOB_EXTENDED_TYPE_CODE,JOB_EXTENDED_TYPE_CODE),
+          LAST_UPDATED_DATE = SYSDATE,
+          LAST_UPDATED_BY = P_UPDATED_BY
+    WHERE ID = P_ID;
+
+      -- update the source if it was supplied
+      IF P_SOURCE IS NOT NULL THEN
+      BEGIN
+          update CMN_SCH_JOB_DEFINITIONS
+          set SOURCE = P_SOURCE
+          where ID = P_ID;
+      END;
+      END IF;
+
+   V_STMT := 'Calling CMN_CAPTIONS_NLS_UPDATE_SP';
+   CMN_CAPTIONS_NLS_UPD_SP (
+      P_TABLE_NAME =&gt; 'CMN_SCH_JOB_DEFINITIONS',
+      P_PK_ID =&gt; P_ID,
+      P_NAME =&gt; P_JOB_NAME,
+      P_DESCRIPTION =&gt; P_JOB_DESCRIPTION,
+      P_UPDATED_BY =&gt; P_UPDATED_BY,
+      P_LANGUAGE =&gt; P_LANGUAGE_CODE
+   );
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in CMN_SCH_JOB_DEF_UPDATE_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

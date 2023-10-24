@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>INV_HIERS_FLAT_INSERT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."INV_HIERS_FLAT_INSERT" (
+   new_child_id    NUMBER,
+   new_parent_id   NUMBER
+)
+AS
+   link_source_id   NUMBER;
+   v_existing_relation NUMBER;
+
+   CURSOR c_flat_hiers (p_child_id NUMBER, p_parent_id NUMBER)
+   IS
+   SELECT PARENTCHILD.PARENT_ID PARENT_ID,PARENTCHILD.CHILD_ID CHILD_ID,COUNT(1) REF_COUNT FROM
+    (
+      SELECT PARENT.PARENT_ID, CHILD.CHILD_ID FROM
+      ( SELECT PARENT_ID,CHILD_ID FROM INV_HIERARCHIES START WITH PARENT_ID = P_CHILD_ID CONNECT BY PRIOR CHILD_ID = PARENT_ID
+        UNION ALL
+        SELECT P_CHILD_ID,P_CHILD_ID FROM DUAL
+      )CHILD,
+      ( SELECT PARENT_ID, CHILD_ID FROM  (SELECT PARENT_ID, CHILD_ID FROM INV_HIERARCHIES START WITH CHILD_ID = P_PARENT_ID CONNECT BY PRIOR PARENT_ID = CHILD_ID )PARENTS WHERE PARENT_ID IS NOT NULL
+        UNION ALL
+        SELECT P_PARENT_ID PARENT_ID,P_PARENT_ID CHILD_ID  FROM DUAL
+      ) PARENT
+    ) PARENTCHILD GROUP BY PARENTCHILD.PARENT_ID, PARENTCHILD.CHILD_ID;
+
+BEGIN
+   INSERT INTO inv_flat_hierarchies
+               (ID, child_id, parent_id, ref_count,created_date, created_by,
+                last_updated_date, last_updated_by)
+      SELECT inv_flat_hierarchies_s1.NEXTVAL, new_child_id, new_child_id,
+             1,SYSDATE, 1, SYSDATE, 1
+        FROM DUAL
+       WHERE NOT EXISTS (
+                   SELECT 'EXISTS'
+                     FROM inv_flat_hierarchies
+                    WHERE child_id = new_child_id
+                          AND parent_id = new_child_id);
+
+   INSERT INTO inv_flat_hierarchies
+               (ID, child_id, parent_id, ref_count,created_date, created_by,
+                last_updated_date, last_updated_by)
+      SELECT inv_flat_hierarchies_s1.NEXTVAL, new_parent_id, new_parent_id,1,
+             SYSDATE, 1, SYSDATE, 1
+        FROM DUAL
+       WHERE NOT EXISTS (
+                 SELECT 'EXISTS'
+                   FROM inv_flat_hierarchies
+                  WHERE child_id = new_parent_id
+                        AND parent_id = new_parent_id);
+
+   FOR c IN c_flat_hiers (new_child_id, new_parent_id)
+   LOOP
+      select min(1) into v_existing_relation from inv_flat_hierarchies where child_id = c.child_id and parent_id = c.parent_id ;
+
+      if v_existing_relation IS NULL then
+
+        INSERT INTO inv_flat_hierarchies
+                  (ID, child_id, parent_id,
+                   link_source_id, ref_count,created_date, created_by,
+                   last_updated_date, last_updated_by
+                  )
+           VALUES (inv_flat_hierarchies_s1.NEXTVAL, c.child_id, c.parent_id,
+                   new_parent_id, 0, SYSDATE, 1,
+                   SYSDATE, 1
+                  );
+      END IF;
+      update inv_flat_hierarchies set ref_count = ref_count+c.ref_count where  child_id = c.child_id and  parent_id = c.parent_id;
+   END LOOP;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_MATRIX_ROW_INSERT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_MATRIX_ROW_INSERT_SP" 
+(
+  iMatrixKey   NUMBER,
+  in_cFromDate IN DATE,
+  in_cToDate   IN DATE,
+  nNumVal1     NUMBER,
+  nNumVal2     NUMBER,
+  nNumVal3     NUMBER,
+  in_cStrVal1  IN VARCHAR2,
+  cValue1      VARCHAR2  DEFAULT NULL,
+  cValue2      VARCHAR2  DEFAULT NULL,
+  cValue3      VARCHAR2  DEFAULT NULL,
+  cValue4      VARCHAR2  DEFAULT NULL,
+  cValue5      VARCHAR2  DEFAULT NULL,
+  cValue6      VARCHAR2  DEFAULT NULL,
+  cValue7      VARCHAR2  DEFAULT NULL,
+  cValue8      VARCHAR2  DEFAULT NULL,
+  cValue9      VARCHAR2  DEFAULT NULL,
+  cValue10     VARCHAR2  DEFAULT NULL,
+  currency     VARCHAR2,
+  p_language   VARCHAR2,
+  p_username   VARCHAR2,
+  userId       NUMBER DEFAULT 1
+)
+AS
+  cFromDate        DATE;
+  cToDate          DATE;
+  cStrVal1         GLOBALPKG.STRING;
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  dFromDate        DATE;
+  dToDate          DATE;
+  report           VARCHAR2(256);
+  -- -- Fix for DE38843. Trim any leading or trailing spaces user might have entered
+  pcValue1         GLOBALPKG.STRING := TRIM ( cValue1 );
+  pcValue2         GLOBALPKG.STRING := TRIM ( cValue2 );
+  pcValue3         GLOBALPKG.STRING := TRIM ( cValue3 );
+  pcValue4         GLOBALPKG.STRING := TRIM ( cValue4 );
+  pcValue5         GLOBALPKG.STRING := TRIM ( cValue5 );
+  pcValue6         GLOBALPKG.STRING := TRIM ( cValue6 );
+  pcValue7         GLOBALPKG.STRING := TRIM ( cValue7 );
+  pcValue8         GLOBALPKG.STRING := TRIM ( cValue8 );
+  pcValue9         GLOBALPKG.STRING := TRIM ( cValue9 );
+  pcValue10        GLOBALPKG.STRING := TRIM ( cValue10 );
+BEGIN
+
+	PAC_MNT_MATRIX_ROW_INSERT_SP.cFromDate := PAC_MNT_MATRIX_ROW_INSERT_SP.in_cFromDate;
+  PAC_MNT_MATRIX_ROW_INSERT_SP.cToDate   := PAC_MNT_MATRIX_ROW_INSERT_SP.in_cToDate;
+  PAC_MNT_MATRIX_ROW_INSERT_SP.cStrVal1  := PAC_MNT_MATRIX_ROW_INSERT_SP.in_cStrVal1;
+  PAC_MNT_MATRIX_ROW_INSERT_SP.cStrVal1  := TRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.cStrVal1);
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue1 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue1 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue2 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue2 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue3 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue3 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue4 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue4 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue5 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue5 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue6 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue6 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue7 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue7 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue8 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue8 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue9 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue9 := NULL;
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue10 = '*' THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue10 := NULL;
+	END IF;
+
+  PAC_MNT_MATRIX_ROW_INSERT_SP.report :=  '';
+
+  BEGIN
+	  PAC_MNT_MATRIX_ROW_VALIDATE_SP(
+      PAC_MNT_MATRIX_ROW_INSERT_SP.iMatrixKey,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.cFromDate,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.cToDate,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.cStrVal1,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue1,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue2,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue3,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue4,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue5,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue6,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue7,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue8,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue9,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue10,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.p_language,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.report,
+      PAC_MNT_MATRIX_ROW_INSERT_SP.p_username);
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        raise_application_error(-20115, 'Error while validating matrix');
+			--NULL;
+		/*WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+			raise_application_error(-20115, 'Error while validating matrix');*/
+	END;
+/*
+  IF LTRIM(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.report)) IS NOT NULL THEN
+    BEGIN
+      raise_application_error(-20115, PAC_MNT_MATRIX_ROW_INSERT_SP.report);
+      RETURN;
+    END;
+	END IF;
+*/
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.cFromDate IS NULL THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.cFromDate :=  TO_DATE('01/01/1990','mm/dd/yyyy');
+	END IF;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.cToDate IS NULL THEN
+		PAC_MNT_MATRIX_ROW_INSERT_SP.cToDate :=  TO_DATE('12/31/2999','mm/dd/yyyy');
+	END IF;
+
+	PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate :=  PAC_MNT_MATRIX_ROW_INSERT_SP.cFromDate;
+	PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate :=  PAC_MNT_MATRIX_ROW_INSERT_SP.cToDate;
+
+  IF PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate &gt; PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate THEN
+    BEGIN
+      raise_application_error(-20218, 'Your From date cannot be greater than your To date!');
+      RETURN;
+    END;
+	END IF;
+
+	BEGIN
+
+    BEGIN
+      StoO_selcnt := 0;
+      StoO_error  := 0;
+      StoO_rowcnt := 0;
+
+      SELECT 1 INTO StoO_selcnt
+      FROM DUAL
+      WHERE  EXISTS (
+        SELECT  1
+        FROM ppa_MatrixValues
+        WHERE MatrixKey = PAC_MNT_MATRIX_ROW_INSERT_SP.iMatrixKey
+        and
+          -- this set of or condition's makes sure that
+          -- matrix rows will not be created with overlapping date range's (fixes bug # 46356)
+            (
+            -- this condition checks if any of the existing rows from date
+            -- falls within in the new row's date range
+              ( trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate) &lt;= trunc(FromDate)
+              and trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate) &gt;= trunc(FromDate) ) or
+            -- this condition checks if any of the existing rows to date
+            -- falls  within in the new row's date range
+            ( trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate) &lt;= trunc(ToDate)
+              and trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate) &gt;= trunc(ToDate) ) or
+            -- this condition checks if the from date and the to date fall within
+            -- the existing date range
+            ( trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate) &gt; trunc(FromDate)
+              and trunc(PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate) &lt; trunc(ToDate) )
+            )
+        and NVL(RTRIM(Value1), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue1),' ')
+        and NVL(RTRIM(Value2), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue2),' ')
+        and NVL(RTRIM(Value3), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue3),' ')
+        and NVL(RTRIM(Value4), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue4),' ')
+        and NVL(RTRIM(Value5), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue5),' ')
+        and NVL(RTRIM(Value6), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue6),' ')
+        and NVL(RTRIM(Value7), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue7),' ')
+        and NVL(RTRIM(Value8), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue8),' ')
+        and NVL(RTRIM(Value9), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue9),' ')
+        and NVL(RTRIM(Value10), ' ') = NVL(RTRIM(PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue10),' '));
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+        WHEN OTHERS THEN
+          StoO_rowcnt := 0;
+          StoO_selcnt := 0;
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    IF StoO_selcnt != 0 THEN
+      BEGIN
+        raise_application_error(-20219, 'A row already exists with this information on ');
+        RETURN;
+      END;
+    END IF;
+	END;
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO ppa_MatrixValues (MATRIXROWKEY, MatrixKey, FromDate, ToDate, Value1, Value2, Value3, Value4, Value5, Value6, Value7, Value8, Value9, Value10, NumVal1, NumVal2, NumVal3, StrVal1, matrix_currency_code,
+    CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+    VALUES (S_252_1_PPA_MATRIXVALUES.nextval, PAC_MNT_MATRIX_ROW_INSERT_SP.iMatrixKey, PAC_MNT_MATRIX_ROW_INSERT_SP.dFromDate,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.dToDate, PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue1,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue2, PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue3,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue4, PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue5,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue6, PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue7,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue8, PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue9,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.pcValue10, PAC_MNT_MATRIX_ROW_INSERT_SP.nNumVal1,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.nNumVal2, PAC_MNT_MATRIX_ROW_INSERT_SP.nNumVal3,
+        PAC_MNT_MATRIX_ROW_INSERT_SP.cStrVal1, PAC_MNT_MATRIX_ROW_INSERT_SP.currency,
+        SYSDATE, userId, SYSDATE, userId);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        raise_application_error(-20228, 'Error Inserting New Matrix Row');
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+      raise_application_error(-20228, 'Error Inserting New Matrix Row');
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE ppa_Matrix
+       SET LAST_UPDATED_DATE = SYSDATE,
+           last_updated_by = userId
+     WHERE MATRIXKEY = PAC_MNT_MATRIX_ROW_INSERT_SP.iMatrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        raise_application_error(-20228, 'Error Inserting New Matrix Row');
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+      raise_application_error(-20228, 'Error Inserting New Matrix Row');
+	END;
+END PAC_MNT_MATRIX_ROW_INSERT_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

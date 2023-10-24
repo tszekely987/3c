@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMS_SET_LAST_UPDATED_DATE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMS_SET_LAST_UPDATED_DATE_SP" (
+  p_child_itemid     in   number
+ )
+AS
+  v_ancestor_item_id number;
+BEGIN
+
+  BEGIN
+    WITH results( id, parent_item_id ) AS
+    (
+        SELECT  id,
+                parent_item_id
+        FROM    cms_content_items
+        WHERE   id = p_child_itemid
+        UNION ALL
+        SELECT  child.id,
+                child.parent_item_id
+        FROM    cms_content_items child
+                INNER JOIN results r ON r.parent_item_id = child.id
+    )
+    select id into v_ancestor_item_id from results where parent_item_id is null;
+  EXCEPTION
+    WHEN OTHERS
+      THEN
+        v_ancestor_item_id := -1;
+  END;
+
+  BEGIN
+    update cms_content_items
+    set last_updated_date = sysdate
+    where id = v_ancestor_item_id;
+  END;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

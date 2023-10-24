@@ -1,0 +1,993 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.riskManagement" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Risk Management" languageCode="en" name="Risk Management"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT 
+       @select:dim:user_def:implied:risk:r.odf_pk:risk_int_id@,
+       @select:dim_prop:user_def:implied:risk:r.pk_id:proj_int_id@,
+       @select:dim_prop:user_def:implied:risk:r.pk_unique_name:proj_id@,
+       @select:dim_prop:user_def:implied:risk:r.pk_name:proj_name@,
+       @select:dim_prop:user_def:implied:risk:@UPPER@(inv.odf_object_code):investment_code_upper@,
+       @select:dim_prop:user_def:implied:risk:inv.manager_id:proj_mngr_id@,
+       @select:dim_prop:user_def:implied:risk:r.rim_risk_issue_code:risk_id@,
+       @select:dim_prop:user_def:implied:risk:r.name:risk_name@,
+       @select:dim_prop:user_def:implied:risk:r.description:description@,
+       @select:dim_prop:user_def:implied:risk:r.impact_description:impact_description@,
+       @select:dim_prop:user_def:implied:risk:r.resolution:resolution@,
+       @select:dim_prop:user_def:implied:risk:r.assumptions:assumptions@,
+       @select:dim_prop:user_def:implied:risk:r.risk_symptoms:risk_symptoms@,
+       @select:dim_prop:user_def:implied:risk:category.name:category@,
+       @select:dim_prop:user_def:implied:risk:CASE WHEN r.priority_code = 'LOW' THEN 1 
+                                                   WHEN r.priority_code = 'MEDIUM' THEN 2 
+                                                   WHEN r.priority_code = 'HIGH' THEN 3 ELSE 0 END:priority_sl@,
+       @select:dim_prop:user_def:implied:risk:priority.name:priority@,
+       @select:dim_prop:user_def:implied:risk:status.name:status_code_caption@,
+       @select:dim_prop:user_def:implied:risk:approach.name:approach_code_caption@,
+       @select:dim_prop:user_def:implied:risk:r.is_above_threshold:above_threshold@,
+       @select:dim_prop:user_def:implied:risk:r.probability:probability_sl@,
+       @select:dim_prop:user_def:implied:risk:r.impact:impact_sl@,
+       @select:dim_prop:user_def:implied:risk:sr.full_name:assigned_to@,
+       @select:dim_prop:user_def:implied:risk:sr.email:assigned_email@,
+       @select:dim_prop:user_def:implied:risk:r.target_resolve_date:target_resolve_date@,
+       @select:dim_prop:user_def:implied:risk:r.resolved_date:resolved_date@,
+       @select:dim_prop:user_def:implied:risk:r.impact_date:impact_date@,
+       @select:dim_prop:user_def:implied:risk:r.updated_by:last_updated_by@,
+       @select:dim_prop:user_def:implied:risk:r.last_updated_date:last_updated_date@,
+       @select:metric:user_def:implied:r.calculated_risk:calculated_risk@
+FROM   ODF_RISK_V2 r
+INNER  JOIN  INV_INVESTMENTS inv ON  r.pk_id = inv.id
+                                 AND inv.is_active <> 0
+INNER  JOIN  INV_PROJECTS prj ON  r.pk_id = prj.prid
+LEFT   OUTER JOIN SRM_RESOURCES sr ON  r.assigned_to = sr.user_id 
+LEFT   OUTER JOIN PRJ_OBS_ASSOCIATIONS assoc ON  inv.id = assoc.record_id 
+                                             AND @UPPER@(assoc.table_name) = 'SRM_PROJECTS'
+LEFT   OUTER JOIN PRJ_OBS_UNITS_FLAT flat ON  assoc.unit_id = flat.unit_id 
+LEFT   OUTER JOIN CMN_LOOKUPS_V status ON  status.lookup_code = r.status_code
+                                       AND status.lookup_type = 'RIM_STATUS' 
+                                       AND status.language_code =  @WHERE:PARAM:LANGUAGE@ 
+LEFT   OUTER JOIN CMN_LOOKUPS_V category ON  category.lookup_code = r.category_type
+                                         AND category.lookup_type = 'RIM_CATEGORY_TYPE' 
+                                         AND category.language_code =  @WHERE:PARAM:LANGUAGE@ 
+LEFT   OUTER JOIN CMN_LOOKUPS_V priority ON  priority.lookup_code = r.priority_code
+                                         AND priority.lookup_type = 'RIM_PRIORITY' 
+                                         AND priority.language_code =  @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN CMN_LOOKUPS_V approach ON  approach.lookup_code = r.approach_code
+                                         AND approach.lookup_type = 'RIM_APPROACH' 
+                                         AND approach.language_code =  @WHERE:PARAM:LANGUAGE@
+WHERE  (@WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:OBS@ = flat.branch_unit_id)
+AND    ((r.category_type IS NULL) OR (@WHERE:PARAM:USER_DEF:STRING:r.category_type:CATEGORY@))
+AND    ((r.status_code IS NULL)   OR (@WHERE:PARAM:USER_DEF:STRING:r.status_code:STATUS@))
+AND    ((r.assigned_to IS NULL)   OR (@WHERE:PARAM:USER_DEF:INTEGER:r.assigned_to:ASSIGNED_TO@))
+AND    (prj.is_program = 0 OR @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:show_programs@,1) = 1)
+AND    prj.is_template <> 1
+AND    @WHERE:SECURITY:PROJECT:inv.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="risk_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Risk Internal ID" languageCode="en" name="Risk Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_id" required="false">
+              
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_code_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_mngr_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="risk_id" required="false">
+              
+              
+              
+              
+              <nls description="Risk ID" languageCode="en" name="Risk ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="risk_name" required="false">
+              
+              
+              
+              
+              <nls description="Risk" languageCode="en" name="Risk"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="description" required="false">
+              
+              
+              
+              
+              <nls description="Description" languageCode="en" name="Description"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="impact_description" required="false">
+              
+              
+              
+              
+              <nls description="Impact Description" languageCode="en" name="Impact Description"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resolution" required="false">
+              
+              
+              
+              
+              <nls description="Resolution" languageCode="en" name="Resolution"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assumptions" required="false">
+              
+              
+              
+              
+              <nls description="Assumptions" languageCode="en" name="Assumptions"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="risk_symptoms" required="false">
+              
+              
+              
+              
+              <nls description="Risk Symptoms" languageCode="en" name="Risk Symptoms"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="category" required="false">
+              
+              
+              
+              
+              <nls description="Category" languageCode="en" name="Category"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="priority_sl" lookup="COP_PORTLET_RIM_PRIORITY" required="false">
+              
+              
+              
+              
+              <nls description="Priority" languageCode="en" name="Priority"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="2"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="3"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="priority" required="false">
+              
+              
+              
+              
+              <nls description="Priority Name" languageCode="en" name="Priority Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status_code_caption" required="false">
+              
+              
+              
+              
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="approach_code_caption" required="false">
+              
+              
+              
+              
+              <nls description="Response Type" languageCode="en" name="Response Type"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="above_threshold" required="false">
+              
+              
+              
+              
+              <nls description="Above Threshold" languageCode="en" name="Above Threshold"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="1" lo="1" mappingCode="mapping-1" typeCode="Checkmark"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="probability_sl" lookup="RIM_PROBABILITY" required="false">
+              
+              
+              
+              
+              <nls description="Probability" languageCode="en" name="Probability"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="2"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="3"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="impact_sl" lookup="RIM_IMPACT" required="false">
+              
+              
+              
+              
+              <nls description="Impact" languageCode="en" name="Impact"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="2"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="3"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="assigned_to" required="false">
+              
+              
+              
+              
+              <nls description="Owner" languageCode="en" name="Owner"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assigned_email" required="false">
+              
+              
+              
+              
+              <nls description="Owner Email" languageCode="en" name="Owner Email"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="target_resolve_date" required="false">
+              
+              
+              
+              
+              <nls description="Target Resolution Date" languageCode="en" name="Target Resolution Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resolved_date" required="false">
+              
+              
+              
+              
+              <nls description="Resolved Date" languageCode="en" name="Resolved Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="impact_date" required="false">
+              
+              
+              
+              
+              <nls description="Impact Date" languageCode="en" name="Impact Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_updated_by" required="false">
+              
+              
+              
+              
+              <nls description="Updated By" languageCode="en" name="Updated By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_updated_date" required="false">
+              
+              
+              
+              
+              <nls description="Date Last Updated" languageCode="en" name="Date Last Updated"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="calculated_risk" required="false">
+              
+              
+              
+              
+              <nls description="Calculated Risk" languageCode="en" name="Calculated Risk"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_category" lookup="RIM_CATEGORY_TYPE" required="false">
+              
+              
+              
+              
+              <nls description="Category Filter" languageCode="en" name="Category Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_status" lookup="RIM_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status Filter" languageCode="en" name="Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_assigned_to" lookup="RIM_BROWSE_USER" required="false">
+              
+              
+              
+              
+              <nls description="Owner Filter" languageCode="en" name="Owner Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_show_programs" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Include Programs Filter" languageCode="en" name="Include Programs Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.teamMailTo" code="assignedEmail">
+                
+                
+                
+                
+                <nls description="Owner Email Link" languageCode="en" name="Owner Email Link"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="assigned_email" dataSource="data" paramCode="~mailto~"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_code_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+              </link>
+              <link action="itl.riskObject" code="risk">
+                
+                
+                
+                
+                <nls description="Risk Properties" languageCode="en" name="Risk Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/page/@space" dataSource="input" paramCode="ui.page.space"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="risk_int_id" dataSource="data" paramCode="odf_pk"/>
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

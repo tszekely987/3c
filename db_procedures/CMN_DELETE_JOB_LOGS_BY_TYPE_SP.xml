@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_DELETE_JOB_LOGS_BY_TYPE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_DELETE_JOB_LOGS_BY_TYPE_SP" 
+(
+   p_job_type           in   VARCHAR2,
+   p_age                in   number
+)
+IS
+   v_sql_text VARCHAR2(4000);
+begin
+
+   if ( p_age &gt;= 0 ) then
+      v_sql_text := 'delete    from cmn_sch_job_logs
+         where    job_run_id in (SELECT   id
+                         from    cmn_sch_job_runs
+                         where    created_date &lt; ( sysdate - ' || p_age || ')
+                         and    status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+                         and      job_id in ( select  j.id
+                                           from       cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                                           where  jd.id in (' || p_job_type || ')
+                                           and    job_definition_id = jd.id
+                                           and    jd.job_type = l.id
+                                           and    l.lookup_code != ''REPORT''
+                                           and    l.lookup_type = ''SCH_JOB_TYPE'' ) )';
+   
+      EXECUTE IMMEDIATE (v_sql_text);
+   
+      v_sql_text := 'delete    from cmn_sch_job_run_params
+         where    job_run_id in (SELECT   id
+                      from    cmn_sch_job_runs
+                      where    created_date &lt; ( sysdate - ' || p_age || ')
+                      and    status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+                      and      job_id in ( select  j.id
+                                        from       cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                                        where  jd.id in (' || p_job_type || ')
+                                        and    job_definition_id = jd.id
+                                        and    jd.job_type = l.id
+                                        and    l.lookup_code != ''REPORT''
+                                        and    l.lookup_type = ''SCH_JOB_TYPE'' ) )';
+
+      EXECUTE IMMEDIATE (v_sql_text);
+
+     v_sql_text := 'delete from cmn_sec_assgnd_obj_perm
+         where object_instance_id in (SELECT   job_id
+                      from    cmn_sch_job_runs
+                      where    created_date &lt; ( sysdate - ' || p_age || ')
+                      and      status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+                      and      job_id in ( select  j.id
+                                        from       cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                                        where  jd.id in (' || p_job_type || ')
+                                        and    job_definition_id = jd.id
+                                        and    jd.job_type = l.id
+                                        and    j.status_code not in (''SCHEDULED'', ''PAUSED'')
+                                        and    l.lookup_code != ''REPORT''
+                                        and    l.lookup_type = ''SCH_JOB_TYPE'' ))
+           and object_id in ( select id from cmn_sec_objects
+                          where object_code = ''JOB''
+                          and object_type_code = ''JOB'')';
+
+       EXECUTE IMMEDIATE (v_sql_text);
+    
+       v_sql_text := 'delete from cmn_attribute_values
+         where attribute_set_id in ( SELECT vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+                                where jd.id in (' || p_job_type || ')
+                                and vs.business_object_id = cbo.id
+                                and vs.business_object_instance_id = j.id
+                                and cbo.table_name = ''CMN_SCH_JOB_DEFINITIONS''
+                                and cbo.pk_id = jd.id
+                                and jd.job_type = l.id
+                                and jd.id = j.job_definition_id
+                                and   l.lookup_code != ''REPORT''
+                                and   l.lookup_type = ''SCH_JOB_TYPE''
+                                and j.status_code not in (''SCHEDULED'', ''PAUSED'')
+                                and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+                                and j.created_date &lt; ( sysdate - ' || p_age || ')
+                             )';
+
+      EXECUTE IMMEDIATE (v_sql_text);
+   
+      v_sql_text := 'delete from cmn_attribute_value_sets
+         where id in ( SELECT vs.id from cmn_attribute_value_sets vs, cmn_business_objects cbo, cmn_sch_job_definitions jd, cmn_sch_jobs j, cmn_lookups l
+                     where vs.business_object_id = cbo.id
+                     and jd.id in (' || p_job_type || ')
+                     and vs.business_object_instance_id = j.id
+                     and jd.job_type = l.id
+                     and jd.id = j.job_definition_id
+                     and   l.lookup_code != ''REPORT''
+                     and   l.lookup_type = ''SCH_JOB_TYPE''
+                     and cbo.table_name = ''CMN_SCH_JOB_DEFINITIONS''
+                     and cbo.pk_id = jd.id
+                     and j.status_code not in (''SCHEDULED'', ''PAUSED'')
+                     and j.created_date &lt; ( sysdate - ' || p_age || ')
+                     and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+                     and j.status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+                  )';
+
+      EXECUTE IMMEDIATE (v_sql_text);
+   
+     v_sql_text := 'delete    from cmn_sch_job_runs
+     where    created_date &lt; ( sysdate - ' || p_age || ')
+     and     status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+     and         job_id in ( SELECT  j.id
+                    from       cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                    where   jd.id in (' || p_job_type || ')
+                    and     job_definition_id = jd.id
+                    and     jd.job_type = l.id
+                    and     l.lookup_code != ''REPORT''
+                    and     l.lookup_type = ''SCH_JOB_TYPE'' )';
+
+     EXECUTE IMMEDIATE (v_sql_text);
+  
+      v_sql_text := 'delete from cmn_sch_jobs j
+         where j.job_definition_id in ( SELECT jd.id from cmn_sch_job_definitions jd, cmn_lookups l
+                                where jd.id in (' || p_job_type || ')
+                                and l.lookup_code != ''REPORT''
+                                and l.lookup_type = ''SCH_JOB_TYPE''
+                                and jd.job_type = l.id)
+         and j.status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+         and not exists (select 1 from bpm_def_step_actions bdsa where bdsa.job_id = j.id)
+         and j.created_date &lt; ( sysdate - ' || p_age || ')';
+      EXECUTE IMMEDIATE (v_sql_text);
+
+      v_sql_text := 'delete    from cmn_sch_job_logs
+      where    job_run_id in (SELECT   id
+                      from    cmn_sch_job_runs
+                      where    created_date &lt; ( sysdate - ' || p_age || ')
+                      and     status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+                      and      job_id in ( select  j.id
+                                                    from    cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                                                    where   jd.id in (' || p_job_type || ')
+                                                    and     job_definition_id = jd.id
+                                                    and     jd.job_type = l.id
+                                                    and     l.lookup_code = ''REPORT''
+                                                    and     l.lookup_type = ''SCH_JOB_TYPE'' ) )';
+      EXECUTE IMMEDIATE (v_sql_text);
+
+      v_sql_text := 'delete    from cmn_sch_job_runs
+      where    created_date &lt; ( sysdate - ' || p_age || ') 
+      and      status_code in (''CANCELLED'', ''COMPLETED'', ''ERROR'', ''FAILED'')
+      and         job_id in ( SELECT  j.id
+                        from       cmn_sch_jobs j, cmn_sch_job_definitions jd, cmn_lookups l
+                        where   jd.id in (' || p_job_type || ')
+                        and     job_definition_id = jd.id
+                        and     jd.job_type = l.id
+                        and     l.lookup_code = ''REPORT''
+                        and     l.lookup_type = ''SCH_JOB_TYPE'' )';
+      EXECUTE IMMEDIATE (v_sql_text);
+
+   end if;
+
+end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

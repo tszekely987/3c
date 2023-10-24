@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_NBI_CALENDAR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_NBI_CALENDAR_FCT" ( p_start DATE, p_period_type VARCHAR, p_periods NUMBER )
+   RETURN PFM_CALENDAR
+IS
+ v_calendar PFM_CALENDAR;
+ v_start DATE;
+ v_period INTEGER;
+BEGIN
+  v_period := 0;
+  v_start := trunc( p_start );
+  v_calendar := PFM_CALENDAR();
+  FOR ao_rec IN (
+    select period_name, period_start_date, period_end_date from (
+        select time_key period_name, period_start_date, period_end_date
+          from NBI_DIM_CALENDAR_TIME where HIERARCHY_LEVEL = p_period_type
+           and period_start_date &lt;= v_start and period_end_date &gt;= v_start
+        union
+        select time_key period_name, period_start_date, period_end_date
+          from NBI_DIM_CALENDAR_TIME where HIERARCHY_LEVEL = p_period_type
+           and period_end_date &gt;= v_start
+    )
+    where rownum &lt;= p_periods order by period_start_date  )
+  LOOP
+    v_period := v_period + 1;
+    v_calendar.extend(1);
+    v_calendar(v_period) := PFM_PERIOD( v_period, ao_rec.period_start_date, ao_rec.period_end_date, ao_rec.period_name, 1);
+  END LOOP;
+  return v_calendar;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

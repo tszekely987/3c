@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_PPA_INSERT_CLNTSUPP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_PPA_INSERT_CLNTSUPP" (
+COMPANY_CODE 	VARCHAR2 ,
+COMPANY_NAME 	VARCHAR2 ,
+in_departcode 	IN VARCHAR2  DEFAULT '',
+leader 	VARCHAR2  DEFAULT '',
+return_ 	IN OUT NUMBER,
+status_type 	NUMBER  DEFAULT 1)
+AS
+departcode 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+--integration_id  NUMBER(5,0) := 0;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_ppa_insert_clntsupp.departcode := sp_ppa_insert_clntsupp.in_departcode;
+
+/*
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   integration_id
+		INTO sp_ppa_insert_clntsupp.integration_id FROM projectaccounting;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+*/
+  sp_ppa_insert_clntsupp.return_ :=  1;
+	IF  sp_ppa_insert_clntsupp.COMPANY_CODE = 'CDEFAULT' THEN
+		RETURN ;
+	END IF;
+
+  BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE NOT EXISTS (
+		SELECT  *
+		 FROM clntsupp
+		WHERE COMPANY_CODE = 'CDEFAULT' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		raise_application_error(-20407, 'No Default COMPANY_CODE (CDEFAULT) to inherit supplemental from in PA');
+		sp_ppa_insert_clntsupp.return_ :=  -1;
+		RETURN ;
+	END;
+	END IF;
+
+/* SUN = 3
+	IF  sp_ppa_insert_clntsupp.integration_id != 3 THEN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   departcode
+			INTO sp_ppa_insert_clntsupp.departcode FROM clntsupp
+			WHERE COMPANY_CODE = 'CDEFAULT';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+*/
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE NOT EXISTS (
+		SELECT  1
+		 FROM clntsupp
+		WHERE COMPANY_CODE = UPPER(sp_ppa_insert_clntsupp.COMPANY_CODE) );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO clntsupp (COMPANY_CODE, COMPANY_NAME, locationid, departcode, clntrate, wiptype, clntwipclass, clntclass, projclass, clntsic, openeddate, lostdate, inactivedate, travelzone, travelhours, travelmins, billcycle, directions, notes, deactivatemileage, deactivatetravel, udf3, udf4, udf1, udf2, clntcost, clntstdcost, status_type)SELECT  UPPER(sp_ppa_insert_clntsupp.COMPANY_CODE), sp_ppa_insert_clntsupp.COMPANY_NAME,
+			   locationid, sp_ppa_insert_clntsupp.departcode, clntrate, wiptype,
+			   clntwipclass, clntclass, projclass, clntsic, openeddate, lostdate,
+			   inactivedate, travelzone, travelhours, travelmins, billcycle,
+			   directions, notes, deactivatemileage, deactivatetravel, udf3,
+			   udf4, udf1, udf2, clntcost, clntstdcost, sp_ppa_insert_clntsupp.status_type
+			 FROM clntsupp
+			WHERE COMPANY_CODE = 'CDEFAULT';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	END;
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		sp_ppa_insert_clntsupp.return_ :=  -1;
+		RETURN ;
+	END;
+	END IF;
+	IF  sp_ppa_insert_clntsupp.leader IS NOT NULL THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE clntsupp
+		SET udf1 = sp_ppa_insert_clntsupp.leader
+		WHERE COMPANY_CODE = sp_ppa_insert_clntsupp.COMPANY_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			raise_application_error(-20408, 'Error updating clntsupp record on eNiku Accounting');
+			sp_ppa_insert_clntsupp.return_ :=  -1;
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+END sp_ppa_insert_clntsupp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

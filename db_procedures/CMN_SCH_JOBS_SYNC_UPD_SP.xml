@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SCH_JOBS_SYNC_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SCH_JOBS_SYNC_UPD_SP" (
+   p_job_id          NUMBER,
+   p_status_code     VARCHAR2,
+   p_ret_val     OUT NUMBER
+)
+IS
+   l_job_id NUMBER;
+   CURSOR c_job IS
+     SELECT id
+       FROM CMN_SCH_JOBS
+      WHERE id = p_job_id
+        AND status_code = 'PROCESSING'
+     FOR UPDATE NOWAIT;
+BEGIN
+   p_ret_val := 0;
+   OPEN c_job;
+   FETCH c_job INTO l_job_id;
+
+   IF c_job%FOUND
+   THEN
+     /* Check if the cursor returns any rows; If not, the job has been updated by another database user */
+     UPDATE CMN_SCH_JOBS
+        SET status_code = p_status_code
+      WHERE id = l_job_id;
+     p_ret_val := 1;
+   ELSE
+     p_ret_val := 0;
+   END IF;
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+     p_ret_val := 0;
+   COMMIT;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

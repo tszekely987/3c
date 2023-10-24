@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="BROWSE_NON_OBJECT_PROCESSES" displayAttributeName="process_name" hiddenAttributeName="process_code" objectCode="" sortAttributeName="process_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List of process that are not associated with any object" languageCode="en" name="Processes with no object association"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:ccn.name:process_name@, @SELECT:bdp.process_code:process_code@
+	            FROM BPM_DEF_PROCESSES bdp
+	               , BPM_DEF_PROCESS_VERSIONS bdpv
+	               , CMN_CAPTIONS_NLS ccn
+	           WHERE bdpv.process_id = bdp.id
+	             AND bdpv.user_status_code = 'BPM_PUS_ACTIVE'
+	             AND bdpv.internal_status_code = 'BPM_PIS_VALIDATED'
+	             AND bdp.id = ccn.pk_id
+	             AND ccn.table_name = 'BPM_DEF_PROCESSES'
+	             AND ccn.language_code = @WHERE:PARAM:LANGUAGE@
+	             AND NOT EXISTS (
+	                 SELECT 1
+	                   FROM BPM_DEF_OBJECTS bdo
+	                  WHERE bdpv.id = bdo.pk_id
+	                    AND bdo.type_code = 'BPM_POT_PRIMARY'
+	                    AND bdo.object_type_code != 'xml_document' )
+                      AND bdpv.id in (select bdpv.id from dual
+                      where exists
+                      ( SELECT 1 FROM CMN_SEC_CHK_USER_GLB_R_V0
+                      WHERE user_id=@WHERE:PARAM:USER_ID@ AND object_id in
+                      (SELECT id FROM cmn_sec_objects WHERE object_code like 'PROCESS-START')
+                      AND permission_code='permProcessStart' )
+                      union SELECT object_instance_id FROM CMN_SEC_CHK_USER_INST_V0
+                      WHERE user_id=@WHERE:PARAM:USER_ID@ AND object_id in
+                      (SELECT id FROM cmn_sec_objects WHERE object_code like 'PROCESS-START' )
+                      AND permission_code='permProcessStart') AND @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="process_name"/>
+              <displayedSuggestionAttribute value="process_code"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="process_name"/>
+              <searchedSuggestionAttribute value="process_code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Processes" languageCode="en" name="Select Processes"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Process" languageCode="en" name="Select Process"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="process_name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Process" languageCode="en" name="Process"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="process_code" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Process ID" languageCode="en" name="Process ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="process_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Process" languageCode="en" name="Process"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="process_code" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Process ID" languageCode="en" name="Process ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_MATRIXADDCOLUMN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_MATRIXADDCOLUMN" 
+(
+  iMatrixKey  NUMBER,
+  cColumnName VARCHAR2,
+  cFieldName  VARCHAR2,
+  bCompareCol NUMBER DEFAULT 1,
+  iCompareOp  NUMBER DEFAULT 0,
+  iDataType   NUMBER DEFAULT 1,
+  RC1         IN OUT PPA_MATRIXADDCOLUMNPkg.RCT1,
+  userId      NUMBER DEFAULT 1)
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  iNextColNo       NUMBER;
+  iMatrixColDefKey NUMBER;
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT MAX(ColumnNo)
+      INTO ppa_MatrixAddColumn.iNextColNo
+      FROM ppa_MatrixColDef
+     WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  ppa_MatrixAddColumn.iNextColNo := NVL(ppa_MatrixAddColumn.iNextColNo, 0) + 1;
+	SAVEPOINT Tran1;
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO ppa_MatrixColDef (MATRIXCOLDEFKEY, MatrixKey, ColumnNo, ColumnName, FieldName, CompareCol, CompareOp, DataType,
+    CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+          VALUES (S_129_1_PPA_MATRIXCOLDEF.nextval, ppa_MatrixAddColumn.iMatrixKey, ppa_MatrixAddColumn.iNextColNo,
+        ppa_MatrixAddColumn.cColumnName, ppa_MatrixAddColumn.cFieldName,
+        ppa_MatrixAddColumn.bCompareCol, ppa_MatrixAddColumn.iCompareOp,
+        ppa_MatrixAddColumn.iDataType,
+        SYSDATE, userId, SYSDATE, userId);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error != 0 THEN
+    BEGIN
+      ROLLBACK TO SAVEPOINT Tran1;
+      raise_application_error(-20279, 'Error Inserting New Matrix Column');
+      RETURN;
+    END;
+	END IF;
+
+/*************************/
+/* initialize new column */
+/*************************/
+	ppa_MatrixAddColumn.iMatrixColDefKey :=   globalPkg.identity;
+  IF ppa_MatrixAddColumn.iNextColNo = 10 THEN
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+        SET Value10 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+      WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 9 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value9 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 8 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value8 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 7 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value7 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 6 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value6 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 5 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value5 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 4 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value4 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 3 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value3 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 2 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value2 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF ppa_MatrixAddColumn.iNextColNo = 1 THEN
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_MatrixValues
+         SET Value1 = NULL,
+        LAST_UPDATED_DATE = SYSDATE,
+        last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+
+  IF StoO_error = 0 THEN
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      UPDATE ppa_Matrix
+         SET LAST_UPDATED_DATE = SYSDATE,
+         last_updated_by = userId
+       WHERE MatrixKey = ppa_MatrixAddColumn.iMatrixKey;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+
+  IF StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+    BEGIN
+      ROLLBACK TO SAVEPOINT Tran1;
+      raise_application_error(-20227, 'Error Initializing New Matrix Column');
+      RETURN;
+    END;
+	END IF;
+
+  StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+
+  OPEN RC1 FOR
+  SELECT ppa_MatrixAddColumn.iNextColNo,
+         ppa_MatrixAddColumn.iMatrixColDefKey
+    FROM DUAL;
+END ppa_MatrixAddColumn;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

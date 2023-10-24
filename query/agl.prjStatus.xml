@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="agl.prjStatus" isUserPortletAvailable="0" source="agl.ca.com">
+            
+            
+            
+            
+            <nls description="Project Status" languageCode="en" name="Project Status"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:PROJECT:inv.id:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:@NVL@(fin.budget_cst_total,0):budget@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:@NVL@(fin.planned_cst_total,0):planned_cost@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN @NVL@(fin.planned_cst_total,0) = 0 THEN NULL ELSE ((fin.budget_cst_total - fin.planned_cst_total) / fin.planned_cst_total ) * 100 END:variance@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:mgr.full_name:manager@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:stage.name:stage_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:inv.schedule_start:start_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:inv.schedule_finish:finish_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN rpt1.cop_overall_status > rpt2.cop_overall_status THEN -1 WHEN rpt1.cop_overall_status < rpt2.cop_overall_status THEN 1 ELSE 0 END:overall_trend@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN rpt1.cop_schedule_status > rpt2.cop_schedule_status THEN -1 WHEN rpt1.cop_schedule_status < rpt2.cop_schedule_status THEN 1 ELSE 0 END:schedule_trend@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN rpt1.cop_scope_status > rpt2.cop_scope_status THEN -1 WHEN rpt1.cop_scope_status < rpt2.cop_scope_status THEN 1 ELSE 0 END:scope_trend@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:CASE WHEN rpt1.cop_cost_eft_status > rpt2.cop_cost_eft_status THEN -1 WHEN rpt1.cop_cost_eft_status < rpt2.cop_cost_eft_status THEN 1 ELSE 0 END:cost_trend@, 
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:PROJECT:rpt1.cop_report_date:last_report_date@
+FROM   inv_investments inv
+       LEFT OUTER JOIN ODF_OBJECT_INSTANCE_MAPPING map ON  inv.id = map.primary_object_instance_id 
+                                                       AND map.primary_object_instance_code = 'project'
+                                                       AND map.secondary_object_instance_code = 'financials'
+       LEFT OUTER JOIN fin_financials fin ON map.secondary_object_instance_id = fin.id
+       LEFT OUTER JOIN srm_resources mgr ON inv.manager_id = mgr.user_id
+       LEFT OUTER JOIN cmn_lookups_v stage ON  inv.stage_code = stage.lookup_code
+                                           AND stage.lookup_type = 'INV_STAGE_TYPE'
+                                           AND stage.language_code = @WHERE:PARAM:LANGUAGE@
+       LEFT OUTER JOIN cop_prj_statusrpt_latest_v srl1 ON  inv.id = srl1.investment_id
+                                                       AND srl1.report_order = 1
+       LEFT OUTER JOIN odf_cop_prj_statusrpt_v2 rpt1 ON srl1.report_id = rpt1.odf_pk
+       LEFT OUTER JOIN cop_prj_statusrpt_latest_v srl2 ON  inv.id = srl2.investment_id
+                                                       AND srl2.report_order = 2
+       LEFT OUTER JOIN odf_cop_prj_statusrpt_v2 rpt2 ON srl2.report_id = rpt2.odf_pk
+WHERE  inv.id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND    @WHERE:SECURITY:PROJECT:inv.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="budget" required="false">
+              
+              
+              
+              
+              <nls description="Budget" languageCode="en" name="Budget"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="planned_cost" required="false">
+              
+              
+              
+              
+              <nls description="Planned Cost" languageCode="en" name="Planned Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="variance" required="false">
+              
+              
+              
+              
+              <nls description="Variance" languageCode="en" name="Variance"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager" required="false">
+              
+              
+              
+              
+              <nls description="Manager" languageCode="en" name="Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="stage_name" required="false">
+              
+              
+              
+              
+              <nls description="Stage" languageCode="en" name="Stage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="overall_trend" required="false">
+              
+              
+              
+              
+              <nls description="Overall Status Trend" languageCode="en" name="Overall Status Trend"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="-1" lo="-1" mappingCode="mapping-1" typeCode="ArwDwnRed"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-2" typeCode="ArwRightNeutral"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-3" typeCode="ArwUpGreen"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule_trend" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Trend" languageCode="en" name="Schedule Trend"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="-1" lo="-1" mappingCode="mapping-1" typeCode="ArwDwnRed"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-2" typeCode="ArwRightNeutral"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-3" typeCode="ArwUpGreen"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="scope_trend" required="false">
+              
+              
+              
+              
+              <nls description="Scope Trend" languageCode="en" name="Scope Trend"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="-1" lo="-1" mappingCode="mapping-1" typeCode="ArwDwnRed"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-2" typeCode="ArwRightNeutral"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-3" typeCode="ArwUpGreen"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="cost_trend" required="false">
+              
+              
+              
+              
+              <nls description="Cost and Effort Trend" languageCode="en" name="Cost and Effort Trend"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping type="image">
+                <mapping hi="-1" lo="-1" mappingCode="mapping-1" typeCode="ArwDwnRed"/>
+                <mapping hi="0" lo="0" mappingCode="mapping-2" typeCode="ArwRightNeutral"/>
+                <mapping hi="1" lo="1" mappingCode="mapping-3" typeCode="ArwUpGreen"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="last_report_date" required="false">
+              
+              
+              
+              
+              <nls description="Last Report Date" languageCode="en" name="Last Report Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

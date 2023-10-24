@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_RPT_REPORTS_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_RPT_REPORTS_DEL_SP" (
+   P_REPORT IN VARCHAR2,
+   P_LANGUAGE_CODE IN VARCHAR2 DEFAULT 'en')
+AS
+   V_ID                          NUMBER;
+   V_OBJECT_ID                   NUMBER := 0;
+   V_GROUP_ID                    NUMBER := 0;
+
+   CURSOR C1
+   IS
+      SELECT   RPT.ID
+      FROM     CMN_RPT_REPORTS RPT,
+               CMN_CAPTIONS_NLS NLS
+      WHERE    NLS.NAME = P_REPORT
+      AND      NLS.TABLE_NAME = 'CMN_RPT_REPORTS'
+      AND      NLS.LANGUAGE_CODE = P_LANGUAGE_CODE
+      AND      RPT.ID = NLS.PK_ID;
+BEGIN
+   FOR C_REC IN C1
+   LOOP
+      IF (C_REC.ID IS NOT NULL)
+      THEN
+         -- Delete the rights associated to the report.
+         BEGIN
+            SELECT   ID
+            INTO     V_OBJECT_ID
+            FROM     CMN_SEC_OBJECTS
+            WHERE    NLS_UPPER (
+                        OBJECT_CODE) in
+                                (SELECT   NLS_UPPER (
+                                             '/' || REPLACE (
+                                                       RTRIM (
+                                                          FILENAME,
+                                                          '.rox'),
+                                                       '\',
+                                                       '/'))
+                                 FROM     CMN_RPT_FILE_ASSIGN
+                                 WHERE    REPORT_ID = C_REC.ID);
+         EXCEPTION
+            WHEN NO_DATA_FOUND
+            THEN
+               NULL;
+         END;
+
+         BEGIN
+            SELECT   ID
+            INTO     V_GROUP_ID
+            FROM     CMN_SEC_GROUPS
+            WHERE    NLS_UPPER (
+                        GROUP_CODE) in
+                      (SELECT   'RPT_' || NLS_UPPER (
+                                             REPLACE (
+                                                REPLACE (
+                                                   RTRIM (
+                                                      FILENAME,
+                                                      '.rox'),
+                                                   '\',
+                                                   '/'),
+                                                '/',
+                                                '_'))
+                       FROM     CMN_RPT_FILE_ASSIGN
+                       WHERE    REPORT_ID = C_REC.ID);
+         EXCEPTION
+            WHEN NO_DATA_FOUND
+            THEN
+               NULL;
+         END;
+
+         IF (V_OBJECT_ID IS NOT NULL)
+         THEN
+            DELETE
+              FROM CMN_SEC_ASSGND_OBJ_PERM
+             WHERE OBJECT_ID = V_OBJECT_ID;
+
+            CMN_CAPTIONS_NLS_DEL_SP (
+               'CMN_SEC_OBJECTS',
+               V_OBJECT_ID);
+
+            DELETE
+              FROM CMN_SEC_OBJECTS
+             WHERE ID = V_OBJECT_ID;
+         END IF;
+
+         IF (V_GROUP_ID IS NOT NULL)
+         THEN
+            CMN_CAPTIONS_NLS_DEL_SP (
+               'CMN_SEC_GROUPS',
+               V_GROUP_ID);
+
+            DELETE
+              FROM CMN_SEC_GROUPS
+             WHERE ID = V_GROUP_ID;
+
+            DELETE
+              FROM CMN_SEC_GROUP_HIERARCHIES
+             WHERE GROUP_ID = V_GROUP_ID;
+         END IF;
+
+         -- Delete the saved parameters for the report.
+         DELETE
+           FROM CMN_RPT_RUN_PARAMETERS
+          WHERE RUN_REPORT_ID IN (SELECT   ID
+                                  FROM     CMN_RPT_RUN_REPORTS
+                                  WHERE    REPORT_ID = C_REC.ID);
+
+         DELETE
+           FROM CMN_RPT_RUN_REPORTS
+          WHERE REPORT_ID = C_REC.ID;
+
+         -- Delete the file and category assignment.
+         DELETE
+           FROM CMN_RPT_FILE_ASSIGN
+          WHERE REPORT_ID = C_REC.ID;
+
+         DELETE
+           FROM CMN_RPT_CATEGORY_ASSIGN
+          WHERE REPORT_ID = C_REC.ID;
+
+         -- Delete the assigned parameters for the report.Also from the captions table.
+         DELETE
+           FROM CMN_CAPTIONS_NLS
+          WHERE TABLE_NAME = 'CMN_RPT_ASSIGN_PARAMETERS'
+       AND      PK_ID IN (SELECT   ID
+                          FROM     CMN_RPT_ASSIGN_PARAMETERS
+                          WHERE    REPORT_ID = C_REC.ID);
+
+         DELETE
+           FROM CMN_RPT_ASSIGN_PARAMETERS
+          WHERE REPORT_ID = C_REC.ID;
+
+         -- Delete the report
+         CMN_CAPTIONS_NLS_DEL_SP (
+            'CMN_RPT_REPORTS',
+            C_REC.ID);
+
+         DELETE
+           FROM CMN_RPT_REPORTS
+          WHERE ID = C_REC.ID;
+      END IF;
+   END LOOP;
+EXCEPTION
+   WHEN NO_DATA_FOUND
+   THEN
+      --RAISE_APPLICATION_ERROR (-20952, 'REPORT DOES NOT EXISTS')
+      NULL;
+END CMN_RPT_REPORTS_DEL_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

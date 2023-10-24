@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_COST_INSUPDRULE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_COST_INSUPDRULE_SP" (
+  costplusid     NUMBER,
+  sequence       NUMBER,
+  multfpu        VARCHAR2,
+  multamount     NUMBER,
+  burdenfpu      VARCHAR2,
+  burdenamount   NUMBER,
+  overheadfpu    VARCHAR2,
+  overheadamount NUMBER,
+  fromrange      NUMBER,
+  torange        NUMBER
+)
+AS
+  StoO_selcnt         INTEGER;
+  StoO_error          INTEGER;
+  StoO_rowcnt         INTEGER;
+  StoO_crowcnt        INTEGER := 0;
+  StoO_fetchstatus    INTEGER := 0;
+  StoO_errmsg         GLOBALPKG.STRING;
+  StoO_sqlstatus      INTEGER;
+  multflatpercent     GLOBALPKG.STRING;
+  multeachunit        NUMBER(1,0);
+  burdenflatpercent   GLOBALPKG.STRING;
+  burdeneachunit      NUMBER(1,0);
+  overheadflatpercent GLOBALPKG.STRING;
+  overheadeachunit    NUMBER(1,0);
+  costpluscode        costplus.costpluscode%type;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	/* Get the code from id  as id is being passed */
+  select costpluscode into PAC_MNT_COST_INSUPDRULE_SP.costpluscode
+    from costplus
+   where id = PAC_MNT_COST_INSUPDRULE_SP.costplusid;
+
+	BEGIN
+    IF (PAC_MNT_COST_INSUPDRULE_SP.fromrange &gt;= PAC_MNT_COST_INSUPDRULE_SP.torange) THEN
+      BEGIN
+        ROLLBACK WORK;
+        raise_application_error(-20193, 'Units from should be less then units to');
+        RETURN ;
+      END;
+		END IF;
+
+		PAC_MNT_COST_INSUPDRULE_SP.multflatpercent := SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.multfpu, 1, 1);
+		PAC_MNT_COST_INSUPDRULE_SP.multeachunit := ROUND( TO_NUMBER(SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.multfpu, 2, 1)),0);
+		PAC_MNT_COST_INSUPDRULE_SP.burdenflatpercent := SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.burdenfpu, 1, 1);
+		PAC_MNT_COST_INSUPDRULE_SP.burdeneachunit := ROUND( TO_NUMBER(SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.burdenfpu, 2, 1)),0);
+		PAC_MNT_COST_INSUPDRULE_SP.overheadflatpercent := SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.overheadfpu, 1, 1);
+		PAC_MNT_COST_INSUPDRULE_SP.overheadeachunit := ROUND( TO_NUMBER(SUBSTR(PAC_MNT_COST_INSUPDRULE_SP.overheadfpu, 2, 1)),0);
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  costpluscode, sequence
+			 FROM costplusrules
+			WHERE costpluscode = PAC_MNT_COST_INSUPDRULE_SP.costpluscode
+			 AND sequence = PAC_MNT_COST_INSUPDRULE_SP.sequence );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE costplusrules
+			SET multflatpercent = PAC_MNT_COST_INSUPDRULE_SP.multflatpercent,
+			multamount = PAC_MNT_COST_INSUPDRULE_SP.multamount,
+			multeachunit = PAC_MNT_COST_INSUPDRULE_SP.multeachunit,
+			burdenflatpercent = PAC_MNT_COST_INSUPDRULE_SP.burdenflatpercent,
+			burdenamount = PAC_MNT_COST_INSUPDRULE_SP.burdenamount,
+			burdeneachunit = PAC_MNT_COST_INSUPDRULE_SP.burdeneachunit,
+			overheadflatpercent = PAC_MNT_COST_INSUPDRULE_SP.overheadflatpercent,
+			overheadamount = PAC_MNT_COST_INSUPDRULE_SP.overheadamount,
+			overheadeachunit = PAC_MNT_COST_INSUPDRULE_SP.overheadeachunit,
+			fromrange = PAC_MNT_COST_INSUPDRULE_SP.fromrange,
+			torange = PAC_MNT_COST_INSUPDRULE_SP.torange
+			WHERE costpluscode = PAC_MNT_COST_INSUPDRULE_SP.costpluscode
+			 AND sequence = PAC_MNT_COST_INSUPDRULE_SP.sequence;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			INSERT INTO costplusrules (id, costpluscode, sequence, multflatpercent, multamount, multeachunit, burdenflatpercent, burdenamount, burdeneachunit, overheadflatpercent, overheadamount, overheadeachunit, fromrange, torange)VALUES (costplusrules_s1.nextval, PAC_MNT_COST_INSUPDRULE_SP.costpluscode, PAC_MNT_COST_INSUPDRULE_SP.sequence,
+				   PAC_MNT_COST_INSUPDRULE_SP.multflatpercent, PAC_MNT_COST_INSUPDRULE_SP.multamount,
+				   PAC_MNT_COST_INSUPDRULE_SP.multeachunit, PAC_MNT_COST_INSUPDRULE_SP.burdenflatpercent,
+				   PAC_MNT_COST_INSUPDRULE_SP.burdenamount, PAC_MNT_COST_INSUPDRULE_SP.burdeneachunit,
+				   PAC_MNT_COST_INSUPDRULE_SP.overheadflatpercent, PAC_MNT_COST_INSUPDRULE_SP.overheadamount,
+				   PAC_MNT_COST_INSUPDRULE_SP.overheadeachunit, PAC_MNT_COST_INSUPDRULE_SP.fromrange,
+				   PAC_MNT_COST_INSUPDRULE_SP.torange);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+		END;
+	END;
+END PAC_MNT_COST_INSUPDRULE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

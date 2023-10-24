@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_PROJ_SUBMIT_PRELIM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_PROJ_SUBMIT_PRELIM_SP" (
+--in_clntcode 	IN VARCHAR2 ,
+--in_projid 	IN VARCHAR2 ,
+in_id 	IN VARCHAR2 ,
+in_emplycode 	IN VARCHAR2 ,
+RC1 	IN OUT PAC_MNT_PROJ_SUBMIT_PRELIM_Pkg.RCT1)
+AS
+COMPANY_CODE 	pac_mnt_projects.COMPANY_CODE%TYPE;
+PROJECT_CODE 		pac_mnt_projects.PROJECT_CODE%TYPE;
+RESOURCE_CODE 	pac_mnt_resources.RESOURCE_CODE%TYPE;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+projrevisionid  NUMBER;
+general_info_entered 	NUMBER(1,0);
+transaction_entry_def_entered 	NUMBER(1,0);
+budget_entry_def_entered 	NUMBER(1,0);
+contracted_project 	NUMBER(1,0);
+contract_entered 	NUMBER(1,0);
+budgeted_project 	NUMBER(1,0);
+budget_entered 	NUMBER(1,0);
+projects_sites_entered 	NUMBER(1,0);
+project_access_entered 	NUMBER(1,0);
+project_roles_entered 	NUMBER(1,0);
+user_defined_fields_entered 	NUMBER(1,0);
+user_can_approve 	NUMBER(1,0);
+already_approved 	NUMBER(1,0);
+already_awaiting_approval 	NUMBER(1,0);
+id 			pac_mnt_projects.id%TYPE;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+   BEGIN
+	   SELECT COMPANY_CODE , PROJECT_CODE
+	   INTO   PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE ,PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE
+	   FROM   PAC_MNT_PROJECTS
+	   WHERE  ID = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.in_id;
+   EXCEPTION
+	   	   WHEN NO_DATA_FOUND THEN
+		   		RAISE_APPLICATION_ERROR(-20177,'NO CLIENT/PROJECT FOUND');
+		   WHEN TOO_MANY_ROWS THEN
+		   		RAISE_APPLICATION_ERROR(-20188,'MORE THAN ONE CLIENT/PROJECT FOUND');
+		   WHEN OTHERS THEN
+		   		RAISE_APPLICATION_ERROR(-20199,'ERROR IN GETTING CLIENT/PROJECT FOR GIVEN ID');
+   END;
+
+--	PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE := PAC_MNT_PROJ_SUBMIT_PRELIM_SP.in_clntcode;
+--	PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE := PAC_MNT_PROJ_SUBMIT_PRELIM_SP.in_projid;
+
+	PAC_MNT_PROJ_SUBMIT_PRELIM_SP.RESOURCE_CODE := PAC_MNT_PROJ_SUBMIT_PRELIM_SP.in_emplycode;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT  DECODE(type_, 'P', 1 , 0),
+			DECODE(udf1, NULL, 0 , 1),
+			DECODE(udf1, NULL, 0 , 1),
+			id
+		INTO
+			PAC_MNT_PROJ_SUBMIT_PRELIM_SP.transaction_entry_def_entered,
+			PAC_MNT_PROJ_SUBMIT_PRELIM_SP.contracted_project,
+			PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_defined_fields_entered,
+			PAC_MNT_PROJ_SUBMIT_PRELIM_SP.id
+		FROM 	pac_mnt_projects
+		WHERE 	COMPANY_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE
+		AND 	PROJECT_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.general_info_entered :=  0;
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.transaction_entry_def_entered :=
+		    0;
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.budget_entry_def_entered :=  0;
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.budget_entered :=  0;
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.contracted_project :=  0;
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_defined_fields_entered :=
+		   0;
+	ELSE
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.general_info_entered :=  1;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(projrevisionid)
+		INTO PAC_MNT_PROJ_SUBMIT_PRELIM_SP.projrevisionid FROM projrevision
+		WHERE COMPANY_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE
+		 AND PROJECT_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT
+			approved,
+		 	DECODE(approved, 0, awaitingapproval , 1)
+		INTO
+			PAC_MNT_PROJ_SUBMIT_PRELIM_SP.already_approved,
+		 	PAC_MNT_PROJ_SUBMIT_PRELIM_SP.already_awaiting_approval
+		FROM 	PAC_MNT_PROJECTS
+		WHERE 	ID = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.in_id;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+	END;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM projstaff
+		WHERE COMPANY_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE
+		 AND PROJECT_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE
+		 AND RESOURCE_CODE = PAC_MNT_PROJ_SUBMIT_PRELIM_SP.RESOURCE_CODE
+		 AND PROJECTAPPROVAL = 1
+		 );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+	END;
+	IF StoO_selcnt != 0 THEN
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_can_approve :=  1;
+	ELSE
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_can_approve :=  0;
+	END IF;
+	END;
+	OPEN RC1 FOR
+	SELECT
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.COMPANY_CODE "COMPANY_CODE",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.PROJECT_CODE "PROJECT_CODE",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.projrevisionid "projrevisionid",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.general_info_entered "general_info_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.transaction_entry_def_entered "transaction_entry_def_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.budget_entry_def_entered "budget_entry_def_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.contracted_project "contracted_project",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.contract_entered "contract_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.budgeted_project "budgeted_project",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.budget_entered "budget_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.projects_sites_entered "projects_sites_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.project_access_entered "project_access_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.project_roles_entered "project_roles_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_defined_fields_entered "user_defined_fields_entered",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.user_can_approve "user_can_approve",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.already_approved "already_approved",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.already_awaiting_approval "already_awaiting_approval",
+		PAC_MNT_PROJ_SUBMIT_PRELIM_SP.id "ID"
+	FROM DUAL;
+END PAC_MNT_PROJ_SUBMIT_PRELIM_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

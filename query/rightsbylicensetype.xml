@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="rightsbylicensetype" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            <nls languageCode="en" name="Rights by License Type"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:LICENSE_RIGHTS:b.group_code:group_code@,
+                @SELECT:DIM_PROP:USER_DEF:IMPLIED:LICENSE_RIGHTS:b.group_name:group_name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LICENSE_RIGHTS:a.lic_right_type:lic_right_type@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LICENSE_RIGHTS:b.description:description@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LICENSE_RIGHTS:c.name:license_type@ 
+FROM     cmn_lic_right_v a,
+         cmn_sec_groups_v b,
+         cmn_lic_lookup_v c
+WHERE    a.group_code = b.group_code
+AND      a.id = b.id
+AND      c.lookup_code = a.lic_right_type
+AND      b.language_code=@WHERE:PARAM:LANGUAGE@
+AND      c.language_code=@WHERE:PARAM:LANGUAGE@
+AND      b.is_active = 1
+AND      b.group_code != 'AdminApiAccess'
+AND      EXISTS (select  1
+         FROM    cmn_sec_chk_user_r_v0
+         WHERE  object_id = 1
+         AND  permission_code = 'AdminAccess'
+         AND  user_id = @WHERE:PARAM:USER_ID@)
+AND      @FILTER@]]></nsql>
+            <attribute id="group_code" required="false"/>
+            <attribute id="group_name" required="false"/>
+            <attribute id="lic_right_type" lookup="CMN_DYN_LIC_LOOKUP" required="false"/>
+            <attribute id="description" required="false"/>
+            <attribute id="license_type" required="false"/>
+            <links>
+              <link action="rightsbylicensetype" code="license_type">
+                
+                
+                
+                
+                <nls languageCode="en" name="License Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

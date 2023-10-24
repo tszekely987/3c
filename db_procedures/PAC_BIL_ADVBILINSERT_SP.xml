@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_ADVBILINSERT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_ADVBILINSERT_SP" (
+COMPANY_CODE VARCHAR2 ,
+MASTER_PROJECT_CODE VARCHAR2 ,
+billdate DATE ,
+billamount NUMBER ,
+billed NUMBER ,
+atf NUMBER ,
+invoiceno VARCHAR2 ,
+event VARCHAR2 ,
+TAXCODE VARCHAR2 ,
+admincode VARCHAR2 ,
+taxoverride NUMBER ,
+adminoverride NUMBER ,
+notes VARCHAR2 )
+AS
+StoO_selcnt INTEGER;
+StoO_error INTEGER;
+StoO_rowcnt INTEGER;
+StoO_crowcnt INTEGER := 0;
+StoO_fetchstatus INTEGER := 0;
+StoO_errmsg GLOBALPKG.STRING;
+StoO_sqlstatus INTEGER;
+returncode NUMBER;
+contractamount NUMBER(32,6);
+type_ GLOBALPKG.STRING;
+approvedamount NUMBER(32,6);
+unbilledamt NUMBER(32,6);
+/* IF ATF is set make sure the Invoice number is entered */
+temp_rc Pac_Bil_Getschapprvdamt_Sppkg.RCT1;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+IF  Pac_Bil_Advbilinsert_Sp.atf = 1 AND
+Pac_Bil_Advbilinsert_Sp.invoiceno IS NULL THEN
+BEGIN
+RAISE_APPLICATION_ERROR(-20192, 'Invoice NUMBER must be entered for ATF
+transactions');
+END;
+ELSE
+   IF Pac_Bil_Advbilinsert_Sp.atf = 0 AND
+     Pac_Bil_Advbilinsert_Sp.invoiceno IS NOT NULL THEN
+   BEGIN
+   RAISE_APPLICATION_ERROR(-20700, 'Invoice NUMBER can only be entered
+for ATF transactions');
+   END;
+   ELSE
+      IF Pac_Bil_Advbilinsert_Sp.billamount &lt; 0 THEN
+      BEGIN
+     RAISE_APPLICATION_ERROR(-20701, 'Negative Bill Amounts are not
+allowed');
+      END;
+   END IF;
+END IF;
+BEGIN
+BEGIN
+Pac_Bil_Chkdupinvno_Sp
+(invoiceno=&gt;Pac_Bil_Advbilinsert_Sp.invoiceno,
+returncode=&gt;Pac_Bil_Advbilinsert_Sp.returncode);
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+NULL;
+WHEN OTHERS THEN
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+/* Invoice No. is Not Duplicate */
+IF  Pac_Bil_Advbilinsert_Sp.returncode = 0 THEN
+BEGIN
+BEGIN
+Pac_Bil_Getcontractamt_Sp(COMPANY_CODE=&gt;Pac_Bil_Advbilinsert_Sp.COMPANY_CODE,
+PROJECT_CODE=&gt;Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE,
+contractamount=&gt;Pac_Bil_Advbilinsert_Sp.contractamount,
+type_=&gt;Pac_Bil_Advbilinsert_Sp.type_);
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+NULL;
+WHEN OTHERS THEN
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+IF  Pac_Bil_Advbilinsert_Sp.type_ = 'C' THEN
+BEGIN
+BEGIN
+Pac_Bil_Getschapprvdamt_Sp(COMPANY_CODE=&gt;Pac_Bil_Advbilinsert_Sp.COMPANY_CODE,
+PROJECT_CODE=&gt;Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE,
+approvedamount=&gt;Pac_Bil_Advbilinsert_Sp.approvedamount,
+rc1 =&gt; temp_rc);
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+NULL;
+WHEN OTHERS THEN
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+BEGIN
+StoO_rowcnt := 0;
+StoO_selcnt := 0;
+StoO_error  := 0;
+SELECT   SUM(billamount)
+INTO Pac_Bil_Advbilinsert_Sp.unbilledamt FROM BILLINGSCHEDULE
+WHERE billed = 0
+AND COMPANY_CODE = Pac_Bil_Advbilinsert_Sp.COMPANY_CODE
+AND PROJECT_CODE = Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE;
+StoO_rowcnt := SQL%ROWCOUNT;
+EXCEPTION
+WHEN TOO_MANY_ROWS THEN
+StoO_rowcnt := 2;
+WHEN NO_DATA_FOUND THEN
+StoO_rowcnt := 0;
+StoO_selcnt := 0;
+WHEN OTHERS THEN
+StoO_rowcnt := 0;
+StoO_selcnt := 0;
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+/* The CONTRACT AMOUNT HAS TO BE GREATER THAN THE TOTAL AMOUNT*/
+IF  NVL(Pac_Bil_Advbilinsert_Sp.contractamount, 0) &gt; (
+NVL(Pac_Bil_Advbilinsert_Sp.approvedamount, 0) +
+NVL(Pac_Bil_Advbilinsert_Sp.unbilledamt, 0) +
+NVL(Pac_Bil_Advbilinsert_Sp.billamount, 0) ) THEN
+BEGIN
+BEGIN
+StoO_error   := 0;
+StoO_rowcnt  := 0;
+INSERT INTO BILLINGSCHEDULE (BILLINGSCHEDULEKEY, COMPANY_CODE, MASTER_PROJECT_CODE, PROJECT_CODE,billdate,
+billamount, billed, atf, invoiceno, event, TAXCODE, admincode, taxoverride,
+adminoverride, notes)VALUES (S_167_1_BILLINGSCHEDULE.nextval, Pac_Bil_Advbilinsert_Sp.COMPANY_CODE,
+Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE,
+   Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE, Pac_Bil_Advbilinsert_Sp.billdate,
+Pac_Bil_Advbilinsert_Sp.billamount,
+   Pac_Bil_Advbilinsert_Sp.billed, Pac_Bil_Advbilinsert_Sp.atf,
+Pac_Bil_Advbilinsert_Sp.invoiceno,
+   Pac_Bil_Advbilinsert_Sp.event, Pac_Bil_Advbilinsert_Sp.TAXCODE,
+   Pac_Bil_Advbilinsert_Sp.admincode,
+Pac_Bil_Advbilinsert_Sp.taxoverride,
+   Pac_Bil_Advbilinsert_Sp.adminoverride,
+Pac_Bil_Advbilinsert_Sp.notes);
+StoO_rowcnt := SQL%ROWCOUNT;
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+NULL;
+WHEN OTHERS THEN
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+END;
+ELSE
+RAISE_APPLICATION_ERROR(-20190, 'The Amount entered makes the Total
+greater than the Contract Amount');
+END IF;
+END;
+ELSE
+BEGIN
+StoO_error   := 0;
+StoO_rowcnt  := 0;
+INSERT INTO BILLINGSCHEDULE (BILLINGSCHEDULEKEY, COMPANY_CODE, MASTER_PROJECT_CODE, PROJECT_CODE,billdate,
+billamount, billed, atf, invoiceno, event, TAXCODE, admincode, taxoverride,
+adminoverride, notes)VALUES (S_167_1_BILLINGSCHEDULE.nextval, Pac_Bil_Advbilinsert_Sp.COMPANY_CODE,
+Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE,
+   Pac_Bil_Advbilinsert_Sp.MASTER_PROJECT_CODE, Pac_Bil_Advbilinsert_Sp.billdate,
+Pac_Bil_Advbilinsert_Sp.billamount,
+   Pac_Bil_Advbilinsert_Sp.billed, Pac_Bil_Advbilinsert_Sp.atf,
+Pac_Bil_Advbilinsert_Sp.invoiceno,
+   Pac_Bil_Advbilinsert_Sp.event, Pac_Bil_Advbilinsert_Sp.TAXCODE,
+   Pac_Bil_Advbilinsert_Sp.admincode,
+Pac_Bil_Advbilinsert_Sp.taxoverride,
+   Pac_Bil_Advbilinsert_Sp.adminoverride,
+Pac_Bil_Advbilinsert_Sp.notes);
+StoO_rowcnt := SQL%ROWCOUNT;
+EXCEPTION
+WHEN NO_DATA_FOUND THEN
+NULL;
+WHEN OTHERS THEN
+StoO_error := SQLCODE;
+StoO_errmsg := SQLERRM;
+END;
+END IF;
+END;
+/* Invoice No. IS duplicate */
+ELSE
+RAISE_APPLICATION_ERROR(-20191, 'Invoice NUMBER cannot be Duplicate');
+END IF;
+END;
+-- SEND Back a Error message forcing the invoice number
+END IF;
+END Pac_Bil_Advbilinsert_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

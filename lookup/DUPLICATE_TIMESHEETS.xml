@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="false" autoSuggestMaxSuggestions="10" code="DUPLICATE_TIMESHEETS" displayAttributeName="fullname" hiddenAttributeName="prid" objectCode="" sortAttributeName="fullname" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Returns a list of duplicate timesheet entries if any for a resource." languageCode="en" name="Get Duplicate Timesheets"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[select
+@SELECT:q1.prid:prid@,
+@SELECT:q1.fullname:fullname@,
+@SELECT:q1.uniqueName:uniqueName@,
+@SELECT:q1.startdate:startdate@,
+@SELECT:q1.status:status@,
+@SELECT:@NVL@(q3.Time_Entry_Count,0):timeentrycount@
+from
+(select timesheet.PRID, q2.resourceId, q2.fullName, q2.uniqueName, q2.timeperiodId, q2.startDate, timesheet.prstatus as status from prtimesheet timesheet,
+(select srm_resources.id as resourceId, srm_resources.full_name as fullName, srm_resources.unique_name as uniqueName, prtimeperiod.prstart as startDate,
+prtimesheet.prtimeperiodid as timeperiodId
+from prtimesheet, prtimeperiod, srm_resources
+where prtimesheet.prresourceid = srm_resources.ID
+and prtimesheet.prtimeperiodid = prtimeperiod.prid
+and prtimesheet.prstatus < 4
+group by srm_resources.id,srm_resources.full_name, prtimeperiod.prstart, prtimesheet.prtimeperiodid, srm_resources.unique_name
+having count(*) > 1) q2  where  timesheet.prtimeperiodid = q2.timeperiodId and timesheet.prresourceid = q2.resourceId and timesheet.prstatus < 4) q1 Left Join
+(select prtimesheetid, count(*) as Time_Entry_Count from prtimeentry group by prtimesheetid) q3
+On q1.prid=q3.prtimesheetid WHERE 1=1 AND @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="fullname"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="fullname"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="DUPLICATE TIMESHEETS" languageCode="en" name="DUPLICATE TIMESHEETS"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="DUPLICATE TIMESHEETS" languageCode="en" name="DUPLICATE TIMESHEETS"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="prid" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timesheet ID" languageCode="en" name="Timesheet ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="fullname" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Full Name" languageCode="en" name="Full Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="uniquename" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Unique Name" languageCode="en" name="Unique Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="startdate" defaultValue="" order="4" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Timesheet Start Date" languageCode="en" name="Timesheet Start Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="status" defaultValue="" order="5" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timesheet Status" languageCode="en" name="Timesheet Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="timeentrycount" defaultValue="" order="6" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timeentry Count" languageCode="en" name="Timeentry Count"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timesheet ID" languageCode="en" name="Timesheet ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="fullname" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Full Name" languageCode="en" name="Full Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="uniquename" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Unique Name" languageCode="en" name="Unique Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="startdate" order="4" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="Timesheet Start Date" languageCode="en" name="Timesheet Start Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="status" order="5" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timesheet Status" languageCode="en" name="Timesheet Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="timeentrycount" order="6" widgetType="text">
+                
+                
+                
+                
+                <nls description="Timeentry Count" languageCode="en" name="Timeentry Count"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

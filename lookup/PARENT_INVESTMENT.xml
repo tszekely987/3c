@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="PARENT_INVESTMENT" displayAttributeName="inv_name" hiddenAttributeName="id" objectCode="" sortAttributeName="inv_type" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Lookup for Parent Investment" languageCode="en" name="Parent Investment"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:inv.id:id@, @SELECT:inv.name:inv_name@, @SELECT:inv.code:inv_code@
+        , @SELECT:cap.name:inv_type@, @SELECT:inv.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+FROM inv_investments inv
+     join odf_objects obj on obj.code = inv.odf_object_code
+     join odf_object_capabilities ooc on inv.odf_object_code = ooc.object_code and ooc.enabled = 1 and ooc.capability_code = 'HIERARCHY_ENABLED'
+     join cmn_captions_nls cap on cap.table_name = 'ODF_OBJECTS' and cap.language_code = @WHERE:PARAM:LANGUAGE@ and cap.pk_id = obj.ID
+     left outer join inv_projects ip on ip.prid = inv.id
+WHERE @FILTER@
+   AND ((obj.template_extension is not null) or inv.odf_object_code in ('project', 'idea'))
+   AND inv.is_active = 1
+   AND @NVL@(inv.odf_template, 0) != 1
+   AND @NVL@(ip.is_program, 0) != 1
+   AND (inv.id != @WHERE:PARAM:USER_DEF:INTEGER:INV_ID@ OR @WHERE:PARAM:USER_DEF:INTEGER:INV_ID@ is null)
+   @BROWSE-ONLY:
+   AND exists (select 1 from (select object_instance_id from odfsec_inv_v2 where user_id = @WHERE:PARAM:USER_ID@) v2 where v2.object_instance_id = inv.ID)
+   :BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="inv_name"/>
+              <displayedSuggestionAttribute value="inv_code"/>
+              <displayedSuggestionAttribute value="inv_type"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="inv_name"/>
+              <searchedSuggestionAttribute value="inv_code"/>
+              <searchedSuggestionAttribute value="inv_type"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Browse Parent Investments" languageCode="en" name="Browse Parent Investments"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Browse Parent Investments" languageCode="en" name="Browse Parent Investments"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="inv_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="inv_code" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Code" languageCode="en" name="Investment Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="inv_type" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Type" languageCode="en" name="Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="id" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="id" languageCode="en" name="id"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="inv_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="inv_code" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Code" languageCode="en" name="Investment Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="inv_type" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Type" languageCode="en" name="Type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

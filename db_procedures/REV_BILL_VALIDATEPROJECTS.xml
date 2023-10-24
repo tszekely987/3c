@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_VALIDATEPROJECTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_VALIDATEPROJECTS" (
+  cCOMPANY_CODE VARCHAR2 ,
+  cProjectList  VARCHAR2,
+  RC4   IN OUT Rev_Bill_Getdmndbillingitempkg.RCT4)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_errmsg VARCHAR2(255);
+  StoO_sqlstatus  INTEGER;
+  cBillingCurrency  VARCHAR2(30);
+
+  	BEGIN
+	     BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   BILLING_CURRENCY_CODE
+				INTO REV_BILL_VALIDATEPROJECTS.cBillingCurrency
+				FROM PAC_MNT_PROJECTS P
+				WHERE P.COMPANY_CODE = cCOMPANY_CODE
+				AND INSTR( cProjectList, '~' || RTRIM(P.PROJECT_CODE)   || '~') &gt; 0
+			 	GROUP BY BILLING_CURRENCY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+                StoO_rowcnt := 2;
+				StoO_selcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		 END;
+			
+		 OPEN RC4 FOR
+		 	SELECT StoO_selcnt FROM DUAL;
+			
+	END REV_BILL_VALIDATEPROJECTS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

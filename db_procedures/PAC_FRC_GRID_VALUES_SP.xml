@@ -1,0 +1,1490 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_FRC_GRID_VALUES_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_FRC_GRID_VALUES_SP" 
+(PROJECT_ID  	   NUMBER,
+ REVISION NUMBER,
+ P_REVISION_DESC VARCHAR2,
+ CURRENCY_TYPE	   VARCHAR2,
+ LANGUAGE_CODE	   VARCHAR2,
+ PA_USER	   	   NUMBER,
+ COLUMNS_TO_DISPLAY VARCHAR2,
+ P_COMPARISONS 		VARCHAR2,
+ P_SHOW_TOTALS		NUMBER,
+ START_PERIOD_NAME	VARCHAR2,
+ START_PERIOD_ID	NUMBER,
+ NEXT_PERIOD_ID     NUMBER,
+ PREVIOUS_PERIOD_ID NUMBER,
+ P_START_PERIOD VARCHAR2,
+ P_FINISH_PERIOD VARCHAR2,
+ P_FORECAST_TYPE		NUMBER,
+ P_XOG		NUMBER DEFAULT 0,
+ P_IS_REVENUE_PLAN NUMBER,
+ RC1 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT1,
+ RC2 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT2,
+ RC3 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT6,
+ RC4 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT3,
+ RC5 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT4,
+ RC6 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT4,
+ RC7 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT5,
+ RC8	IN OUT Pac_Frc_Grid_Values_Pkg.RCT4,
+ RC9 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT3,
+ RC10 	IN OUT Pac_Frc_Grid_Values_Pkg.RCT3)
+
+AS
+
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	Globalpkg.STRING;
+StoO_sqlstatus		INTEGER;
+
+v_PROJECT_ID  		NUMBER;
+v_REVISION 			NUMBER;
+v_MAX_REVISION 			NUMBER;
+v_FORECAST_STATUS	NUMBER;
+v_FORECAST_ID		NUMBER;
+v_REVENUE_BENEFITS  Globalpkg.STRING := 'BENEFITS';
+v_REVISION_DESCRIPTION Globalpkg.STRING;
+v_MIN_STATUS		INTEGER;
+
+v_LAST_MODIFIED_DATE DATE;
+v_LAST_REVISION 	 NUMBER;
+v_LAST_REVISION_APPROVED_DATE DATE;
+v_APPROVER_FIRST_NAME Globalpkg.STRING;
+v_APPROVER_LAST_NAME Globalpkg.STRING;
+v_START_PERIOD 		NUMBER;
+v_END_PERIOD        NUMBER;
+v_START_PERIOD_NAME Globalpkg.STRING;
+v_PROJECT_START_PERIOD NUMBER;
+v_START_DATE 		DATE;
+v_START_DATE_PROJECT DATE;
+v_END_DATE_PROJECT 	 DATE;
+v_START_PERIOD_NAME_PROJECT  Globalpkg.STRING;
+v_END_PERIOD_NAME_PROJECT  Globalpkg.STRING;
+v_P_QUARTER         NUMBER;
+v_P_YEAR			NUMBER;
+v_IS_REVENUE_PLAN   NUMBER;
+v_CURRENCY_TYPE		Globalpkg.STRING;
+v_CURRENCY_CODE		Globalpkg.STRING;
+v_LANGUAGE_CODE		Globalpkg.STRING;
+v_PERIOD_NAME		Globalpkg.STRING;
+v_PERIOD_ID			NUMBER;
+v_PERIOD_NUMBER		NUMBER;
+
+v_BYEAR 				NUMBER;
+v_COLUMNS_TO_DISPLAY    Globalpkg.STRING;
+v_COLUMNS_TO_DISPLAY_SELECT Globalpkg.STRING;
+v_PERIOD_TYPE     		Globalpkg.STRING;
+v_COLUMN_VALUES			Globalpkg.STRING;
+v_MULTI_CURRENCY        INTEGER;
+
+v_USE_SYSTEM_CURRENCY   INTEGER := 0;
+v_PROJECT_CODE       	Globalpkg.STRING;
+
+v_TOTAL_COST           NUMBER  :=0;
+v_TOTAL_COST_ACTUAL    NUMBER:=0;
+v_TOTAL_REVENUE 	   NUMBER:=0;
+v_TOTAL_REVENUE_ACTUAL NUMBER:=0;
+v_TOTAL_UNITS		   NUMBER:=0;
+v_TOTAL_UNITS_ACTUAL   NUMBER:=0;
+v_FORECAST_TYPE		   NUMBER;
+v_USE_DETAIL_TYPE	   NUMBER;
+
+v_DEFAULT_VIEW      Globalpkg.STRING;
+v_SHOW_TOTALS		NUMBER :=0;
+v_SHOW_ACTUALS      NUMBER := 0;
+v_SHOW_VARIANCE		NUMBER := 0;
+v_SHOW_UNITS 		NUMBER := 1;
+v_SHOW_COST 		NUMBER := 1;
+v_SHOW_REVENUE 		NUMBER := 1;
+v_NO_OF_PERIODS		NUMBER := 18;
+V_FREEZE_DATE       DATE;
+V_UNITS_FACTOR		NUMBER(32,6) := 1;
+V_SHOW_TRANSCLASS	INTEGER := 0;
+
+BEGIN
+
+  DELETE FROM TEMP_FRC_GRID_PERIOD_VALUES;
+
+  v_PROJECT_ID := Pac_Frc_Grid_Values_Sp.PROJECT_ID ;
+  v_REVISION := Pac_Frc_Grid_Values_Sp.REVISION ;
+  v_COLUMNS_TO_DISPLAY_SELECT := COLUMNS_TO_DISPLAY ;
+  v_CURRENCY_TYPE := NVL( Pac_Frc_Grid_Values_Sp.CURRENCY_TYPE, 'HOME') ;
+  v_LANGUAGE_CODE := Pac_Frc_Grid_Values_Sp.LANGUAGE_CODE ;
+  v_START_PERIOD_NAME := START_PERIOD_NAME ;
+  v_FORECAST_TYPE := Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE ;
+  
+  -- Get the units factor
+  V_UNITS_FACTOR := PRJ_HPD_FACTOR_FCT();
+
+  -- Get the date freeze date 
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    SELECT TO_DATE(COV.VALUE,'DD-MON-RR')
+  	  INTO V_FREEZE_DATE
+	  FROM CMN_OPTIONS CO,
+	       CMN_OPTION_VALUES COV
+	  WHERE CO.ID = COV.OPTION_ID AND
+	        CO.OPTION_CODE = 'PAC_FRC_FREEZE_DATE';
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    StoO_error := SQLCODE;
+
+    EXCEPTION
+    WHEN OTHERS THEN
+ 	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+  END;
+
+  -- Get the type and project code of the project
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    SELECT NVL(P_IS_REVENUE_PLAN,P.IS_REVENUE_PLAN),	UPPER(I.CODE)
+  	  INTO v_IS_REVENUE_PLAN,v_PROJECT_CODE
+	  FROM INV_INVESTMENTS I
+        , INV_PROJECTS P
+	  WHERE I.ID = Pac_Frc_Grid_Values_Sp.v_PROJECT_ID
+    AND   P.PRID=I.ID;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    StoO_error := SQLCODE;
+
+    EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+	    NULL;
+	  WHEN TOO_MANY_ROWS THEN
+	    NULL;
+	  WHEN OTHERS THEN
+ 	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+  END;
+
+  --See if we're using Multi Currency
+  BEGIN
+    SELECT COV.VALUE
+  	  INTO v_MULTI_CURRENCY
+	  FROM CMN_OPTIONS CO,
+	       CMN_OPTION_VALUES COV
+	  WHERE CO.ID = COV.OPTION_ID AND
+	        CO.OPTION_CODE = 'CMN_IS_MULTI_CURRENCY_SYSTEM';
+
+    SELECT COV.VALUE
+  	  INTO V_SHOW_TRANSCLASS
+	  FROM CMN_OPTIONS CO,
+	       CMN_OPTION_VALUES COV
+	  WHERE CO.ID = COV.OPTION_ID AND
+	        CO.OPTION_CODE = 'PAC_FRC_SHOW_TRANSCLASS';
+			
+    EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+	    NULL;
+	  WHEN TOO_MANY_ROWS THEN
+	    NULL;
+	  WHEN OTHERS THEN
+ 	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+  END;
+
+  /* If We're using MC and we have a financial project we will not use the system currency */
+  IF v_MULTI_CURRENCY = 1 THEN
+    BEGIN
+      BEGIN
+        StoO_selcnt := 0;
+
+        SELECT 1
+          INTO StoO_selcnt
+           FROM DUAL
+           WHERE EXISTS (SELECT 1
+                           FROM PAC_MNT_PROJECTS
+                           WHERE ID = Pac_Frc_Grid_Values_Sp.PROJECT_ID );
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+	  IF StoO_selcnt = 1 THEN
+	    BEGIN
+          v_USE_SYSTEM_CURRENCY := 0;		  
+		END;
+	  ELSE
+	    BEGIN
+          v_USE_SYSTEM_CURRENCY := 1;		  
+		END;
+	  END IF;
+	END;
+  ELSE
+    v_USE_SYSTEM_CURRENCY := 1 ;
+  END IF ;
+  
+  -- Get the currency code depending upon the currency type.
+  IF v_USE_SYSTEM_CURRENCY = 0 THEN
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+	  IF NVL( v_CURRENCY_TYPE, 'HOME' ) = 'HOME' THEN
+		SELECT HOME_CURRENCY_CODE
+            INTO v_CURRENCY_CODE
+            FROM ENTITY E,
+		     LOCATIONS L,
+		     PAC_MNT_PROJECTS P
+		WHERE P.ID = v_PROJECT_ID AND
+		      P.LOCATIONID = L.LOCATIONID AND
+		      L.ENTITY = E.ENTITY ;
+        ELSE
+	    SELECT BILLING_CURRENCY_CODE
+		  INTO v_CURRENCY_CODE
+		  FROM PAC_MNT_PROJECTS
+		  WHERE ID = v_PROJECT_ID ;
+	  END IF;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+      EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+  	      NULL;
+        WHEN TOO_MANY_ROWS THEN
+	      NULL;
+        WHEN OTHERS THEN
+ 	      StoO_error := SQLCODE;
+	      StoO_errmsg := SQLERRM;
+    END;
+  ELSE
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+	  SELECT cov.value
+        INTO v_CURRENCY_CODE
+	    FROM CMN_OPTIONS CO,
+		     CMN_OPTION_VALUES COV
+		WHERE CO.ID = COV.OPTION_ID AND
+		      CO.OPTION_CODE = 'CMN_SYSTEM_CURRENCY';
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+  
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT MAX( P.REVISION ),MIN(STATUS)
+  INTO v_MAX_REVISION,v_MIN_STATUS
+  FROM PAC_FRC_FORECAST_PROPERTIES P
+  WHERE P.PROJECT_ID = v_PROJECT_ID
+  AND P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;
+
+  IF v_REVISION IS NULL THEN
+    v_REVISION:= v_MAX_REVISION;
+	IF v_MIN_STATUS != 2 and v_REVISION &gt; 0 THEN
+	  v_LAST_REVISION := v_REVISION - 1 ;
+    END IF;
+  ELSIF v_REVISION &lt;&gt; v_MAX_REVISION THEN
+    v_LAST_REVISION := v_REVISION;
+  ELSIF v_MIN_STATUS &lt;&gt; 2 and v_REVISION &gt; 0 THEN
+	  v_LAST_REVISION := v_REVISION - 1 ;
+  END IF;
+    StoO_rowcnt := SQL%ROWCOUNT;
+    StoO_error := SQLCODE;
+
+    EXCEPTION
+	  WHEN NO_DATA_FOUND THEN
+	    NULL;
+	  WHEN TOO_MANY_ROWS THEN
+	    NULL;
+	  WHEN OTHERS THEN
+ 	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+  
+  END; 
+
+  /* Get Last revision information for UI */
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT P.LAST_UPDATED_DATE, S.FIRST_NAME,S.LAST_NAME
+  	INTO v_LAST_REVISION_APPROVED_DATE,v_APPROVER_FIRST_NAME, v_APPROVER_LAST_NAME
+	FROM PAC_FRC_FORECAST_PROPERTIES P, SRM_RESOURCES S
+	WHERE P.PROJECT_ID = v_PROJECT_ID AND
+		  P.REVISION = NVL(v_LAST_REVISION,v_REVISION) AND
+		  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE AND
+		  P.LAST_UPDATED_BY = S.USER_ID;
+
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  v_LAST_REVISION_APPROVED_DATE := NULL;
+	WHEN TOO_MANY_ROWS THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+  END;  
+
+  /* Get necessary information from the current revision */
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT P.REVISION_DESCRIPTION,
+		 P.PERIOD_TYPE,
+		 STATUS,
+		 ID,
+  		 START_PERIOD,
+		 SHOW_UNITS,
+  		 SHOW_COST,
+		 SHOW_REVENUE,
+		 DEFAULT_VIEW,
+		 USE_DETAIL_TYPE		 
+  	INTO v_REVISION_DESCRIPTION,
+		 v_PERIOD_TYPE,
+		 v_FORECAST_STATUS,
+		 v_FORECAST_ID,
+  		 v_PROJECT_START_PERIOD,
+		 v_SHOW_UNITS,
+	 	 v_SHOW_COST,
+		 v_SHOW_REVENUE,
+		 v_DEFAULT_VIEW,
+		 v_USE_DETAIL_TYPE		 
+	FROM PAC_FRC_FORECAST_PROPERTIES P
+	WHERE P.PROJECT_ID = v_PROJECT_ID AND
+		  P.REVISION = v_REVISION AND
+		  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  NULL;
+	WHEN TOO_MANY_ROWS THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+  END;
+  
+  /* Validate the start and finish periods. If valid update the start and finsh period for the plan*/
+  IF P_START_PERIOD IS NOT NULL AND v_FORECAST_STATUS != 2 THEN
+  	   BEGIN 
+       StoO_selcnt := 0;
+  	   SELECT BS.ID,BE.ID  INTO v_PROJECT_START_PERIOD,v_END_PERIOD
+	   FROM BIZ_COM_PERIODS BS, BIZ_COM_PERIODS BE 
+	   WHERE BS.period_name = P_START_PERIOD AND
+	   		 			 BE.period_name = P_FINISH_PERIOD AND
+						 BS.start_date &lt;= BE.start_date AND 
+						 BS.period_type=BE.period_type AND 
+						 BS.period_type=v_PERIOD_TYPE;
+		-- update the revenue/benefits flag in INV_PROJECTS
+		UPDATE INV_PROJECTS SET IS_REVENUE_PLAN = P_IS_REVENUE_PLAN
+		WHERE PRID=v_PROJECT_ID;
+		
+		UPDATE PAC_FRC_FORECAST_PROPERTIES
+		SET START_PERIOD = v_PROJECT_START_PERIOD,
+		 		  END_PERIOD =v_END_PERIOD,
+				  REVISION_DESCRIPTION = P_REVISION_DESC,				  
+				  LAST_UPDATED_DATE=SYSDATE,
+                  LAST_UPDATED_BY= PA_USER
+		WHERE PROJECT_ID = v_PROJECT_ID AND
+		  	  			   REVISION = v_REVISION AND
+		  				   FORECAST_TYPE = P_FORECAST_TYPE;
+		EXCEPTION
+				 WHEN NO_DATA_FOUND THEN
+	  			 	  RAISE_APPLICATION_ERROR(-20979, 'Invalid period name selected. ');
+					  RETURN;
+				WHEN OTHERS THEN
+					  RAISE_APPLICATION_ERROR(-20972, 'Plan description is too long. ');
+					  RETURN;
+		END;		
+   END IF;
+
+  -- Get the last updated date for the UI.
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT MAX(D.LAST_UPDATED_DATE)
+  	INTO v_LAST_MODIFIED_DATE
+    FROM PAC_FRC_FORECAST_DETAILS D,
+		 PAC_FRC_FORECAST_PROPERTIES P
+	WHERE P.PROJECT_ID = v_PROJECT_ID AND
+		  D.FORECAST_ID = P.ID AND
+		  P.REVISION = v_REVISION AND
+		  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  NULL;
+	WHEN TOO_MANY_ROWS THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+  END;
+
+  -- Get the start period date for the start period specidied in the plan
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT START_DATE, B.PERIOD_NAME
+  	INTO v_START_DATE_PROJECT, v_START_PERIOD_NAME_PROJECT
+  	FROM BIZ_COM_PERIODS B,
+		 PAC_FRC_FORECAST_PROPERTIES P
+	WHERE P.PROJECT_ID = v_PROJECT_ID AND
+		  P.START_PERIOD = B.ID AND
+		  v_REVISION = P.REVISION AND
+		  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  NULL;
+	WHEN TOO_MANY_ROWS THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+  END;
+  -- Get the finish period date for the finish period specidied in the plan
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT B.END_DATE,
+  		 B.ID, B.PERIOD_NAME
+  	INTO v_END_DATE_PROJECT,
+		 v_END_PERIOD,
+		 v_END_PERIOD_NAME_PROJECT
+  	FROM BIZ_COM_PERIODS B,
+		 PAC_FRC_FORECAST_PROPERTIES P
+	WHERE P.PROJECT_ID = v_PROJECT_ID AND
+		  P.END_PERIOD = B.ID AND
+		  v_REVISION = P.REVISION AND
+		  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  NULL;
+	WHEN TOO_MANY_ROWS THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+  END;
+
+  -- Set the units, cost and revenue flags according to the data to display selected.
+  IF P_COMPARISONS IS NOT NULL THEN
+	   v_SHOW_UNITS := 1;
+	   v_SHOW_COST  := 1;
+	   v_SHOW_REVENUE := 1;
+  	   IF v_COLUMNS_TO_DISPLAY_SELECT = 'UNITS_COST' THEN
+	     v_SHOW_REVENUE := 0;
+       ELSIF v_COLUMNS_TO_DISPLAY_SELECT IN ( 'UNITS_REVENUE', 'UNITS_BENEFITS' ) THEN
+  	     v_SHOW_COST  := 0;
+	   ELSIF v_COLUMNS_TO_DISPLAY_SELECT IN ( 'COST_REVENUE', 'COST_BENEFITS' ) THEN
+	     v_SHOW_UNITS := 0;
+	   ELSIF v_COLUMNS_TO_DISPLAY_SELECT = 'UNITS' THEN
+  	     v_SHOW_COST  := 0;
+	     v_SHOW_REVENUE := 0;
+	   ELSIF v_COLUMNS_TO_DISPLAY_SELECT IN ( 'REVENUE', 'BENEFITS' ) THEN
+	     v_SHOW_UNITS := 0;
+  	     v_SHOW_COST  := 0;
+	   ELSIF v_COLUMNS_TO_DISPLAY_SELECT = 'COST' THEN
+	     v_SHOW_UNITS := 0;
+	     v_SHOW_REVENUE := 0;
+	   END IF;
+  END IF;
+  -- Calculate the no. of periods taking into account the units, cost and revenue flag.
+  IF (v_SHOW_UNITS + v_SHOW_COST + v_SHOW_REVENUE) != 0 THEN
+  	 v_NO_OF_PERIODS := v_NO_OF_PERIODS/(v_SHOW_UNITS + v_SHOW_COST + v_SHOW_REVENUE);
+  ELSE
+  	 v_NO_OF_PERIODS := 0;
+  END IF; 
+  
+  -- Check the show totals flag. If true then get the totals.
+    IF  P_COMPARISONS IS NOT NULL THEN
+  	 v_DEFAULT_VIEW := P_COMPARISONS;
+	 v_SHOW_TOTALS := P_SHOW_TOTALS;
+  ELSE
+  	 select cov.value 
+	 into v_SHOW_TOTALS
+	 from cmn_options co, cmn_option_values cov 
+	 where co.id = cov.option_id 
+	 and co.option_code = 'PAC_FRC_SHOW_TOTALS';
+	 
+	 -- Set the 'Data to Display' from the v_show_units,v_show_cost and v_show_revenue accordingly.
+	 IF v_SHOW_UNITS = 0 or  v_SHOW_COST = 0 or v_SHOW_REVENUE = 0 THEN
+	   IF v_SHOW_UNITS = 1 and v_SHOW_COST = 1 THEN
+	     v_COLUMNS_TO_DISPLAY_SELECT := 'UNITS_COST';
+	   ELSIF v_SHOW_UNITS = 1 and v_SHOW_REVENUE = 1 THEN
+	     IF v_IS_REVENUE_PLAN = 0 THEN
+	      v_COLUMNS_TO_DISPLAY_SELECT := 'UNITS_BENEFITS';
+		 ELSE
+		  v_COLUMNS_TO_DISPLAY_SELECT := 'UNITS_REVENUE';
+		 END IF;
+	   ELSIF v_SHOW_COST = 1 and v_SHOW_REVENUE = 1 THEN
+	     IF v_IS_REVENUE_PLAN = 0 THEN
+	      v_COLUMNS_TO_DISPLAY_SELECT := 'COST_BENEFITS';
+		 ELSE
+		  v_COLUMNS_TO_DISPLAY_SELECT := 'COST_REVENUE';
+		 END IF;
+	   ELSIF v_SHOW_UNITS = 1 THEN
+	     v_COLUMNS_TO_DISPLAY_SELECT := 'UNITS';
+	   ELSIF v_SHOW_COST = 1 THEN
+	     v_COLUMNS_TO_DISPLAY_SELECT := 'COST';
+	   ELSIF v_SHOW_REVENUE = 1 THEN
+	     IF v_IS_REVENUE_PLAN = 0 THEN
+	      v_COLUMNS_TO_DISPLAY_SELECT := 'BENEFITS';
+		 ELSE
+		  v_COLUMNS_TO_DISPLAY_SELECT := 'REVENUE';
+		 END IF;
+	   END IF;
+	 END IF;
+
+  END IF;
+  
+  -- Recalculate the no. of periods taking into account the comparisions selected.
+  IF v_DEFAULT_VIEW IS NULL or v_DEFAULT_VIEW = 'All' THEN
+  	 v_NO_OF_PERIODS := v_NO_OF_PERIODS/3;
+	 v_SHOW_ACTUALS	 := 1;
+	 v_SHOW_VARIANCE := 1;
+  ELSIF v_DEFAULT_VIEW = 'PLAN_ACTUALS' THEN
+  	 v_NO_OF_PERIODS := FLOOR(v_NO_OF_PERIODS/2);
+	 v_SHOW_ACTUALS	 := 1;
+  ELSIF v_DEFAULT_VIEW = 'PLAN_VARIANCE' THEN
+  	 v_NO_OF_PERIODS := FLOOR(v_NO_OF_PERIODS/2);
+	 v_SHOW_VARIANCE := 1;
+  END IF; 
+  
+  /* First see if the user entered a valid start period name on the screen. If so use as the start period. */
+  BEGIN
+	  IF v_START_PERIOD_NAME IS NOT NULL THEN
+	    SELECT B.ID
+		 INTO v_START_PERIOD
+	  	FROM BIZ_COM_PERIODS B,
+			 PAC_FRC_FORECAST_PROPERTIES P
+		WHERE B.PERIOD_NAME = v_START_PERIOD_NAME AND
+			  B.START_DATE BETWEEN v_START_DATE_PROJECT AND
+			  			   	   	   v_END_DATE_PROJECT   AND
+			  B.END_DATE BETWEEN   v_START_DATE_PROJECT AND
+			  		 	   		   v_END_DATE_PROJECT   AND
+			  P.PROJECT_ID = v_PROJECT_ID AND
+			  v_REVISION = P.REVISION AND
+			  P.FORECAST_TYPE = Pac_Frc_Grid_Values_Sp.P_FORECAST_TYPE;	    
+	  ELSIF START_PERIOD_ID IS NOT NULL THEN
+	     SELECT B.ID , B.PERIOD_NAME
+		 INTO v_START_PERIOD, v_START_PERIOD_NAME
+		 FROM BIZ_COM_PERIODS B
+		 WHERE B.ID = START_PERIOD_ID;	  
+	  ELSIF NEXT_PERIOD_ID IS NOT NULL THEN
+	     SELECT B.id,B.period_name INTO v_START_PERIOD, v_START_PERIOD_NAME
+		 FROM biz_com_periods B 
+		 WHERE B.start_date = (SELECT MIN(BS.start_date) FROM biz_com_periods BS
+		 	   				  WHERE BS.start_date &gt;  ( SELECT BN.start_date  
+							  FROM biz_com_periods BN WHERE BN.ID=NEXT_PERIOD_ID)
+							AND BS.period_type =  v_PERIOD_TYPE)
+		AND B.period_type = v_PERIOD_TYPE;
+	   ELSIF PREVIOUS_PERIOD_ID IS NOT NULL THEN
+	    BEGIN
+		   StoO_rowcnt := v_NO_OF_PERIODS - 1;
+		   SELECT S.id,S.period_name INTO v_START_PERIOD, v_START_PERIOD_NAME
+		   FROM biz_com_periods S 
+		   WHERE StoO_rowcnt = (SELECT count(*) FROM biz_com_periods E
+		 	   				  WHERE E.start_date &lt;  ( SELECT BN.start_date  
+							  FROM biz_com_periods BN WHERE BN.ID=PREVIOUS_PERIOD_ID)
+							AND E.period_type =  v_PERIOD_TYPE AND E.start_date &gt; S.start_date)
+		AND S.period_type = v_PERIOD_TYPE and S.START_DATE &gt;= v_START_DATE_PROJECT;
+		EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+            NULL;
+	    END;
+	  END IF;
+	  EXCEPTION
+		  WHEN NO_DATA_FOUND THEN
+		    RAISE_APPLICATION_ERROR(-20944, 'Grid display start period should be between the plan start and finish period.');
+		    RETURN;
+		  WHEN TOO_MANY_ROWS THEN
+		    NULL;
+		  WHEN OTHERS THEN
+ 		    NULL;
+  END;
+
+  /* IF  start period was not provided then get the default from the project */
+  IF v_START_PERIOD IS NULL THEN
+     v_START_PERIOD := v_PROJECT_START_PERIOD ;
+  END IF;
+
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  SELECT P_QUARTER,
+  		 P_YEAR,
+		 START_DATE,
+		 PERIOD_NAME
+	 INTO v_P_QUARTER,
+  		 v_P_YEAR,
+		 v_START_DATE,
+		 
+		 v_START_PERIOD_NAME
+	 FROM BIZ_COM_PERIODS
+	 WHERE ID = v_START_PERIOD ;
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	 WHEN NO_DATA_FOUND THEN
+	   NULL;
+	 WHEN TOO_MANY_ROWS THEN
+	   NULL;
+	 WHEN OTHERS THEN
+ 	   StoO_error := SQLCODE;
+	   StoO_errmsg := SQLERRM;
+  END;   
+
+  /* Insert the forecasting values */
+  IF v_USE_DETAIL_TYPE = 0 THEN
+  BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+	         Cost_Actual,
+			 Revenue_Actual,
+			 Units,
+			 PeriodName,
+			 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT T.TRANSCLASS,
+			   D.PERIOD_ID,
+			   NVL( V.COST, 0),
+			   NVL( V.REVENUE, 0),
+			   0,
+			   0,
+			   NVL( D.UNITS, 0),
+			   B.PERIOD_NAME,
+			   B.START_DATE,
+			   B.END_DATE,
+			   T.ID,
+			   DECODE(V_SHOW_TRANSCLASS,0,T.SHORTDESC,T.DESCRIPTION),
+			   A.SORT_ORDER
+		 	FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+				 PAC_FRC_PROJ_ASSOC A,
+		         TRANSCLASS T,
+				 BIZ_COM_PERIODS B
+			WHERE D.FORECAST_ID = P.ID 	  AND
+				  P.PROJECT_ID = v_PROJECT_ID  	  AND
+				  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+				  D.DETAIL_ID = T.ID  AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE AND
+			  	  v_REVISION = P.REVISION AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+				  B.ID = D.PERIOD_ID AND
+				  A.FORECAST_ID = P.ID AND
+				  A.DETAIL_ID = D.DETAIL_ID AND
+				  B.START_DATE &gt;= v_START_DATE_PROJECT AND
+			      B.START_DATE &lt;= v_END_DATE_PROJECT;
+
+	  --Insert the Transclasses that do not have forecast detail records associated so they display on the screen
+	  --  and we can se actuals for them
+
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+			 Units,
+			 PeriodName,
+			 PeriodNumber,
+	 		 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT
+		   T.TRANSCLASS,
+		   B.ID,
+		   0,
+		   0,
+		   0,
+		   B.PERIOD_NAME,
+	       0,
+		   B.START_DATE,
+		   B.END_DATE,
+		   T.ID,
+		   DECODE(V_SHOW_TRANSCLASS,0,T.SHORTDESC,T.DESCRIPTION),
+		   A.SORT_ORDER
+		FROM TRANSCLASS T,
+			 PAC_FRC_PROJ_ASSOC A,
+			 PAC_FRC_FORECAST_PROPERTIES P,
+			 BIZ_COM_PERIODS B
+		WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			  P.REVISION = v_REVISION AND
+			  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+			  P.ID = A.FORECAST_ID AND
+			  T.ID = A.DETAIL_ID AND
+			  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+			  B.START_DATE &gt;= v_START_DATE_PROJECT
+			  AND B.START_DATE &lt;= v_END_DATE_PROJECT
+			  AND T.ID NOT IN (SELECT DETAIL_ID FROM TEMP_FRC_GRID_PERIOD_VALUES 
+			  	  	   	   	  		  				 WHERE PERIODID = B.ID) ;
+
+	  /* Now update TEMP_FRC_GRID_PERIOD_VALUES with Actuals */
+	  IF v_SHOW_ACTUALS = 1 OR v_SHOW_VARIANCE = 1 THEN
+		  UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( COST_ACTUAL, REVENUE_ACTUAL, UNITS_ACTUAL ) =
+		  ( SELECT NVL( SUM( WV.TOTALCOST ), 0), NVL( SUM( WV.TOTALAMOUNT ), 0) * v_IS_REVENUE_PLAN, NVL( SUM( W.QUANTITY ), 0)
+		    FROM PPA_WIP W,
+			     PPA_WIP_VALUES WV
+			WHERE W.PROJECT_CODE = Pac_Frc_Grid_Values_Sp.v_PROJECT_CODE AND
+			      W.TRANSNO = WV.TRANSNO AND
+			      W.STATUS = 0 AND
+				  W.TRANSCLASS = TEMP_FRC_GRID_PERIOD_VALUES.DISPLAYVALUE AND
+				  W.TRANSDATE BETWEEN TEMP_FRC_GRID_PERIOD_VALUES.START_DATE AND TEMP_FRC_GRID_PERIOD_VALUES.END_DATE AND
+				  WV.CURRENCY_TYPE = v_CURRENCY_TYPE );
+	   END IF;
+	  
+	  /* If Internal Project update TEMP_FRC_GRID_PERIOD_VALUES with Benefit Actuals from the forecast tables */
+	  IF v_IS_REVENUE_PLAN = 0 THEN
+	    StoO_error   := 0;
+	    StoO_rowcnt  := 0;
+	    UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( REVENUE_ACTUAL ) =
+	   	  ( SELECT NVL( SUM( V.ACTUAL_BENEFITS ), REVENUE_ACTUAL)
+		    FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+		         TRANSCLASS T
+			WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			      v_REVISION = P.REVISION AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+	              D.FORECAST_ID = P.ID 	  AND
+				  D.DETAIL_ID = T.ID  AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.DETAIL_ID = T.ID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.PERIODID = D.PERIOD_ID AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE ) ;
+	  END IF;	  
+
+  	  StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+  END;
+  ELSIF v_USE_DETAIL_TYPE = 1 THEN
+  BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+	         Cost_Actual,
+			 Revenue_Actual,
+			 Units,
+			 PeriodName,
+			 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT R.UNIQUE_NAME,
+			   D.PERIOD_ID,
+			   NVL( V.COST, 0),
+			   NVL( V.REVENUE, 0),
+			   0,
+			   0,
+			   NVL( D.UNITS, 0),
+			   B.PERIOD_NAME,
+			   B.START_DATE,
+			   B.END_DATE,
+			   R.ID,
+			   R.UNIQUE_NAME,
+			   A.SORT_ORDER
+		 	FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+				 PAC_FRC_PROJ_ASSOC A,
+		         SRM_RESOURCES R,
+				 BIZ_COM_PERIODS B
+			WHERE D.FORECAST_ID = P.ID 	  AND
+				  P.PROJECT_ID = v_PROJECT_ID  	  AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+				  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+				  D.DETAIL_ID = R.ID  AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE AND
+			  	  v_REVISION = P.REVISION AND
+				  B.ID = D.PERIOD_ID AND
+				  A.FORECAST_ID = P.ID AND
+				  A.DETAIL_ID = D.DETAIL_ID AND
+				  B.START_DATE &gt;= v_START_DATE_PROJECT AND
+			      B.START_DATE &lt;= v_END_DATE_PROJECT;
+
+	  --Insert the Transclasses that do not have forecast detail records associated so they display on the screen
+	  --  and we can se actuals for them
+
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+			 Units,
+			 PeriodName,
+			 PeriodNumber,
+	 		 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT
+		   R.UNIQUE_NAME,
+		   B.ID,
+		   0,
+		   0,
+		   0,
+		   B.PERIOD_NAME,
+	       0,
+		   B.START_DATE,
+		   B.END_DATE,
+		   R.ID,
+		   R.UNIQUE_NAME,
+		   A.SORT_ORDER
+		FROM SRM_RESOURCES R,
+			 PAC_FRC_PROJ_ASSOC A,
+			 PAC_FRC_FORECAST_PROPERTIES P,
+			 BIZ_COM_PERIODS B
+		WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			  P.REVISION = v_REVISION AND
+			  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+			  P.ID = A.FORECAST_ID AND
+			  R.ID = A.DETAIL_ID AND
+			  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+			  B.START_DATE &gt;= v_START_DATE_PROJECT
+			  AND B.START_DATE &lt;= v_END_DATE_PROJECT
+			  AND R.ID NOT IN (SELECT DETAIL_ID FROM TEMP_FRC_GRID_PERIOD_VALUES 
+			  	  	   	   	  		  				 WHERE PERIODID = B.ID) ;	  
+
+	  /* Now update TEMP_FRC_GRID_PERIOD_VALUES with Actuals */
+	  IF v_SHOW_ACTUALS = 1 OR v_SHOW_VARIANCE = 1 THEN
+		  UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( COST_ACTUAL, REVENUE_ACTUAL, UNITS_ACTUAL ) =
+		  ( SELECT NVL( SUM( WV.TOTALCOST ), 0), NVL( SUM( WV.TOTALAMOUNT ), 0) * v_IS_REVENUE_PLAN, NVL( SUM( W.QUANTITY ), 0)
+		    FROM PPA_WIP W,
+			     PPA_WIP_VALUES WV
+			WHERE W.PROJECT_CODE = Pac_Frc_Grid_Values_Sp.v_PROJECT_CODE AND
+			      W.TRANSNO = WV.TRANSNO AND
+			      W.STATUS = 0 AND
+				  W.ROLE_CODE = TEMP_FRC_GRID_PERIOD_VALUES.DISPLAYVALUE AND
+				  W.TRANSDATE BETWEEN TEMP_FRC_GRID_PERIOD_VALUES.START_DATE AND TEMP_FRC_GRID_PERIOD_VALUES.END_DATE AND
+				  WV.CURRENCY_TYPE = v_CURRENCY_TYPE );
+	   END IF;
+	   
+	   /* If Internal Project update TEMP_FRC_GRID_PERIOD_VALUES with Benefit Actuals from the forecast tables */
+	  IF v_IS_REVENUE_PLAN = 0 THEN
+	    StoO_error   := 0;
+	    StoO_rowcnt  := 0;
+	    UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( REVENUE_ACTUAL ) =
+	   	  ( SELECT NVL( SUM( V.ACTUAL_BENEFITS ), REVENUE_ACTUAL)
+		    FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+		         SRM_RESOURCES R
+			WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			      v_REVISION = P.REVISION AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+	              D.FORECAST_ID = P.ID 	  AND
+				  D.DETAIL_ID = R.ID  AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.DETAIL_ID = R.ID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.PERIODID = D.PERIOD_ID AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE ) ;
+	  END IF;
+  	  StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+  END;
+  ELSIF v_USE_DETAIL_TYPE = 2 THEN
+  BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+	         Cost_Actual,
+			 Revenue_Actual,
+			 Units,
+			 PeriodName,
+			 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT R.PREXTERNALID,
+			   D.PERIOD_ID,
+			   NVL( V.COST, 0),
+			   NVL( V.REVENUE, 0),
+			   0,
+			   0,
+			   NVL( D.UNITS, 0),
+			   B.PERIOD_NAME,
+			   B.START_DATE,
+			   B.END_DATE,
+			   R.PRID,
+			   R.PRNAME,
+			   A.SORT_ORDER
+		 	FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+				 PAC_FRC_PROJ_ASSOC A,
+		         PRCHARGECODE R,
+				 BIZ_COM_PERIODS B
+			WHERE D.FORECAST_ID = P.ID 	  AND
+				  P.PROJECT_ID = v_PROJECT_ID  	  AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+				  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+				  D.DETAIL_ID = R.PRID  AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE AND
+			  	  v_REVISION = P.REVISION AND
+				  B.ID = D.PERIOD_ID AND
+				  A.FORECAST_ID = P.ID AND
+				  A.DETAIL_ID = D.DETAIL_ID AND
+				  B.START_DATE &gt;= v_START_DATE_PROJECT AND
+			      B.START_DATE &lt;= v_END_DATE_PROJECT;
+
+	  --Insert the Transclasses that do not have forecast detail records associated so they display on the screen
+	  --  and we can se actuals for them
+
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+			 Units,
+			 PeriodName,
+			 PeriodNumber,
+	 		 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER )
+		SELECT
+		   R.PREXTERNALID,
+		   B.ID,
+		   0,
+		   0,
+		   0,
+		   B.PERIOD_NAME,
+	       0,
+		   B.START_DATE,
+		   B.END_DATE,
+		   R.PRID,
+		   R.PRNAME,
+		   A.SORT_ORDER
+		FROM PRCHARGECODE R,
+			 PAC_FRC_PROJ_ASSOC A,
+			 PAC_FRC_FORECAST_PROPERTIES P,
+			 BIZ_COM_PERIODS B
+		WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			  P.REVISION = v_REVISION AND
+			  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+			  P.ID = A.FORECAST_ID AND
+			  R.PRID = A.DETAIL_ID AND
+			  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+			  B.START_DATE &gt;= v_START_DATE_PROJECT
+			  AND B.START_DATE &lt;= v_END_DATE_PROJECT
+			  AND R.PRID NOT IN (SELECT DETAIL_ID FROM TEMP_FRC_GRID_PERIOD_VALUES 
+			  	  	   	   	  		  				 WHERE PERIODID = B.ID) ;	  
+
+	  /* Now update TEMP_FRC_GRID_PERIOD_VALUES with Actuals */
+	  IF v_SHOW_ACTUALS = 1 OR v_SHOW_VARIANCE = 1 THEN
+		  UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( COST_ACTUAL, REVENUE_ACTUAL, UNITS_ACTUAL ) =
+		  ( SELECT NVL( SUM( WV.TOTALCOST ), 0), NVL( SUM( WV.TOTALAMOUNT ), 0) * v_IS_REVENUE_PLAN, NVL( SUM( W.QUANTITY ), 0)
+		    FROM PPA_WIP W,
+			     PPA_WIP_VALUES WV
+			WHERE W.PROJECT_CODE = Pac_Frc_Grid_Values_Sp.v_PROJECT_CODE AND
+			      W.TRANSNO = WV.TRANSNO AND
+			      W.STATUS = 0 AND
+				  W.CHARGE_CODE = TEMP_FRC_GRID_PERIOD_VALUES.DISPLAYVALUE AND
+				  W.TRANSDATE BETWEEN TEMP_FRC_GRID_PERIOD_VALUES.START_DATE AND TEMP_FRC_GRID_PERIOD_VALUES.END_DATE AND
+				  WV.CURRENCY_TYPE = v_CURRENCY_TYPE );
+	   END IF;
+	   
+	   /* If Internal Project update TEMP_FRC_GRID_PERIOD_VALUES with Benefit Actuals from the forecast tables */
+	  IF v_IS_REVENUE_PLAN = 0 THEN
+	    StoO_error   := 0;
+	    StoO_rowcnt  := 0;
+	    UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( REVENUE_ACTUAL ) =
+	   	  ( SELECT NVL( SUM( V.ACTUAL_BENEFITS ), REVENUE_ACTUAL)
+		    FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+		         PRCHARGECODE R
+			WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			      v_REVISION = P.REVISION AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+	              D.FORECAST_ID = P.ID 	  AND
+				  D.DETAIL_ID = R.PRID  AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.DETAIL_ID = R.PRID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.PERIODID = D.PERIOD_ID AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE ) ;
+	  END IF;
+  	  StoO_rowcnt := SQL%ROWCOUNT;
+      StoO_error := SQLCODE;
+
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;		  
+  END;
+  ELSIF v_USE_DETAIL_TYPE = 3 THEN
+  BEGIN
+  
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+			 DISPLAYVALUE2,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+	         Cost_Actual,
+			 Revenue_Actual,
+			 Units,
+			 PeriodName,
+			 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DETAIL2_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER)
+		SELECT T.TRANSCLASS,
+			   C.PREXTERNALID,
+			   D.PERIOD_ID,
+			   NVL( V.COST, 0),
+			   NVL( V.REVENUE, 0),
+			   0,
+			   0,
+			   NVL( D.UNITS, 0),
+			   B.PERIOD_NAME,
+			   B.START_DATE,
+			   B.END_DATE,
+			   T.ID,
+			   C.PRID,
+			   DECODE(V_SHOW_TRANSCLASS,0,T.SHORTDESC,T.DESCRIPTION),
+			   A.SORT_ORDER
+		 	FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+				 PAC_FRC_PROJ_ASSOC A,
+		         TRANSCLASS T,
+				 PRCHARGECODE C,
+				 BIZ_COM_PERIODS B
+			WHERE D.FORECAST_ID = P.ID 	  AND
+				  P.PROJECT_ID = v_PROJECT_ID  	  AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+				  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+				  D.DETAIL_ID = T.ID  AND
+				  D.DETAIL2_ID = C.PRID AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE AND
+			  	  v_REVISION = P.REVISION AND
+				  B.ID = D.PERIOD_ID AND
+				  A.FORECAST_ID = P.ID AND
+				  A.DETAIL_ID = D.DETAIL_ID AND
+				  A.DETAIL2_ID = D.DETAIL2_ID AND
+				  B.START_DATE &gt;= v_START_DATE_PROJECT AND
+			      B.START_DATE &lt;= v_END_DATE_PROJECT;
+
+	  --Insert the Transclasses that do not have forecast detail records associated so they display on the screen
+	  --  and we can se actuals for them
+
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  INSERT INTO TEMP_FRC_GRID_PERIOD_VALUES (
+	  		 DisplayValue,
+			 DISPLAYVALUE2,
+	  		 PeriodID,
+			 Cost,
+			 Revenue,
+			 Units,
+			 PeriodName,
+			 PeriodNumber,
+	 		 START_DATE,
+			 END_DATE,
+			 DETAIL_ID,
+			 DETAIL2_ID,
+			 DISPLAYVALUE_DESCRIPTION,
+			 SORT_ORDER
+			 )
+		SELECT
+		   T.TRANSCLASS,
+		   C.PREXTERNALID,
+		   B.ID,
+		   0,
+		   0,
+		   0,
+		   B.PERIOD_NAME,
+	       0,
+		   B.START_DATE,
+		   B.END_DATE,
+		   T.ID,
+		   C.PRID,
+		   DECODE(V_SHOW_TRANSCLASS,0,T.SHORTDESC,T.DESCRIPTION),
+		   A.SORT_ORDER
+		FROM TRANSCLASS T,
+		     PRCHARGECODE C,
+			 PAC_FRC_PROJ_ASSOC A,
+			 PAC_FRC_FORECAST_PROPERTIES P,
+			 BIZ_COM_PERIODS B
+		WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			  P.REVISION = v_REVISION AND
+			  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+			  P.ID = A.FORECAST_ID AND
+			  T.ID = A.DETAIL_ID AND
+			  C.PRID = A.DETAIL2_ID AND
+			  P.PERIOD_TYPE = B.PERIOD_TYPE AND
+			  B.START_DATE &gt;= v_START_DATE_PROJECT
+			  AND B.START_DATE &lt;= v_END_DATE_PROJECT
+			  AND NOT EXISTS (SELECT 'EXISTS' FROM TEMP_FRC_GRID_PERIOD_VALUES 
+			  	  	   	   	  		  				 WHERE DETAIL_ID = T.ID and DETAIL2_ID = C.PRID AND PERIODID = B.ID) ;	  
+
+	  /* Now update TEMP_FRC_GRID_PERIOD_VALUES with Actuals */
+	  IF v_SHOW_ACTUALS = 1 OR v_SHOW_VARIANCE = 1 THEN
+		  UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( COST_ACTUAL, REVENUE_ACTUAL, UNITS_ACTUAL ) =
+		  ( SELECT NVL( SUM( WV.TOTALCOST ), 0), NVL( SUM( WV.TOTALAMOUNT ), 0) * v_IS_REVENUE_PLAN, NVL( SUM( W.QUANTITY ), 0)
+		    FROM PPA_WIP W,
+			     PPA_WIP_VALUES WV
+			WHERE W.PROJECT_CODE = Pac_Frc_Grid_Values_Sp.v_PROJECT_CODE AND
+			      W.TRANSNO = WV.TRANSNO AND
+			      W.STATUS = 0 AND
+				  W.TRANSCLASS = TEMP_FRC_GRID_PERIOD_VALUES.DISPLAYVALUE AND
+				  W.CHARGE_CODE = TEMP_FRC_GRID_PERIOD_VALUES.DISPLAYVALUE2 AND
+				  W.TRANSDATE BETWEEN TEMP_FRC_GRID_PERIOD_VALUES.START_DATE AND TEMP_FRC_GRID_PERIOD_VALUES.END_DATE AND
+				  WV.CURRENCY_TYPE = v_CURRENCY_TYPE );
+	   END IF;
+	   
+	   /* If Internal Project update TEMP_FRC_GRID_PERIOD_VALUES with Benefit Actuals from the forecast tables */
+	  IF v_IS_REVENUE_PLAN = 0 THEN
+	    StoO_error   := 0;
+	    StoO_rowcnt  := 0;
+	    UPDATE TEMP_FRC_GRID_PERIOD_VALUES
+	      SET ( REVENUE_ACTUAL ) =
+	   	  ( SELECT NVL( SUM( V.ACTUAL_BENEFITS ), REVENUE_ACTUAL)
+		    FROM PAC_FRC_FORECAST_DETAILS D,
+				 PAC_FRC_FORECAST_PROPERTIES P,
+				 PAC_FRC_FORECAST_VALUES V,
+		         TRANSCLASS T,
+				 PRCHARGECODE C
+			WHERE P.PROJECT_ID = v_PROJECT_ID AND
+			      v_REVISION = P.REVISION AND
+				  P.FORECAST_TYPE = v_FORECAST_TYPE AND
+	              D.FORECAST_ID = P.ID 	  AND
+				  D.DETAIL_ID = T.ID  AND
+				  D.DETAIL2_ID = C.PRID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.DETAIL_ID = T.ID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.DETAIL2_ID = C.PRID AND
+				  TEMP_FRC_GRID_PERIOD_VALUES.PERIODID = D.PERIOD_ID AND
+				  D.ID = V.FORECAST_DETAILS_ID AND
+				  V.CURRENCY_TYPE = v_CURRENCY_TYPE ) ;
+	  END IF;
+
+	 OPEN RC9 FOR
+		SELECT NVL( SUM(Cost), 0)  cost,
+			   NVL( SUM(Revenue), 0) revenue,
+			   NVL( SUM(Cost_Actual), 0) cost_actual,
+			   NVL( SUM(Revenue_Actual), 0) revenue_actual,
+			   (NVL( SUM(Units_Actual), 0) / V_UNITS_FACTOR) units_actual,
+			   (NVL( SUM(Units), 0) / V_UNITS_FACTOR) units,
+			   DETAIL2_ID
+		 	FROM TEMP_FRC_GRID_PERIOD_VALUES
+			GROUP BY DisplayValue2,DETAIL2_ID
+			ORDER BY DisplayValue2;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		  RAISE_APPLICATION_ERROR(	SQLCODE ,  SQLERRM);	
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+		  RAISE_APPLICATION_ERROR(	StoO_error ,  StoO_errmsg);			  
+  END;
+  END IF; 
+
+  -- Get the totals of the plan for each detail level.
+  BEGIN
+  StoO_error   := 0;
+  StoO_rowcnt  := 0;
+  OPEN RC7 FOR
+	SELECT DISPLAYVALUE,
+	       DisplayValue2,
+		   NVL( SUM(Cost), 0)  cost,
+		   NVL( SUM(Revenue), 0) revenue,
+		   NVL( SUM(Cost_Actual), 0) cost_actual,
+		   NVL( SUM(Revenue_Actual), 0) revenue_actual,
+		   (NVL( SUM(Units_Actual), 0) / V_UNITS_FACTOR) units_actual,
+		   (NVL( SUM(Units), 0) / V_UNITS_FACTOR) units,
+		   DETAIL_ID||DETAIL2_ID detail
+	 	FROM TEMP_FRC_GRID_PERIOD_VALUES
+		GROUP BY DISPLAYVALUE,DisplayValue2,detail_id,detail2_id,SORT_ORDER
+		ORDER BY DisplayValue2,SORT_ORDER,DisplayValue;
+
+  StoO_rowcnt := SQL%ROWCOUNT;
+  StoO_error := SQLCODE;
+
+  EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+	  NULL;
+	WHEN OTHERS THEN
+ 	  StoO_error := SQLCODE;
+	  StoO_errmsg := SQLERRM;
+	  RAISE_APPLICATION_ERROR(	StoO_error ,  StoO_errmsg);	
+  END;
+
+  -- Get the grand totals of the plan.
+  BEGIN
+  	  StoO_error   := 0;
+  	  StoO_rowcnt  := 0;
+	  SELECT NVL( SUM( V.Cost ), 0),
+	  		 NVL( SUM( V.Cost_Actual ), 0),
+			 NVL( SUM ( V.REVENUE ), 0),
+			 NVL( SUM ( V.REVENUE_ACTUAL ), 0),
+			 NVL( SUM( V.UNITS ), 0),
+	  		 NVL( SUM( V.UNITS_ACTUAL ), 0)
+	  INTO	 v_TOTAL_COST,
+	  		 v_TOTAL_COST_ACTUAL,
+			 v_TOTAL_REVENUE,
+			 v_TOTAL_REVENUE_ACTUAL,
+			 v_TOTAL_UNITS,
+			 v_TOTAL_UNITS_ACTUAL
+	  FROM TEMP_FRC_GRID_PERIOD_VALUES V ;
+	  
+	  -- delete all the periods which will not be shown in the grid.
+	  DELETE FROM TEMP_FRC_GRID_PERIOD_VALUES
+	  WHERE PERIODID NOT IN  (SELECT ID 
+	  				 	 	 		 		   	  		 			FROM (SELECT DISTINCT B.ID ID,B.START_DATE
+																		 		 		 FROM BIZ_COM_PERIODS B,TEMP_FRC_GRID_PERIOD_VALUES T 
+																						 WHERE T.PERIODID=B.ID 
+																						 AND B.START_DATE &gt;=v_START_DATE
+																						 ORDER BY B.START_DATE) 
+																						 WHERE (P_XOG = 1 OR ROWNUM &lt; v_NO_OF_PERIODS + 1));
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+	  
+  END;
+
+  IF v_USE_DETAIL_TYPE = 3 THEN
+  BEGIN  
+	OPEN RC10 FOR
+	SELECT NVL( SUM(Cost), 0)  cost,
+		   NVL( SUM(Revenue), 0) revenue,
+		   NVL( SUM(Cost_Actual), 0) cost_actual,
+		   NVL( SUM(Revenue_Actual), 0) revenue_actual,
+		   (NVL( SUM(Units_Actual), 0) / V_UNITS_FACTOR) units_actual,
+		   (NVL( SUM(Units), 0) / V_UNITS_FACTOR) units,
+		   DETAIL2_ID
+	 	FROM TEMP_FRC_GRID_PERIOD_VALUES
+		GROUP BY DisplayValue2,DETAIL2_ID,start_date
+		ORDER BY DisplayValue2,start_date; 
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  NULL;
+		WHEN OTHERS THEN
+	 	  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;		  
+  END;
+  ELSE
+   OPEN RC9 FOR SELECT 0 units,0 units_actual,0 cost ,0 cost_actual,0 revenue,0 revenue_actual,0 detail2_id FROM DUAL;
+   OPEN RC10 FOR SELECT 0 units,0 units_actual,0 cost ,0 cost_actual,0 revenue,0 revenue_actual,0 detail2_id FROM DUAL;
+  END IF;
+
+  IF v_IS_REVENUE_PLAN = 0 THEN
+    v_REVENUE_BENEFITS := 'REVENUE';
+	v_COLUMNS_TO_DISPLAY_SELECT := REPLACE(v_COLUMNS_TO_DISPLAY_SELECT,'REVENUE','BENEFITS');
+  ELSE
+    v_COLUMNS_TO_DISPLAY_SELECT := REPLACE(v_COLUMNS_TO_DISPLAY_SELECT,'BENEFITS','REVENUE');
+  END IF;
+
+  OPEN RC1 FOR
+	 SELECT v_CURRENCY_CODE currency_code,
+			v_MIN_STATUS min_status,
+			NVL( v_REVISION, 0) revision,
+		    NVL(P_REVISION_DESC, v_REVISION_DESCRIPTION) revision_desc,
+			v_START_PERIOD display_start_period_id,
+			v_CURRENCY_TYPE currency_type,
+			v_START_PERIOD_NAME period_name,			
+			v_LAST_MODIFIED_DATE last_modified,
+			v_PERIOD_TYPE period_type,
+			v_FORECAST_STATUS status,
+			v_LAST_REVISION last_revision,
+			v_LAST_REVISION_APPROVED_DATE approval_date,
+			v_APPROVER_FIRST_NAME approver,
+			v_APPROVER_LAST_NAME approver_last_name,
+			v_FORECAST_ID forecast_id,
+			v_USE_SYSTEM_CURRENCY  is_system_cuurency,
+             v_IS_REVENUE_PLAN is_revenue_plan,
+			 v_USE_DETAIL_TYPE detail_type,
+			 v_START_PERIOD_NAME_PROJECT start_period,
+			 v_END_PERIOD_NAME_PROJECT finish_period,
+			 v_SHOW_TOTALS	show_totals,
+			 v_SHOW_ACTUALS   show_actuals,
+			 v_SHOW_VARIANCE	show_variance,
+			 v_SHOW_UNITS show_units,
+			 v_SHOW_COST show_cost,
+			 v_SHOW_REVENUE show_revenue,
+			 v_DEFAULT_VIEW comparisons,
+			 v_COLUMNS_TO_DISPLAY_SELECT display_type,
+			 v_TOTAL_COST cost,
+			 v_TOTAL_COST_ACTUAL cost_actual,
+			 v_TOTAL_REVENUE revenue,
+			 v_TOTAL_REVENUE_ACTUAL revenue_actual,
+		     (v_TOTAL_UNITS / V_UNITS_FACTOR ) units,
+			 (v_TOTAL_UNITS_ACTUAL / V_UNITS_FACTOR) units_actual,
+			 greatest(MAX(ABS(units))/ V_UNITS_FACTOR,MAX(ABS(cost)),MAX(ABS(revenue))) max_number		 
+	FROM TEMP_FRC_GRID_PERIOD_VALUES;
+
+  OPEN RC2 FOR
+  SELECT PERIODID id,PERIODNAME name, DECODE(V_FREEZE_DATE,NULL,0,DECODE(GREATEST(V_FREEZE_DATE , END_DATE),V_FREEZE_DATE ,1,0)) IS_FROZEN,
+         start_date, end_date
+  FROM (SELECT DISTINCT PERIODID,PERIODNAME,END_DATE,START_DATE
+  	   FROM TEMP_FRC_GRID_PERIOD_VALUES T 
+  	   ORDER BY END_DATE);
+
+  OPEN RC3 FOR
+    SELECT DISPLAYVALUE,
+		   DISPLAYVALUE2,
+           (NVL(UNITS,0) / V_UNITS_FACTOR) units, 
+		   (NVL(UNITS_ACTUAL,0) / V_UNITS_FACTOR) units_actual,
+		   NVL(COST,0) cost,
+		   NVL(COST_ACTUAL,0) cost_actual,
+		   NVL(REVENUE,0) revenue,
+		   NVL(REVENUE_ACTUAL,0) revenue_actual,
+		   DETAIL_ID,
+		   DETAIL2_ID,
+		   PERIODID period_id,
+		   PERIODNAME period_name,
+		   DETAIL_ID || DETAIL2_ID DETAIL,
+		   DISPLAYVALUE_DESCRIPTION DESCRIPTION,
+		   DECODE(V_FREEZE_DATE,NULL,0,DECODE(GREATEST(V_FREEZE_DATE , END_DATE),V_FREEZE_DATE ,1,0)) IS_FROZEN
+	   FROM TEMP_FRC_GRID_PERIOD_VALUES
+	   ORDER BY DETAIL2_ID,SORT_ORDER,DETAIL_ID,start_date;
+
+  OPEN RC4 FOR
+	   SELECT  (SUM(UNITS) / V_UNITS_FACTOR) units, (SUM(UNITS_ACTUAL) / V_UNITS_FACTOR) units_actual,
+						SUM(COST) cost, SUM(COST_ACTUAL) cost_actual,
+						SUM(REVENUE) revenue, SUM(REVENUE_ACTUAL) revenue_actual,
+					   PERIODID id
+	   FROM TEMP_FRC_GRID_PERIOD_VALUES
+	   GROUP BY PERIODID,start_date
+	   ORDER BY start_date;
+
+  OPEN RC5 FOR
+    SELECT LOOKUP_CODE,
+		   NAME
+ 	  FROM CMN_LOOKUPS_V
+	  WHERE LOOKUP_TYPE = 'PAC_FRC_DATA_DISPLAY' AND
+	 	    LANGUAGE_CODE = RTRIM(v_LANGUAGE_CODE) AND
+		    INSTR( LOOKUP_CODE,v_REVENUE_BENEFITS ) = 0
+		    ORDER BY SORT_ORDER;
+			
+	 OPEN RC6 FOR
+    SELECT LOOKUP_CODE,
+		   NAME
+ 	  FROM CMN_LOOKUPS_V
+	  WHERE LOOKUP_TYPE = 'PAC_FRC_PLAN_COMPARISONS' AND
+	 	    LANGUAGE_CODE = RTRIM(v_LANGUAGE_CODE)
+		    ORDER BY SORT_ORDER;
+			
+	 IF v_USE_SYSTEM_CURRENCY = 0 THEN
+	    OPEN RC8 FOR
+	 	SELECT LOOKUP_CODE,
+		   NAME
+ 	   FROM CMN_LOOKUPS_V
+	   WHERE LOOKUP_TYPE = 'CMN_CURRENCY_TYPE' AND
+	 	    LANGUAGE_CODE = RTRIM(v_LANGUAGE_CODE)
+			AND LOOKUP_CODE IN ('HOME','BILLING')
+		    ORDER BY SORT_ORDER;
+	ELSE
+	   OPEN RC8 FOR
+	   SELECT NULL,NAME
+	    FROM cmn_options_v 
+		WHERE option_code='CMN_SYSTEM_CURRENCY' 
+		AND language_code=RTRIM(v_LANGUAGE_CODE);
+	END IF;	 
+END Pac_Frc_Grid_Values_Sp;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

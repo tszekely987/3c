@@ -1,0 +1,83 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DHW_INV_SEC_EXTRACT_V0">
+    <indexes/>
+    <text_length>5317</text_length>
+    <text>select distinct USER_ID, OBJECT_ID, OBJECT_INSTANCE_ID, PERMISSION_CODE, PERMISSION_VALUE
+  from   (select  /* + index( AP,CMN_SEC_ASSGND_OBJ_PERM_N6) */                     -- Instance rule for principal is group
+                  UG.USER_ID, AP.OBJECT_ID, AP.OBJECT_INSTANCE_ID, PE.PERMISSION_CODE, PE.PERMISSION_VALUE
+          from    CMN_SEC_PERM_ELEMENTS PE, CMN_SEC_ASSGND_OBJ_PERM AP, CMN_SEC_GROUPS PARENT_GROUP, CMN_SEC_GROUPS G,
+                  CMN_SEC_GROUP_FLAT_HIERS H, CMN_SEC_USER_GROUPS UG
+          where   ap.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     pe.permission_code in ('READ','ProjectViewManagement') 
+          and     UG.GROUP_ID = H.GROUP_ID
+          and     H.GROUP_ID = G.ID
+          and     G.IS_ACTIVE = 1
+          and     AP.PRINCIPAL_ID = H.PARENT_GROUP_ID
+          and     H.PARENT_GROUP_ID = PARENT_GROUP.ID
+          and     PARENT_GROUP.IS_ACTIVE = 1
+          and     AP.PRINCIPAL_TYPE = 'GROUP'
+          and     AP.PERMISSION_ID = PE.PERMISSION_ID
+          union all                                                                   -- Instance rule for principal is user
+          select  AP.PRINCIPAL_ID USER_ID, AP.OBJECT_ID, AP.OBJECT_INSTANCE_ID, PE.PERMISSION_CODE, PE.PERMISSION_VALUE
+          from    CMN_SEC_PERM_ELEMENTS PE, CMN_SEC_ASSGND_OBJ_PERM AP
+          where   ap.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     pe.permission_code in ('READ','ProjectViewManagement') 
+          and     AP.PRINCIPAL_TYPE = 'USER' 
+          and     AP.PERMISSION_ID = PE.PERMISSION_ID
+          union all
+          select  /*+ index(ri,CMN_SEC_RIGHT_U1) */                                   -- OBS UNIT RULE for principal is user
+                  OS.PRINCIPAL_ID USER_ID, RI.OBJECT_ID, OU.INSTANCE_ID OBJECT_INSTANCE_ID, RI.PERMISSION_CODE, RI.PERMISSION_VALUE
+          from    CMN_SEC_ASSGND_RIGHT OS, OBS_UNIT_ENTITIES_V OU, CMN_SEC_RIGHT RI
+          where   ri.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     ri.permission_code in ('READ','ProjectViewManagement') 
+          and     OS.PRINCIPAL_TYPE = 'USER'
+          and     OS.INSTANCE_TYPE = OU.UNIT_MODE
+          and     OS.INSTANCE_ID = OU.UNIT_ID
+          and     RI.RIGHT_ID = OS.RIGHT_ID
+          and     RI.IS_ACTIVE = 1
+          and     UPPER(OU.TABLE_NAME) = UPPER(RI.RIGHT_OBS_TYPE)
+          union all                                                                   -- OBS UNIT RULE for principal is group
+          select  /*+ index(ri,CMN_SEC_RIGHT_U1) */
+                  UG.USER_ID USER_ID, RI.OBJECT_ID, OU.INSTANCE_ID OBJECT_INSTANCE_ID, RI.PERMISSION_CODE, RI.PERMISSION_VALUE
+          from    CMN_SEC_ASSGND_RIGHT OS, OBS_UNIT_ENTITIES_V OU, CMN_SEC_RIGHT RI, CMN_SEC_USER_GROUPS UG, CMN_SEC_GROUPS G
+          where   ri.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     ri.permission_code in ('READ','ProjectViewManagement') 
+          and     OS.PRINCIPAL_TYPE = 'GROUP'
+          and     OS.PRINCIPAL_ID = UG.GROUP_ID
+          and     OS.INSTANCE_TYPE = OU.UNIT_MODE
+          and     OS.INSTANCE_ID = OU.UNIT_ID
+          and     RI.IS_ACTIVE = 1
+          and     G.ID = UG.GROUP_ID
+          and     G.IS_ACTIVE = 1
+          and     UPPER(OU.TABLE_NAME) = UPPER(RI.RIGHT_OBS_TYPE)
+          and     OS.RIGHT_ID = RI.RIGHT_ID
+          union all                                                                   -- Instance RULE FOR PRINCIPAL IS OBS,
+          select /*+ index(ri,CMN_SEC_RIGHT_U1) */
+                  R.USER_ID USER_ID, RI.OBJECT_ID, OS.INSTANCE_ID OBJECT_INSTANCE_ID, RI.PERMISSION_CODE, RI.PERMISSION_VALUE
+          from    CMN_SEC_RIGHT RI, CMN_SEC_ASSGND_RIGHT OS, OBS_UNIT_ENTITIES_V OU, SRM_RESOURCES R
+          where   ri.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     ri.permission_code in ('READ','ProjectViewManagement') 
+          and     OU.INSTANCE_ID = R.ID
+          and     UPPER(OU.TABLE_NAME) = 'SRM_RESOURCES'
+          and     OS.PRINCIPAL_TYPE = OU.UNIT_MODE
+          and     OS.PRINCIPAL_ID = OU.UNIT_ID
+          and     OS.INSTANCE_TYPE = 'INSTANCE'
+          and     OS.RIGHT_ID = RI.RIGHT_ID
+          and     RI.IS_ACTIVE = 1
+          union all                                                                     -- OBS UNIT RULE FOR PRINCIPAL IS OBS
+          select  /*+ index(ri,CMN_SEC_RIGHT_U1) */
+                  R.USER_ID USER_ID, RI.OBJECT_ID, OU2.INSTANCE_ID OBJECT_INSTANCE_ID, RI.PERMISSION_CODE, RI.PERMISSION_VALUE
+          from    SRM_RESOURCES R, OBS_UNIT_ENTITIES_V OU1, CMN_SEC_ASSGND_RIGHT OS, CMN_SEC_RIGHT RI, OBS_UNIT_ENTITIES_V OU2
+          where   ri.object_id in (663, 50663, 50660, 51780, 50669, 50666, 51101) 
+          and     ri.permission_code in ('READ','ProjectViewManagement') 
+          and     OU1.INSTANCE_ID = R.ID
+          and     UPPER(OU1.TABLE_NAME) = 'SRM_RESOURCES'
+          and     OS.PRINCIPAL_TYPE = OU1.UNIT_MODE
+          and     OS.PRINCIPAL_ID = OU1.UNIT_ID
+          and     OS.INSTANCE_TYPE = OU2.UNIT_MODE
+          and     OS.INSTANCE_ID = OU2.UNIT_ID
+          and     OS.RIGHT_ID = RI.RIGHT_ID
+          and     RI.IS_ACTIVE = 1
+          and     UPPER(OU2.TABLE_NAME) = UPPER(RI.RIGHT_OBS_TYPE))</text>
+  </QueryResult>
+</ClarityDBViewQuery>

@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_MAINT_GETPROJECTS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_MAINT_GETPROJECTS" (
+in_clntcode  IN VARCHAR2  DEFAULT NULL,
+in_projid  IN VARCHAR2  DEFAULT NULL,
+in_title  IN VARCHAR2  DEFAULT NULL,
+in_locationid  IN VARCHAR2  DEFAULT NULL,
+status  VARCHAR2  DEFAULT 'statusAll',
+type_  VARCHAR2  DEFAULT 'typeBoth',
+includechangeorders VARCHAR2 DEFAULT '0',
+RESOURCE_CODE  pac_mnt_resources.RESOURCE_CODE%TYPE,
+RC1  IN OUT REV_MAINT_GETPROJECTSPkg.RCT1)
+AS
+COMPANY_CODE  GLOBALPKG.STRING;
+PROJECT_CODE  GLOBALPKG.STRING;
+title  GLOBALPKG.STRING;
+locationid  GLOBALPKG.STRING;
+StoO_selcnt INTEGER;
+StoO_error  INTEGER;
+StoO_rowcnt INTEGER;
+StoO_crowcnt INTEGER := 0;
+StoO_fetchstatus INTEGER := 0;
+StoO_errmsg GLOBALPKG.STRING;
+StoO_sqlstatus INTEGER;
+template1  NUMBER(1,0);
+template2  NUMBER(1,0);
+statusOpen  GLOBALPKG.STRING;
+statusClose  GLOBALPKG.STRING;
+statusHold  GLOBALPKG.STRING;
+displayOpen GLOBALPKG.STRING;
+displayClose GLOBALPKG.STRING;
+displayHold GLOBALPKG.STRING;
+displayStandard GLOBALPKG.STRING;
+displayContract GLOBALPKG.STRING;
+displayRetainer GLOBALPKG.STRING;
+displayInternal GLOBALPKG.STRING;
+language_id NUMBER;
+upper_emplycode pac_mnt_resources.RESOURCE_CODE%TYPE;
+BEGIN
+/*
+   Called From:
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+   --Fix for #38377 - Used a new view
+   SELECT LANGUAGE_ID
+   INTO rev_maint_getprojects.language_id
+   FROM PAC_CMN_USERS_V
+   WHERE RESOURCE_CODE = rev_maint_getprojects.RESOURCE_CODE;
+   StoO_rowcnt := SQL%ROWCOUNT;
+   EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayOpen
+    FROM  CMN_LOOKUPS_V,
+          CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_STATUS'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'O'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayClose
+    FROM  CMN_LOOKUPS_V,
+          CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_STATUS'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'C'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayHold
+    FROM  CMN_LOOKUPS_V,
+          CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_STATUS'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'H'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayStandard
+    FROM  CMN_LOOKUPS_V,
+          CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TYPE'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'S'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayContract
+    FROM  CMN_LOOKUPS_V,
+       CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TYPE'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'P'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayRetainer
+    FROM  CMN_LOOKUPS_V,
+       CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TYPE'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'R'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ BEGIN
+    StoO_rowcnt := 0;
+    StoO_selcnt := 0;
+    StoO_error  := 0;
+    SELECT CMN_LOOKUPS_V.NAME
+    INTO rev_maint_getprojects.displayInternal
+    FROM  CMN_LOOKUPS_V,
+       CMN_LANGUAGES
+    WHERE      CMN_LOOKUPS_V.LOOKUP_TYPE = 'PAC_PROJECT_TYPE'
+    AND      CMN_LOOKUPS_V.LOOKUP_CODE = 'I'
+    AND      CMN_LOOKUPS_V.LANGUAGE_CODE = CMN_LANGUAGES.LANGUAGE_CODE
+    AND      CMN_LANGUAGES.ID = rev_maint_getprojects.language_id;
+    EXCEPTION
+	WHEN TOO_MANY_ROWS THEN
+		StoO_rowcnt := 2;
+	WHEN NO_DATA_FOUND THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+	WHEN OTHERS THEN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+ END;
+ rev_maint_getprojects.upper_emplycode := UPPER(rev_maint_getprojects.RESOURCE_CODE);
+ rev_maint_getprojects.COMPANY_CODE := rev_maint_getprojects.in_clntcode;
+ rev_maint_getprojects.PROJECT_CODE := rev_maint_getprojects.in_projid;
+ rev_maint_getprojects.title := rev_maint_getprojects.in_title;
+ rev_maint_getprojects.locationid := rev_maint_getprojects.in_locationid;
+-- rev_maint_getprojects.PROJECT_CODE :=  RTRIM(LTRIM(NVL(RTRIM(rev_maint_getprojects.PROJECT_CODE),'') || '%'));
+-- rev_maint_getprojects.title :=  RTRIM(LTRIM(NVL(RTRIM(rev_maint_getprojects.title),  '') || '%'));
+ rev_maint_getprojects.statusOpen :=  NULL;
+ rev_maint_getprojects.statusClose :=  NULL;
+ rev_maint_getprojects.statusHold :=  NULL;
+ IF  rev_maint_getprojects.type_ = 'typeProject' THEN
+  rev_maint_getprojects.template1 :=  0;
+  rev_maint_getprojects.template2 :=  0;
+ ELSE
+  IF  rev_maint_getprojects.type_ = 'typeTemplate' THEN
+   rev_maint_getprojects.template1 :=  1;
+   rev_maint_getprojects.template2 :=  1;
+  ELSE
+   rev_maint_getprojects.template1 :=  1;
+   rev_maint_getprojects.template2 :=  0;
+  END IF;
+ END IF;
+ IF  rev_maint_getprojects.status = 'statusAll' THEN
+  rev_maint_getprojects.statusOpen :=  'O';
+  rev_maint_getprojects.statusClose :=  'C';
+  rev_maint_getprojects.statusClose :=  'H';
+ ELSE
+  IF  rev_maint_getprojects.status = 'statusOpen' THEN
+   rev_maint_getprojects.statusOpen :=  'O';
+  ELSE
+   IF  rev_maint_getprojects.status = 'statusClose' THEN
+    rev_maint_getprojects.statusClose :=  'C';
+   ELSE
+    IF  rev_maint_getprojects.status = 'statusHold' THEN
+     rev_maint_getprojects.statusHold :=  'H';
+    END IF;
+   END IF;
+  END IF;
+ END IF;
+ OPEN RC1 FOR
+ SELECT
+   p.COMPANY_CODE "COMPANY_CODE",
+   p.PROJECT_CODE "PROJECT_CODE",
+   inv.NAME "title",
+   p.locationid "locationid",
+   DECODE(p.status, 'O', rev_maint_getprojects.displayOpen,
+                    'C', rev_maint_getprojects.displayClose,
+                    'H', rev_maint_getprojects.displayHold) "status",
+   DECODE(p.type_, 'S', rev_maint_getprojects.displayStandard,
+                   'I', rev_maint_getprojects.displayInternal,
+                   'P', rev_maint_getprojects.displayContract,
+                   'R', rev_maint_getprojects.displayRetainer) "type_",
+   p.id
+ FROM pac_mnt_projects p,
+      inv_investments inv
+ WHERE
+  p.id = inv.id
+  --Mdofied for #38254 - Don't if Function Based index can be used on NVL(NLS_UPPER()) ???
+  AND nvl(NLS_UPPER(p.COMPANY_CODE),'%') like nvl(NLS_UPPER(rev_maint_getprojects.COMPANY_CODE), '%') ESCAPE '\'
+  AND nvl(NLS_UPPER(p.PROJECT_CODE),'%') like nvl(NLS_UPPER(rev_maint_getprojects.PROJECT_CODE), '%') ESCAPE '\'
+  AND nvl(NLS_UPPER(inv.NAME),'%') like nvl(NLS_UPPER(rev_maint_getprojects.title), '%') ESCAPE '\'
+  AND nvl(NLS_UPPER(p.locationid),'%') like nvl(NLS_UPPER(rev_maint_getprojects.locationid), '%') ESCAPE '\'
+--  (rev_maint_getprojects.COMPANY_CODE is NULL or NLS_UPPER(p.COMPANY_CODE)  LIKE NLS_UPPER(rev_maint_getprojects.COMPANY_CODE) ESCAPE '\')
+-- AND ( rev_maint_getprojects.PROJECT_CODE is NULL or NLS_UPPER(p.PROJECT_CODE)  LIKE NLS_UPPER(rev_maint_getprojects.PROJECT_CODE) ESCAPE '\')
+--  AND ( rev_maint_getprojects.title is NULL or NLS_UPPER(p.title)  LIKE NLS_UPPER(rev_maint_getprojects.title) ESCAPE '\' )
+--  AND ( rev_maint_getprojects.locationid is NULL or NLS_UPPER(p.locationid)  LIKE NLS_UPPER(rev_maint_getprojects.locationid) ESCAPE '\' )
+  AND p.template_only  IN (rev_maint_getprojects.template1, rev_maint_getprojects.template2)
+  AND p.status  IN (rev_maint_getprojects.statusOpen, rev_maint_getprojects.statusHold, rev_maint_getprojects.statusClose)
+  AND (includechangeorders = '1' OR p.changeorder is NULL)
+/*  AND EXISTS (
+ SELECT  1
+  FROM projstaff s
+  WHERE s.COMPANY_CODE = p.COMPANY_CODE
+  AND s.PROJECT_CODE = p.PROJECT_CODE
+  AND s.RESOURCE_CODE = rev_maint_getprojects.upper_emplycode
+  AND s.projectaccess = 1)
+*/
+;
+END rev_maint_getprojects;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

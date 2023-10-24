@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_GET_TASK_CHARGECODE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_GET_TASK_CHARGECODE_SP" 
+(
+  P_TASK_ID NUMBER,
+  P_CHARGECODE_ID OUT NUMBER,
+  P_CHARGECODE_NAME OUT VARCHAR2,
+  P_CHARGECODE_EXTID OUT VARCHAR2
+)
+IS
+   v_cc_id NUMBER;
+   v_wbsseq NUMBER;
+   v_wbslev NUMBER;
+   v_projid NUMBER;
+   
+   v_cc_name  VARCHAR2(255);
+   v_cc_extid  VARCHAR2(255);
+
+   CURSOR tasks IS
+      SELECT PRID, PRWBSLEVEL, PRWBSSEQUENCE, PRCHARGECODEID
+      FROM   PRTASK
+      WHERE  PRPROJECTID = v_projid
+         AND   PRWBSSEQUENCE &lt; v_wbsseq
+         AND   PRWBSLEVEL &lt; v_wbslev
+      ORDER BY PRWBSSEQUENCE DESC;
+
+BEGIN
+
+  P_CHARGECODE_ID := 0;
+  P_CHARGECODE_NAME := '';
+  P_CHARGECODE_EXTID := '';
+
+   IF P_TASK_ID IS NULL OR P_TASK_ID &lt; 1
+   THEN
+      RETURN;
+   END IF;
+
+   SELECT PRWBSSEQUENCE, PRWBSLEVEL, PRPROJECTID, PRCHARGECODEID
+   INTO   v_wbsseq, v_wbslev, v_projid, v_cc_id
+   FROM   PRTASK
+   WHERE  PRID = P_TASK_ID;
+
+   IF v_cc_id IS NOT NULL AND v_cc_id &gt; 0
+   THEN
+      P_CHARGECODE_ID := v_cc_id;
+   END IF;
+      
+   IF P_CHARGECODE_ID = 0 AND v_wbslev &gt; 1
+   THEN
+      -- loop all tasks above me task in the project
+      -- note DESC order and re-track level when a parent is encountered
+      FOR eachRecord IN tasks
+      LOOP
+        IF eachRecord.PRWBSLEVEL &lt; v_wbslev
+        THEN
+          IF eachRecord.PRCHARGECODEID IS NOT NULL
+          THEN
+            P_CHARGECODE_ID := eachRecord.PRCHARGECODEID;
+            v_wbslev := 0; -- how do I break out?
+          ELSE
+            -- next time up a level
+            v_wbslev := eachRecord.PRWBSLEVEL;
+          END IF;
+        END IF;
+      END LOOP;
+   END IF;
+
+   -- if not on any task, use the project
+   IF P_CHARGECODE_ID = 0
+   THEN
+      SELECT CHARGECODEID
+      INTO  v_cc_id
+      FROM  INV_INVESTMENTS
+      WHERE ID = v_projid;
+      
+      IF v_cc_id IS NOT NULL AND v_cc_id &gt; 0
+      THEN
+         P_CHARGECODE_ID := v_cc_id;
+      END IF;
+   END IF;
+
+   IF P_CHARGECODE_ID IS NOT NULL AND P_CHARGECODE_ID &gt; 0
+   THEN
+      SELECT PRID, PRNAME, PREXTERNALID
+      INTO v_cc_id, v_cc_name, v_cc_extid
+      FROM PRCHARGECODE
+      WHERE PRID = P_CHARGECODE_ID;
+      
+      P_CHARGECODE_ID := v_cc_id;
+      P_CHARGECODE_NAME := v_cc_name;
+      P_CHARGECODE_EXTID := v_cc_extid;
+   END IF;
+
+EXCEPTION
+   WHEN OTHERS
+   THEN
+     P_CHARGECODE_ID := 0;
+     P_CHARGECODE_NAME := '';
+     P_CHARGECODE_EXTID := '';
+     RAISE_APPLICATION_ERROR (-20000, SQLERRM);
+      
+END PRJ_GET_TASK_CHARGECODE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

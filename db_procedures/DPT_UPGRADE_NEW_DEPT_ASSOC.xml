@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DPT_UPGRADE_NEW_DEPT_ASSOC</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DPT_UPGRADE_NEW_DEPT_ASSOC" 
+        (
+           oldDepartmentCode departments.DEPARTCODE%type,
+           newDepartmentCode departments.DEPARTCODE%type,
+           locationCode      locations.LOCATIONID%type
+        )
+          /*
+            This procedure is called by the migration / upgrade manual step when a department pointing to multiple entities via location references needs to change
+            to refer to a single entity - This procedure is invoked by the migration (application level) code
+          */
+      AS
+           newDepartmentId number;
+           oldDepartmentId number;
+           vLocationId      number;
+           newDeptName     departments.SHORTDESC%type;
+
+      BEGIN
+        if oldDepartmentCode = newDepartmentCode then
+          DPT_UPGRADE_FIN_OBJECT_ASSOCS (oldDepartmentCode, newDepartmentCode, locationCode);
+          return;
+        end if;
+
+          select id, shortdesc
+             into newDepartmentId, newDeptName
+          from departments where departcode = newDepartmentCode;
+
+          select id into oldDepartmentId
+          from departments where departcode = oldDepartmentCode;
+
+          select id into vLocationId
+          from locations where locationid = locationCode;
+
+          if ( newDepartmentId is null OR oldDepartmentId is null OR vLocationId is null) then
+              begin
+
+                  raise_application_error(-20000, 'Invalid department / location combination provided');
+              end;
+        end if;
+
+          update cbk_gl_allocation set department_id = newDepartmentId
+          where department_id = oldDepartmentId
+          and location_id = vLocationId;
+
+          update clntsupp set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update fin_object_properties set department_id = newDepartmentId
+          Where department_id = oldDepartmentId
+          and location_id = vLocationId;
+
+          update fin_object_prop_defaults set department_id = newDepartmentId
+          Where department_id = oldDepartmentId
+          and location_id = vLocationId;
+
+          update nameoptions set defaultdepartment = newDepartmentCode
+          Where defaultdepartment = oldDepartmentCode;
+
+          update NBI_FM_PT_FACTS set department = newDepartmentCode, department_name = newDeptName
+          Where department = oldDepartmentCode
+          and location = locationCode;
+
+          update NBI_PROJECT_CURRENT_FACTS set department = newDepartmentCode, department_name = newDeptName
+          Where department = oldDepartmentCode
+          and location = locationCode;
+
+          update NBI_RESOURCE_CURRENT_FACTS set department = newDepartmentCode, department_name = newDeptName
+          Where department = oldDepartmentCode
+          and location = locationCode;
+
+          update NBI_RT_FACTS set department = newDepartmentCode, department_name = newDeptName
+          Where department = oldDepartmentCode
+          and location = locationCode;
+
+          update pac_chg_resource_credits set department_id = newDepartmentId
+          Where department_id = oldDepartmentId
+          and location_id = vLocationId;
+
+          update pac_mnt_projects set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update pac_mnt_resources set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update ppa_billingdetails set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update ppa_transcontrol  set departcode = newDepartmentCode
+          where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update ppa_transcontrol set EMPLYHOMEDEPART = newDepartmentCode
+          Where EMPLYHOMEDEPART = oldDepartmentCode
+          and EMPLYHOMELOCATION = locationCode;
+
+          update ppa_transcontrol set PROJECT_DEPARTMENT = newDepartmentCode
+          where PROJECT_DEPARTMENT = oldDepartmentCode
+          and PROJECT_LOCATION = locationCode;
+
+          update ppa_transwipadjust
+          set DEPARTCODE = newDepartmentCode
+          where DEPARTCODE = oldDepartmentCode
+          and LOCATIONID = locationCode;
+
+          update ppa_transwipadjust
+          set EMPLYHOMEDEPART = newDepartmentCode
+          where EMPLYHOMEDEPART = oldDepartmentCode
+          and EMPLYHOMELOCATION = locationCode;
+
+          update ppa_wip set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update ppa_wip  set EMPLYHOMEDEPART = newDepartmentCode
+          where EMPLYHOMEDEPART = oldDepartmentCode
+          and EMPLYHOMELOCATION = locationCode;
+
+          update ppa_wip  set PROJECT_DEPARTMENT = newDepartmentCode
+          where PROJECT_DEPARTMENT = oldDepartmentCode
+          and PROJECT_LOCATION = locationCode;
+
+          update TEMP_IMP_VALIDATE_TRANSIMPORT set departcode = newDepartmentCode
+          Where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          update TEMP_IMP_VALIDATE_TRANSIMPORT set emplyhomedepart = newDepartmentCode
+          Where emplyhomedepart = oldDepartmentCode
+          and emplyhomelocation = locationCode;
+
+          update TEMP_IMP_VALIDATE_TRANSIMPORT set project_department = newDepartmentCode
+          Where project_department = oldDepartmentCode
+          and project_location = locationCode;
+
+          update locationdept set departcode = newDepartmentCode, dept_id = newDepartmentId, locn_id = vLocationId
+          where departcode = oldDepartmentCode
+          and locationid = locationCode;
+
+          -- DPT_UPD_MATRIX_NEW_DEPARTMENT (oldDepartmentCode, newDepartmentCode);
+
+          DPT_UPGRADE_FIN_OBJECT_ASSOCS (oldDepartmentCode, newDepartmentCode, locationCode);
+
+          -- for financially enabled objects
+            -- insert into obs instance mappings
+
+          /*
+              The following were not updated because
+              1. they do not have the location / department combination
+              2. are views
+              3. are new tables that will not have relevant data
+
+              -- update cbk_gl_allocation_detail set department_id = @newDepartmentId where department_id = @oldDepartmentId
+
+              -- update cbk_gl_txns set department_id = @newDepartmentId where department_id = @oldDepartmentId
+
+              -- update cbk_invoice set department_id = @newDepartmentId where department_id = @oldDepartmentId
+
+              -- update dpt_subscriptions set department_id = ? Where department_id = ?
+
+              -- update NBI_FM_PROJECT_TIME_FACTS set department = @newDepartmentCode, department_name = @newDeptName Where department = @oldDepartmentCode
+
+              -- update NBI_RESOURCE_FACTS set department = @newDepartmentCode, department_name = @newDeptName Where department = @oldDepartmentCode
+
+              -- update NBI_RESOURCE_TIME_FACTS set department = @newDepartmentCode, department_name = @newDeptName Where department = @oldDepartmentCode
+
+              -- update pma_portfolios set department_id = @newDepartmentId Where department_id = @oldDepartmentId
+          */
+        exception
+          when others then
+            raise_application_error(-20000, SQLERRM);
+
+
+      END DPT_UPGRADE_NEW_DEPT_ASSOC;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

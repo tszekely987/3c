@@ -1,0 +1,1127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>COP_PII_ANONYMIZE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."COP_PII_ANONYMIZE_SP" 
+(
+    p_job_run_id IN NUMBER,
+    p_job_user_id IN NUMBER,
+    p_anonymize_resource NUMBER DEFAULT 0,
+	p_anonymize_all NUMBER DEFAULT 0,
+	p_dblink_count NUMBER DEFAULT 0
+)
+IS
+    v_resource_key NUMBER;
+    v_resource_id VARCHAR2(96);
+    v_user_key NUMBER;
+    v_user_name VARCHAR2(240);
+    v_next_value NUMBER;
+    v_next_str_value VARCHAR2(30);
+    v_table_field VARCHAR2(30);
+    v_matrix_key NUMBER;
+    v_column NUMBER;
+    v_attribute_key NUMBER;
+    v_object VARCHAR2(23);
+    v_attribute VARCHAR2(30);
+    v_data_type VARCHAR2(20);
+    v_parent VARCHAR2(30);
+	v_data_size NUMBER;
+    v_sql_text VARCHAR2(4000);
+    v_trans_cnt number default 0;
+    v_index_exist number default 0;  
+	v_records_exist number default 0;	
+	v_table_exist number default 0;
+    v_commit_flg      NUMBER default 1;
+    TYPE v_temp_defs IS VARRAY(100) OF VARCHAR2(32767);
+    v_index_trigger_disable_defs 	  v_temp_defs;
+    v_index_trigger_rebuild_defs 	  v_temp_defs;	
+
+BEGIN	
+	-- Need to create indexes to improve performance, so if exist already remove index   
+	CMN_DROP_INDEX_SP('COP_TMP_DATA_MASK_DETAILS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_TRANSNO_PPA_WIP_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_PPA_WIP_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_PAC_MNT_RESOURCES_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_PAC_MNT_PROJECTS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_NBI_RESOURCE_CURRENT_FACTS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_NBI_PROJECT_CURRENT_FACTS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_TABLE_NAME_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_COLUMN_NAME_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_VALUEAFTER_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_VALUEBEFORE_CMN_AUDITS_INDXTMP');	
+	
+	-- Index on custom table 
+	v_sql_text := q'[CREATE INDEX COP_TMP_DATA_MASK_DETAILS_INDXTMP 
+						ON COP_TMP_DATA_MASK_DETAILS(resource_key,resource_id,user_key,user_name)]';
+	EXECUTE IMMEDIATE v_sql_text;
+
+	BEGIN 
+		-- Remove the existing data and take fresh copy to process masking 
+		SELECT count(1) INTO v_table_exist FROM user_tables WHERE upper(table_name) = 'COP_TMP_DATA_MASK_DETAILS';
+		IF (v_table_exist&gt;0) THEN
+			v_sql_text :=q'[TRUNCATE TABLE COP_TMP_DATA_MASK_DETAILS]';
+			EXECUTE IMMEDIATE v_sql_text;
+		END IF; 	
+
+		-- insert records for processing
+		INSERT INTO COP_TMP_DATA_MASK_DETAILS SELECT r.id v_resource_key, r.unique_name v_resource_id, 
+														r.user_id v_user_key, u.user_name v_user_name, 
+														'ZZZ' || cop_pii_anonymize_s1.NEXTVAL v_next_str_value 
+												  FROM   srm_resources r 
+												  INNER JOIN cmn_sec_users u ON r.user_id = u.id 
+												  INNER JOIN odf_ca_resource rc ON r.id = rc.id 
+												  WHERE  r.person_type &lt;&gt; 0 
+													AND    r.resource_type = 0 
+													AND    r.id &gt;= 5000000 
+													AND    u.user_name NOT IN ('xc_admin','csk.admin','od_admin@dummy.com','ppmjasperadmin','api_admin','ppm_invalid_user')
+													AND   (p_anonymize_all = 1
+													OR   ((p_anonymize_resource = 1
+													AND    r.is_active = 0
+													AND    NVL(rc.obj_anonymize_pii,0) = 1)
+													OR    (NVL(rc.obj_last_anonymized,TO_DATE('01/01/1900','MM/DD/YYYY')) BETWEEN TO_DATE('01/01/2000','MM/DD/YYYY') 
+													AND    NVL((SELECT MAX(last_updated_date) 
+																FROM odf_ca_cop_pii_attribute),TO_DATE('01/01/2000','MM/DD/YYYY'))))); 
+    COMMIT;
+	END;
+  
+	SELECT COUNT(1) INTO v_records_exist FROM COP_TMP_DATA_MASK_DETAILS;
+    
+	IF v_records_exist &gt;0 THEN 
+	
+		-- Fetching DDL commands for Indexes and triggers to disable while processing update statements
+		-- List of key table indexes, triggers disable before processing data to boost performance 
+		SELECT index_trigger_disable_defs,index_trigger_enable_defs bulk collect INTO v_index_trigger_disable_defs,v_index_trigger_rebuild_defs  
+		FROM
+		(
+		  SELECT table_owner||'.'||table_name table_name,'INDEX' object_type,
+				 'ALTER INDEX '||table_owner||'.'||index_name||(CASE WHEN index_type='FUNCTION-BASED NORMAL' THEN ' DISABLE' ELSE ' UNUSABLE' END) index_trigger_disable_defs,
+				 'ALTER INDEX '||table_owner||'.'||index_name||' REBUILD' index_trigger_enable_defs 
+		  FROM user_indexes 
+		  WHERE table_name in ('NBI_PROJECT_CURRENT_FACTS','NBI_RESOURCE_CURRENT_FACTS','PAC_MNT_PROJECTS','PAC_MNT_RESOURCES',
+			  'PPA_WIP','CMN_AUDITS') 
+			  AND (index_name not like '%_PK' OR uniqueness !='UNIQUE')
+		) defs;	
+
+        --Disable Triggers, Indexes before doing DML on table for huge data processing
+        IF v_index_trigger_disable_defs.count&gt;0 THEN
+          FOR I IN v_index_trigger_disable_defs.FIRST..v_index_trigger_disable_defs.LAST LOOP 
+             v_sql_text := v_index_trigger_disable_defs(I);
+             EXECUTE IMMEDIATE v_sql_text; 
+          END LOOP;
+          EXECUTE IMMEDIATE 'alter session set skip_unusable_indexes = true'; 
+        END IF;		
+	
+	
+		DELETE FROM odf_ca_cop_pii_attribute
+		WHERE  obj_pii_attribute NOT IN (SELECT id FROM odf_custom_attributes);
+
+		UPDATE clb_dms_files
+		SET    purge = 1
+		WHERE  id IN (
+					  SELECT f.id 
+		              FROM   clb_dms_folders fo
+					  INNER JOIN clb_dms_flat_hierarchy h ON fo.id = h.ancestor_id
+					  INNER JOIN clb_dms_files f ON h.child_id = f.parent_folder_id 
+					  INNER JOIN cop_tmp_data_mask_details flt ON flt.resource_key = fo.assoc_obj_id 
+					  WHERE fo.assoc_obj_type = 'Resources') ;
+		COMMIT;
+					  
+		/* Update user table values */
+		v_table_field := 'CMN_SEC_USERS';
+		MERGE INTO cmn_sec_users sec 
+			USING cop_tmp_data_mask_details flt 
+			ON (sec.id = flt.user_key)
+		  WHEN MATCHED THEN
+			UPDATE SET sec.user_name = flt.mask_str_value,
+					   sec.first_name = flt.mask_str_value,
+					   sec.middle_name = 'Z',
+					   sec.last_name = flt.mask_str_value,
+					   sec.email_address = flt.mask_str_value,
+					   sec.secondary_email = flt.mask_str_value,
+					   sec.sms_email_address = flt.mask_str_value,
+					   sec.photo_file = NULL,
+					   sec.full_name = flt.mask_str_value,
+					   sec.bo_user = flt.mask_str_value,
+					   sec.user_uid = flt.mask_str_value,
+					   sec.favorite_photo = NULL; 
+		
+		COMMIT;
+
+		/* Update old datamart project current fact values based on account_executive_id matching */
+		v_table_field := 'NBI_PROJECT_CURRENT_FACTS';
+
+		-- custom index to process records 
+		v_sql_text := q'[CREATE INDEX ZZ_NBI_PROJECT_CURRENT_FACTS_INDXTMP ON NBI_PROJECT_CURRENT_FACTS(account_executive_id,manager_id)]';
+		EXECUTE IMMEDIATE v_sql_text;
+		
+		MERGE INTO nbi_project_current_facts fct  
+			  USING (SELECT fct.PROJECT_ID, 
+                 (CASE WHEN fct.account_executive_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.ae_last_name END) ae_last_name,  
+                 (CASE WHEN fct.account_executive_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.ae_first_name END) ae_first_name,
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_last_name END) manager_last_name,
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_first_name END) manager_first_name 
+                FROM nbi_project_current_facts fct   
+                JOIN cop_tmp_data_mask_details flt ON fct.account_executive_id = flt.user_key 
+				) flt ON (fct.PROJECT_ID = flt.PROJECT_ID)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.ae_last_name = flt.ae_last_name,
+                 fct.ae_first_name = flt.ae_first_name,
+                 fct.manager_last_name = flt.manager_last_name,
+                 fct.manager_first_name = flt.manager_first_name; 
+
+		MERGE INTO nbi_project_current_facts fct  
+			  USING (SELECT fct.PROJECT_ID, 
+                 (CASE WHEN fct.account_executive_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.ae_last_name END) ae_last_name,  
+                 (CASE WHEN fct.account_executive_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.ae_first_name END) ae_first_name,
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_last_name END) manager_last_name,
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_first_name END) manager_first_name 
+                FROM nbi_project_current_facts fct   
+                JOIN cop_tmp_data_mask_details flt ON fct.manager_id = flt.user_key 
+					     ) flt ON (fct.PROJECT_ID = flt.PROJECT_ID)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.ae_last_name = flt.ae_last_name,
+                 fct.ae_first_name = flt.ae_first_name,
+                 fct.manager_last_name = flt.manager_last_name,
+                 fct.manager_first_name = flt.manager_first_name;				 
+		COMMIT;
+	
+		CMN_DROP_INDEX_SP('ZZ_NBI_PROJECT_CURRENT_FACTS_INDXTMP');
+	
+		/* Update old datamart resource current fact values  based on resource_id matching */
+		v_table_field := 'NBI_RESOURCE_CURRENT_FACTS';
+
+
+		v_sql_text := q'[CREATE INDEX ZZ_NBI_RESOURCE_CURRENT_FACTS_INDXTMP ON NBI_RESOURCE_CURRENT_FACTS(resource_id,manager_id)]';
+		EXECUTE IMMEDIATE v_sql_text;
+	
+		MERGE INTO nbi_resource_current_facts fct  
+			  USING (SELECT fct.resource_id, 
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_last_name END) manager_last_name,  
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_first_name END) manager_first_name,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.resource_code END) resource_code,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.last_name END) last_name,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.first_name END) first_name
+                FROM nbi_resource_current_facts fct   
+                JOIN cop_tmp_data_mask_details flt ON fct.resource_id = flt.resource_key   
+					     ) flt ON (fct.resource_id = flt.resource_id)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.manager_last_name = flt.manager_last_name,
+                 fct.manager_first_name = flt.manager_first_name,
+                 fct.resource_code = flt.resource_code,
+                 fct.last_name = flt.last_name,
+                 fct.first_name = flt.first_name;
+
+		MERGE INTO nbi_resource_current_facts fct  
+			  USING (SELECT fct.resource_id, 
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_last_name END) manager_last_name,  
+                 (CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value 
+                       ELSE fct.manager_first_name END) manager_first_name,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.resource_code END) resource_code,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.last_name END) last_name,
+                 (CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value 
+                       ELSE fct.first_name END) first_name
+                FROM nbi_resource_current_facts fct   
+                JOIN cop_tmp_data_mask_details flt ON fct.manager_id = flt.user_key   
+					     ) flt ON (fct.resource_id = flt.resource_id)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.manager_last_name = flt.manager_last_name,
+                 fct.manager_first_name = flt.manager_first_name,
+                 fct.resource_code = flt.resource_code,
+                 fct.last_name = flt.last_name,
+                 fct.first_name = flt.first_name;
+		COMMIT;
+
+		-- remove the custom index
+		CMN_DROP_INDEX_SP('ZZ_NBI_RESOURCE_CURRENT_FACTS_INDXTMP');
+		
+		/* Update old datamart resource time fact values based on resource_id filter */
+		v_table_field := 'NBI_RT_FACTS';
+		MERGE INTO nbi_rt_facts fct 
+			  USING cop_tmp_data_mask_details flt 
+			ON (fct.resource_id = flt.resource_key)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.manager_last_name = CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value ELSE fct.manager_last_name END,
+					   fct.manager_first_name = CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value ELSE fct.manager_first_name END,
+					   fct.resource_code = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.resource_code END,
+					   fct.last_name = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.last_name END,
+					   fct.first_name = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.first_name END;               
+		
+		/* Update old datamart resource time fact values based on manager_id filter*/
+		MERGE INTO nbi_rt_facts fct 
+			  USING cop_tmp_data_mask_details flt 
+			ON (fct.manager_id = flt.user_key)
+		  WHEN MATCHED THEN
+			UPDATE SET fct.manager_last_name = CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value ELSE fct.manager_last_name END,
+					   fct.manager_first_name = CASE WHEN fct.manager_id = flt.user_key THEN flt.mask_str_value ELSE fct.manager_first_name END,
+					   fct.resource_code = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.resource_code END,
+					   fct.last_name = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.last_name END,
+					   fct.first_name = CASE WHEN fct.resource_id = flt.resource_key THEN flt.mask_str_value ELSE fct.first_name END; 
+		COMMIT;
+
+		/* Update CMN_OPTION_VALUES */
+		v_table_field := 'CMN_OPTION_VALUES';
+		MERGE INTO CMN_OPTION_VALUES opv 
+			  USING ( SELECT o.id,COALESCE(flt.mask_str_value,'ZZZ'||o.id) mask_str_value
+						FROM cmn_options o 
+						LEFT JOIN (SELECT mask_str_value FROM cop_tmp_data_mask_details WHERE rownum&lt;2) flt ON 1=1 
+						WHERE lower(o.option_code)='tel_email'
+					) flt 
+			ON (opv.option_id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET opv.value = flt.mask_str_value||SUBSTR(opv.value,instr(opv.value||',','@',1),instr(opv.value||',',',',1)-instr(opv.value||',','@',1)); 		
+		
+		/* Update conversations */
+		v_table_field := 'NMC_CONVERSATIONS';
+		MERGE INTO nmc_conversations conv 
+			  USING cop_tmp_data_mask_details flt 
+			ON (conv.resource_id = flt.resource_key )
+		  WHEN MATCHED THEN
+			UPDATE SET conv.resource_name = flt.mask_str_value;
+		COMMIT;
+
+		/* Update conversation message */
+		v_table_field := 'NMC_CONVERSATIONS';
+		MERGE INTO nmc_conversations conv 
+			  USING ( SELECT c.conversation_id, trim(' ' from '@'||c.ref_text) search_str_value, flt.mask_str_value
+						FROM nmc_conv_references c
+						JOIN cop_tmp_data_mask_details flt ON c.data_id = flt.user_key where lower(c.data_type)='resource') flt 
+			ON (conv.id = flt.conversation_id)
+		  WHEN MATCHED THEN
+			UPDATE SET conv.message = REPLACE(conv.message,flt.search_str_value,flt.mask_str_value);
+
+		/* Update conversation references */
+		v_table_field := 'NMC_CONV_REFERENCES';
+		MERGE INTO nmc_conv_references convref 
+			  USING cop_tmp_data_mask_details flt 
+			ON (convref.data_id = flt.user_key AND lower(convref.data_type)='resource')
+		  WHEN MATCHED THEN
+			UPDATE SET convref.ref_text = flt.mask_str_value;
+			
+
+		/* Update integrations */
+		v_table_field := 'NMC_INTEGRATIONS';
+		MERGE INTO nmc_integrations intg 
+		USING (SELECT intg.id, 
+					  (CASE WHEN intg.user_name = flt.user_name THEN flt.mask_str_value ELSE intg.user_name END) user_name,
+					  (CASE WHEN intg.proxy_user_name = flt.user_name THEN flt.mask_str_value ELSE intg.proxy_user_name END) proxy_user_name
+				FROM nmc_integrations intg 
+				JOIN cop_tmp_data_mask_details flt ON intg.user_name = flt.user_name 
+			  ) flt ON (intg.id = flt.id)
+		  WHEN MATCHED THEN 
+			UPDATE SET intg.user_name = flt.user_name, intg.proxy_user_name = flt. proxy_user_name;
+
+		MERGE INTO nmc_integrations intg 
+		USING (SELECT intg.id, 
+					  (CASE WHEN intg.user_name = flt.user_name THEN flt.mask_str_value ELSE intg.user_name END) user_name,
+					  (CASE WHEN intg.proxy_user_name = flt.user_name THEN flt.mask_str_value ELSE intg.proxy_user_name END) proxy_user_name
+				FROM nmc_integrations intg 
+				JOIN cop_tmp_data_mask_details flt ON intg.proxy_user_name = flt.user_name
+			  ) flt ON (intg.id = flt.id)
+		  WHEN MATCHED THEN 
+			UPDATE SET intg.user_name = flt.user_name, intg.proxy_user_name = flt. proxy_user_name;               
+		COMMIT;
+		
+		/* Update resource studio table */
+		v_table_field := 'ODF_CA_RESOURCE 1';
+		MERGE INTO odf_ca_resource res 
+			  USING cop_tmp_data_mask_details flt 
+			ON (res.id = flt.resource_key)
+		  WHEN MATCHED THEN
+			UPDATE SET res.obj_bi_user_id = flt.mask_str_value;               
+		
+		COMMIT;
+		
+		/* Update project financials table */
+		v_table_field := 'PAC_MNT_PROJECTS'; 
+		
+		v_sql_text := q'[CREATE INDEX ZZ_PAC_MNT_PROJECTS_INDXTMP ON PAC_MNT_PROJECTS(resource_code,approvedby_resource_code,awaitapprvl_resource_code)]';
+		EXECUTE IMMEDIATE v_sql_text;
+		
+		MERGE INTO pac_mnt_projects prj 
+			  USING (SELECT prj.id,
+			               (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value ELSE prj.resource_code END) resource_code,  
+						   (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+								 ELSE prj.approvedby_resource_code END) approvedby_resource_code, 
+						   (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+								ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code 
+					  FROM pac_mnt_projects prj 
+					  JOIN cop_tmp_data_mask_details flt ON prj.resource_code = flt.resource_id 
+					  ) flt ON (prj.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+					   prj.approvedby_resource_code = flt.approvedby_resource_code, 
+					   prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code; 
+
+		MERGE INTO pac_mnt_projects prj 
+			  USING (SELECT prj.id,
+			               (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value ELSE prj.resource_code END) resource_code,  
+						   (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+								 ELSE prj.approvedby_resource_code END) approvedby_resource_code, 
+						   (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+								ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code 
+					  FROM pac_mnt_projects prj 
+					  JOIN cop_tmp_data_mask_details flt ON prj.approvedby_resource_code = flt.resource_id  
+					  ) flt ON (prj.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+					   prj.approvedby_resource_code = flt.approvedby_resource_code, 
+					   prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code;
+
+		MERGE INTO pac_mnt_projects prj 
+			  USING (SELECT prj.id,
+			               (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value ELSE prj.resource_code END) resource_code,  
+						   (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+								 ELSE prj.approvedby_resource_code END) approvedby_resource_code, 
+						   (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+								ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code 
+					  FROM pac_mnt_projects prj 
+					  JOIN cop_tmp_data_mask_details flt ON prj.awaitapprvl_resource_code = flt.resource_id 
+					  ) flt ON (prj.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+					   prj.approvedby_resource_code = flt.approvedby_resource_code, 
+					   prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code;					   
+		COMMIT;
+
+		CMN_DROP_INDEX_SP('ZZ_PAC_MNT_PROJECTS_INDXTMP');
+		
+		/* Update financial resource table*/
+		v_table_field := 'PAC_MNT_RESOURCES'; 
+
+		v_sql_text := q'[CREATE INDEX ZZ_PAC_MNT_RESOURCES_INDXTMP ON PAC_MNT_RESOURCES(resource_code,reportsto_resource_code)]';
+		EXECUTE IMMEDIATE v_sql_text;
+	
+		MERGE INTO pac_mnt_resources res  
+			  USING (SELECT res.id,
+                 (CASE WHEN res.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE res.resource_code END) resource_code,  
+                 (CASE WHEN res.reportsto_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE res.reportsto_resource_code END) reportsto_resource_code 
+                FROM pac_mnt_resources res  
+                JOIN cop_tmp_data_mask_details flt ON res.resource_code = flt.resource_id 
+					     ) flt ON (res.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET res.resource_code = flt.resource_code,
+					   res.reportsto_resource_code = flt.reportsto_resource_code;
+
+		MERGE INTO pac_mnt_resources res  
+			  USING (SELECT res.id,
+                 (CASE WHEN res.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE res.resource_code END) resource_code,  
+                 (CASE WHEN res.reportsto_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE res.reportsto_resource_code END) reportsto_resource_code 
+                FROM pac_mnt_resources res  
+                JOIN cop_tmp_data_mask_details flt ON res.reportsto_resource_code = flt.resource_id 
+					     ) flt ON (res.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET res.resource_code = flt.resource_code,
+					   res.reportsto_resource_code = flt.reportsto_resource_code;		
+		COMMIT;
+
+		CMN_DROP_INDEX_SP('ZZ_PAC_MNT_RESOURCES_INDXTMP');
+		
+		/* Update financial billing based on resource_code filter*/
+		v_table_field := 'PPA_BILLINGS';
+		MERGE INTO ppa_billings blng  
+			  USING (SELECT blng.transno,
+                 (CASE WHEN blng.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.resource_code END) resource_code,  
+                 (CASE WHEN blng.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN blng.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_billings blng  
+                JOIN cop_tmp_data_mask_details flt ON blng.resource_code = flt.resource_id 
+					     ) flt ON (blng.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET blng.resource_code = flt.resource_code,
+                 blng.entry_resource_code = flt.entry_resource_code, 
+                 blng.lastupdtdby_resource_code = flt.lastupdtdby_resource_code; 
+
+		MERGE INTO ppa_billings blng  
+			  USING (SELECT blng.transno,
+                 (CASE WHEN blng.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.resource_code END) resource_code,  
+                 (CASE WHEN blng.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN blng.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_billings blng  
+                JOIN cop_tmp_data_mask_details flt ON blng.entry_resource_code = flt.resource_id 
+					     ) flt ON (blng.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET blng.resource_code = flt.resource_code,
+                 blng.entry_resource_code = flt.entry_resource_code, 
+                 blng.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+
+		MERGE INTO ppa_billings blng  
+			  USING (SELECT blng.transno,
+                 (CASE WHEN blng.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.resource_code END) resource_code,  
+                 (CASE WHEN blng.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN blng.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE blng.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_billings blng  
+                JOIN cop_tmp_data_mask_details flt ON blng.lastupdtdby_resource_code = flt.resource_id 
+					     ) flt ON (blng.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET blng.resource_code = flt.resource_code,
+                 blng.entry_resource_code = flt.entry_resource_code, 
+                 blng.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;				 
+		COMMIT;
+		
+		/* Update financial posting batch table */
+		v_table_field := 'PPA_POSTINGBATCH';
+		MERGE INTO ppa_postingbatch pbtch  
+		USING (SELECT pbtch.batchno,flt.mask_str_value post_resource_code 
+				FROM ppa_postingbatch pbtch  
+				JOIN cop_tmp_data_mask_details flt ON pbtch.post_resource_code = flt.resource_id 
+			  ) flt ON (pbtch.batchno = flt.batchno)
+		  WHEN MATCHED THEN 
+			UPDATE SET pbtch.post_resource_code = flt.post_resource_code;
+		COMMIT;
+	
+		/* Update unposted transaction billings based on resource_code filter */
+		v_table_field := 'PPA_TRANSBILL';
+		MERGE INTO ppa_transbill trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transbill trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code; 
+
+		MERGE INTO ppa_transbill trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transbill trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.entry_resource_code = flt.resource_id  
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+
+		MERGE INTO ppa_transbill trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transbill trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.lastupdtdby_resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;				 
+		COMMIT;		
+		
+		/* Update unposted transactional WIP table based on resource_code filter  */
+		v_table_field := 'PPA_TRANSCONTROL'; 
+		MERGE INTO ppa_transcontrol trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transcontrol trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.resource_code = flt.resource_id 
+					) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+				 
+		MERGE INTO ppa_transcontrol trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transcontrol trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.entry_resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+
+		MERGE INTO ppa_transcontrol trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transcontrol trns  
+                JOIN cop_tmp_data_mask_details flt ON  trns.lastupdtdby_resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;				 
+				 
+		COMMIT;
+		
+		/* Update transactional WIP adjustments based on resource_code filter */
+		v_table_field := 'PPA_TRANSWIPADJUST'; 
+		MERGE INTO ppa_transwipadjust trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transwipadjust trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code; 		
+
+		MERGE INTO ppa_transwipadjust trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transwipadjust trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.entry_resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code; 
+	
+		MERGE INTO ppa_transwipadjust trns  
+			  USING (SELECT trns.transno,
+                 (CASE WHEN trns.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.resource_code END) resource_code,  
+                 (CASE WHEN trns.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.entry_resource_code END) entry_resource_code,
+                 (CASE WHEN trns.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE trns.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+                FROM ppa_transwipadjust trns  
+                JOIN cop_tmp_data_mask_details flt ON trns.lastupdtdby_resource_code = flt.resource_id 
+					     ) flt ON (trns.transno = flt.transno)
+		  WHEN MATCHED THEN
+			UPDATE SET trns.resource_code = flt.resource_code,
+                 trns.entry_resource_code = flt.entry_resource_code, 
+                 trns.lastupdtdby_resource_code = flt.lastupdtdby_resource_code; 				 
+		COMMIT;		
+
+		/* Update WIP table based on resource_code filter*/
+		v_table_field := 'PPA_WIP'; 
+		
+		v_sql_text := q'[CREATE INDEX ZZ_TRANSNO_PPA_WIP_INDXTMP on PPA_WIP(transno)]';
+		EXECUTE IMMEDIATE v_sql_text;
+		
+		v_sql_text := q'[CREATE INDEX ZZ_PPA_WIP_INDXTMP on PPA_WIP(resource_code,entry_resource_code,lastupdtdby_resource_code)]';
+		EXECUTE IMMEDIATE v_sql_text;
+		       
+		MERGE INTO ppa_wip wip   
+			  USING (SELECT wip.transno,
+					   (CASE WHEN wip.resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.resource_code END) resource_code,  
+					   (CASE WHEN wip.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.entry_resource_code END) entry_resource_code,
+					   (CASE WHEN wip.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+					  FROM ppa_wip wip  
+					  JOIN cop_tmp_data_mask_details flt ON (wip.resource_code = flt.resource_id 
+																	) 
+					 ) flt ON (wip.transno = flt.transno)
+			WHEN MATCHED THEN
+			UPDATE SET wip.resource_code = flt.resource_code,
+					   wip.entry_resource_code = flt.entry_resource_code, 
+					   wip.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+		
+		COMMIT;		
+		MERGE INTO ppa_wip wip   
+			  USING (SELECT wip.transno,
+					   (CASE WHEN wip.resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.resource_code END) resource_code,  
+					   (CASE WHEN wip.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.entry_resource_code END) entry_resource_code,
+					   (CASE WHEN wip.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+					  FROM ppa_wip wip  
+					  JOIN cop_tmp_data_mask_details flt ON (wip.entry_resource_code = flt.resource_id  
+																	) 
+					 ) flt ON (wip.transno = flt.transno)
+			WHEN MATCHED THEN
+			UPDATE SET wip.resource_code = flt.resource_code,
+					   wip.entry_resource_code = flt.entry_resource_code, 
+					   wip.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;
+		
+		COMMIT;		
+		MERGE INTO ppa_wip wip   
+			  USING (SELECT wip.transno,
+					   (CASE WHEN wip.resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.resource_code END) resource_code,  
+					   (CASE WHEN wip.entry_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.entry_resource_code END) entry_resource_code,
+					   (CASE WHEN wip.lastupdtdby_resource_code = flt.resource_id THEN flt.mask_str_value 
+							 ELSE wip.lastupdtdby_resource_code END) lastupdtdby_resource_code  
+					  FROM ppa_wip wip  
+					  JOIN cop_tmp_data_mask_details flt ON (wip.lastupdtdby_resource_code = flt.resource_id 
+																	) 
+					 ) flt ON (wip.transno = flt.transno)
+			WHEN MATCHED THEN
+			UPDATE SET wip.resource_code = flt.resource_code,
+					   wip.entry_resource_code = flt.entry_resource_code, 
+					   wip.lastupdtdby_resource_code = flt.lastupdtdby_resource_code;                   
+		COMMIT;
+		
+		CMN_DROP_INDEX_SP('ZZ_TRANSNO_PPA_WIP_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_PPA_WIP_INDXTMP');
+		
+		/* Update project staff table */
+		v_table_field := 'PROJSTAFF';
+		MERGE INTO projstaff stf 
+			  USING (SELECT stf.project_code, stf.resource_code, stf.company_code, flt.mask_str_value 
+			           FROM projstaff stf 
+					   JOIN cop_tmp_data_mask_details flt ON stf.resource_code = flt.resource_id) flt 
+			ON (stf.project_code = flt.project_code AND stf.company_code = flt.company_code)
+		  WHEN MATCHED THEN
+			UPDATE SET stf.resource_code = flt.mask_str_value 
+			WHERE stf.resource_code = flt.resource_code;
+			
+		COMMIT;
+
+		/* Update project revision table based on resource_code filter   */
+		v_table_field := 'PROJREVISION';
+		MERGE INTO projrevision prj  
+			  USING (SELECT prj.project_code, prj.projrevisionid, prj.company_code,
+                 (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.resource_code END) resource_code,  
+                 (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.approvedby_resource_code END) approvedby_resource_code,
+                 (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code  
+                FROM projrevision prj   
+                JOIN cop_tmp_data_mask_details flt ON prj.resource_code = flt.resource_id 
+					     ) flt ON (prj.project_code = flt.project_code and prj.projrevisionid = flt.projrevisionid and prj.company_code = flt.company_code)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+                 prj.approvedby_resource_code = flt.approvedby_resource_code, 
+                 prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code; 
+				 
+		MERGE INTO projrevision prj  
+			  USING (SELECT prj.project_code, prj.projrevisionid, prj.company_code,
+                 (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.resource_code END) resource_code,  
+                 (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.approvedby_resource_code END) approvedby_resource_code,
+                 (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code  
+                FROM projrevision prj   
+                JOIN cop_tmp_data_mask_details flt ON prj.approvedby_resource_code = flt.resource_id 
+					     ) flt ON (prj.project_code = flt.project_code and prj.projrevisionid = flt.projrevisionid and prj.company_code = flt.company_code)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+                 prj.approvedby_resource_code = flt.approvedby_resource_code, 
+                 prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code; 
+
+		MERGE INTO projrevision prj  
+			  USING (SELECT prj.project_code, prj.projrevisionid, prj.company_code,
+                 (CASE WHEN prj.resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.resource_code END) resource_code,  
+                 (CASE WHEN prj.approvedby_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.approvedby_resource_code END) approvedby_resource_code,
+                 (CASE WHEN prj.awaitapprvl_resource_code = flt.resource_id THEN flt.mask_str_value 
+                       ELSE prj.awaitapprvl_resource_code END) awaitapprvl_resource_code  
+                FROM projrevision prj   
+                JOIN cop_tmp_data_mask_details flt ON prj.awaitapprvl_resource_code = flt.resource_id 
+					     ) flt ON (prj.project_code = flt.project_code and prj.projrevisionid = flt.projrevisionid and prj.company_code = flt.company_code)
+		  WHEN MATCHED THEN
+			UPDATE SET prj.resource_code = flt.resource_code,
+                 prj.approvedby_resource_code = flt.approvedby_resource_code, 
+                 prj.awaitapprvl_resource_code = flt.awaitapprvl_resource_code; 				 
+		COMMIT;
+    
+		/* Update resource table */
+		v_table_field := 'SRM_CONTACTS';
+		MERGE INTO srm_contacts srm  
+			  USING cop_tmp_data_mask_details flt 
+			ON (srm.principal_id = flt.resource_key AND srm.principal_type = 'RESOURCE')
+		  WHEN MATCHED THEN
+			UPDATE SET srm.job_title = flt.mask_str_value,
+					   srm.address1 = flt.mask_str_value,
+					   srm.address2 = flt.mask_str_value,
+					   srm.address3 = flt.mask_str_value,
+					   srm.city = flt.mask_str_value,
+					   srm.state_province = flt.mask_str_value,
+					   srm.country_id = 223,
+					   srm.postal_code = flt.mask_str_value,
+					   srm.phone_home = flt.mask_str_value,
+					   srm.phone_work = flt.mask_str_value,
+					   srm.phone_cell = flt.mask_str_value,
+					   srm.phone_fax = flt.mask_str_value,
+					   srm.phone_pager = flt.mask_str_value,
+					   srm.url = flt.mask_str_value;
+					
+		COMMIT;
+		
+		/* Update resource table */
+		v_table_field := 'SRM_RESOURCES';
+		MERGE INTO srm_resources res   
+			  USING (SELECT res.id,flt.mask_str_value  
+					   FROM srm_resources res 
+					   JOIN cop_tmp_data_mask_details flt ON res.id = flt.resource_key ) flt 
+			ON (res.id = flt.id)
+		  WHEN MATCHED THEN
+			UPDATE SET res.unique_name = flt.mask_str_value,
+					   res.first_name = flt.mask_str_value,
+					   res.middle_name = 'Z',
+					   res.last_name = flt.mask_str_value,
+					   res.full_name = flt.mask_str_value,
+					   res.email = flt.mask_str_value,
+					   res.sms_email = flt.mask_str_value;		      
+		COMMIT;
+	
+
+		/* Update common audits table */		
+
+		-- indexes creation for processing records 
+		v_sql_text := q'[CREATE INDEX ZZ_TABLE_NAME_CMN_AUDITS_INDXTMP 
+						ON CMN_AUDITS(UPPER("TABLE_NAME"))]';
+		EXECUTE IMMEDIATE v_sql_text;
+
+		v_sql_text := q'[CREATE INDEX ZZ_COLUMN_NAME_CMN_AUDITS_INDXTMP 
+						ON CMN_AUDITS(UPPER("COLUMN_NAME"))]';
+		EXECUTE IMMEDIATE v_sql_text; 
+		
+		v_sql_text := q'[CREATE INDEX ZZ_VALUEAFTER_CMN_AUDITS_INDXTMP 
+						ON CMN_AUDITS(NVL("RAW_VALUE_AFTER",'0'))]';
+		EXECUTE IMMEDIATE v_sql_text; 
+
+		v_sql_text := q'[CREATE INDEX ZZ_VALUEBEFORE_CMN_AUDITS_INDXTMP 
+						ON CMN_AUDITS(NVL("RAW_VALUE_BEFORE",'0'))]';
+		EXECUTE IMMEDIATE v_sql_text; 		
+
+		v_table_field := 'CMN_AUDITS 1';
+		MERGE INTO cmn_audits aud    
+		  USING cop_tmp_data_mask_details flt ON (aud.object_id = flt.resource_key 
+													 AND UPPER(table_name) IN ('SRM_RESOURCES','ODF_CA_RESOURCE')
+													 AND UPPER(column_name) IN ('UNIQUE_NAME','FIRST_NAME','LAST_NAME','FULL_NAME','EMAIL','SMS_EMAIL','MANAGER_ID','BOOK_MANAGER_ID','OBJ_BI_USER_ID')
+													 )
+			WHEN MATCHED THEN 
+			UPDATE SET aud.value_before = flt.mask_str_value,
+					   aud.value_after = flt.mask_str_value,
+					   aud.raw_value_before = flt.mask_str_value,
+					   aud.raw_value_after = flt.mask_str_value;
+		
+		COMMIT;
+
+		v_table_field := 'CMN_AUDITS BEFORE USER';
+		MERGE INTO cmn_audits aud    
+		  USING (SELECT aud.id, flt.mask_str_value  
+					FROM cmn_audits aud 
+					JOIN cop_tmp_data_mask_details flt ON (
+										  NVL(aud.raw_value_before,'0') = TO_CHAR(flt.user_key)
+									AND  ((UPPER(table_name) = 'RIM_RISKS_AND_ISSUES' AND UPPER(column_name) IN ('ASSIGNED_TO','RESOLVED_BY'))
+									OR    (UPPER(table_name) = 'RIM_CHANGE_REQUESTS' AND UPPER(column_name) IN ('APPROVED_BY','ASSESSOR'))
+									OR    (UPPER(table_name) = 'INV_INVESTMENTS' AND UPPER(column_name) IN ('APPROVEDBY_ID','MANAGER_ID','TARGET_MANAGER_ID'))
+									OR    (UPPER(table_name) = 'DEPARTMENTS' AND UPPER(column_name) IN ('BRM_ID','DEPARTMENT_MANAGER_ID'))
+									OR    (UPPER(table_name) = 'INV_IDEAS' AND UPPER(column_name) = 'INITIATOR_ID')
+									OR    (UPPER(table_name) = 'IMM_INCIDENTS' AND UPPER(column_name) IN ('ASSIGNED_PRJMGR_ID','ASSIGNED_TO','REPORTED_BY'))
+									OR    (UPPER(table_name) = 'LOCATIONS' AND UPPER(column_name) = 'LOC_MANAGER_ID')
+									OR    (UPPER(table_name) = 'RQP_RELEASE_PLANS' AND UPPER(column_name) = 'RQP_MANAGER_ID')
+									OR    (UPPER(table_name) = 'RQP_REQUIREMENTS' AND UPPER(column_name) = 'RQP_MANAGER_ID')
+									OR    (UPPER(table_name) = 'SRM_RESOURCES' AND UPPER(column_name) IN ('BOOK_MANAGER_ID','MANAGER_ID'))
+									OR    (UPPER(table_name) = 'PRTEAM' AND UPPER(column_name) = 'REQUESTED_MANAGER_ID'))
+									)
+				) flt ON (aud.id = flt.id) 
+			WHEN MATCHED THEN 
+			UPDATE SET aud.value_before = flt.mask_str_value,
+					   aud.raw_value_before = flt.mask_str_value;
+		COMMIT;
+		
+		v_table_field := 'CMN_AUDITS AFTER USER';
+		MERGE INTO cmn_audits aud    
+		  USING (SELECT aud.id, flt.mask_str_value  
+					FROM cmn_audits aud 
+					JOIN cop_tmp_data_mask_details flt ON (
+										  NVL(aud.raw_value_after,'0') = TO_CHAR(flt.user_key)
+									AND  ((UPPER(table_name) = 'RIM_RISKS_AND_ISSUES' AND UPPER(column_name) IN ('ASSIGNED_TO','RESOLVED_BY'))
+									OR    (UPPER(table_name) = 'RIM_CHANGE_REQUESTS' AND UPPER(column_name) IN ('APPROVED_BY','ASSESSOR'))
+									OR    (UPPER(table_name) = 'INV_INVESTMENTS' AND UPPER(column_name) IN ('APPROVEDBY_ID','MANAGER_ID','TARGET_MANAGER_ID'))
+									OR    (UPPER(table_name) = 'DEPARTMENTS' AND UPPER(column_name) IN ('BRM_ID','DEPARTMENT_MANAGER_ID'))
+									OR    (UPPER(table_name) = 'INV_IDEAS' AND UPPER(column_name) = 'INITIATOR_ID')
+									OR    (UPPER(table_name) = 'IMM_INCIDENTS' AND UPPER(column_name) IN ('ASSIGNED_PRJMGR_ID','ASSIGNED_TO','REPORTED_BY'))
+									OR    (UPPER(table_name) = 'LOCATIONS' AND UPPER(column_name) = 'LOC_MANAGER_ID')
+									OR    (UPPER(table_name) = 'RQP_RELEASE_PLANS' AND UPPER(column_name) = 'RQP_MANAGER_ID')
+									OR    (UPPER(table_name) = 'RQP_REQUIREMENTS' AND UPPER(column_name) = 'RQP_MANAGER_ID')
+									OR    (UPPER(table_name) = 'SRM_RESOURCES' AND UPPER(column_name) IN ('BOOK_MANAGER_ID','MANAGER_ID'))
+									OR    (UPPER(table_name) = 'PRTEAM' AND UPPER(column_name) = 'REQUESTED_MANAGER_ID'))
+									)
+				) flt ON (aud.id = flt.id) 
+			WHEN MATCHED THEN 
+			UPDATE SET aud.value_after = flt.mask_str_value,
+					   aud.raw_value_after = flt.mask_str_value; 					   
+		COMMIT;
+
+		v_table_field := 'CMN_AUDITS BEFORE RESOURCE';
+		MERGE INTO cmn_audits aud    
+		  USING (SELECT aud.id, flt.mask_str_value  
+					FROM cmn_audits aud 
+					JOIN cop_tmp_data_mask_details flt ON (
+										  NVL(aud.raw_value_before,'0') = TO_CHAR(flt.resource_key)
+									AND  ((UPPER(table_name) = 'ODF_CA_PROJECT' 
+										  AND UPPER(column_name) IN ('OBJ_STAKEHOLDER1','OBJ_STAKEHOLDER2','OBJ_STAKEHOLDER3'))
+									OR    (UPPER(table_name) = 'RDM_ROADMAPS' AND UPPER(column_name) = 'AUTHOR')
+									OR    (UPPER(table_name) = 'RDM_ROADMAP_ITEMS' AND UPPER(column_name) IN ('OWNER','SPONSOR'))
+									OR    (UPPER(table_name) = 'BIZ_COM_SUP_PROPERTIES' AND UPPER(column_name) IN ('OWNER','SPONSOR'))
+									OR    (UPPER(table_name) = 'ODF_CA_IDEA' AND UPPER(column_name) = 'OBJ_BUSINESS_OWNER')
+									OR    (UPPER(table_name) = 'RSM_REQ_RESOURCES' AND UPPER(column_name) = 'RESOURCE_ID')
+									OR    (UPPER(table_name) = 'PRTASK' AND UPPER(column_name) = 'TASK_OWNER')
+									OR    (UPPER(table_name) = 'PRTEAM' AND UPPER(column_name) = 'PRRESOURCEID'))
+									)
+				) flt ON (aud.id = flt.id)
+			WHEN MATCHED THEN 
+			UPDATE SET aud.value_before = flt.mask_str_value,
+					   aud.raw_value_before = flt.mask_str_value;	
+		COMMIT;
+		
+		v_table_field := 'CMN_AUDITS AFTER RESOURCE';
+		MERGE INTO cmn_audits aud    
+		  USING (SELECT aud.id, flt.mask_str_value  
+					FROM cmn_audits aud 
+					JOIN cop_tmp_data_mask_details flt ON (
+										  NVL(aud.raw_value_after,'0') = TO_CHAR(flt.resource_key)
+									AND  ((UPPER(table_name) = 'ODF_CA_PROJECT' 
+										  AND UPPER(column_name) IN ('OBJ_STAKEHOLDER1','OBJ_STAKEHOLDER2','OBJ_STAKEHOLDER3'))
+									OR    (UPPER(table_name) = 'RDM_ROADMAPS' AND UPPER(column_name) = 'AUTHOR')
+									OR    (UPPER(table_name) = 'RDM_ROADMAP_ITEMS' AND UPPER(column_name) IN ('OWNER','SPONSOR'))
+									OR    (UPPER(table_name) = 'BIZ_COM_SUP_PROPERTIES' AND UPPER(column_name) IN ('OWNER','SPONSOR'))
+									OR    (UPPER(table_name) = 'ODF_CA_IDEA' AND UPPER(column_name) = 'OBJ_BUSINESS_OWNER')
+									OR    (UPPER(table_name) = 'RSM_REQ_RESOURCES' AND UPPER(column_name) = 'RESOURCE_ID')
+									OR    (UPPER(table_name) = 'PRTASK' AND UPPER(column_name) = 'TASK_OWNER')
+									OR    (UPPER(table_name) = 'PRTEAM' AND UPPER(column_name) = 'PRRESOURCEID'))
+									)
+				) flt ON (aud.id = flt.id)
+			WHEN MATCHED THEN 
+			UPDATE SET aud.value_after = flt.mask_str_value,
+					   aud.raw_value_after = flt.mask_str_value;
+		COMMIT;
+
+		DECLARE CURSOR cursor_1 IS
+					SELECT resource_key, resource_id, user_key, user_name, mask_str_value  
+					FROM   cop_tmp_data_mask_details ORDER BY resource_id;
+		BEGIN
+			OPEN cursor_1;
+			LOOP    
+				FETCH cursor_1 INTO v_resource_key, v_resource_id, v_user_key, v_user_name, v_next_str_value;
+				EXIT WHEN cursor_1%NOTFOUND;
+
+				v_trans_cnt := v_trans_cnt+1; 			
+				   
+				DECLARE CURSOR cursor_2 IS
+				SELECT m.matrixkey, mc.columnno
+				FROM   ppa_matrix m
+					   INNER JOIN ppa_matrixcoldef mc ON m.matrixkey = mc.matrixkey
+				WHERE  mc.fieldname = 'resource_code';
+				BEGIN
+					OPEN cursor_2;
+					LOOP
+						FETCH cursor_2 INTO v_matrix_key, v_column;
+						EXIT WHEN cursor_2%NOTFOUND;
+						
+						v_table_field := 'PPA_MATRIXVALUES';
+						UPDATE ppa_matrixvalues
+						SET    value1 = CASE WHEN v_column = 1 THEN v_next_str_value ELSE value1 END,
+							   value2 = CASE WHEN v_column = 2 THEN v_next_str_value ELSE value2 END,
+							   value3 = CASE WHEN v_column = 3 THEN v_next_str_value ELSE value3 END,
+							   value4 = CASE WHEN v_column = 4 THEN v_next_str_value ELSE value4 END,
+							   value5 = CASE WHEN v_column = 5 THEN v_next_str_value ELSE value5 END,
+							   value6 = CASE WHEN v_column = 6 THEN v_next_str_value ELSE value6 END,
+							   value7 = CASE WHEN v_column = 7 THEN v_next_str_value ELSE value7 END,
+							   value8 = CASE WHEN v_column = 8 THEN v_next_str_value ELSE value8 END,
+							   value9 = CASE WHEN v_column = 9 THEN v_next_str_value ELSE value9 END,
+							   value10 = CASE WHEN v_column = 10 THEN v_next_str_value ELSE value10 END
+						WHERE  matrixkey = v_matrix_key
+						AND    CASE WHEN v_column = 1 THEN value1
+									WHEN v_column = 2 THEN value2
+									WHEN v_column = 3 THEN value3
+									WHEN v_column = 4 THEN value4
+									WHEN v_column = 5 THEN value5
+									WHEN v_column = 6 THEN value6
+									WHEN v_column = 7 THEN value7
+									WHEN v_column = 8 THEN value8
+									WHEN v_column = 9 THEN value9
+									WHEN v_column = 10 THEN value10
+									ELSE '0' END = v_resource_id;
+					END LOOP;
+				END;
+					  
+				DECLARE CURSOR cursor_3 IS
+				SELECT ca.id, o.code, ca.column_name, ca.data_type, o.parent_object_code, data_size
+				FROM   odf_custom_attributes ca
+					   INNER JOIN odf_objects o ON ca.object_name = o.code
+					   INNER JOIN odf_ca_cop_pii_attribute c ON ca.id = c.obj_pii_attribute
+				WHERE  ca.is_custom = 1
+				AND    ca.is_virtual = 0
+		--        AND    ca.is_active = 1
+				AND    ca.is_system = 0
+				AND    ca.data_type IN ('number','string','date','clob','richtext')
+				AND    NVL(ca.extended_type,'x') NOT IN ('boolean','lookup','money')
+				AND   (o.parent_object_code = 'resource' OR o.code = 'resource')
+				ORDER BY o.code;
+				BEGIN
+					OPEN cursor_3;
+					LOOP
+						FETCH cursor_3 INTO v_attribute_key, v_object, v_attribute, v_data_type, v_parent, v_data_size;
+						EXIT WHEN cursor_3%NOTFOUND;
+							  
+						IF v_parent IS NULL THEN
+							v_sql_text := 'UPDATE odf_ca_' || v_object || ' SET ' || v_attribute || ' = ' ||
+										  CASE WHEN v_data_type IN ('clob','string','richtext') AND v_data_size &lt; 10 THEN '''Z'''
+											   WHEN v_data_type IN ('clob','string','richtext') AND v_data_size &gt;= 10 THEN '''' || v_next_str_value || ''''
+											   WHEN v_data_type = 'number' THEN TO_CHAR(0)
+											   WHEN v_data_type = 'date' THEN 'TO_DATE(''01/01/1900'',''MM/DD/YYYY'')'
+											   ELSE 'NULL' END;
+							v_sql_text := v_sql_text || ' WHERE id = ' || v_resource_key;
+						ELSE
+							v_sql_text := 'UPDATE odf_ca_' || v_object || ' SET ' || v_attribute || ' = ' ||
+										  CASE WHEN v_data_type IN ('clob','string','richtext') AND v_data_size &lt; 10 THEN '''Z'''
+											   WHEN v_data_type IN ('clob','string','richtext') AND v_data_size &gt;= 10 THEN '''' || v_next_str_value || ''''
+											   WHEN v_data_type = 'number' THEN TO_CHAR(0)
+											   WHEN v_data_type = 'date' THEN 'TO_DATE(''01/01/1900'',''MM/DD/YYYY'')'
+											   ELSE 'NULL' END;
+							v_sql_text := v_sql_text || ' WHERE odf_parent_id = ' || v_resource_key;
+						END IF;
+						v_table_field :=  'ODF_CA' || v_object;
+						EXECUTE IMMEDIATE (v_sql_text);
+							  
+			            v_table_field := 'CMN_AUDITS';
+			            IF v_parent IS NULL THEN
+			                v_sql_text := 'UPDATE cmn_audits SET value_before = ''' || v_next_str_value || ''', value_after = ''' ||
+			                              v_next_str_value || ''', raw_value_before = ''' || v_next_str_value || ''', raw_value_after = ''' ||
+			                              v_next_str_value || ''' WHERE object_id = ' || v_resource_key || 
+			                              ' AND UPPER(TABLE_NAME) = ''ODF_CA_RESOURCE'' AND UPPER(column_name) = ''' || UPPER(v_attribute) || '''';
+			            ELSE
+			                v_sql_text := 'UPDATE cmn_audits SET value_before = ''' || v_next_str_value || ''', value_after = ''' ||
+			                              v_next_str_value || ''', raw_value_before = ''' || v_next_str_value || ''', raw_value_after = ''' ||
+			                              v_next_str_value || ''' WHERE UPPER(TABLE_NAME) = ''ODF_CA_' || UPPER(v_object) ||
+			                              ''' AND UPPER(column_name) = ''' || UPPER(v_attribute) || ''' AND object_id IN (SELECT id FROM odf_ca_' ||
+			                              v_object || ' WHERE odf_parent_id = ' || v_resource_key || ')';
+			            END IF;
+			            v_table_field :=  'CMN_AUDITS 2';
+			            EXECUTE IMMEDIATE (v_sql_text);
+						 
+					END LOOP;
+				END; 
+					  
+				IF p_dblink_count = 0 THEN
+					UPDATE odf_ca_resource SET obj_anonymize_pii = 0, obj_last_anonymized = SYSDATE WHERE id = v_resource_key;
+				END IF;
+
+			  IF v_trans_cnt = 10 THEN 
+				v_trans_cnt := 0;
+				COMMIT;
+			  END IF;
+					  
+			END LOOP;
+		END;
+		COMMIT;
+		   
+	END IF;
+
+	--Rebuild Triggers 
+	IF (v_index_trigger_rebuild_defs is not null and v_index_trigger_rebuild_defs.count&gt;0) THEN 
+	  FOR I IN v_index_trigger_rebuild_defs.FIRST..v_index_trigger_rebuild_defs.LAST LOOP 
+		 v_sql_text := v_index_trigger_rebuild_defs(I);
+		 EXECUTE IMMEDIATE v_sql_text; 
+	  END LOOP;
+	  EXECUTE IMMEDIATE 'alter session set skip_unusable_indexes = false';
+	END IF;
+	
+	-- Remove temporary created indexes 	
+	CMN_DROP_INDEX_SP('COP_TMP_DATA_MASK_DETAILS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_TABLE_NAME_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_COLUMN_NAME_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_VALUEAFTER_CMN_AUDITS_INDXTMP');
+	CMN_DROP_INDEX_SP('ZZ_VALUEBEFORE_CMN_AUDITS_INDXTMP');
+	  
+	EXCEPTION
+	WHEN OTHERS THEN
+	BEGIN
+		CMN_DROP_INDEX_SP('COP_TMP_DATA_MASK_DETAILS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_TRANSNO_PPA_WIP_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_PPA_WIP_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_PAC_MNT_RESOURCES_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_PAC_MNT_PROJECTS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_NBI_RESOURCE_CURRENT_FACTS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_NBI_PROJECT_CURRENT_FACTS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_TABLE_NAME_CMN_AUDITS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_COLUMN_NAME_CMN_AUDITS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_VALUEAFTER_CMN_AUDITS_INDXTMP');
+		CMN_DROP_INDEX_SP('ZZ_VALUEBEFORE_CMN_AUDITS_INDXTMP');
+
+		--Rebuild Triggers
+		IF (v_index_trigger_rebuild_defs is not null and v_index_trigger_rebuild_defs.count&gt;0) THEN
+		  FOR I IN v_index_trigger_rebuild_defs.FIRST..v_index_trigger_rebuild_defs.LAST LOOP 
+			 v_sql_text := v_index_trigger_rebuild_defs(I);
+			 EXECUTE IMMEDIATE v_sql_text; 
+		  END LOOP;
+		  EXECUTE IMMEDIATE 'alter session set skip_unusable_indexes = false';
+		END IF;
+		
+		raise_application_error(-20100, 'ENCOUNTERED EXCEPTION WHILE PROCESSING ' || v_table_field || '. SQLERRM : ' || SQLERRM);
+
+	END; 
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

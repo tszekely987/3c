@@ -1,0 +1,754 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_GETBILCLNTPROJS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_GETBILCLNTPROJS" (
+in_Biller 	VARCHAR2 ,
+in_COMPANY_CODE 	VARCHAR2 ,
+in_PROJECT_CODE 	VARCHAR2 ,
+in_ProjTypes 	VARCHAR2 ,
+in_LockStatus	VARCHAR2 ,
+in_dFromBillDate 	IN DATE ,
+in_dToBillDate 	IN DATE ,
+in_ThresholdAmt 	NUMBER ,
+in_Location		VARCHAR2,
+in_ContractAmountOption	VARCHAR2,
+in_BillingSubProjects	VARCHAR2,
+in_PROJECT_CLASS 	    VARCHAR2 ,
+in_User                 NUMBER,
+RC1 	IN OUT REV_BILL_GETBILCLNTPROJSPkg.RCT1)
+AS
+dFromBillDate 	DATE;
+dToBillDate 	DATE;
+--ibillingSession INTEGER;
+cUser GLOBALPKG.STRING;
+cLockingUser GLOBALPKG.STRING;
+cCOMPANY_CODE 	GLOBALPKG.STRING;
+cPROJECT_CODE 	GLOBALPKG.STRING;
+cPROJECT_CLASS 	GLOBALPKG.STRING;
+cLocation 	GLOBALPKG.STRING;
+cProjTypes 	GLOBALPKG.STRING;
+cLockStatus	GLOBALPKG.STRING;
+nThresholdAmt 	NUMBER;
+v_ContractAmountOption	GLOBALPKG.STRING;
+v_BillingSubProjects	GLOBALPKG.STRING;
+v_InsertedCount NUMBER ;
+v_Status	INTEGER;
+v_HasSubProjects INTEGER;
+v_EnforceContractAmount NUMBER;
+v_ProjectCodeForBillingProject GLOBALPKG.STRING;
+v_ProjectTitle GLOBALPKG.STRING;
+v_QBEProjectID NUMBER;
+v_QBEProjectBillProjectID NUMBER;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+UF1_rowid 	ROWID;
+V_SQL_WHERE_CLAUSE VARCHAR2( 4000 );
+V_STMT VARCHAR2( 4000 );
+V_STMT1 VARCHAR2( 4000 );
+V_STMT2 VARCHAR2( 4000 );
+bHasGlobalRight INTEGER;
+
+V_SQL_WHERE_COMPANY_L_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_COMPANY_U_CLAUSE VARCHAR2( 1000 );
+
+
+UF1_oval1  TEMP_BILL_GET_CLIENT_PROJECT.Lock_%TYPE;
+CURSOR UF1_cursor IS
+SELECT T.ROWID, 1
+FROM olb_BillingCheckout o, TEMP_BILL_GET_CLIENT_PROJECT t
+WHERE o.COMPANY_CODE = T.COMPANY_CODE
+AND o.PROJECT_CODE = T.PROJECT_CODE
+FOR UPDATE OF T.Lock_;
+
+v_SUB_PROJECT_ID NUMBER;
+CURSOR GET_SUBPROJECTS_CSR IS
+SELECT PROJECT_ID
+FROM TEMP_BILL_GET_CLIENT_PROJECT C
+WHERE SUBPROJECT = 1 ;
+
+BEGIN
+
+  REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE := REV_BILL_GETBILCLNTPROJS.in_COMPANY_CODE;
+  REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE :=  REV_BILL_GETBILCLNTPROJS.in_PROJECT_CODE;
+  REV_BILL_GETBILCLNTPROJS.cPROJECT_CLASS :=  REV_BILL_GETBILCLNTPROJS.in_PROJECT_CLASS;
+  REV_BILL_GETBILCLNTPROJS.cProjTypes :=  REV_BILL_GETBILCLNTPROJS.in_ProjTypes;
+  REV_BILL_GETBILCLNTPROJS.cLockStatus :=  REV_BILL_GETBILCLNTPROJS.in_LockStatus;
+  REV_BILL_GETBILCLNTPROJS.nThresholdAmt := REV_BILL_GETBILCLNTPROJS.in_ThresholdAmt;
+  REV_BILL_GETBILCLNTPROJS.cLocation := REV_BILL_GETBILCLNTPROJS.in_Location;
+  REV_BILL_GETBILCLNTPROJS.cUser := REV_BILL_GETBILCLNTPROJS.in_Biller;
+  --	REV_BILL_GETBILCLNTPROJS.ibillingSession := 0;
+  REV_BILL_GETBILCLNTPROJS.dFromBillDate :=  REV_BILL_GETBILCLNTPROJS.in_dFromBillDate;
+  REV_BILL_GETBILCLNTPROJS.dToBillDate :=  REV_BILL_GETBILCLNTPROJS.in_dToBillDate;
+  REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption	:= in_ContractAmountOption ;
+  REV_BILL_GETBILCLNTPROJS.v_BillingSubProjects   := in_BillingSubProjects ;
+
+ bHasGlobalRight := 0;
+
+    	BEGIN
+    	StoO_error := 0;
+    	select 1
+    	into   bHasGlobalRight
+    	from dual
+    	where  exists (SELECT object_id
+                   FROM   cmn_sec_chk_user_r_v0
+                   WHERE  object_id = 51560
+                   AND    user_id = in_User
+                   AND    permission_code = 'READ' );
+    	EXCEPTION
+      	WHEN NO_DATA_FOUND
+      	THEN
+        	NULL;
+      	WHEN OTHERS
+      	THEN
+        	StoO_error := SQLCODE;
+        	StoO_errmsg := SQLERRM;
+    	END;
+
+  --Fix for bug 55374
+  --Set the values of these variables to the default values even if they are null
+  IF REV_BILL_GETBILCLNTPROJS.cProjTypes IS NULL THEN
+    REV_BILL_GETBILCLNTPROJS.cProjTypes := 'SPR';
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.cProjTypes = 'SPR' THEN
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND P.type_ in (''S'',''P'',''R'')';
+  ELSE
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND P.type_ = ''' || REV_BILL_GETBILCLNTPROJS.cProjTypes || '''';
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.cLockStatus IS NULL THEN
+    REV_BILL_GETBILCLNTPROJS.cLockStatus := 'A';
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption IS NULL THEN
+    REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption := 'A';
+  END IF;
+
+  IF (TRUNC(REV_BILL_GETBILCLNTPROJS.dToBillDate) - TRUNC(REV_BILL_GETBILCLNTPROJS.dFromBillDate)) &lt; 0 Then
+    Raise_Application_Error(-20391, 'Invalid From/To Date range. Enter a To Date greater than the From Date.');
+  End If;
+
+  IF (REV_BILL_GETBILCLNTPROJS.dToBillDate IS NULL) AND (REV_BILL_GETBILCLNTPROJS.dFromBillDate IS NOT NULL) THEN
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND W.TransDate BETWEEN ''' || REV_BILL_GETBILCLNTPROJS.dFromBillDate || ''' AND W.TransDate ';
+  END IF;
+
+  IF(REV_BILL_GETBILCLNTPROJS.dToBillDate IS NOT NULL) AND (REV_BILL_GETBILCLNTPROJS.dFromBillDate IS NULL) THEN
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND W.TransDate BETWEEN W.TransDate  AND ''' || REV_BILL_GETBILCLNTPROJS.dToBillDate || '''';
+  END IF;
+
+  IF(REV_BILL_GETBILCLNTPROJS.dToBillDate IS NOT NULL) AND (REV_BILL_GETBILCLNTPROJS.dFromBillDate IS NOT NULL) THEN
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND W.TransDate BETWEEN ''' || REV_BILL_GETBILCLNTPROJS.dFromBillDate || '''  AND ''' || REV_BILL_GETBILCLNTPROJS.dToBillDate ||'''';
+  END IF;
+
+  --performace fix for CLRT-19503
+  IF REV_BILL_GETBILCLNTPROJS.cLocation IS NOT NULL THEN
+    REV_BILL_GETBILCLNTPROJS.cLocation := '%' || REV_BILL_GETBILCLNTPROJS.cLocation || '%';
+    V_SQL_WHERE_CLAUSE := V_SQL_WHERE_CLAUSE || ' AND NLS_UPPER( C.LOCATIONID ) LIKE NLS_UPPER('''|| REV_BILL_GETBILCLNTPROJS.cLocation || ''')';
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE IS NOT NULL THEN
+    REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE := '%' || REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE || '%';
+    V_SQL_WHERE_COMPANY_U_CLAUSE := ' AND NLS_UPPER( W.COMPANY_CODE ) LIKE NLS_UPPER('''|| REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE || ''')';
+    V_SQL_WHERE_COMPANY_L_CLAUSE := ' AND NLS_UPPER( O.COMPANY_CODE ) LIKE NLS_UPPER('''|| REV_BILL_GETBILCLNTPROJS.cCOMPANY_CODE || ''')';
+  END IF;
+
+  DELETE FROM TEMP_BILL_GET_CLIENT_PROJECT;
+  DELETE FROM TEMP_BIL_SUBPROJECTS ;
+
+  /* If user does a QBE search on project we need to find out if it is a sub project or master.
+    Then get subprojects so we have the correct totals */
+  IF REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE IS NOT NULL AND REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE != ' ' Then
+    BEGIN
+
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      SELECT ID,
+           BILLING_PROJECT_ID
+      INTO v_QBEProjectID,
+           v_QBEProjectBillProjectID
+      FROM PAC_MNT_PROJECTS
+      WHERE NLS_UPPER( PROJECT_CODE ) = NLS_UPPER( REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE ) ;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+       WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+    /* If this is not a billing master we need to get it */
+    IF v_QBEProjectID != NVL( v_QBEProjectBillProjectID, v_QBEProjectID ) Then
+      BEGIN
+        PAC_BIL_GET_BILLING_PROJECT_SP( v_QBEProjectID, v_ProjectCodeForBillingProject, v_EnforceContractAmount, v_ProjectTitle ) ;
+      END;
+
+      REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE := v_ProjectCodeForBillingProject ;
+    End If;
+
+    /* Insert top level projects first. Then we'll get all the subprojects. */
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+      INSERT INTO TEMP_BIL_SUBPROJECTS ( COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+                                          BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+      SELECT COMPANY_CODE, PROJECT_CODE, ID, ID,
+            BILLING_PROJECT_ID, 0, NULL
+      FROM PAC_MNT_PROJECTS P
+      WHERE NLS_UPPER( PROJECT_CODE ) = NLS_UPPER( REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE );
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+
+    -- Accumulate all the sub projects for the master in TEMP_BIL_SUBPROJECTS. 0 means don't get WIP totals
+    BEGIN
+      PAC_BIL_GET_SUBPROJECTS_SP ( 0, v_Status, v_HasSubProjects ) ;
+    END;
+  ELSE
+    /* Insert dummy row so we can do NVL function to get all projects */
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+      INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE, PROJECT_ID, MASTER_PROJECT_ID,
+                                        BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+      SELECT NULL, NULL, NULL, NULL, NULL, 0, NULL FROM DUAL ;
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+    END;
+  END IF; --END IF REV_BILL_GETBILCLNTPROJS.cPROJECT_CODE IS NOT NULL
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    /* Locking result set to enable the user to unlock billing transactions */
+    IF REV_BILL_GETBILCLNTPROJS.cLockStatus IN ( 'L', 'A' ) THEN
+      BEGIN
+      /* SELECT BILLINGSESSIONKEY
+         INTO REV_BILL_GETBILCLNTPROJS.ibillingSession
+        FROM pc_BillingSession
+        WHERE USERID = REV_BILL_GETBILCLNTPROJS.cUser; */
+
+      cLockingUser := cUser;
+
+      BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+
+		 V_STMT := 'INSERT INTO TEMP_BILL_GET_CLIENT_PROJECT
+                   (DESCRIPTION, PROJECT_CODE,  PROJTYPE,
+                    COMPANY_CODE, BILL_TO_COMPANY_CODE,AFFILIATEPROJECT, AMTREMAIN,
+                    SUBPROJECT, LOCK_, ASSOCIATION, BILLING_CURRENCY_CODE,
+                    RESOURCE_LOCKED_BY, CONTRACT_AMOUNT_ENFORCED, HAS_BILLING_SUBPROJECTS,
+                    PROJECT_ID, BILLSESSIONKEY )
+                    SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+                           P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+                           RTRIM(P.affiliateproject), SUM(WV.AMOUNTREMAINING),
+                           ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                           2, '''', P.BILLING_CURRENCY_CODE, '
+                           || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                           ', 0, 0, P.ID, O.ACTIONID
+                           FROM OLB_BILLINGCHECKOUT O,
+                                PAC_MNT_PROJECTS P,
+                                INV_INVESTMENTS INV,
+                                PAC_MNT_RESOURCES R,
+                                PPA_WIP W,
+                                PPA_WIP_VALUES WV,
+                                SRM_RESOURCES S,
+                                CLNTSUPP C
+                                WHERE P.ID = INV.ID
+                                  AND WV.TRANSNO = W.TRANSNO
+                                  AND WV.CURRENCY_TYPE = ''BILLING''
+                                  AND W.COMPANY_CODE  = O.COMPANY_CODE
+                                  AND W.PROJECT_CODE = O.PROJECT_CODE
+                                  AND P.COMPANY_CODE = C.COMPANY_CODE
+                                  AND P.APPROVED = 1
+                               AND  ('|| bHasGlobalRight||' = 1)                             
+                                AND NLS_UPPER( O.USERID ) = NLS_UPPER( R.RESOURCE_CODE )
+                                AND R.ID = S.ID
+                                AND W.Chargeable = 1
+                                AND W.Status = 0
+                                AND P.COMPANY_CODE = O.COMPANY_CODE
+                                AND P.PROJECT_CODE = O.PROJECT_CODE
+                                AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                                     FROM TEMP_BIL_SUBPROJECTS T )';
+
+        V_STMT1 := 'SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+                           P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+                           RTRIM(P.affiliateproject), SUM(WV.AMOUNTREMAINING),
+                           ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                           2, '''', P.BILLING_CURRENCY_CODE, '
+                           || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                           ', 0, 0, P.ID, O.ACTIONID
+                           FROM OLB_BILLINGCHECKOUT O,
+                                PAC_MNT_PROJECTS P,
+                                INV_INVESTMENTS INV,
+                                PAC_MNT_RESOURCES R,
+                                PPA_WIP W,
+                                PPA_WIP_VALUES WV,
+                                SRM_RESOURCES S,
+                                CLNTSUPP C
+                                WHERE P.ID = INV.ID
+                                  AND WV.TRANSNO = W.TRANSNO
+                                  AND WV.CURRENCY_TYPE = ''BILLING''
+                                  AND W.COMPANY_CODE  = O.COMPANY_CODE
+                                  AND W.PROJECT_CODE = O.PROJECT_CODE
+                                  AND P.COMPANY_CODE = C.COMPANY_CODE
+                                  AND P.APPROVED = 1
+                               AND  (EXISTS (
+                                      SELECT object_id
+                                      FROM cmn_sec_chk_user_inst_v0
+                                      WHERE user_id = '
+                                      || in_User ||
+                                      ' AND object_id = 51560
+                                      AND permission_code = ''READ''
+                                      AND object_instance_id = INV.ID))                             
+                                AND NLS_UPPER( O.USERID ) = NLS_UPPER( R.RESOURCE_CODE )
+                                AND R.ID = S.ID
+                                AND W.Chargeable = 1
+                                AND W.Status = 0
+                                AND P.COMPANY_CODE = O.COMPANY_CODE
+                                AND P.PROJECT_CODE = O.PROJECT_CODE
+                                AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                                     FROM TEMP_BIL_SUBPROJECTS T )';
+                 V_STMT2 := ' 
+                   SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+                   P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+                   RTRIM(P.affiliateproject), SUM(WV.AMOUNTREMAINING),
+                   ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                   2, '''', P.BILLING_CURRENCY_CODE, '
+                   || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                   ', 0, 0, P.ID, O.ACTIONID
+                   FROM OLB_BILLINGCHECKOUT O,
+                        PAC_MNT_PROJECTS P,
+                        INV_INVESTMENTS INV,
+                        PAC_MNT_RESOURCES R,
+                        PPA_WIP W,
+                        PPA_WIP_VALUES WV,
+                        SRM_RESOURCES S,
+                        CLNTSUPP C
+                        WHERE P.ID = INV.ID
+                          AND WV.TRANSNO = W.TRANSNO
+                          AND WV.CURRENCY_TYPE = ''BILLING''
+                          AND W.COMPANY_CODE  = O.COMPANY_CODE
+                          AND W.PROJECT_CODE = O.PROJECT_CODE
+                          AND P.COMPANY_CODE = C.COMPANY_CODE
+                          AND P.APPROVED = 1
+                          AND ( EXISTS ( SELECT  1
+                              FROM projstaff PS
+                              WHERE PS.RESOURCE_CODE = NVL(''' || REV_BILL_GETBILCLNTPROJS.cUser ||
+                              ''', PS.RESOURCE_CODE )
+                        AND PS.billingaccess = 1
+                        AND PS.COMPANY_CODE = P.COMPANY_CODE
+                        AND PS.PROJECT_CODE = P.PROJECT_CODE ))
+                        AND NLS_UPPER( O.USERID ) = NLS_UPPER( R.RESOURCE_CODE )
+                        AND R.ID = S.ID
+                        AND W.Chargeable = 1
+                        AND W.Status = 0
+                        AND P.COMPANY_CODE = O.COMPANY_CODE
+                        AND P.PROJECT_CODE = O.PROJECT_CODE
+                        AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                             FROM TEMP_BIL_SUBPROJECTS T )';
+                                 
+
+        EXECUTE IMMEDIATE	V_STMT|| V_SQL_WHERE_COMPANY_L_CLAUSE || V_SQL_WHERE_CLAUSE ||
+                                ' GROUP BY INV.NAME,
+                                  P.PROJECT_CODE,
+                                  P.type_,
+                                  P.COMPANY_CODE,
+                                  P.BILL_TO_COMPANY_CODE,
+                                  P.affiliateproject,
+                                  ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                                  P.BILLING_CURRENCY_CODE,'
+                                  || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                                  ',P.ID, O.ACTIONID' ||
+							' UNION ' || V_STMT1|| V_SQL_WHERE_COMPANY_L_CLAUSE || V_SQL_WHERE_CLAUSE ||
+                                ' GROUP BY INV.NAME,
+                                  P.PROJECT_CODE,
+                                  P.type_,
+                                  P.COMPANY_CODE,
+                                  P.BILL_TO_COMPANY_CODE,
+                                  P.affiliateproject,
+                                  ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                                  P.BILLING_CURRENCY_CODE,'
+                                  || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                                  ',P.ID, O.ACTIONID' ||
+							' UNION ' || V_STMT2|| V_SQL_WHERE_COMPANY_L_CLAUSE || V_SQL_WHERE_CLAUSE ||
+                                ' GROUP BY INV.NAME,
+                                  P.PROJECT_CODE,
+                                  P.type_,
+                                  P.COMPANY_CODE,
+                                  P.BILL_TO_COMPANY_CODE,
+                                  P.affiliateproject,
+                                  ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+                                  P.BILLING_CURRENCY_CODE,'
+                                  || 'RTRIM(S.FIRST_NAME) || '' '' || S.LAST_NAME'||
+                                  ',P.ID, O.ACTIONID';
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+        END;
+      END;
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.cLockStatus IN ( 'U', 'A' ) THEN
+    BEGIN
+
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+ V_STMT := 'INSERT INTO TEMP_BILL_GET_CLIENT_PROJECT
+         (DESCRIPTION, PROJECT_CODE, PROJTYPE, COMPANY_CODE, BILL_TO_COMPANY_CODE,
+          AFFILIATEPROJECT, AMTREMAIN, SUBPROJECT, LOCK_, ASSOCIATION,
+          BILLING_CURRENCY_CODE, CONTRACT_AMOUNT_ENFORCED, HAS_BILLING_SUBPROJECTS,PROJECT_ID )
+          SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+          P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+          RTRIM(P.affiliateproject), SUM(WV.AmountRemaining),
+          ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+          0, '''', P.BILLING_CURRENCY_CODE, 0, 0, P.ID
+          FROM PPA_WIP W,
+               PPA_WIP_VALUES WV,
+               PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS  INV,
+               CLNTSUPP C
+          WHERE P.ID = INV.ID
+                AND WV.TRANSNO = W.TRANSNO
+                AND WV.CURRENCY_TYPE = ''BILLING''
+                AND  P.COMPANY_CODE = C.COMPANY_CODE
+                AND P.APPROVED = 1
+                AND P.STATUS != ''C''
+                AND W.Chargeable = 1
+                AND WV.AmountRemaining != 0
+                AND W.Status = 0
+                AND P.COMPANY_CODE = W.COMPANY_CODE
+                AND P.PROJECT_CODE = W.PROJECT_CODE
+               AND  ('|| bHasGlobalRight||' = 1)  
+          AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                                  FROM TEMP_BIL_SUBPROJECTS T )
+          AND NOT EXISTS ( SELECT 1 FROM TEMP_BILL_GET_CLIENT_PROJECT TM WHERE P.PROJECT_CODE = TM.PROJECT_CODE) ';
+         
+
+    V_STMT1 := ' 
+           SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+          P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+          RTRIM(P.affiliateproject), SUM(WV.AmountRemaining),
+          ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+          0, '''', P.BILLING_CURRENCY_CODE, 0, 0, P.ID
+          FROM PPA_WIP W,
+               PPA_WIP_VALUES WV,
+               PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS  INV,
+               CLNTSUPP C
+          WHERE P.ID = INV.ID
+                AND WV.TRANSNO = W.TRANSNO
+                AND WV.CURRENCY_TYPE = ''BILLING''
+                AND  P.COMPANY_CODE = C.COMPANY_CODE
+                AND P.APPROVED = 1
+                AND P.STATUS != ''C''
+                AND W.Chargeable = 1
+                AND WV.AmountRemaining != 0
+                AND W.Status = 0
+                AND P.COMPANY_CODE = W.COMPANY_CODE
+                AND P.PROJECT_CODE = W.PROJECT_CODE
+               AND  ( EXISTS (
+                     SELECT object_id
+                     FROM cmn_sec_chk_user_inst_v0
+                     WHERE user_id = ' ||in_User||
+                     ' AND object_id = 51560
+                       AND permission_code =''READ''
+                       AND object_instance_id = INV.ID))  
+          AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                                  FROM TEMP_BIL_SUBPROJECTS T )
+          AND NOT EXISTS ( SELECT 1 FROM TEMP_BILL_GET_CLIENT_PROJECT TM WHERE P.PROJECT_CODE = TM.PROJECT_CODE) ';
+         
+V_STMT2 := ' 
+           SELECT INV.NAME, P.PROJECT_CODE, P.type_,
+          P.COMPANY_CODE, P.BILL_TO_COMPANY_CODE,
+          RTRIM(P.affiliateproject), SUM(WV.AmountRemaining),
+          ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))),
+          0, '''', P.BILLING_CURRENCY_CODE, 0, 0, P.ID
+          FROM PPA_WIP W,
+               PPA_WIP_VALUES WV,
+               PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS  INV,
+               CLNTSUPP C
+          WHERE P.ID = INV.ID
+                AND WV.TRANSNO = W.TRANSNO
+                AND WV.CURRENCY_TYPE = ''BILLING''
+                AND  P.COMPANY_CODE = C.COMPANY_CODE
+                AND P.APPROVED = 1
+                AND P.STATUS != ''C''
+                AND W.Chargeable = 1
+                AND WV.AmountRemaining != 0
+                AND W.Status = 0
+                AND P.COMPANY_CODE = W.COMPANY_CODE
+                AND P.PROJECT_CODE = W.PROJECT_CODE
+                AND ( EXISTS ( SELECT  1
+                    FROM projstaff PS
+                    WHERE PS.RESOURCE_CODE = NVL(''' || REV_BILL_GETBILCLNTPROJS.cUser ||
+                    ''', PS.RESOURCE_CODE )
+                    AND PS.billingaccess = 1
+                    AND PS.COMPANY_CODE = P.COMPANY_CODE
+                    AND PS.PROJECT_CODE = P.PROJECT_CODE ))
+          AND P.PROJECT_CODE IN ( SELECT NVL( T.PROJECT_CODE, P.PROJECT_CODE )
+                                  FROM TEMP_BIL_SUBPROJECTS T )
+          AND NOT EXISTS ( SELECT 1 FROM TEMP_BILL_GET_CLIENT_PROJECT TM WHERE P.PROJECT_CODE = TM.PROJECT_CODE) ';
+
+        EXECUTE IMMEDIATE V_STMT || V_SQL_WHERE_COMPANY_U_CLAUSE || V_SQL_WHERE_CLAUSE
+          || ' GROUP BY INV.NAME, P.PROJECT_CODE, P.type_, P.COMPANY_CODE,P.BILL_TO_COMPANY_CODE,
+             P.affiliateproject, ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))), P.BILLING_CURRENCY_CODE, P.ID ' 
+			||' UNION '|| V_STMT1 || V_SQL_WHERE_COMPANY_U_CLAUSE || V_SQL_WHERE_CLAUSE
+          || ' GROUP BY INV.NAME, P.PROJECT_CODE, P.type_, P.COMPANY_CODE,P.BILL_TO_COMPANY_CODE,
+             P.affiliateproject, ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))), P.BILLING_CURRENCY_CODE, P.ID '
+			|| ' UNION ' || V_STMT2 || V_SQL_WHERE_COMPANY_U_CLAUSE || V_SQL_WHERE_CLAUSE
+          || ' GROUP BY INV.NAME, P.PROJECT_CODE, P.type_, P.COMPANY_CODE,P.BILL_TO_COMPANY_CODE,
+             P.affiliateproject, ABS( SIGN( P.ID - NVL( P.BILLING_PROJECT_ID, P.ID))), P.BILLING_CURRENCY_CODE, P.ID';
+        
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+  StoO_rowcnt := SQL%ROWCOUNT;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        NULL;
+    WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+  END;
+
+  IF REV_BILL_GETBILCLNTPROJS.cLockStatus != 'L' THEN
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		--UPDATE T
+		UPDATE TEMP_BILL_GET_CLIENT_PROJECT
+		SET
+		Lock_ = UF1_oval1
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+  END IF;
+
+  IF REV_BILL_GETBILCLNTPROJS.cLockStatus = 'U' THEN -- Show only UnLocked
+	 BEGIN
+	 StoO_error   := 0;
+	 StoO_rowcnt  := 0;
+
+  	 DELETE TEMP_BILL_GET_CLIENT_PROJECT
+	 	WHERE LOCK_ = 1;
+
+     StoO_rowcnt := SQL%ROWCOUNT;
+	 EXCEPTION
+	 WHEN NO_DATA_FOUND THEN
+		NULL;
+	 WHEN OTHERS THEN
+		StoO_error := SQLCODE;
+		StoO_errmsg := SQLERRM;
+	 END;
+  END IF;
+
+ /* Spin through the sub projects and get the master for each. Then update result set table */
+  OPEN GET_SUBPROJECTS_CSR;
+	LOOP
+	  FETCH GET_SUBPROJECTS_CSR INTO v_SUB_PROJECT_ID ;
+		EXIT WHEN GET_SUBPROJECTS_CSR%NOTFOUND;
+
+		BEGIN
+		  /* Get Top Level Billing Project */
+          PAC_BIL_GET_BILLING_PROJECT_SP( v_SUB_PROJECT_ID, v_ProjectCodeForBillingProject, v_EnforceContractAmount, v_ProjectTitle ) ;
+		END;
+
+		BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+		  UPDATE TEMP_BILL_GET_CLIENT_PROJECT
+	  	    SET PROJECT_CODE =  v_ProjectCodeForBillingProject,
+			 	DESCRIPTION = v_ProjectTitle,
+				PROJECT_ID = (SELECT ID
+				   	   FROM PAC_MNT_PROJECTS
+					   WHERE PROJECT_CODE = v_ProjectCodeForBillingProject )
+			WHERE PROJECT_ID = v_SUB_PROJECT_ID ;
+		  StoO_rowcnt := SQL%ROWCOUNT;
+		  EXCEPTION
+	      WHEN NO_DATA_FOUND THEN
+		    NULL;
+	      WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+        END;
+	END LOOP;
+  CLOSE GET_SUBPROJECTS_CSR;
+
+  /* If Project Class has been entered in the QBE search then remove the projects that do not have the
+     designated project class. This logic is done here because at this point we have determined the master projects
+	 for Multi-Level Billing  */
+  IF REV_BILL_GETBILCLNTPROJS.cPROJECT_CLASS IS NOT NULL AND REV_BILL_GETBILCLNTPROJS.cPROJECT_CLASS != ' ' Then
+	BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+
+	  DELETE FROM TEMP_BILL_GET_CLIENT_PROJECT
+	    WHERE PROJECT_CODE NOT IN ( SELECT P.PROJECT_CODE
+		                              FROM PAC_MNT_PROJECTS P
+									  WHERE P.PROJECT_CODE = TEMP_BILL_GET_CLIENT_PROJECT.PROJECT_CODE AND
+									        P.CLASS = REV_BILL_GETBILCLNTPROJS.cPROJECT_CLASS ) ;
+
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+	    NULL;
+      WHEN OTHERS THEN
+	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+    END;
+  END IF;
+
+  BEGIN
+    StoO_error   := 0;
+ 	StoO_rowcnt  := 0;
+    UPDATE TEMP_BILL_GET_CLIENT_PROJECT
+	    SET CONTRACT_AMOUNT_ENFORCED = 1
+	    WHERE TEMP_BILL_GET_CLIENT_PROJECT.PROJECT_CODE IN ( SELECT PROJECT_CODE
+	  												  	   	 FROM PROJCNTRTS
+															 WHERE PROJCNTRTS.PROJECT_CODE = TEMP_BILL_GET_CLIENT_PROJECT.PROJECT_CODE AND
+															 	   PROJCNTRTS.ENFORCE_CONTRACT_AMOUNT = 1 )  ;
+       StoO_rowcnt := SQL%ROWCOUNT;
+	   EXCEPTION
+	   WHEN NO_DATA_FOUND THEN
+		 NULL;
+	   WHEN OTHERS THEN
+		 StoO_error := SQLCODE;
+		 StoO_errmsg := SQLERRM;
+  End;
+
+  /* A project has subprojects if the billing project id points to it and that project is approved and not closed */
+  BEGIN
+    StoO_error   := 0;
+	StoO_rowcnt  := 0;
+    UPDATE TEMP_BILL_GET_CLIENT_PROJECT
+	    SET HAS_BILLING_SUBPROJECTS = 1
+	    WHERE TEMP_BILL_GET_CLIENT_PROJECT.PROJECT_ID IN ( SELECT DISTINCT BILLING_PROJECT_ID
+	  												  	   	 FROM PAC_MNT_PROJECTS P
+															 WHERE P.ID != TEMP_BILL_GET_CLIENT_PROJECT.PROJECT_ID AND
+															 	   APPROVED = 1 AND
+																   STATUS IN ('O', 'H') )  ;
+       StoO_rowcnt := SQL%ROWCOUNT;
+	   EXCEPTION
+	   WHEN NO_DATA_FOUND THEN
+		 NULL;
+	   WHEN OTHERS THEN
+		 StoO_error := SQLCODE;
+		 StoO_errmsg := SQLERRM;
+  End;
+
+  IF REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption = 'A' Then
+    REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption := NULL ;
+  End If;
+
+  IF REV_BILL_GETBILCLNTPROJS.v_BillingSubProjects = 'A' Then
+    REV_BILL_GETBILCLNTPROJS.v_BillingSubProjects := NULL ;
+  End If;
+
+  OPEN RC1 FOR
+	SELECT DESCRIPTION,
+		   PROJECT_CODE,
+		   RTRIM(ProjType) "ProjType",
+		   t.COMPANY_CODE "Client",
+		   '',
+		   SUM( AmtRemain ), --Change to Sum to roll up subprojects
+		   '',
+		   0,
+		   Lock_,
+		   REV_BILL_GETBILCLNTPROJS.dToBillDate "CutOffDate",
+		   '',
+		   t.BILLSESSIONKEY,
+		   REV_BILL_GETBILCLNTPROJS.dFromBillDate,
+		   BILLING_CURRENCY_CODE,
+		   s.COMPANY_NAME,
+		   RESOURCE_LOCKED_BY,
+		   CONTRACT_AMOUNT_ENFORCED,
+		   HAS_BILLING_SUBPROJECTS,
+		   REV_BILL_GETBILCLNTPROJS.cLockStatus
+    FROM TEMP_BILL_GET_CLIENT_PROJECT t,
+		 SRM_COMPANIES s
+	WHERE NLS_UPPER( s.COMPANY_ID ) = NLS_UPPER( t.COMPANY_CODE ) AND
+		  CONTRACT_AMOUNT_ENFORCED = TO_NUMBER( NVL(REV_BILL_GETBILCLNTPROJS.v_ContractAmountOption, CONTRACT_AMOUNT_ENFORCED))
+	GROUP BY DESCRIPTION,
+		     PROJECT_CODE,
+		     RTRIM(ProjType),
+		     t.COMPANY_CODE,
+		     Lock_,
+		     REV_BILL_GETBILCLNTPROJS.dToBillDate,
+		     t.BILLSESSIONKEY,
+		     REV_BILL_GETBILCLNTPROJS.dFromBillDate,
+		     BILLING_CURRENCY_CODE,
+		     s.COMPANY_NAME,
+		     RESOURCE_LOCKED_BY,
+		     CONTRACT_AMOUNT_ENFORCED,
+		     HAS_BILLING_SUBPROJECTS,
+			 REV_BILL_GETBILCLNTPROJS.cLockStatus
+    HAVING SUM( AmtRemain ) &gt;= NVL( REV_BILL_GETBILCLNTPROJS.nThresholdAmt, SUM( AmtRemain ))
+	ORDER BY PROJECT_CODE ;
+
+	DELETE FROM TEMP_BILL_GET_CLIENT_PROJECT;
+	DELETE FROM TEMP_BIL_SUBPROJECTS ;
+
+END REV_BILL_GETBILCLNTPROJS;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

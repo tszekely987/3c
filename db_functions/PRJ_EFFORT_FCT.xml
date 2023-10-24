@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_EFFORT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_EFFORT_FCT" (p_agg_id INTEGER, p_agg_type VARCHAR2, p_attr VARCHAR2)
+   RETURN NUMBER
+/*
+   This function returns the project (or task) aggregate 'effort' attribute
+   Returns 0 (not NULL) if the value is undefined or the mode not supported
+
+   p_agg_id: id of aggregate object
+   p_agg_type: use object code, 'project' or 'task'
+   p_attr:  'ACT', 'ETC', 'TOTAL', 'PCTCMP', 'CALCETC'
+
+   Note: CALCETC is only supported at the project level.
+*/
+
+IS
+ v_return    NUMBER;
+  v_act       NUMBER;
+  v_etc       NUMBER;
+  v_calcetc   NUMBER;
+BEGIN
+  IF UPPER(p_agg_type) = 'PROJECT'
+  THEN
+  IF UPPER(p_attr) = 'CALCETC'
+    THEN
+     select nvl(sum(t.prcalcestimate),0)
+      into  v_calcetc
+      from prtask t
+      where t.prprojectid = p_agg_id
+      and t.prwbslevel &lt;= 1;
+     ELSE
+      select nvl(sum(a.practsum/3600),0)
+      , nvl(sum(a.prestsum/3600),0)
+      into v_act, v_etc
+      from prassignment a
+      , srm_resources r
+      , prtask t
+      where r.resource_type = 0
+      and a.prresourceid = r.id
+      and a.prtaskid = t.prid
+      and t.prprojectid = p_agg_id;
+    END IF;
+  ELSIF UPPER(p_agg_type) = 'TASK'
+  THEN
+    select nvl(sum(a.practsum/3600),0), nvl(sum(a.prestsum/3600),0)
+    into v_act, v_etc
+      from  prtask t
+        , prtask wbsInfo
+        , prassignment a
+        , srm_resources r
+      where t.prprojectid = wbsInfo.prprojectid
+      	and a.prtaskid = t.prid
+      	and wbsInfo.prid = p_agg_id
+      	and ((t.prwbssequence &gt;= wbsInfo.prwbssequence
+      		  and t.prwbssequence &lt; wbsInfo.WBS_NNBSEQ))
+      	and a.prresourceid = r.id
+      	and r.resource_type = 0;
+  ELSIF UPPER(p_agg_type) = 'TENTATIVE_TASK'
+  THEN
+    select nvl(sum(ta.actual_sum/3600),0), nvl(sum(ta.estimate_sum/3600),0)
+    into v_act, v_etc
+    from prj_tentative_assignments ta, prassignment pra
+         , srm_resources r
+         , (select p_agg_id task_id from dual
+           union
+           select t.prid task_id
+            from prtask t, prtask wbsInfo
+           where t.prprojectid=wbsInfo.prprojectid
+           and wbsInfo.prid = p_agg_id
+           and wbsInfo.pristask=0
+           and t.prwbssequence &gt; wbsInfo.prwbssequence
+           and t.prwbssequence &lt; wbsInfo.WBS_NNBSEQ
+          ) tasks
+    where pra.prresourceid=r.id
+    and ta.assignment_id = pra.prid
+    and r.resource_type = 0
+    and pra.prtaskid = tasks.task_id;
+  ELSE
+    v_act := 0;
+    v_etc := 0;
+  END IF;
+
+  -- note: NOT trying to preserve NULL value behavior (return 0)
+  v_return := 0;
+
+  IF p_attr = 'ETC'
+  THEN
+    v_return := v_etc;
+  ELSIF p_attr = 'ACT'
+  THEN
+    v_return := v_act;
+  ELSIF p_attr = 'CALCETC'
+  THEN
+    v_return := v_calcetc;
+  ELSIF p_attr = 'TOTAL'
+  THEN
+    v_return := v_act + v_etc;
+  ELSIF p_attr = 'PCTCMP' AND (v_act + v_etc) &gt; 0
+  THEN
+    v_return := v_act / (v_act + v_etc);
+  END IF;
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

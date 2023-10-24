@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="LOOKUP_CHARGE_CODES_PRJ" displayAttributeName="prname" hiddenAttributeName="prid" objectCode="" sortAttributeName="prname" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List of charge codes when Investment specific charge codes are enabled" languageCode="en" name="Active Charge Codes"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[
+                  
+         select @SELECT:cc.prID:prID@,
+        @SELECT:cc.PRUID:UNIQUE_CODE@,
+        @SELECT:cc.prName:prName@,
+        @SELECT:cc.prExternalID:prExternalID@,
+        @SELECT:inv.name:name@,
+		@SELECT:cc.prModTime:LAST_UPDATED_DATE@
+ from prchargecode cc left outer join inv_investments inv on cc.prprojectid=inv.id
+where @FILTER@
+@BROWSE-ONLY:  
+and cc.prisopen<>0
+and (cc.prprojectid is null or cc.prprojectid=ISNULL(@WHERE:PARAM:USER_DEF:INTEGER:INV_ID@,@WHERE:PARAM:USER_DEF:INTEGER:PROJECT_ID@))
+  :BROWSE-ONLY@
+                ]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[select @SELECT:cc.prID:prID@,
+        @SELECT:cc.PRUID:UNIQUE_CODE@,
+        @SELECT:cc.prName:prName@,
+        @SELECT:cc.prExternalID:prExternalID@,
+        @SELECT:inv.name:name@,
+		@SELECT:cc.prModTime:LAST_UPDATED_DATE@
+ from prchargecode cc, inv_investments inv
+where cc.prprojectid=inv.id(+)
+@BROWSE-ONLY:  
+and cc.prisopen<>0
+and (cc.prprojectid is null or cc.prprojectid=NVL(@WHERE:PARAM:USER_DEF:INTEGER:INV_ID@,@WHERE:PARAM:USER_DEF:INTEGER:PROJECT_ID@))
+  :BROWSE-ONLY@
+and @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[select @SELECT:cc.prID:prID@,
+ @SELECT:cc.PRUID:UNIQUE_CODE@,
+ @SELECT:cc.prName:prName@,
+ @SELECT:cc.prExternalID:prExternalID@,
+ @SELECT:inv.name:name@,
+ @SELECT:cc.prModTime:LAST_UPDATED_DATE@
+ from prchargecode cc left outer join inv_investments inv on cc.prprojectid=inv.id
+where @FILTER@
+@BROWSE-ONLY:
+and cc.prisopen<>0
+and (cc.prprojectid is null or cc.prprojectid=coalesce(@WHERE:PARAM:USER_DEF:INTEGER:INV_ID@,@WHERE:PARAM:USER_DEF:INTEGER:PROJECT_ID@))
+  :BROWSE-ONLY@
+]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="prname"/>
+              <displayedSuggestionAttribute value="prexternalid"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="prname"/>
+              <searchedSuggestionAttribute value="prexternalid"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Charge Codes" languageCode="en" name="Charge Codes"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Charge Codes" languageCode="en" name="Charge Codes"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="prname" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Charge Code" languageCode="en" name="Charge Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="prexternalid" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="ID" languageCode="en" name="ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="4" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="prid" languageCode="en" name="prid"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prname" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Charge Code" languageCode="en" name="Charge Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="prexternalid" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="ID" languageCode="en" name="ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Investment Name" languageCode="en" name="Investment Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

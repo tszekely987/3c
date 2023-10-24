@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="iv_get_all_variables" createdBy="admin" endStep="Finish" source="customer" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls languageCode="en" name="IV Get All Variables"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security>
+              <UserSecurity rightCode="PROCESS-DEF-INST-INITIATE" userName="admin"/>
+              <UserSecurity rightCode="PROCESS-DEF-INST-WRITE" userName="admin"/>
+            </Security>
+            <Objects/>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="step1"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="step1" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls languageCode="en" name="step1"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="gs" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="gs"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:core="jelly:core" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:util="jelly:util" xmlns:x="jelly:org.apache.commons.jelly.tags.xml.XMLTagLibrary" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <core:set value="${context.getVariables().keySet().toString()}" var="allNames"/>
+                          <core:set value="${allNames.substring(1)}" var="allNames"/>
+                          <util:replace new="" old="]" var="allNames">${allNames}</util:replace>
+                          <core:new className="java.util.TreeMap" var="sortedMap"/>
+                          <core:new className="java.util.Hashtable" var="variableClasses"/>
+                          <core:forEach items="${allNames}" var="thisVariable">
+                            <core:switch on="${thisVariable}">
+                              <core:case value="thisVariable"/>
+                              <core:case value="context"/>
+                              <core:case value="args"/>
+                              <core:case value="systemScope">
+                                <core:forEach items="${systemScope.propertyNames()}" var="thisProperty">
+                                  <core:set value="${systemScope.getProperty(thisProperty)}" var="thisValue"/>
+                                  <core:set value="${thisValue.getClass().getName()}" var="thisValueClass"/>
+                                  <core:mute>${sortedMap.put(thisProperty, thisValue)}</core:mute>
+                                  <core:mute>${variableClasses.put(thisProperty, 'systemScope')}</core:mute>
+                                </core:forEach>
+                              </core:case>
+                              <core:default>
+                                <core:set value="${context.getVariable(thisVariable)}" var="thisValue"/>
+                                <core:mute>${sortedMap.put(thisVariable, thisValue)}</core:mute>
+                                <core:set value="${thisValue.getClass().getName()}" var="thisValueClass"/>
+                                <core:mute>${variableClasses.put(thisVariable, thisValueClass)}</core:mute>
+                              </core:default>
+                            </core:switch>
+                          </core:forEach>
+                          <core:forEach items="${sortedMap.keySet()}" var="thiskey">
+                            <gel:log message="${thiskey} = ${sortedMap.get(thiskey)} (${variableClasses.get(thiskey)})"/>
+                          </core:forEach>
+                        </gel:script>
+                      </scriptText>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

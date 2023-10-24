@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_VALIDATE_RC_DETAILS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_VALIDATE_RC_DETAILS_SP" (
+  resourceCreditId   NUMBER,
+  status			 VARCHAR2
+)
+  AS
+
+v_allocation_percent NUMBER;
+
+UF1_oval1 				PAC_CHG_RESCREDIT_DATES.ID%TYPE;
+CURSOR UF1_cursor IS
+	SELECT PAC_CHG_RESCREDIT_DATES.ID
+	FROM PAC_CHG_RESCREDIT_DATES
+	WHERE PAC_CHG_RESCREDIT_DATES.RESOURCE_CREDIT_ID = PAC_CHG_VALIDATE_RC_DETAILS_SP.resourceCreditId;
+		
+BEGIN
+	 IF PAC_CHG_VALIDATE_RC_DETAILS_SP.status = 'ACTIVE' THEN
+	 BEGIN
+		 v_allocation_percent := 0;
+		 OPEN UF1_cursor;
+		 LOOP
+			 FETCH UF1_cursor INTO UF1_oval1;
+			 EXIT WHEN UF1_cursor%NOTFOUND;
+			 BEGIN
+		  	   	  SELECT SUM(ALLOCATION_PERCENT) INTO v_allocation_percent FROM PAC_CHG_RESCREDIT_DETAILS WHERE 
+			  	 	  RES_CREDIT_DATES_ID = UF1_oval1;
+						  
+				  IF ( v_allocation_percent &lt;&gt; 100 ) THEN
+		 	  	 	 RAISE_APPLICATION_ERROR(-20842, 'Allocation Percentages not totalling to a hundred percent for one or more rules');
+				  END IF;
+			 END;
+		 END LOOP;
+		 CLOSE UF1_cursor;
+	 END;
+	 END IF;
+END PAC_CHG_VALIDATE_RC_DETAILS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

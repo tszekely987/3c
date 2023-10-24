@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUP_TYPES_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOOKUP_TYPES_INS_SP" (
+   p_lookup_type               IN   VARCHAR2,
+   p_lookup_type_name          IN   VARCHAR2,
+   p_lookup_type_description   IN   VARCHAR2,
+   p_is_system                 IN   NUMBER,
+   p_is_active                 IN   NUMBER,
+   p_is_admin_visible          IN   NUMBER,
+   p_is_sorted_alpha           IN   NUMBER,
+   p_internal_id_column        IN   VARCHAR2 DEFAULT 'lookup_code',
+   p_display_label_column      IN   VARCHAR2 DEFAULT 'name' ,
+   p_created_by                IN   NUMBER DEFAULT 1,
+   p_lookup_source             IN   VARCHAR2 DEFAULT 'LOOKUP_SOURCE_STATIC',
+   p_parent_lookup_type        IN   VARCHAR2 DEFAULT NULL,
+   p_is_hierarchy              IN   NUMBER DEFAULT 0,
+   p_object_code               IN   VARCHAR2 DEFAULT NULL,
+   p_source                    IN   VARCHAR2 DEFAULT NULL,
+   p_feature_code              IN   VARCHAR2 DEFAULT NULL
+)
+IS
+   v_id                       NUMBER;
+   e_record_exists            EXCEPTION;
+   v_cnt1                     NUMBER;
+   v_cnt2                     NUMBER;
+   v_list_of_values_id        NUMBER;
+   v_key_attribute_id         NUMBER    := 0;
+   v_label_attribute_id       NUMBER    := 0;
+   v_parent_id                   NUMBER    := 0;
+   v_parent_lookup_type  VARCHAR2( 255 ) := NULL;
+
+BEGIN
+   SELECT   COUNT (*)
+   INTO     v_cnt1
+   FROM     cmn_lookup_types
+   WHERE    UPPER(lookup_type) = UPPER(p_lookup_type);
+
+   SELECT   COUNT (*)
+   INTO     v_cnt2
+   FROM     cmn_list_of_values
+   WHERE    UPPER(lookup_type_code) = UPPER(p_lookup_type);
+
+   IF (    v_cnt1 &lt;= 0
+       AND v_cnt2 &lt;= 0)
+   THEN
+      SELECT   cmn_lookup_types_s1.nextval
+      INTO     v_id
+      FROM     dual;
+      SELECT   cmn_list_of_values_s1.nextval
+      INTO     v_list_of_values_id
+      FROM     dual;
+
+      INSERT INTO cmn_lookup_types
+                  (
+                     id,
+                     lookup_type,
+                     is_system,
+                     is_active,
+                     is_admin_visible,
+                     is_sorted_alpha,
+                     feature_code,
+                     created_date,
+                     created_by,
+                     last_updated_date,
+                     last_updated_by
+                  )
+           VALUES (
+              v_id,
+              CMN_LOOKUP_TYPE_CASE_FCT(p_lookup_type),
+              p_is_system,
+              p_is_active,
+              p_is_admin_visible,
+              p_is_sorted_alpha,
+              p_feature_code,
+              SYSDATE,
+              p_created_by,
+              SYSDATE,
+              p_created_by
+           );
+
+      -- update the source if it was supplied
+      IF P_SOURCE IS NOT NULL THEN
+      BEGIN
+          update CMN_LOOKUP_TYPES
+          set SOURCE = p_source
+          where ID = v_id;
+      END;
+      END IF;
+
+      -- Now add to the cmn_list_of_values table too.
+      V_PARENT_LOOKUP_TYPE := TRIM( P_PARENT_LOOKUP_TYPE );
+
+      IF V_PARENT_LOOKUP_TYPE IS NOT NULL AND LENGTH( V_PARENT_LOOKUP_TYPE) &gt; 0 THEN
+      BEGIN
+          SELECT ID INTO V_PARENT_ID
+          FROM CMN_LIST_OF_VALUES
+          WHERE LOOKUP_TYPE_CODE = V_PARENT_LOOKUP_TYPE;
+
+          EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR (-20000, 'PARENT LOOKUP TYPE NOT FOUND');
+      END;
+      END IF;
+
+      INSERT INTO cmn_list_of_values                  (
+                     id,
+                     lookup_type_code,
+                     sql_text_id,
+                     lookup_source_code,
+                     parent_id,
+                     is_active,
+                     is_system,
+                     object_code,
+                     created_date,
+                     last_updated_date,
+                     created_by,
+                     last_updated_by
+                  )
+           VALUES (
+              v_list_of_values_id,
+              CMN_LOOKUP_TYPE_CASE_FCT(p_lookup_type),
+              NULL,
+              p_lookup_source,
+              v_parent_id,
+              p_is_active,
+              p_is_system,
+              p_object_code,
+              SYSDATE,
+              SYSDATE,
+              p_created_by,
+              p_created_by
+           );
+
+       -- Now insert  into the flat hierarchy for lookup types.
+       CMN_LOV_HIERS_INS_SP(
+           P_LOOKUP_TYPE,
+           P_PARENT_LOOKUP_TYPE,
+           P_CREATED_BY
+        );
+
+      cmn_captions_nls_ins_sp (
+         'CMN_LOOKUP_TYPES',
+         v_id,
+         p_lookup_type_name,
+         p_lookup_type_description,
+         p_created_by,
+         NULL,
+         NULL,
+         NULL,
+         NULL,
+         NULL
+      );
+
+      -- Also create one List Instance for this Lookup by default.
+      -- This will be done by adding a row to CMN_LOV_OBJECTS table.
+      IF (p_lookup_source = 'LOOKUP_SOURCE_STATIC' OR p_lookup_source = 'LOOKUP_SOURCE_DEPENDENT')
+      THEN
+         cmn_id_sp (p_table_name =&gt; 'CMN_LOV_OBJECTS', p_next_id =&gt; v_id);
+         -- Select the attribute id's for the lookup_code and name column
+         -- from the cmn_attributes.
+SELECT
+  a.id
+  INTO v_key_attribute_id
+FROM
+  cmn_attributes a
+WHERE
+  upper(a.column_name) = upper(P_INTERNAL_ID_COLUMN)
+  and table_name = 'CMN_LOV_OBJECTS';
+
+IF v_key_attribute_id IS NULL OR v_key_attribute_id &lt;= 0
+THEN
+  SELECT
+  a.id
+  INTO v_key_attribute_id
+FROM
+  cmn_attributes a
+WHERE
+  upper(a.column_name) = 'LOOKUP_CODE'
+  and table_name = 'CMN_LOV_OBJECTS';
+END IF;
+
+SELECT
+  a.id
+  INTO   v_label_attribute_id
+  FROM
+  cmn_attributes a
+WHERE
+  upper(a.column_name) = upper(P_DISPLAY_LABEL_COLUMN)
+  and table_name = 'CMN_LOV_OBJECTS'  ;
+
+IF   v_label_attribute_id IS NULL OR v_label_attribute_id &lt;= 0
+THEN
+  SELECT
+  a.id
+  INTO   v_label_attribute_id
+FROM
+  cmn_attributes a
+WHERE
+  upper(a.column_name) = 'NAME'
+  and table_name = 'CMN_LOV_OBJECTS';
+END IF;
+
+
+         INSERT INTO cmn_lov_objects
+                     (
+                        id,
+                        lookup_type_code,
+                        object_internal_name,
+                        ui_type,
+                        key_attribute_id,
+                        label_attribute_id,
+                        sort_attribute_id,
+                        sort_direction,
+                        is_active,
+                        is_system,
+                        is_hierarchy,
+                        created_date,
+                        created_by,
+                        last_updated_date,
+                        last_updated_by
+                     )
+              VALUES (
+                 v_id,
+                 CMN_LOOKUP_TYPE_CASE_FCT(p_lookup_type),
+                 CMN_LOOKUP_TYPE_CASE_FCT(p_lookup_type),
+                 'LOV_SELECT',
+                 v_key_attribute_id,
+                 v_label_attribute_id,
+                 v_label_attribute_id,
+            'asc',
+                 1,
+                 1,
+                 p_is_hierarchy,
+                 SYSDATE,
+                 1,
+                 SYSDATE,
+                 1
+              );
+      END IF;
+   ELSE
+      raise_application_error (-20000, 'RECORD EXISTS');
+   END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

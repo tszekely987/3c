@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>OBS_UNITS_DEL_T3</code>
+          <table_name>PRJ_OBS_UNITS</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."OBS_UNITS_DEL_T3" 
+before delete
+on prj_obs_units
+referencing new as new old as old
+for each row
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+
+	lock table obs_units_flat_by_mode in exclusive mode;
+	--
+	--	remove all reference to this unit
+	--
+	delete	obs_units_flat_by_mode
+	where		unit_id = :old.id
+	or			linked_unit_id = :old.id;
+
+	commit;
+	
+exception
+   when others
+   then
+      rollback;
+
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

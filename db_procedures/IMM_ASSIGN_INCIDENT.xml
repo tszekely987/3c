@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>IMM_ASSIGN_INCIDENT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."IMM_ASSIGN_INCIDENT" ( 
+P_JOB_RUN_ID NUMBER,
+P_JOB_USER_ID NUMBER DEFAULT 1,
+P_PROCESS_INSTANCE_ID NUMBER,
+P_STEP_INSTANCE_ID NUMBER,
+P_STEP_ACTION_ID NUMBER
+)
+IS
+V_USER_ID NUMBER;
+V_OBJECT_ID NUMBER;
+V_OBJECT_TYPE VARCHAR2(30);
+BEGIN
+V_USER_ID := P_JOB_USER_ID;
+BEGIN
+  SELECT A.OBJECT_ID
+  INTO V_OBJECT_ID
+  FROM 
+  BPM_RUN_OBJECTS A,
+  BPM_RUN_PROCESSES B 
+  WHERE  B.ID = P_PROCESS_INSTANCE_ID
+  AND  A.PK_ID = B.ID
+  AND  A.TABLE_NAME = 'BPM_RUN_PROCESSES'
+  AND  A.SRC_PK_ID IS NULL
+  AND A.OBJECT_TYPE_CODE = 'incident'
+  AND  (A.IS_SYSTEM IS NULL OR A.IS_SYSTEM = 0);
+  
+  -- Get the least utilized IT Worker
+  SELECT max(RESOURCES.USER_ID) into V_USER_ID
+  FROM
+    (SELECT a.USER_ID FROM cmn_sec_assgnd_obj_perm_v a, imm_categories c
+     WHERE
+      a.OBJECT_CODE = 'INCIDENT_CATEGORY'
+      AND a.component_code = 'ITL'
+      AND a.object_type = 'RECORD'
+      AND a.permission_code = 'READ' 
+      AND c.ID = a.object_instance_id
+      AND c.ID IN ( SELECT CATEGORY_ID from IMM_INCIDENTS WHERE ID = V_OBJECT_ID)
+      UNION
+      SELECT a.USER_ID FROM cmn_sec_assgnd_obj_perm_r_v a
+      WHERE a.OBJECT_CODE = 'INCIDENT_CATEGORY'
+      AND a.component_code = 'ITL'
+      AND a.object_type = 'RECORD'
+      AND a.permission_code = 'READ' 
+     ) 
+    CAT_USERS, SRM_RESOURCES RESOURCES			          
+  WHERE  CAT_USERS.USER_ID = RESOURCES.USER_ID 
+  AND RESOURCES.PERSON_TYPE != 0
+  and not exists
+  (
+   select 'a' from imm_incidents i 
+   where i.status_code in ('NEW','OPEN','ASSIGNED')
+   and i.assigned_to = resources.user_id);
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+    BEGIN
+      select max(assigned_to)  into V_USER_ID from imm_incidents i 
+      where i.status_code in ('NEW','OPEN','ASSIGNED')
+       and i.assigned_to in (
+           SELECT RESOURCES.USER_ID
+           FROM
+           (SELECT a.USER_ID FROM cmn_sec_assgnd_obj_perm_v a, imm_categories c
+           WHERE
+           a.OBJECT_CODE = 'INCIDENT_CATEGORY'
+           AND a.component_code = 'ITL'
+           AND a.object_type = 'RECORD'
+           AND a.permission_code = 'READ' 
+           AND c.ID = a.object_instance_id
+           AND c.ID IN ( SELECT CATEGORY_ID from IMM_INCIDENTS WHERE ID = V_OBJECT_ID)
+           UNION
+           SELECT a.USER_ID FROM cmn_sec_assgnd_obj_perm_r_v a
+           WHERE a.OBJECT_CODE = 'INCIDENT_CATEGORY'
+           AND a.component_code = 'ITL'
+           AND a.object_type = 'RECORD'
+           AND a.permission_code = 'READ' 
+          ) 
+          CAT_USERS, SRM_RESOURCES RESOURCES			          
+          WHERE  CAT_USERS.USER_ID = RESOURCES.USER_ID 
+          AND RESOURCES.PERSON_TYPE != 0
+        )
+      group by assigned_to
+      having count(*) = ( select min(count(*)) from imm_incidents group by assigned_to);
+    EXCEPTION
+      WHEN OTHERS THEN
+  	    NULL;
+    END;
+    WHEN OTHERS THEN
+      NULL;
+  END;
+BEGIN
+  UPDATE IMM_INCIDENTS 
+  SET ASSIGNED_TO=V_USER_ID 
+  WHERE
+  ID = V_OBJECT_ID;
+  EXCEPTION
+    WHEN OTHERS THEN
+	NULL;
+END;
+  
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

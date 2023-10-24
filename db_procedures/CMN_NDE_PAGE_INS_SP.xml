@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_NDE_PAGE_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_NDE_PAGE_INS_SP" (
+   P_PAGE_CODE		   		IN   VARCHAR2,
+   P_COMPONENT_CODE	 	  IN   VARCHAR2,
+   P_TEMPLATE_CODE	 	  IN   VARCHAR2,
+   P_LAYOUT_CODE		 		IN   VARCHAR2,
+   P_SPACE_CODE		   		IN   VARCHAR2,
+   P_NAME   						IN   VARCHAR2,
+   P_DESCRIPTION      	IN   VARCHAR2,
+   P_PAGE_TYPE_CODE		  IN   VARCHAR2 DEFAULT 'page',
+   P_PARENT_PAGE_CODE	  IN   VARCHAR2 DEFAULT '',
+   P_CREATED_BY       	IN   NUMBER DEFAULT 1,
+   P_INSTANCE_TYPE     IN   VARCHAR2 DEFAULT 'SYSTEM'
+)
+IS
+   V_PAGE_ID            	              NUMBER;
+   V_PORTLET_ID          	              NUMBER;
+   V_PAGE_PORTLET_ID     	              NUMBER;
+   V_MENU_ITEM_ID		     	              NUMBER;
+   V_ACTION_ID           	              NUMBER;
+   V_POLICY_ID          	              NUMBER;
+   V_PARENT_PAGE_ID            	       	NUMBER;
+   V_TEMPLATE_PAGE_ID          	       	NUMBER;
+   V_LAYOUT_ID 				         	       	NUMBER;
+   V_POSITION 				         	       	NUMBER;
+   V_EXISTING_ACTION 				         	  NUMBER;
+   V_CREATE_DATE                 				DATE := SYSDATE;
+   V_CNT1		               							NUMBER;
+   V_PARENT_TYPE_CODE										VARCHAR2(30);
+BEGIN
+
+		IF ( ( P_PAGE_TYPE_CODE != 'page' ) and ( P_PAGE_TYPE_CODE != 'tabPage' )and ( P_PAGE_TYPE_CODE != 'tab' ) )
+		THEN
+      RAISE_APPLICATION_ERROR (-20000, 'INVALID PAGE TYPE');
+   	END IF;
+		
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_PAGES
+		WHERE    PAGE_CODE 		= P_PAGE_CODE;
+
+   	IF    V_CNT1 &gt; 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20006, 'PAGE EXISTS');
+   	END IF;
+
+		SELECT   COUNT (*)
+		INTO     V_CNT1
+		FROM     CMN_LOOKUPS
+		WHERE    LOOKUP_CODE = P_INSTANCE_TYPE
+		AND			 LOOKUP_TYPE = 'CMN_PAGE_INSTANCE_TYPE'
+		AND			 IS_ACTIVE = 1;
+
+   	IF    V_CNT1 = 0
+   	THEN
+      RAISE_APPLICATION_ERROR (-20007, 'INVALID INSTANCE TYPE');
+   	END IF;
+		
+		BEGIN
+			SELECT   CMN_PAGES_S1.NEXTVAL
+			INTO     V_PAGE_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+		V_EXISTING_ACTION := -1;
+		
+		BEGIN
+			SELECT  ID
+			INTO    V_EXISTING_ACTION
+			FROM    CMN_ACTIONS
+			where		action_code = P_PAGE_CODE;
+		EXCEPTION
+			WHEN OTHERS THEN
+				SELECT   CMN_ACTIONS_S1.NEXTVAL
+				INTO     V_ACTION_ID
+				FROM     DUAL;
+   	END;
+
+		BEGIN
+			SELECT  ID, page_type_code
+			INTO    V_PARENT_PAGE_ID, V_PARENT_TYPE_CODE
+			FROM    CMN_PAGES
+			where		page_code = P_PARENT_PAGE_CODE;
+		EXCEPTION
+			WHEN OTHERS THEN
+				V_PARENT_PAGE_ID := -1;
+   	END;
+
+		IF ( ( P_PAGE_TYPE_CODE = 'tab' ) and ( V_PARENT_PAGE_ID = -1 ) )
+		THEN
+      RAISE_APPLICATION_ERROR (-20006, 'PARENT PAGE DOES NOT EXIST');
+   	END IF;
+		
+		IF ( ( P_PAGE_TYPE_CODE = 'tab' ) and ( V_PARENT_TYPE_CODE != 'tabPage' ) )
+		THEN
+      RAISE_APPLICATION_ERROR (-20006, 'PARENT PAGE NOT A TAB SET');
+   	END IF;
+		
+		BEGIN
+			SELECT  ID
+			INTO    V_TEMPLATE_PAGE_ID
+			FROM    CMN_PAGES
+			where		page_code = P_TEMPLATE_CODE;
+		EXCEPTION
+			WHEN OTHERS THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'TEMPLATE PAGE DOES NOT EXIST');
+   	END;
+
+		BEGIN
+			SELECT  ID
+			INTO    V_LAYOUT_ID
+			FROM    CMN_PAGE_LAYOUTS
+			where		layout_code = P_LAYOUT_CODE;
+		EXCEPTION
+			WHEN OTHERS THEN
+      	RAISE_APPLICATION_ERROR (-20006, 'PAGE LAYOUT DOES NOT EXIST');
+   	END;
+
+		insert into cmn_pages
+		( id, page_code, principal_type, principal_id, instance_type,
+			page_type_code, layout_id, space_code, component_code,
+			template_page_id, parent_page_id, is_system,
+			created_date, created_by, last_updated_date, last_updated_by)
+		values
+		( V_PAGE_ID, P_PAGE_CODE, 'SYSTEM', 0, P_INSTANCE_TYPE,
+			P_PAGE_TYPE_CODE, V_LAYOUT_ID, P_SPACE_CODE, P_COMPONENT_CODE,
+			V_TEMPLATE_PAGE_ID, V_PARENT_PAGE_ID, 1,
+			V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY );
+			
+		cmn_captions_nls_upd_sp( 'CMN_PAGES', V_PAGE_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY );
+
+		if V_EXISTING_ACTION &lt; 0 then
+			insert into cmn_actions
+			( id, action_code, principal_type, principal_id,
+				page_id, component_code, is_ssl_enabled, is_active,
+				created_date, created_by, last_updated_date, last_updated_by)
+			values
+			( V_ACTION_ID, P_PAGE_CODE, 'SYSTEM', 0, 
+				V_PAGE_ID, P_COMPONENT_CODE, 1, 1,
+				V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY );
+
+			cmn_captions_nls_upd_sp( 'CMN_ACTIONS', V_ACTION_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY );
+		else
+			update cmn_actions set page_id = v_page_id
+			where  id = V_EXISTING_ACTION;
+			V_ACTION_ID := V_EXISTING_ACTION;
+		end if;
+
+--
+--	Setup the security policy for later user
+--
+		BEGIN
+			SELECT   CMN_SEC_POLICIES_S1.NEXTVAL
+			INTO     V_POLICY_ID
+			FROM     DUAL;
+		EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+   	END;
+
+	 insert into cmn_sec_policies (
+					id, policy_code,
+					object_instance_id, object_code, component_code,
+					object_type_code, permission_code, feature_code,
+					created_date, created_by, last_updated_date, last_updated_by)
+	 values ( V_POLICY_ID, ''||V_POLICY_ID,
+						V_PAGE_ID, 'PAGE', 'CMN',
+						'PAGE', 'VIEW', 'base',
+						V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY );
+
+--
+--	Need to add the portlet tabset to this page
+--
+		IF ( P_PAGE_TYPE_CODE = 'tabPage' )
+		THEN
+			BEGIN
+				SELECT  ID
+				INTO    V_PORTLET_ID
+				FROM    CMN_PORTLETS
+				where		portlet_code = 'union.tabs';
+
+				BEGIN
+					SELECT   CMN_PAGE_PORTLETS_S1.NEXTVAL
+					INTO     V_PAGE_PORTLET_ID
+					FROM     DUAL;
+				EXCEPTION
+					WHEN OTHERS THEN
+						NULL;
+				END;
+
+				insert into cmn_page_portlets
+				( id, page_id, portlet_id, principal_type, principal_id,
+					portlet_row, portlet_column, state, is_mandatory,
+					portlet_title_pk_id, portlet_title_table,
+					created_date, created_by, last_updated_date, last_updated_by)
+				values
+				( V_PAGE_PORTLET_ID, V_PAGE_ID, V_PORTLET_ID, 'SYSTEM', 0, 
+					0, 1, 0, 1,
+					V_PORTLET_ID, 'CMN_PORTLETS',
+					V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY );
+
+			EXCEPTION
+				WHEN OTHERS THEN
+					RAISE_APPLICATION_ERROR (-20006, 'TAB PORTLET DOES NOT EXIST');
+   		END;
+   	END IF;
+
+--
+--	For tabs add the menu item
+--
+
+		IF ( P_PAGE_TYPE_CODE = 'tab' )
+		THEN
+			BEGIN
+				SELECT   CMN_MENU_ITEMS_S1.NEXTVAL
+				INTO     V_MENU_ITEM_ID
+				FROM     DUAL;
+			EXCEPTION
+				WHEN OTHERS THEN
+					NULL;
+			END;
+
+			BEGIN
+					select 	nvl(max(position),-1) + 1
+					into		V_POSITION
+					from 		cmn_menu_items cmi, cmn_actions ca
+					where   cmi.container_id = V_PARENT_PAGE_ID
+					and     ca.id = cmi.action_id
+					and     ca.principal_id = 0
+					and     ca.principal_type = 'SYSTEM';
+			EXCEPTION
+				WHEN OTHERS THEN
+					V_POSITION := 0;
+			END;
+
+			INSERT INTO cmn_menu_items
+									(
+									 id, container_id, action_id, menu_item_level, 
+									 position,
+									 is_required, is_default, item_type_code,
+									 principal_id, principal_type, container_type_code,
+									 created_date, created_by, last_updated_date, last_updated_by
+									)
+			VALUES
+			(	V_MENU_ITEM_ID, V_PARENT_PAGE_ID, V_ACTION_ID, 0, 
+			 	V_POSITION,
+			 	0, 0, 'PANE',
+			 	0, 'SYSTEM', 'PANE',
+    		V_CREATE_DATE, P_CREATED_BY, V_CREATE_DATE, P_CREATED_BY );
+
+			cmn_captions_nls_upd_sp( 'CMN_MENU_ITEMS', V_MENU_ITEM_ID, P_NAME, P_DESCRIPTION, P_CREATED_BY );
+	
+		END IF;
+		
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

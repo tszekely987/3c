@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_DATE_FROM_JULIAN_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_DATE_FROM_JULIAN_FCT" (P_JULIAN INTEGER)
+RETURN DATE
+AS
+  v_x INTEGER;
+  v_j INTEGER;
+  v_year INTEGER;
+  v_month INTEGER;
+  v_day INTEGER;
+BEGIN
+
+  v_j := p_julian + 693900;
+  v_year := trunc((( v_j * 4 ) - 1 ) / 146097);
+  v_j := ( v_j * 4 ) - 1 - 146097 * v_year;
+  v_x := trunc( v_j / 4 );
+  v_j := trunc((( v_x * 4 ) + 3) / 1461);
+  v_x := (v_x * 4) + 3 - 1461 * v_j;
+  v_x := trunc((v_x + 4) / 4) ;
+
+  v_month := trunc(( 5 * v_x - 3 ) / 153);
+  v_x := 5 * v_x - 3 - 153 * v_month;
+  v_day := trunc((v_x + 5)/5);
+  v_year := 100 * v_year + v_j;
+
+  IF( v_month &lt; 10 ) THEN
+    v_month := v_month + 3;
+  ELSE
+    v_month := v_month - 9;
+    v_year := v_year + 1;
+  END IF;
+
+  return to_date( v_year || '-' || v_month || '-' || v_day, 'YYYY-MM-DD');
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

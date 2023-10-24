@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_SLICES_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_SLICES_FCT" (id NUMBER, p_curve clob , P_CALENDAR PFM_CALENDAR )
+   RETURN PFM_SLICES
+IS
+ v_slices PFM_SLICES;
+ v_segments  PFM_SEGMENTS;
+ v_sum    NUMBER;
+ v_date DATE;
+ v_idx NUMBER;
+ v_period PFM_PERIOD;
+ v_earliest_date DATE;
+ v_latest_date DATE;
+BEGIN
+  -- Find the earliest and latest dates of the calendar periods
+  select MIN( start_date ), MAX( finish_date ) into v_earliest_date, v_latest_date from table( p_calendar );
+
+  -- get the set of slices that are bounded by the period dates
+  v_segments := PFM_SEGMENTS_FCT( 0, p_curve, PFM_DATE_TO_JULIAN_FCT( v_earliest_date ), PFM_DATE_TO_JULIAN_FCT( v_latest_date ));
+  v_slices := PFM_SLICES();
+  FOR i IN p_calendar.FIRST..p_calendar.LAST LOOP
+    v_slices.extend();
+    v_period := p_calendar(i);
+    v_idx := v_period.period;
+    v_sum := PFM_QUERY_FCT( v_segments, PFM_DATE_TO_JULIAN_FCT( v_period.start_date ), PFM_DATE_TO_JULIAN_FCT( v_period.finish_date ) );
+    v_slices(i) := PFM_SLICE( id, v_period.period, v_period.start_date, v_period.finish_date-1, v_sum, v_period.period_name );
+  END LOOP;
+  return v_slices;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

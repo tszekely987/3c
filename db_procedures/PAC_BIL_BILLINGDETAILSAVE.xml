@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_BILLINGDETAILSAVE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_BILLINGDETAILSAVE" (
+cUserID 	VARCHAR2 ,
+iBillSessionKey 	NUMBER ,
+iTransNo 	NUMBER ,
+nBillAmt 	NUMBER ,
+nAdjAmt 	NUMBER ,
+cBillFlags 	VARCHAR2,
+nAmtRemaining NUMBER )
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+v_nBillAmt  NUMBER(32, 6);
+v_nAdjAmt   NUMBER(32, 6);
+BEGIN
+
+    IF iTransNo IS NOT NULL Then
+	  BEGIN
+        IF NVL( nAmtRemaining, 0) &gt; 0 Then
+   	      IF (NVL( nBillAmt, 0) - NVL( nAdjAmt, 0)) &gt; NVL( nAmtRemaining, 0) THEN
+		    RAISE_APPLICATION_ERROR(-20908, 'You may not Bill + Adjust more than the amount remaining.');
+	        RETURN;
+	      END IF;
+	    ELSE  /* Add following logic for negative transactions */
+   	      IF (NVL( nBillAmt, 0) - NVL( nAdjAmt, 0)) &lt; NVL( nAmtRemaining, 0) THEN
+		    RAISE_APPLICATION_ERROR(-20908, 'You may not Bill + Adjust more than the amount remaining.');
+	        RETURN;
+	      END IF;
+	    End IF;
+	  END;
+	End If;
+
+-- No longer applies for negative transactions
+/*	IF NVL( nBillAmt, 0) &lt; 0 THEN
+		RAISE_APPLICATION_ERROR(-20912, 'Billing Items may not be negative.');
+	    RETURN;
+	END IF; */
+
+	v_nBillAmt := NVL( PAC_BIL_BILLINGDETAILSAVE.nBillAmt, 0);
+	v_nAdjAmt  := NVL( PAC_BIL_BILLINGDETAILSAVE.nAdjAmt, 0);
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE PC_BILLINGDETAILALLOCATIONS
+	  SET BILLAMOUNT = NVL(PAC_BIL_BILLINGDETAILSAVE.V_NBILLAMT, 0),
+	      ADJUSTAMOUNT = NVL(PAC_BIL_BILLINGDETAILSAVE.V_NADJAMT, 0),
+	      BILLFLAGS = NVL(PAC_BIL_BILLINGDETAILSAVE.CBILLFLAGS, 'N')
+	  WHERE BILLINGSESSIONKEY = PAC_BIL_BILLINGDETAILSAVE.IBILLSESSIONKEY
+	    AND TRANSNO = PAC_BIL_BILLINGDETAILSAVE.ITRANSNO;
+
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	/* Reset the Temp Detail Summary to zero so that the allocations are applied when we return to the details screen*/
+	BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  UPDATE PAC_BIL_DETAIL_SUMMARY
+	    SET BILLAMOUNT = 0,
+		    ADJUSTAMOUNT = 0
+	    WHERE BILLINGSESSIONKEY = PAC_BIL_BILLINGDETAILSAVE.iBillSessionKey and
+	  		EXISTS (SELECT 1
+				   	  FROM PC_BILLINGDETAILALLOCATIONS p
+					  WHERE p.COMPANY_CODE = PAC_BIL_DETAIL_SUMMARY.COMPANY_CODE AND
+					  		p.PROJECT_CODE = PAC_BIL_DETAIL_SUMMARY.PROJECT_CODE AND
+							p.TRANSTYPE = PAC_BIL_DETAIL_SUMMARY.TRANSTYPE AND
+							p.BILLINGSESSIONKEY = PAC_BIL_DETAIL_SUMMARY.BILLINGSESSIONKEY ) ;
+
+  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END PAC_BIL_BILLINGDETAILSAVE;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

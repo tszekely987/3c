@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_COSTPLUS_GETRULE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_COSTPLUS_GETRULE_SP" (
+costplusid 	NUMBER ,
+seq 	NUMBER  DEFAULT NULL,
+flag 	VARCHAR2  DEFAULT NULL,
+lang  VARCHAR2 ,
+RC1 	IN OUT PAC_MNT_COSTPLUS_GETRULE_SPPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+maxunits  NUMBER(32,6);
+minunits  NUMBER(32,6);
+mcounter  NUMBER;
+p_seq 	NUMBER;
+costpluscode costplus.costpluscode%type;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	/* Get the code from id  as id is being passed */
+	select costpluscode into PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode from costplus where id = PAC_MNT_COSTPLUS_GETRULE_SP.costplusid;
+
+	PAC_MNT_COSTPLUS_GETRULE_SP.p_seq := PAC_MNT_COSTPLUS_GETRULE_SP.seq;
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   COUNT(costplusrules.sequence)
+		INTO PAC_MNT_COSTPLUS_GETRULE_SP.mcounter FROM costplusrules
+		WHERE
+		(PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode = costplusrules.costpluscode);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  ( PAC_MNT_COSTPLUS_GETRULE_SP.mcounter = 0 or   PAC_MNT_COSTPLUS_GETRULE_SP.flag = 'I') THEN
+	BEGIN
+		PAC_MNT_COSTPLUS_GETRULE_SP.minunits := 0;
+		PAC_MNT_COSTPLUS_GETRULE_SP.maxunits := 999999999;
+		PAC_MNT_COSTPLUS_GETRULE_SP.p_seq := PAC_MNT_COSTPLUS_GETRULE_SP.mcounter + 1;
+		IF  ( PAC_MNT_COSTPLUS_GETRULE_SP.mcounter &gt; 0) THEN
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   costplusrules.torange
+				INTO PAC_MNT_COSTPLUS_GETRULE_SP.minunits FROM costplusrules
+				WHERE
+				(PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode = costplusrules.costpluscode
+				 and costplusrules.sequence = ( PAC_MNT_COSTPLUS_GETRULE_SP.mcounter
+				   ));
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  ( PAC_MNT_COSTPLUS_GETRULE_SP.minunits = 999999999) THEN
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   costplusrules.fromrange
+					INTO PAC_MNT_COSTPLUS_GETRULE_SP.minunits FROM costplusrules
+					WHERE
+					(PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode = costplusrules.costpluscode
+					 and costplusrules.sequence = ( PAC_MNT_COSTPLUS_GETRULE_SP.mcounter
+					   ));
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+			END IF;
+		END;
+		END IF;
+		PAC_MNT_COSTPLUS_GETRULE_SP.minunits := PAC_MNT_COSTPLUS_GETRULE_SP.minunits + 1;
+		OPEN RC1 FOR
+		SELECT costplus.costpluscode,  cmn_lookups_v.name "asapplytoactualstdcost",
+		PAC_MNT_COSTPLUS_GETRULE_SP.minunits "fromrange",  PAC_MNT_COSTPLUS_GETRULE_SP.maxunits "torange",
+		'F0' "multflatpercent",  0 "multamount",  'P0' "burdenflatpercent",
+		  0 "burdenamount",  'P0' "overheadflatpercent",  0 "overheadamount",
+		   PAC_MNT_COSTPLUS_GETRULE_SP.p_seq "sequence" FROM costplus, cmn_lookups_v
+		WHERE costplus.costpluscode = PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode
+		 and costplus.applytoactualstdcost = cmn_lookups_v.LOOKUP_CODE
+		 and cmn_lookups_v.LANGUAGE_CODE = PAC_MNT_COSTPLUS_GETRULE_SP.lang
+		 and cmn_lookups_v.LOOKUP_TYPE = 'PAC_MNT_COSTTYPE';
+	END;
+	ELSE
+	BEGIN
+		IF  ( PAC_MNT_COSTPLUS_GETRULE_SP.p_seq = -1) THEN
+			PAC_MNT_COSTPLUS_GETRULE_SP.p_seq := 1;
+		END IF;
+		OPEN RC1 FOR
+		SELECT costplusrules.costpluscode,  cmn_lookups_v.name "asapplytoactualstdcost",
+		costplusrules.fromrange,  costplusrules.torange,
+		  RTRIM(costplusrules.multflatpercent || RPAD(costplusrules.multeachunit,
+		   1, ' ')) "multflatpercent",  costplusrules.multamount,  RTRIM(costplusrules.burdenflatpercent || RPAD(costplusrules.burdeneachunit,
+		   1, ' ')) "burdenflatpercent",  costplusrules.burdenamount,  RTRIM(costplusrules.overheadflatpercent || RPAD(costplusrules.overheadeachunit,
+		   1, ' ')) "overheadflatpercent",  costplusrules.overheadamount,   costplusrules.sequence FROM costplusrules, costplus, cmn_lookups_v
+		WHERE costplusrules.costpluscode = costplus.costpluscode
+		 AND costplus.costpluscode = PAC_MNT_COSTPLUS_GETRULE_SP.costpluscode
+		 and costplusrules.sequence = PAC_MNT_COSTPLUS_GETRULE_SP.p_seq
+		 and costplus.applytoactualstdcost = cmn_lookups_v.LOOKUP_CODE
+		 and cmn_lookups_v.LANGUAGE_CODE = PAC_MNT_COSTPLUS_GETRULE_SP.lang
+		 and cmn_lookups_v.LOOKUP_TYPE = 'PAC_MNT_COSTTYPE';
+	END;
+	END IF;
+END PAC_MNT_COSTPLUS_GETRULE_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

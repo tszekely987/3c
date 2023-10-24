@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="OBJ_PII_ATTRIBUTE" displayAttributeName="display_full_name" hiddenAttributeName="attribute_id" objectCode="" sortAttributeName="display_full_name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="This lookup displays attributes eligible for Personally Identifiable Information (PII)" languageCode="en" name="Personally Identifiable Information (PII) Attribute"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:ca.id:attribute_id@,
+       @SELECT:cco.name @+@ ' - ' @+@ cca.name @+@ ' - ' @+@ ca.column_name:display_full_name@,
+       @SELECT:cco.name:display_object_name@,
+       @SELECT:cca.name:display_column_name@,
+       @SELECT:ca.column_name:internal_column_name@,
+       @SELECT:cca.language_code:language_code@,
+       @SELECT:ca.last_updated_date:last_updated_date@
+FROM   odf_custom_attributes ca
+       INNER JOIN cmn_captions_nls cca ON ca.id = cca.pk_id AND cca.table_name = 'ODF_CUSTOM_ATTRIBUTES'
+                                      AND cca.language_code = @WHERE:PARAM:LANGUAGE@
+       INNER JOIN odf_objects o ON ca.object_name = o.code
+       INNER JOIN cmn_captions_nls cco ON o.id = cco.pk_id AND cco.table_name = 'ODF_OBJECTS'
+                                      AND cco.language_code = @WHERE:PARAM:LANGUAGE@
+WHERE  @FILTER@
+AND    ca.is_custom = 1
+AND    ca.is_virtual = 0
+AND    ca.is_system = 0
+AND    ca.data_type IN ('number','string','date','clob','richtext')
+AND    @NVL@(ca.extended_type,'x') NOT IN ('boolean','lookup','money')
+AND   (o.parent_object_code = 'resource'
+OR     o.code = 'resource')
+@BROWSE-ONLY:
+AND    ca.id NOT IN (SELECT obj_pii_attribute FROM odf_ca_cop_pii_attribute)
+:BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="display_full_name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="display_full_name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Personally Identifiable Information (PII) Attribute" languageCode="en" name="Personally Identifiable Information (PII) Attribute"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Personally Identifiable Information (PII) Attributes" languageCode="en" name="Personally Identifiable Information (PII) Attributes"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="display_object_name" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Object" languageCode="en" name="Object"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="display_column_name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Attribute" languageCode="en" name="Attribute"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="attribute_id" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="Attribute ID" languageCode="en" name="Attribute ID"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="display_full_name" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="Display Name" languageCode="en" name="Display Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="display_object_name" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Object" languageCode="en" name="Object"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="display_column_name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Attribute" languageCode="en" name="Attribute"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="internal_column_name" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Database Column" languageCode="en" name="Database Column"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

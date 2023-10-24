@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_PREVIEW_GL_TRANS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_PREVIEW_GL_TRANS_SP" 
+(
+  P_USERID          NUMBER,
+  P_SESSIONID       NUMBER,
+  P_LANGUAGE_CODE   VARCHAR2,
+  RC1        IN OUT PAC_CHG_PREVIEW_GL_TRANS_PKG.RCT1
+)
+AS
+  V_STMT            VARCHAR2(255);
+
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+BEGIN
+  V_STMT := 'Calling PAC_CHG_GENERATE_GL_TRANS_SP';
+  PAC_CHG_GENERATE_GL_TRANS_SP ( P_USERID, P_SESSIONID, P_LANGUAGE_CODE );
+
+  V_STMT := 'Selecting results from PAC_CHG_GENERATE_GL_TRANS_SP';
+  OPEN RC1 FOR
+  SELECT W.TRANSDATE, W.PROJECT_CODE, W.RESOURCE_CODE, SUM(V.AMOUNT), V.CURRENCY_CODE,
+         PAC_CHG_PREVIEW_DB_ACCTS_FCT(T.DATES_ID),
+         PAC_CHG_PREVIEW_CR_ACCTS_FCT(C.DATES_ID)
+    FROM PAC_CHG_TRIALRUNS T,
+         PAC_CHG_TRIALRUNS C,
+         PAC_CHG_TRIALRUNS_VALUES V,
+         PPA_WIP W
+   WHERE T.SESSIONID = P_SESSIONID
+     AND NVL(T.ERROR_CODE, 0) = 0
+     AND T.CHARGEBACK_TYPE = 'D'
+     AND T.TRANS_SOURCE = 'W'
+     AND C.SESSIONID = T.SESSIONID
+     AND C.CHARGEBACK_TYPE = 'C'
+     AND NVL(C.ERROR_CODE, 0) = 0
+     AND T.TRANSNO = C.TRANSNO
+     AND T.ID = V.TRIALRUN_ID
+     AND V.CURRENCY_TYPE = 'NATURAL'
+     AND T.TRANSNO = W.TRANSNO
+   GROUP BY W.TRANSDATE, W.PROJECT_CODE, W.RESOURCE_CODE, V.CURRENCY_CODE, T.DATES_ID, C.DATES_ID
+   UNION
+  SELECT W.TRANSDATE, W.PROJECT_CODE, W.RESOURCE_CODE, SUM(V.AMOUNT), V.CURRENCY_CODE,
+         PAC_CHG_PREVIEW_DB_ACCTS_FCT(T.DATES_ID),
+         PAC_CHG_PREVIEW_CR_ACCTS_FCT(C.DATES_ID)
+    FROM PAC_CHG_TRIALRUNS T,
+         PAC_CHG_TRIALRUNS C,
+         PAC_CHG_TRIALRUNS_VALUES V,
+         PPA_BILLINGS A,
+         PPA_WIP W
+   WHERE T.SESSIONID = P_SESSIONID
+     AND NVL(T.ERROR_CODE, 0) = 0
+     AND T.CHARGEBACK_TYPE = 'D'
+     AND T.TRANS_SOURCE = 'A'
+     AND C.SESSIONID = T.SESSIONID
+     AND C.CHARGEBACK_TYPE = 'C'
+     AND NVL(C.ERROR_CODE, 0) = 0
+     AND T.TRANSNO = C.TRANSNO
+     AND T.ID = V.TRIALRUN_ID
+     AND V.CURRENCY_TYPE = 'NATURAL'
+     AND T.TRANSNO = A.TRANSNO
+     AND A.APPLYTO = W.TRANSNO
+   GROUP BY W.TRANSDATE, W.PROJECT_CODE, W.RESOURCE_CODE, V.CURRENCY_CODE, T.DATES_ID, C.DATES_ID;
+
+EXCEPTION
+  WHEN OTHERS THEN
+
+-- change message
+    RAISE_APPLICATION_ERROR(-20785, 'PREVIEWING FAILED : ' || V_STMT || ': ' || SQLERRM);
+END PAC_CHG_PREVIEW_GL_TRANS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

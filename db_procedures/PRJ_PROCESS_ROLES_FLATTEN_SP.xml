@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_PROCESS_ROLES_FLATTEN_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_PROCESS_ROLES_FLATTEN_SP" IS
+   v_currentID NUMBER;
+   
+   CURSOR allRoles IS
+      SELECT   prID, prParentID
+      FROM     PRJ_RESOURCES
+      WHERE    prIsRole &lt;&gt; 0 
+      ORDER BY prID
+      ;
+      
+BEGIN
+   DELETE FROM PRJ_ROLES_FLAT;
+
+   FOR eachRecord IN allRoles
+   LOOP
+
+	    CMN_ID_SP('PRJ_ROLES_FLAT', v_currentID);
+   
+      /*any way to get the current user id instead of '1'?*/
+   
+      INSERT INTO PRJ_ROLES_FLAT
+      (
+         ID,
+         ROLE_ID,
+         BRANCH_ROLE_ID,
+         CREATED_DATE,
+         CREATED_BY,
+         LAST_UPDATED_DATE,
+         LAST_UPDATED_BY
+      )
+      VALUES
+      (
+         v_currentID,
+         eachRecord.prID,
+         eachRecord.prID,
+         sysdate,
+         1,
+         sysdate,
+         1
+      );
+      
+      IF eachRecord.prParentID IS NOT NULL
+      THEN
+         prj_climb_roles_sp(eachRecord.prID, eachRecord.prParentID);
+      END IF;
+         
+   END LOOP;
+END PRJ_PROCESS_ROLES_FLATTEN_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

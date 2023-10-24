@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="current_waiting_jobs" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            <nls description="This query returns jobs in a waiting state on other jobs." languageCode="en" name="Currently Waiting Jobs"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:JOB:@DBUSER@.CMN_TO_CHAR_FCT(JOBS.ID):JOB_ID@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:JOBS.NAME:JOB_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:JOB_DEF_NAME.NAME:JOB_DEF_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:WAITON.NAME:WAIT_JOB_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:WAITON_JOB_DEF_NAME.NAME:WAIT_JOB_DEF_NAME@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:@DBUSER@.CMN_TO_CHAR_FCT(WAITON.ID):WAIT_JOB_ID@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:@DBUSER@.CMN_TO_CHAR_FCT(WAITONRUN.ID):WAIT_RUN_ID@,
+					@SELECT:DIM_PROP:USER_DEF:IMPLIED:JOB:WAITONRUN.STATUS_CODE:WAIT_STATUS_CODE@
+					from cmn_sch_jobs jobs,
+					cmn_sch_job_definitions defs,
+					cmn_sch_job_nonconcur non,
+					cmn_sch_jobs waiton,
+					cmn_sch_job_definitions waiton_job_defs,
+					cmn_sch_job_runs waitonrun,
+					cmn_captions_nls job_def_name,
+					cmn_captions_nls waiton_job_def_name
+					where jobs.status_code = 'WAITING'
+					and jobs.job_definition_id = defs.id
+					and defs.id = non.job_definition_id
+					and defs.is_active = 1
+					and waiton.job_definition_id = non.non_concur_job_def_id
+					and waitonrun.job_id = waiton.id
+					and waitonrun.status_code IN ('PROCESSING','JOB_RUN_CANCELLED')
+					and job_def_name.table_name = 'CMN_SCH_JOB_DEFINITIONS' and job_def_name.language_code = 'en' and job_def_name.pk_id = defs.id
+					and waiton_job_defs.id = waiton.job_definition_id
+					and waiton_job_def_name.table_name = 'CMN_SCH_JOB_DEFINITIONS' and waiton_job_def_name.language_code = 'en' and waiton_job_def_name.pk_id = waiton_job_defs.id
+					AND @FILTER@]]></nsql>
+            <attribute id="job_id" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting Job Id"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="job_name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting Job Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="job_def_name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting Job Def Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wait_job_name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting On Job Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wait_job_def_name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting On Job Def Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wait_job_id" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting On Job Id"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wait_run_id" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting On Run Id"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wait_status_code" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Waiting On Status Code"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

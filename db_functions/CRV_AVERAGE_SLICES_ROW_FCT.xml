@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CRV_AVERAGE_SLICES_ROW_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CRV_AVERAGE_SLICES_ROW_FCT" (p_id NUMBER, p_field_id NUMBER, p_scenario_id NUMBER, p_period_type VARCHAR, p_start DATE, p_finish DATE, p_periods NUMBER, p_cal_type VARCHAR DEFAULT 'DEFAULT', p_options VARCHAR DEFAULT NULL  )
+   RETURN CRV_SLICES PIPELINED
+  IS
+  BEGIN
+    FOR ao_rec IN (
+      with curves as (
+         select object_id, field_id, scenario_id, curve from crv_sql_curves where object_id = p_id and field_id = p_field_id and scenario_id = p_scenario_id
+      )
+      SELECT * FROM TABLE( CRV_SQL_CURVE_PKG.SUM_SLICES_TABLE( cursor( select * from curves ), p_period_type, p_start, p_finish, p_periods, p_cal_type, p_options || ',AVERAGE') )
+    )
+    LOOP
+      pipe row( CRV_SLICE( ao_rec.id, ao_rec.field, ao_rec.scenario, ao_rec.period, ao_rec.start_date, ao_rec.finish_date, ao_rec.slice, ao_rec.calendar_key, ao_rec.period_name, ao_rec.group_by ) );
+    END LOOP;
+    RETURN;
+  END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

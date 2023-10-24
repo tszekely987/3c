@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.projectCycleTimeAnalysis" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Project Cycle Time Analysis" languageCode="en" name="Project Cycle Time Analysis"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT
+       @select:dim:user_def:implied:project:i.id:project_int_id@,   
+       @select:dim_prop:user_def:implied:project:i.name:project_name@,       
+       @select:dim_prop:user_def:implied:project:CASE WHEN LENGTH(i.name) > 16 THEN @SUBSTR@(i.name,1,16) @+@ '...' ELSE i.name END:project_short_name@,       
+       @select:dim_prop:user_def:implied:project:r.user_id:Manager_id@,
+       @select:dim_prop:user_def:implied:project:r.full_name:Manager_Name@,
+       @select:dim_prop:user_def:implied:project:CASE WHEN i.STATUS IN (1,5,8) THEN 1 ELSE 0 END:is_approved@,
+       @select:dim_prop:user_def:implied:project:ProjAttr.obj_Methodology:Methodology_ID@,       
+       @select:dim_prop:user_def:implied:project:ProjAttr.obj_request_type:Project_Type_ID@,       
+       @select:dim_prop:user_def:implied:project:prj.is_template:Is_Template@,       
+       @select:dim:user_def:implied:phase:@NVL@(PhaseMstr.Task_Code,'Undefined'):Phase_ID@,       
+       @select:dim_prop:user_def:implied:phase:@DBUSER@.CMN_TO_CHAR_FCT(CASE WHEN prj.is_template = 1 THEN (((10000 - PhaseMstr.Task_sequence) * 10)+0) ELSE (((10000 - PhaseMstr.Task_sequence) * 10)+100000)  END):Phase_ID_Sort@,
+       @select:dim_prop:user_def:implied:phase:@NVL@(PhaseMstr.Task_Name,'Undefined'):Phase_Name@,
+       @select:dim_prop:user_def:implied:phase:PhaseMstr.Task_Sequence:Phase_Seq@,       
+       @select:dim_prop:user_def:implied:phase:taskTable.PrStart:Start_Date@,
+       @select:dim_prop:user_def:implied:phase:@UPPER@(i.odf_object_code):investment_code_upper@,
+       @select:dim_prop:user_def:implied:phase:@DBUSER@.cop_calc_finish_time_fct(taskTable.PrFinish):Finish_Date@,
+       @select:metric:user_def:implied:@DBUSER@.CMN_DATEDIFF_FCT(@DBUSER@.cmn_date_trunc_fct(taskTable.PrFinish),@DBUSER@.cmn_date_trunc_fct(taskTable.PrStart))+1:duration_days@	   
+FROM   cop_phase_rollup_v PhaseMstr
+INNER  JOIN  inv_investments i
+       ON    PhaseMstr.Project_Id = i.id 
+INNER  JOIN  inv_projects prj
+       ON    prj.PrId = i.id 
+INNER  JOIN  odf_ca_project ProjAttr
+       ON    ProjAttr.id = i.id
+INNER  JOIN  PrTask taskTable
+       ON    taskTable.PrId = PhaseMstr.task_Id
+       AND   taskTable.PrProjectId = PhaseMstr.Project_Id
+       AND   taskTable.prwbslevel = 1
+LEFT   OUTER JOIN prj_obs_associations assoc
+             ON   assoc.table_name = 'SRM_PROJECTS'
+             AND  i.id = assoc.record_id 
+LEFT   OUTER JOIN prj_obs_units_flat flat
+             ON   assoc.unit_id = flat.unit_id 
+LEFT   OUTER JOIN srm_resources r
+             ON   r.user_id = i.manager_id
+WHERE  i.odf_object_code = 'project'
+AND    i.id = @NVL@(@WHERE:PARAM:XML:INTEGER:/data/id/@value@,i.id) 
+AND    i.is_active <> 0  
+AND    prj.is_program <> 1  
+AND    prj.is_template <> 1
+AND    PhaseMstr.IsTask = 0
+AND    PhaseMstr.ismilestone = 0
+AND    taskTable.PrFinish <> taskTable.PrStart
+AND    ((flat.branch_unit_id IS NULL) OR (@WHERE:PARAM:USER_DEF:INTEGER:flat.branch_unit_id:PROJECT_OBS@))
+AND    @WHERE:SECURITY:PROJECT:i.id@
+AND    @FILTER@]]></nsql>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_short_name" required="false">
+              
+              
+              
+              
+              <nls description="Project Short Name" languageCode="en" name="Project Short Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_name" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_approved" lookup="COP_PORTLET_INVESTMENT_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status Filter" languageCode="en" name="Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="methodology_id" lookup="OBJ_PROJECT_TEMPLATE" required="false">
+              
+              
+              
+              
+              <nls description="Methodology Filter" languageCode="en" name="Methodology Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_type_id" lookup="OBJ_IDEA_PROJECT_TYPE" required="false">
+              
+              
+              
+              
+              <nls description="Project Type Filter" languageCode="en" name="Project Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="is_template" required="false">
+              
+              
+              
+              
+              <nls description="Template" languageCode="en" name="Template"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_id" required="false">
+              
+              
+              
+              
+              <nls description="Phase Internal ID" languageCode="en" name="Phase Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_id_sort" required="false">
+              
+              
+              
+              
+              <nls description="Phase Internal ID (Sort)" languageCode="en" name="Phase Internal ID (Sort)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_name" required="false">
+              
+              
+              
+              
+              <nls description="Phase" languageCode="en" name="Phase"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="phase_seq" required="false">
+              
+              
+              
+              
+              <nls description="Phase WBS Sequence" languageCode="en" name="Phase WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="start_date" required="false">
+              
+              
+              
+              
+              <nls description="Start" languageCode="en" name="Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_code_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="finish_date" required="false">
+              
+              
+              
+              
+              <nls description="Finish" languageCode="en" name="Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="duration_days" required="false">
+              
+              
+              
+              
+              <nls description="Duration" languageCode="en" name="Duration"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_project_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              <nls description="OBS Project Filter" languageCode="en" name="OBS Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="pma.investmentProperties" code="projectproperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_code_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

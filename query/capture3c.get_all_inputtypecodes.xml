@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_all_inputtypecodes" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_all_inputtypecodes"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:INPUT_TYPE_CODES:X.CODE:CODE@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:INPUT_TYPE_CODES:X.LAST_UPDATED_DATE:LAST_UPDATED_DATE@,
+@SELECT:DIM_PROP:USER_DEF:IMPLIED:INPUT_TYPE_CODES:X.LAST_UPDATED_BY:LAST_UPDATED_BY@
+FROM
+(
+	SELECT tc.code AS code,
+		tc.last_updated_date AS last_updated_date,
+		tc.last_updated_by AS last_updated_by
+	FROM
+	(
+		SELECT DISTINCT 'all_input_type_codes' AS code,
+			tc.prmodtime AS last_updated_date,
+			CASE WHEN tc.prmodby = 'admin' THEN 1 ELSE CAST(tc.prmodby AS INT) END AS last_updated_by
+		FROM prtypecode tc
+	) tc
+	LEFT JOIN cmn_sec_users csu ON csu.id = tc.last_updated_by
+) x
+WHERE @FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="last_updated_date" required="false"/>
+            <attribute id="last_updated_by" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

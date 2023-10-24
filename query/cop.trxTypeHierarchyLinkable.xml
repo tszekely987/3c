@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.trxTypeHierarchyLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Actuals by Transaction Type (Instance = Project)" languageCode="en" name="Actuals by Transaction Type"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:TRX:A.TranTypeId_ResId_TrxId:Dim_Id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.descr:TrxType_Resource_Date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.Resource_Name:Resource_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.task_name:Task_Name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.Transaction_Date:Transaction_Date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.Quantity:Quantity@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.Total_Cost:Cost@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.TheLevel:TheLevel@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:A.sort1:sort1@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:TRX:CASE WHEN A.TheLevel <> 3 THEN A.TranTypeId_ResId_TrxId ELSE NULL END:hg_has_children@
+FROM
+(
+-- Level 1 Transaction Types  --
+SELECT 'L1' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) TranTypeId_ResId_TrxId,
+       trans_type.name descr,
+       NULL resource_name,
+       NULL transaction_date,
+       NULL task_name,
+       SUM(w.quantity) quantity,
+       SUM(wv.totalcost) total_cost,
+       1 TheLevel,
+       trans_type.name sort1
+FROM   ppa_wip w
+INNER  JOIN srm_resources r
+       ON   w.resource_code = r.unique_name 
+INNER  JOIN ppa_wip_values wv
+       ON   w.transno = wv.transno
+       AND  @UPPER@(wv.currency_type) = 'HOME'
+INNER  JOIN prTask t
+       ON   w.task_id = t.prID
+INNER  JOIN cmn_lookups_v trans_type
+       ON   w.transtype = trans_type.lookup_code
+       AND  trans_type.lookup_type = 'PAC_TRANSACTION_TYPE' 
+       AND  trans_type.language_code = @WHERE:PARAM:LANGUAGE@ 
+WHERE  w.status = 0
+AND    @WHERE:SECURITY:INV:w.investment_id@
+AND    (@WHERE:PARAM:USER_DEF:STRING:hg_row_id@ IS NULL)
+AND    (@WHERE:PARAM:USER_DEF:DATE:pBeginDate@ IS NULL OR 
+        @WHERE:PARAM:USER_DEF:DATE:pEndDate@ IS NULL OR
+        w.transdate BETWEEN @WHERE:PARAM:USER_DEF:DATE:pBeginDate@ AND @WHERE:PARAM:USER_DEF:DATE:pEndDate@)
+AND    w.investment_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+GROUP  BY trans_type.id, trans_type.name
+UNION
+-- Level 2 Resources --
+SELECT 'L2' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(r.id) TranTypeId_ResId_TrxId,
+       CASE WHEN exp.expmode = 1 THEN trans_type.name ELSE r.full_name END descr,
+       CASE WHEN exp.expmode = 1 THEN r.full_name ELSE NULL END resource_name,
+       NULL transaction_date,
+       NULL task_name,
+       SUM(w.quantity) quantity,
+       SUM(wv.totalcost) total_cost,
+       2 TheLevel,
+       trans_type.name @+@ r.full_name sort1
+FROM   ppa_wip w
+INNER  JOIN  srm_resources r
+       ON    w.resource_code = r.unique_name
+INNER  JOIN  ppa_wip_values wv
+       ON    w.transno = wv.transno
+       AND   @UPPER@(wv.currency_type) = 'HOME' 
+INNER  JOIN  prTask t
+       ON    w.task_id = t.prID
+INNER  JOIN  cmn_lookups_v trans_type
+       ON    w.transtype = trans_type.lookup_code 
+       AND   trans_type.lookup_type = 'PAC_TRANSACTION_TYPE'
+       AND   trans_type.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN (SELECT @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:hg_all_rows@,0) AS expmode FROM DUAL) exp
+       ON    1 = 1   
+WHERE  w.status = 0
+AND    ( ('L1' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@) OR (@WHERE:PARAM:USER_DEF:INTEGER:hg_all_rows@ = 1) )
+AND    (@WHERE:PARAM:USER_DEF:DATE:pBeginDate@ IS NULL OR @WHERE:PARAM:USER_DEF:DATE:pEndDate@ IS NULL OR
+        w.transdate BETWEEN @WHERE:PARAM:USER_DEF:DATE:pBeginDate@ AND @WHERE:PARAM:USER_DEF:DATE:pEndDate@)
+AND    w.investment_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+GROUP  BY  ('L2' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(r.id)), 
+       r.id,
+       exp.expmode,
+       r.full_name,
+       trans_type.name
+UNION
+-- Level 3 the Transactions  --
+SELECT 'L3' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(r.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(w.transno) TranTypeId_ResId_TrxId,
+       CASE WHEN exp.expmode = 1 THEN trans_type.name ELSE TO_CHAR(w.transdate, 'MM/DD/YYYY') END descr,
+       CASE WHEN exp.expmode = 1 THEN r.full_name ELSE NULL END resource_name,
+       CASE WHEN exp.expmode = 1 THEN w.transdate ELSE NULL END transaction_date,
+       t.prname task_name,
+       (w.quantity) quantity,
+       (wv.totalcost) total_cost,
+       3 TheLevel,
+       trans_type.name @+@ r.full_name @+@ TO_CHAR(w.transdate,'YYYY-MM-DD') sort1
+FROM   ppa_wip w
+INNER  JOIN  srm_resources r
+       ON    w.resource_code = r.unique_name
+INNER  JOIN  ppa_wip_values wv
+       ON    w.transno = wv.transno 
+       AND   @UPPER@(wv.currency_type) = 'HOME' 
+INNER  JOIN  prTask t
+       ON    w.task_id = t.prID 
+INNER  JOIN  cmn_lookups_v trans_type
+       ON    w.transtype = trans_type.lookup_code 
+       AND   trans_type.lookup_type = 'PAC_TRANSACTION_TYPE'
+       AND   trans_type.language_code = @WHERE:PARAM:LANGUAGE@
+LEFT   OUTER JOIN (SELECT @NVL@(@WHERE:PARAM:USER_DEF:INTEGER:hg_all_rows@,0) AS expmode FROM DUAL) exp
+             ON   1 = 1   
+WHERE  w.status = 0
+AND    (('L2' @+@ @DBUSER@.CMN_TO_CHAR_FCT(trans_type.id) @+@ @DBUSER@.CMN_TO_CHAR_FCT(r.id) = @WHERE:PARAM:USER_DEF:STRING:hg_row_id@) OR (@WHERE:PARAM:USER_DEF:INTEGER:hg_all_rows@ = 1) )
+AND    (@WHERE:PARAM:USER_DEF:DATE:pBeginDate@ IS NULL OR 
+        @WHERE:PARAM:USER_DEF:DATE:pEndDate@ IS NULL OR
+        w.transdate BETWEEN @WHERE:PARAM:USER_DEF:DATE:pBeginDate@ AND @WHERE:PARAM:USER_DEF:DATE:pEndDate@)
+AND    w.investment_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+) A
+WHERE  @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="trxtype_resource_date" required="false">
+              
+              
+              
+              
+              <nls description="Transaction / Resource / Date" languageCode="en" name="Transaction / Resource / Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resource_name" required="false">
+              
+              
+              
+              
+              <nls description="Resource Name" languageCode="en" name="Resource"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_name" required="false">
+              
+              
+              
+              
+              <nls description="Task Name" languageCode="en" name="Task"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="transaction_date" required="false">
+              
+              
+              
+              
+              <nls description="Transaction Date" languageCode="en" name="Transaction Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="quantity" required="false">
+              
+              
+              
+              
+              <nls description="Quantity" languageCode="en" name="Quantity"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="cost" required="false">
+              
+              
+              
+              
+              <nls description="Cost" languageCode="en" name="Cost"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="thelevel" required="false">
+              
+              
+              
+              
+              <nls description="Level (Internal)" languageCode="en" name="Level (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sort1" required="false">
+              
+              
+              
+              
+              <nls description="Sort Column" languageCode="en" name="Sort Column"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="hg_has_children" required="false">
+              
+              
+              
+              
+              <nls description="Has Child Records (Internal)" languageCode="en" name="Has Child Records (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_penddate" required="false">
+              
+              
+              
+              
+              <nls description="To Date Filter" languageCode="en" name="To Date Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hg_all_rows" required="false">
+              
+              
+              
+              
+              <nls description="Export All Rows (Internal)" languageCode="en" name="Export All Rows (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_pbegindate" required="false">
+              
+              
+              
+              
+              <nls description="From Date Filter" languageCode="en" name="From Date Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hg_row_id" required="false">
+              
+              
+              
+              
+              <nls description="Row ID (Internal)" languageCode="en" name="Row ID (Internal)"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

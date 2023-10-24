@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_OPTION_VALUES_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_OPTION_VALUES_INS_SP" (
+   P_OPTION_CODE      IN   VARCHAR2,
+   P_COMPONENT_CODE   IN   VARCHAR2,
+   P_USER_NAME        IN   VARCHAR2,
+   P_VALUE            IN   VARCHAR2,
+   P_CREATED_BY       IN   NUMBER DEFAULT 1
+)
+IS
+   V_USER_ID                     NUMBER := NULL;
+   V_COMPONENT_ID                NUMBER := NULL;
+   V_ID                          NUMBER;
+BEGIN
+   SELECT   CMN_OPTION_VALUES_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   IF P_COMPONENT_CODE IS NOT NULL
+   THEN
+      SELECT   MAX (ID)
+      INTO     V_COMPONENT_ID
+      FROM     CMN_COMPONENTS
+      WHERE    COMPONENT_CODE = P_COMPONENT_CODE;
+   END IF;
+   IF P_USER_NAME IS NOT NULL
+   THEN
+      SELECT   MAX (ID)
+      INTO     V_USER_ID
+      FROM     CMN_SEC_USERS
+      WHERE    USER_NAME = P_USER_NAME;
+   END IF;
+   INSERT INTO CMN_OPTION_VALUES
+               (
+                  ID,
+                  OPTION_ID,
+                  COMPONENT_ID,
+                  USER_ID,
+                  VALUE,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               O.ID,
+               V_COMPONENT_ID,
+               V_USER_ID,
+               P_VALUE,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     CMN_OPTIONS O
+      WHERE    OPTION_CODE = P_OPTION_CODE;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

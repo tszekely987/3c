@@ -1,0 +1,969 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="Idea_Approval" createdBy="admin" endStep="End" source="customer" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Standard process to manage submission of ideas and their subsequent review and approval or rejection. Also allows ideas to be returned for more information and resubmitted. This process is invoked implicitly when an idea is submitted for approval." languageCode="en" name="Idea Approval"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisIdea" objectType="idea" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step expirationType="Days" id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls description="This step creates an action item for the idea to be approved and then waits for that action item to be used to approve the idea or for the status of the idea to be changed to approved." languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiObjectName="ActionItem-Start" aiPriority="CAL_LOW" aiSubject="Please review this idea" aiUserStatusOnly="0" code="ai_start" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="This step creates an action item for the idea to be approved and then waits for that action item to be used to approve the idea or for the status of the idea to be changed to approved." languageCode="en" name="Start"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message languageCode="ca" name="Please review this idea"/>
+                    <message languageCode="cs" name="Please review this idea"/>
+                    <message languageCode="da" name="Please review this idea"/>
+                    <message languageCode="de" name="Please review this idea"/>
+                    <message languageCode="en" name="Please review this idea"/>
+                    <message languageCode="es" name="Please review this idea"/>
+                    <message languageCode="fi" name="Please review this idea"/>
+                    <message languageCode="fr" name="Please review this idea"/>
+                    <message languageCode="hu" name="Please review this idea"/>
+                    <message languageCode="it" name="Please review this idea"/>
+                    <message languageCode="ja" name="Please review this idea"/>
+                    <message languageCode="ko" name="Please review this idea"/>
+                    <message languageCode="nl" name="Please review this idea"/>
+                    <message languageCode="no" name="Please review this idea"/>
+                    <message languageCode="pl" name="Please review this idea"/>
+                    <message languageCode="pt" name="Please review this idea"/>
+                    <message languageCode="ru" name="Please review this idea"/>
+                    <message languageCode="sv" name="Please review this idea"/>
+                    <message languageCode="tr" name="Please review this idea"/>
+                    <message languageCode="zh" name="Please review this idea"/>
+                    <message languageCode="zh_TW" name="Please review this idea"/>
+                    <Assignees>
+                      <Assignee id="Approvers" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="REJECT" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                      <AIAction statusCode="APPROVE" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                      <AIAction statusCode="INCOMPLETE" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition note="Confirm idea is submitted for approval" sequencNo="1" type="BPM_SCT_PRECONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 6) )]]></ExpressionText>
+                      </Condition>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 1) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Notify Approved"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 3) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Notify Rejected"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="3" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 7) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Resubmit"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition note="Conflicting responses to action item" sequencNo="4" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Conflicting responses to action item" languageCode="en" name="Conflicting responses to action item"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[(actionitem.Start.ActionItem-Start.assignees-APPROVE > 0  && actionitem.Start.ActionItem-Start.assignees-REJECT > 0) || (actionitem.Start.ActionItem-Start.assignees-APPROVE > 0  && actionitem.Start.ActionItem-Start.assignees-INCOMPLETE > 0) || (actionitem.Start.ActionItem-Start.assignees-REJECT > 0  && actionitem.Start.ActionItem-Start.assignees-INCOMPLETE > 0)]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Conflicting Responses"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="5" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Start.ActionItem-Start.assignees-APPROVE > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Approved"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="6" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Start.ActionItem-Start.assignees-REJECT > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Rejected"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="7" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Start.ActionItem-Start.assignees-INCOMPLETE > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Incomplete"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Set Status to Approved" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls description="This step fires when the action item is used to approve the idea; it sets the idea's status property to approved." languageCode="en" name="Set Status to Approved"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="set_status_approved" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="This step fires when the action item is used to approve the idea; it sets the idea's status property to approved." languageCode="en" name="Set Status to Approved"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="1"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                  <Action code="set_approvedby_id" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls description="Set the approved by ID to the user who approved the action item." languageCode="en" name="Set the approved by ID"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:bpm="jelly:com.niku.bpm.gel.BPMTagLibrary" xmlns:core="jelly:core" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <!-- get the handler ID for the action item -->
+                          <gel:callPMD pmdID="projmgr.ideaApproval_getHandlerID" var="results">
+                            <gel:pmdParameter name="process_id" value="${gel_processInstanceId}"/>
+                          </gel:callPMD>
+                          <core:set value="" var="handlerID"/>
+                          <core:choose>
+                            <core:when test="${results[0].getDataValue('action_item_handler_id') != null}">
+                              <core:set value="${results[0].getDataValue('action_item_handler_id')}" var="handlerID"/>
+                            </core:when>
+                          </core:choose>
+                          <core:if test="${!empty handlerID}">
+                            <!-- get the user id for the user who approved the action item -->
+                            <gel:callPMD pmdID="projmgr.ideaApproval_getUserID" var="results">
+                              <gel:pmdParameter name="handler_id" value="${handlerID}"/>
+                            </gel:callPMD>
+                            <core:set value="" var="approverID"/>
+                            <core:choose>
+                              <core:when test="${results[0].getDataValue('user_id') != null}">
+                                <core:set value="${results[0].getDataValue('user_id')}" var="approverID"/>
+                              </core:when>
+                            </core:choose>
+                            <core:if test="${!empty approverID}">
+                              <gel:callPMD pmdID="projmgr.ideaApproval_setApprover">
+                                <gel:pmdParameter name="approver_id" value="${approverID}"/>
+                                <gel:pmdParameter name="inv_id" value="${gel_objectInstanceId}"/>
+                              </gel:callPMD>
+                            </core:if>
+                          </core:if>
+                        </gel:script>
+                      </scriptText>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Notify Approved"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Set Status to Rejected" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="This step fires when the action item is used to reject the idea; it sets the idea's status property to rejected." languageCode="en" name="Set Status to Rejected"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="set_status_rejected" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="This step fires when the action item is used to reject the idea; it sets the idea's status property to rejected." languageCode="en" name="Set Status to Rejected"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="3"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Notify Rejected"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Set Status to Incomplete" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="This step fires when the action item is used to set the idea status to incomplete; it sets the idea's status property to incomplete." languageCode="en" name="Set Status to Incomplete"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="set_status_incomplete" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="This step fires when the action item is used to set the idea status to incomplete; it sets the idea's status property to incomplete." languageCode="en" name="Set Status to Incomplete"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="7"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Resubmit"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="End" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls description="This step is void." languageCode="en" name="End"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Resubmit" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                <nls description="This step creates an action item for the idea to be completed and resubmitted and then waits for that action item to be used to resubmit the idea or for the status of the idea to be changed to submitted." languageCode="en" name="Resubmit"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiObjectName="ActionItem-Resubmit" aiPriority="CAL_LOW" aiSubject="Please complete this idea and resubmit it for review." aiUserStatusOnly="0" code="ai_resubmit" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="This step creates an action item for the idea to be completed and resubmitted and then waits for that action item to be used to resubmit the idea or for the status of the idea to be changed to submitted." languageCode="en" name="Resubmit"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message languageCode="ca" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="cs" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="da" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="de" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="en" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="es" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="fi" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="fr" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="hu" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="it" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="ja" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="ko" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="nl" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="no" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="pl" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="pt" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="ru" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="sv" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="tr" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="zh" name="Please complete this idea and resubmit it for review."/>
+                    <message languageCode="zh_TW" name="Please complete this idea and resubmit it for review."/>
+                    <Assignees>
+                      <Assignee id="Owner" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="RESUBMIT" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 6) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Start"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Resubmit.ActionItem-Resubmit.assignees-RESUBMIT >= 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Submitted"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Notify Approved" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="This step notifies the idea owner that the idea has been approved." languageCode="en" name="Notify Approved"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="true">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees>
+                    <Assignee id="Owner" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_PROFILE"/>
+                  </Assignees>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Notify Rejected" isMileStone="false" sequenceNo="8">
+                
+                
+                
+                
+                <nls description="This step notifies the idea owner that the idea has been rejected." languageCode="en" name="Notify Rejected"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="true">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees>
+                    <Assignee id="Owner" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_PROFILE"/>
+                  </Assignees>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="End"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Set Status to Submitted" isMileStone="false" sequenceNo="9">
+                
+                
+                
+                
+                <nls description="This step fires when the action item is used to resubmit the idea; it sets the idea's status property to submitted and returns to the start of the process." languageCode="en" name="Set Status to Submitted"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="set_status_submitted" objectMethod="status" objectName="thisIdea" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls description="This step fires when the action item is used to resubmit the idea; it sets the idea's status property to submitted and returns to the start of the process." languageCode="en" name="Set Status to Submitted"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="6"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Start"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step expirationType="Days" id="Conflicting Responses" isMileStone="false" sequenceNo="10">
+                
+                
+                
+                
+                <nls description="This step is the same as the start step except that the action item indicates that response to the previous action item was amibiguous." languageCode="en" name="Conflicting Responses"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="ATTENTION: This idea was reviewed by multiple managers who responded differently to it. Please discuss this off-line and give one response." aiObjectName="ActionItem-Conflicting Responses" aiPriority="CAL_LOW" aiSubject="Please review this idea again -- different responses were given" aiUserStatusOnly="0" code="ai_conflicting_responses" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="This step is the same as the start step except that the action item indicates that response to the previous action item was amibiguous." languageCode="en" name="Conflicting Responses"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="ATENCIÓN: Diversos gestors han revisat la idea i han proporcionat diferents opinions sobre això. Discuteixi el tema fora de línia i proporcioni una resposta." languageCode="ca" name="Revisi de nou la idea. S'han proporcionat noves opinions sobre això."/>
+                    <message description="POZOR: Tento návrh posoudilo několik manažerů různě. Proberte ho osobně a shodněte se na jedné reakci." languageCode="cs" name="Posuďte znovu tento návrh – jsou na něj různé reakce."/>
+                    <message description="BEMÆRK: Denne idé er blevet gennemgået af flere ledere, der givet forskellige svar. Diskutér dette offline og afgiv et samlet svar." languageCode="da" name="Gennemgå ideen igen - der blev givet forskellige svar"/>
+                    <message description="ACHTUNG: Diese Idee wurde von mehreren Managern überprüft, die jeweils verschieden darauf reagierten. Diskutieren Sie dies 'offline' und geben Sie eine einheitliche Antwort." languageCode="de" name="Prüfen Sie diese Idee noch einmal -- es wurden unterschiedliche Antworten gegeben"/>
+                    <message description="ATTENTION: This idea was reviewed by multiple managers who responded differently to it. Please discuss this off-line and give one response." languageCode="en" name="Please review this idea again -- different responses were given"/>
+                    <message description="ATENCIÓN: Varios gestores han revisado la idea y han proporcionado diferentes opiniones al respecto. Discuta el tema fuera de línea y proporcione una respuesta." languageCode="es" name="Revise de nuevo la idea. Se han proporcionado nuevas opiniones al respecto."/>
+                    <message description="Huomaa: Usea vastuuhenkilö tarkisti tämän idean, ja heidän antamansa vastaukset poikkeavat toisistaan. Keskustele asiasta heidän kanssaan järjestelmän ulkopuolella ja anna yksi vastaus." languageCode="fi" name="Tarkista tämä idea uudelleen. Siihen annettiin useita eri vastauksia"/>
+                    <message description="Avertissement : Cette idée a été révisée par plusieurs responsables et plusieurs réponses ont été fournies. Vous devez en discuter hors ligne et fournir une réponse unique." languageCode="fr" name="Révisez de nouveau cette idée, car différentes réponses ont été fournies."/>
+                    <message description="FIGYELEM: Ezt az ötletet több vezető is ellenőrizte, és nem egyformán reagáltak rá. Kérjük, vitassák meg ezt egymás között, és adjanak egységes reakciót." languageCode="hu" name="Ellenőrizze újra ezt az ötletet -- eltérő reakciókat kapott"/>
+                    <message description="Attenzione: La revisione dell'idea è stata eseguita da più manager che hanno fornito risposte diverse. Definire la revisione definitiva in separata sede e fornire una sola risposta." languageCode="it" name="Eseguire nuovamente la revisione dell'idea in quanto sono state fornite risposte diverse."/>
+                    <message description="注意: このアイデアは複数のマネージャによってレビューされ、異なる応答が返されました。オフラインでディスカッションを行い、1 つの応答を指定してください。" languageCode="ja" name="このアイデアを再度レビューしてください -- 別の応答が指定されました"/>
+                    <message description="주의: 이 아이디어는 여러 관리자가 검토하였으며 관리자마다 응답이 다릅니다. 이 아이디어를 오프라인으로 논의하여 한 가지 응답을 제공하십시오." languageCode="ko" name="이 아이디어를 다시 검토하십시오. 다른 응답이 제공되었습니다."/>
+                    <message description="LET OP: Dit idee is beoordeeld door meerdere managers die elk een andere beoordeling hebben gegeven. Bespreek dit idee offline en voer één beoordeling in." languageCode="nl" name="Bekijk dit idee opnieuw. Er zijn verschillende reacties gegeven"/>
+                    <message description="OBS! Denne ideen ble gjennomgått av flere ledere som reagerte forskjellig på den. Diskuter dette i frakoblet modus og gi ett svar." languageCode="no" name="Gjennomgå denne ideen på nytt – ulike svar ble gitt"/>
+                    <message description="UWAGA: Tę ideę przejrzało wielu menedżerów, którzy różnie na nią odpowiedzieli. Powinni oni omówić tę rozbieżność i podać jedną odpowiedź." languageCode="pl" name="Przejrzyj ideę ponownie, ponieważ podano różne odpowiedzi"/>
+                    <message description="ATENÇÃO: os gerentes que analisaram esta ideia deram respostas diferentes. É necessário discuti-las offline e dar uma resposta final." languageCode="pt" name="Analise a ideia novamente, pois foram dadas respostas diferentes."/>
+                    <message description="ВНИМАНИЕ: Эта идея была проверена несколькими менеджерами и получила различную оценку. Просьба к менеджерам обсудить и принять общее решение." languageCode="ru" name="Выполните проверку этой идеи снова, т.к. были даны различные отклики"/>
+                    <message description="Obs: Den här idén har granskats av flera ansvariga som svarat på olika sätt. Diskutera detta offline och ge ett svar." languageCode="sv" name="Granska den här idén igen -- olika svar angavs"/>
+                    <message description="DİKKAT: Bu fikir, fikre farklı yanıtlar veren birden fazla yönetici tarafından gözden geçirildi. Lütfen bunu çevrimdışı olarak tartışın ve tek bir yanıt verin." languageCode="tr" name="Lütfen bu fikri tekrar gözden geçirin -- farklı yanıtlar verildi"/>
+                    <message description="注意: 此构思已经过多个经理复查，但给出了不同答复。请离线讨论这个问题并给出一致性答复。" languageCode="zh" name="请再次复查此构思 - 给出了不同答复"/>
+                    <message description="注意：多位主管檢閱這個構想且各自的回應不盡相同。請另行討論並提供一個回應。" languageCode="zh_TW" name="請再次檢閱這個構想 -- 收到不同的回應"/>
+                    <Assignees>
+                      <Assignee id="Approvers" objectName="thisIdea" objectTypeCode="idea" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="REJECT" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                      <AIAction statusCode="APPROVE" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                      <AIAction statusCode="INCOMPLETE" statusTypeCode="IDEA_PROCESS_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition note="Confirm idea is submitted for approval" sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 1) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Notify Approved"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="2" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 3) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Notify Rejected"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="3" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ ( idea.thisIdea.status ==  lookup("INVESTMENT_OBJ_STATUS", 7) )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Resubmit"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition note="Conflicting responses to action item" sequencNo="4" type="BPM_SCT_POSTCONDITION">
+                        
+                        
+                        
+                        
+                        <nls description="Conflicting responses to action item" languageCode="en" name="Conflicting responses to action item"/>
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        <ExpressionText><![CDATA[(actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-APPROVE > 0  && actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-REJECT > 0) || (actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-APPROVE > 0  && actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-INCOMPLETE > 0) || (actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-REJECT > 0  && actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-INCOMPLETE > 0)]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Conflicting Responses"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="5" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-APPROVE > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Approved"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="6" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-REJECT > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Rejected"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="7" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[ actionitem.Conflicting Responses.ActionItem-Conflicting Responses.assignees-INCOMPLETE > 0]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Set Status to Incomplete"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="3" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

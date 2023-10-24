@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_UPGRADE_INST_RIGHT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_UPGRADE_INST_RIGHT_SP" (
+   p_right_code       in   varchar2,
+   p_permission_code  in   varchar2,
+   p_object_code      in   varchar2,
+   p_object_type       IN   VARCHAR2,
+   p_component_code    IN   VARCHAR2,
+   p_created_by       in   number default 1
+)
+is
+  v_next_id             NUMBER := 0;
+  v_permission_id       NUMBER := 0;
+  v_object_id           NUMBER := 0;
+  v_principal_type      varchar2(30);
+  v_principal_id        NUMBER := 0;
+  v_right_id            NUMBER := 0;
+  v_object_instance_id  NUMBER := 0;
+  v_count               NUMBER := 0;
+  
+  --
+  --  Usage:
+  --    exec cmn_upgrade_inst_right_sp('ProjectEditFull', 'CreateProject', 'PRJ_PROJECT');
+  --
+  --
+  --  Get all the right/object instance assignments for the instance rights we
+  --  modified
+  --
+  CURSOR instance_assign
+  IS
+    SELECT  distinct csaop.principal_id, csaop.principal_type, right_id, object_instance_id
+    FROM    cmn_sec_assgnd_obj_perm csaop, cmn_sec_groups r
+    WHERE   r.id         = csaop.right_id
+    and     r.group_code = p_right_code;
+    
+BEGIN
+
+   select id
+   into   v_permission_id
+   from   cmn_sec_permissions
+   where  permission_code = p_permission_code;
+
+--   select id
+--  into    v_object_id
+--   from   cmn_sec_objects
+--   where  object_code = p_object_code ;
+
+-- added p_component_code and p_object_type to get precise object_id
+
+   SELECT   ID INTO v_object_id
+   FROM     CMN_SEC_OBJECTS
+   WHERE    OBJECT_CODE = p_object_code
+   AND      COMPONENT_ID = (SELECT ID FROM CMN_COMPONENTS 
+                            WHERE COMPONENT_CODE = p_component_code)
+   AND      OBJECT_TYPE_ID = (SELECT ID FROM CMN_LOOKUPS 
+                              WHERE LOOKUP_TYPE = 'SEC_OBJECT_TYPE'
+                              AND   LOOKUP_CODE = p_object_type);
+   
+   IF (v_object_id != 0)
+   THEN
+     FOR instance_assign_rec IN instance_assign
+     LOOP
+        v_principal_type      := instance_assign_rec.principal_type;
+        v_principal_id        := instance_assign_rec.principal_id;
+        v_right_id            := instance_assign_rec.right_id;
+        v_object_instance_id  := instance_assign_rec.object_instance_id;
+  
+        select  count(*)
+        into    v_count
+        from    cmn_sec_assgnd_obj_perm csaop, cmn_sec_groups r
+        where   r.id                      = csaop.right_id
+        and     r.group_code              = p_right_code
+        and     csaop.principal_id        = v_principal_id
+        and     csaop.principal_type      = v_principal_type
+        and     csaop.right_id            = v_right_id
+        and     csaop.object_instance_id  = v_object_instance_id
+        and     csaop.permission_id       = v_permission_id
+        and     csaop.object_id           = v_object_id;
+          
+        if  v_count = 0 then
+          --Add this record to CMN_SEC_ASSGND_OBJ_PERM
+          cmn_id_sp (p_table_name =&gt; 'CMN_SEC_ASSGND_OBJ_PERM', p_next_id =&gt; v_next_id);
+          
+          insert into cmn_sec_assgnd_obj_perm
+                      ( id, principal_type, principal_id, object_id, 
+                        permission_id, object_instance_id, right_id, 
+                        created_date, created_by, last_updated_date, last_updated_by                  )
+               values (
+                  v_next_id, v_principal_type, v_principal_id, v_object_id,
+                  v_permission_id, v_object_instance_id, v_right_id,
+                  sysdate, p_created_by, sysdate, p_created_by);
+        end if;
+        
+     END LOOP;
+   END IF;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

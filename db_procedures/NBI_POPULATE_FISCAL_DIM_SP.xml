@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_POPULATE_FISCAL_DIM_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_POPULATE_FISCAL_DIM_SP" 
+AS
+   V_FIRST_DAY                   DATE;
+   V_NUM_OF_RECS                 INTEGER;
+   V_DAY                         DATE;
+   V_STMT                        VARCHAR2 (200);
+BEGIN
+   V_STMT := 'Create Periods';
+
+   INSERT INTO NBI_DIM_FISCAL_TIME
+               (
+                  TIME_KEY,
+                  PERIOD_KEY,
+                  PERIOD,
+                  PERIOD_START_DATE,
+                  PERIOD_END_DATE,
+                  QUARTER_KEY,
+                  QUARTER,
+                  YEAR_KEY,
+                  YEAR,
+                  HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+               )
+      SELECT DISTINCT   F.P_YEAR || '-' || F.ID TIME_KEY,
+                        F.P_YEAR || '-' || F.ID PERIOD_KEY,
+                        F.PERIOD PERIOD,
+                        F.START_DATE,
+                        F.END_DATE,
+                        F.P_YEAR || '-Q' || F.ID QUARTER_KEY,
+                        F.P_QUARTER QUARTER,
+                        F.P_YEAR YEAR_KEY,
+                        F.P_YEAR YEAR,
+                        'PERIOD',
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+      FROM     BIZ_COM_PERIODS F,CMN_OPTIONS O,
+               ENTITY E, CMN_OPTION_VALUES V
+   WHERE          F.PERIOD_TYPE = 'MONTHLY'
+      AND      F.ENTITY_ID = E.ID
+      AND      O.OPTION_CODE = 'NBI_ENTITY_CODE'
+      AND      V.OPTION_ID = O.ID
+      AND      E.ENTITY = V.VALUE
+      AND      F.IS_ACTIVE=1
+      AND      NOT EXISTS (SELECT   'PERIOD'
+                           FROM     NBI_DIM_FISCAL_TIME F1
+                           WHERE    F1.TIME_KEY = F.P_YEAR || '-' || F.ID);
+
+   V_STMT := 'Create Quarters';
+
+   INSERT INTO NBI_DIM_FISCAL_TIME
+               (
+                  TIME_KEY,
+                  PERIOD_KEY,
+                  PERIOD,
+                  QUARTER_KEY,
+                  QUARTER,
+                  YEAR_KEY,
+                  YEAR,
+                  HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+               )
+      SELECT DISTINCT   QUARTER_KEY TIME_KEY,
+                        NULL,
+                        NULL,
+                        QUARTER_KEY QUARTER_KEY,
+                        QUARTER QUARTER,
+                        YEAR_KEY YEAR_KEY,
+                        YEAR YEAR,
+                        'QUARTER',
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+      FROM     NBI_DIM_FISCAL_TIME F
+      WHERE    HIERARCHY_LEVEL = 'PERIOD'
+      AND      NOT EXISTS (SELECT   'QUARTER'
+                           FROM     NBI_DIM_FISCAL_TIME F1
+                           WHERE    F1.TIME_KEY = F.QUARTER_KEY);
+
+   V_STMT := 'Create Years';
+
+   INSERT INTO NBI_DIM_FISCAL_TIME
+               (
+                  TIME_KEY,
+                  PERIOD_KEY,
+                  PERIOD,
+                  QUARTER_KEY,
+                  QUARTER,
+                  YEAR_KEY,
+                  YEAR,
+                  HIERARCHY_LEVEL,
+                     CREATED_DATE,
+                     CREATED_BY,
+                     LAST_UPDATED_DATE,
+                     LAST_UPDATED_BY
+               )
+      SELECT DISTINCT   YEAR_KEY,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        YEAR_KEY YEAR_KEY,
+                        YEAR YEAR,
+                        'YEAR',
+                  SYSDATE,
+                  0,
+                  SYSDATE,
+                  0
+      FROM     NBI_DIM_FISCAL_TIME F
+      WHERE    HIERARCHY_LEVEL = 'PERIOD'
+      AND      NOT EXISTS (SELECT   'YEAR'
+                           FROM     NBI_DIM_FISCAL_TIME F1
+                           WHERE    F1.TIME_KEY = F.YEAR_KEY);
+
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_POPULATE_FISCAL_DIM_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

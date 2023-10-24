@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PRJ_TASKS_DEPEND_CIRC_CHECK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PRJ_TASKS_DEPEND_CIRC_CHECK_SP" (
+        id    IN NUMBER,
+        type IN VARCHAR2,
+        Counter OUT NUMBER
+        )
+      AS
+
+      BEGIN
+
+      -- Fill a temp table with all the dependencies associated with a particular project 
+      -- or a single dependency depending on whether the stored procedure was called at a 
+      -- project level or a dependency level.
+      IF UPPER(type) = 'PRJ'
+      THEN
+          insert into PRJ_TEMP_CIRC_DEP_CHK (PRID, PRPREDTASKID, PRSUCCTASKID) 
+              select PRID, PRPREDTASKID, PRSUCCTASKID 
+                 from PRDEPENDENCY 
+                 where prpredtaskid in (select prid from PRTask where prprojectid = id) 
+              union 
+              select PRID, PRPREDTASKID, PRSUCCTASKID 
+                 from PRDEPENDENCY 
+                 where prsucctaskid in (select prid from PRTask where prprojectid = id); 
+      ELSE
+          insert into PRJ_TEMP_CIRC_DEP_CHK (PRID, PRPREDTASKID, PRSUCCTASKID) 
+             select PRID, PRPREDTASKID, PRSUCCTASKID from PRDEPENDENCY where PRID  = id; 
+      END IF;
+
+      -- Insert all dependencies which are either predecessor or successors to the dependencies
+      -- currently in the temp table created above. 
+      declare
+      n1_numb number := 1;
+      BEGIN
+         WHILE n1_numb &gt; 0 LOOP
+             insert into PRJ_TEMP_CIRC_DEP_CHK
+                  select d.prid, d.prpredtaskid, d.prsucctaskid
+                    from prdependency d, PRJ_TEMP_CIRC_DEP_CHK t
+                   where d.prsucctaskid = t.prpredtaskid
+                     and d.prid not in (select prid from PRJ_TEMP_CIRC_DEP_CHK)
+                  union
+                  select d.prid, d.prpredtaskid, d.prsucctaskid
+                    from prdependency d, PRJ_TEMP_CIRC_DEP_CHK t
+                   where d.prpredtaskid = t.prsucctaskid
+                     and d.prid not in (select prid from PRJ_TEMP_CIRC_DEP_CHK);
+            --DBMS_OUTPUT.PUT_LINE(SQL%ROWCOUNT);
+            IF SQL%ROWCOUNT = 0
+               THEN n1_numb := 0;
+            END IF;
+         END LOOP;
+      END;
+
+      -- Delete all the dependencies from the temp table which either do not have a predecessor or
+      -- have a successor making them an end point dependency without any children or parents.
+      declare
+      n2_numb number := 1;
+      BEGIN
+         WHILE n2_numb &gt; 0 LOOP
+            delete from PRJ_TEMP_CIRC_DEP_CHK 
+               where prid not in (select prid from PRJ_TEMP_CIRC_DEP_CHK t 
+                                    WHERE EXISTS (SELECT 1 FROM PRJ_TEMP_CIRC_DEP_CHK WHERE PRPREDTASKID=t.PRSUCCTASKID) 
+                                    AND EXISTS (SELECT 1 FROM PRJ_TEMP_CIRC_DEP_CHK WHERE PRSUCCTASKID=t.PRPREDTASKID));
+            --DBMS_OUTPUT.PUT_LINE(SQL%ROWCOUNT);
+            IF SQL%ROWCOUNT = 0
+               THEN n2_numb := 0;
+            END IF;
+         END LOOP;
+      END;
+
+      -- Select any remaining records from the temporary tables. Any remaining records mean that these
+      -- dependencies have circular references.  If there are no remaining records in the temp table then
+      -- there are no circular dependencies.
+      select count(*) into Counter from PRJ_TEMP_CIRC_DEP_CHK;
+
+      END PRJ_TASKS_DEPEND_CIRC_CHECK_SP;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

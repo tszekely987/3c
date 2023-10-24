@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_COMPONENTS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_COMPONENTS_INS_SP" (
+   P_COMPONENT_CODE          IN   VARCHAR2,
+   P_COMPONENT_NAME          IN   VARCHAR2,
+   P_COMPONENT_DESCRIPTION   IN   VARCHAR2,
+   P_COMPONENT_VERSION       IN   VARCHAR2,
+   P_IS_SYSTEM               IN   NUMBER,
+   P_IS_ACTIVE               IN   NUMBER,
+   P_IS_REPORT_ENABLED       IN   NUMBER,
+   P_CREATED_BY              IN   NUMBER DEFAULT 1
+)
+IS
+   V_ID                          NUMBER;
+BEGIN
+   SELECT   CMN_COMPONENTS_S1.NEXTVAL
+   INTO     V_ID
+   FROM     DUAL;
+   INSERT INTO CMN_COMPONENTS
+               (
+                  ID,
+                  COMPONENT_CODE,
+                  COMPONENT_VERSION,
+                  IS_ACTIVE,
+                  IS_SYSTEM,
+                  IS_REPORT_ENABLED,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+      SELECT   V_ID,
+               P_COMPONENT_CODE,
+               P_COMPONENT_VERSION,
+               P_IS_ACTIVE,
+               P_IS_SYSTEM,
+               P_IS_REPORT_ENABLED,
+               SYSDATE,
+               P_CREATED_BY,
+               SYSDATE,
+               P_CREATED_BY
+      FROM     DUAL
+      WHERE    NOT EXISTS (SELECT   'COMPONENT ALREADY EXISTS'
+                           FROM     CMN_COMPONENTS
+                           WHERE    COMPONENT_CODE = P_COMPONENT_CODE);
+   CMN_CAPTIONS_NLS_INS_SP (
+      'CMN_COMPONENTS',
+      V_ID,
+      P_COMPONENT_NAME,
+      P_COMPONENT_DESCRIPTION,
+      P_CREATED_BY,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL
+   );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

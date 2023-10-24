@@ -1,0 +1,20 @@
+<ClarityDBViewQuery>
+  <QueryResult code="COP_PHASE_ROLLUP_V">
+    <indexes/>
+    <text_length>1145</text_length>
+    <text>SELECT T.project_id, T.task_id, T.task_code, T.task_name, T.task_sequence, T.istask, T.ismilestone,  
+           NVL(P.prID,0) phase_id, P.prExternalID phase_code, P.prName phase_name, T.phase_sequence,
+           NVL(T.task_chargecode,NVL(P.prchargecodeid,NVL(INV.chargecodeid,0))) charge_code
+    FROM  (SELECT TASK.prProjectID project_id, TASK.prID task_id, TASK.prexternalid task_code, TASK.prName task_name, TASK.prWBSSequence task_sequence,
+            TASK.prIsTask istask, TASK.prIsMilestone ismilestone, TASK.prchargecodeid task_chargecode, MAX(NVL(Phase.prWBSSequence,0)) phase_sequence
+           FROM   prTask TASK, PRTASK Phase
+           WHERE  TASK.prProjectID = Phase.prProjectID (+) AND
+                  Phase.prWBSLevel (+) = 1 AND 
+                  TASK.prWBSSequence >= Phase.prWBSSequence (+)
+           GROUP BY TASK.prProjectID, TASK.prID, TASK.prName, TASK.prexternalid, TASK.prWBSSequence, TASK.prIsTask, TASK.prIsMilestone, TASK.prchargecodeid) T, 
+    prTask P, inv_investments INV
+    WHERE  T.project_id = P.prProjectID (+) AND
+           T.phase_sequence = P.prWBSSequence (+) AND
+           T.project_id = INV.id</text>
+  </QueryResult>
+</ClarityDBViewQuery>

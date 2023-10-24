@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_FEATURE_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_FEATURE_INS_SP" (
+	P_FEATURE_CODE  VARCHAR2,
+	P_FEATURE_NAME  VARCHAR2,
+	P_FEATURE_DESC  VARCHAR2,
+	P_FEATURE_TOGGLE  NUMBER,
+	P_FEATURE_PARTITION_CODE  VARCHAR2 DEFAULT 'NIKU.ROOT',
+	P_IS_BETA NUMBER DEFAULT 0
+	)
+	IS
+	F_ID NUMBER;
+
+	BEGIN
+		SELECT ID INTO F_ID
+		FROM CMN_FEATURES 
+		WHERE CODE = P_FEATURE_CODE  ;
+		
+		-- raise error if feature alredy exists
+		RAISE_APPLICATION_ERROR (-20006, 'Feature already exists with the code: ' || P_FEATURE_CODE);
+		
+		EXCEPTION
+		-- handle no data found exception when feature not exists with input feature code
+		WHEN NO_DATA_FOUND THEN
+			F_ID := NULL;
+
+    --check for valid toggle values
+		IF NOT (P_FEATURE_TOGGLE = 0 OR P_FEATURE_TOGGLE =1)
+    THEN
+      RAISE_APPLICATION_ERROR (-20006, 'Invalid feature toggle value, valid values are [0,1]');
+		
+		-- check if feature not exists then insert a record into cmn_features table with the passed inputs
+		ELSIF F_ID IS NULL
+		THEN
+			-- Get ID column value from sequence into F_ID
+			SELECT CMN_FEATURES_S1.NEXTVAL INTO F_ID
+			FROM DUAL;
+			
+			-- insert feature 
+			INSERT INTO CMN_FEATURES(ID,CODE, PARTITION_CODE, ENABLED, PAGE_LAYOUT, NAME, DESCRIPTION, CREATED_DATE,CREATED_BY,LAST_UPDATED_DATE,LAST_UPDATED_BY, IS_BETA) 
+			SELECT F_ID, P_FEATURE_CODE, P_FEATURE_PARTITION_CODE, P_FEATURE_TOGGLE, P.ID, P_FEATURE_NAME, P_FEATURE_DESC, SYSDATE, 1, SYSDATE, 1, P_IS_BETA
+			FROM CMN_PAGES P
+			WHERE P.PAGE_CODE = 'nmc.cmn_featureFrame';
+			
+			CMN_CAPTIONS_NLS_INS_SP( 'CMN_FEATURES', F_ID, P_FEATURE_NAME, P_FEATURE_DESC, 1, 1);
+			
+		END IF;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

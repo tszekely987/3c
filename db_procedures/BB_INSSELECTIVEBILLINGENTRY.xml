@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_INSSELECTIVEBILLINGENTRY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_INSSELECTIVEBILLINGENTRY" 
+(
+  cUserID   VARCHAR2,
+  cClient   VARCHAR2,
+  cProject  VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  b_currency_code varchar2(30);
+
+BEGIN
+
+  BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	
+	INSERT INTO bb_SelectiveBilling (UserID, COMPANY_CODE, PROJECT_CODE)
+	VALUES (bb_InsSelectiveBillingEntry.cUserID, bb_InsSelectiveBillingEntry.cClient,bb_InsSelectiveBillingEntry.cProject);
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+	--Insert into this temp table all the records that were selected.  We will later use this table in
+	--PAC_BIL_PROCESS_BATCH_JOB_SP to check for a validation for 'Consolidate Invoices'
+  select billing_currency_code into bb_InsSelectiveBillingEntry.b_currency_code from pac_mnt_projects
+	where company_code = bb_InsSelectiveBillingEntry.cClient and project_code = bb_InsSelectiveBillingEntry.cProject;
+
+	INSERT INTO PAC_BB_SELECTBILL_CONSINV (ID,UserID, COMPANY_CODE, PROJECT_CODE, CURRENCY_CODE)
+	VALUES (PAC_BB_SELECTBILL_CONSINV_S1.nextval,bb_InsSelectiveBillingEntry.cUserID, bb_InsSelectiveBillingEntry.cClient,bb_InsSelectiveBillingEntry.cProject,
+	bb_InsSelectiveBillingEntry.b_currency_code);
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+  END;
+END bb_InsSelectiveBillingEntry;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

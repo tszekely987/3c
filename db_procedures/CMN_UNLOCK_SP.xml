@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_UNLOCK_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_UNLOCK_SP" (
+   P_USER_ID      NUMBER,
+   P_TABLE_NAME   VARCHAR2,
+   P_LOCK_NAME    VARCHAR2,
+   P_RECORD_ID    NUMBER,
+   P_RET_VAL    OUT NUMBER,
+   P_TIMEOUT_SECONDS NUMBER DEFAULT -1
+)
+/* Description:
+   ------------
+   This function unlocks a specific record.
+
+   It will complete successfully in any case, whether it could unlock the record or not.
+
+   Return Values:
+   --------------
+   &lt;user id&gt; if a lock exists, whether it is for the user passed into this function or not.
+   0 if the lock is held by P_USER_ID but the reference count is &gt;= 1
+   -2 No lock existed whatsoever
+   -1 Any other exception occurred
+
+*/
+AS
+   PRAGMA AUTONOMOUS_TRANSACTION;
+   V_ROWID                       ROWID;
+   V_PRCOUNT                     INTEGER;
+   E_RECORD_LOCKED               EXCEPTION;
+   V_CNT                         NUMBER;
+   V_NO_LOCK                     BOOLEAN := FALSE;
+BEGIN
+
+		SELECT   ROWID
+		INTO     V_ROWID
+		FROM     PRLOCK
+		WHERE    (PRTABLENAME = P_TABLE_NAME OR PRTABLENAME IS NULL)
+		AND      PRNAME = P_LOCK_NAME
+		AND      PRRECORDID = P_RECORD_ID
+		AND      PRUSERID = P_USER_ID
+		AND (  (-1 = p_timeout_seconds)
+--   If timeout specified, then compare lockedsince + timeout seconds to current time.
+             OR ((prlockedsince + 1/24/3600 * p_timeout_seconds) &lt; SYSDATE))
+		FOR UPDATE OF PRUSERID NOWAIT;
+
+
+		DELETE
+		FROM 		 PRLOCK
+		WHERE    ROWID = V_ROWID;
+
+	 /* Setup the default return code */
+   P_RET_VAL := P_USER_ID;
+
+   COMMIT;
+
+EXCEPTION
+   WHEN NO_DATA_FOUND
+   THEN
+   		P_RET_VAL := -2;
+   		COMMIT;
+   WHEN OTHERS
+   THEN
+      P_RET_VAL := -1;
+      COMMIT;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

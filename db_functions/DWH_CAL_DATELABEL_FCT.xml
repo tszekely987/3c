@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>DWH_CAL_DATELABEL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."DWH_CAL_DATELABEL_FCT" (
+    p_language_code VARCHAR2,
+    p_format VARCHAR2,
+    p_date DATE,
+    p_period_type VARCHAR2
+)
+  RETURN VARCHAR
+IS
+    v_date_label VARCHAR2(20);
+    v_label VARCHAR2(20);
+BEGIN 
+    IF p_period_type = 'D' OR p_period_type = 'W' THEN
+        IF INSTR(p_format,'YYYY') &gt; 0 THEN
+            v_date_label := REPLACE(p_format,'YYYY',TO_CHAR(p_date,'YYYY'));
+        ELSIF INSTR(p_format,'YY') &gt; 0 THEN
+            v_date_label := REPLACE(p_format,'YY',TO_CHAR(p_date,'YY'));
+        END IF;
+        IF INSTR(v_date_label,'MM') &gt; 0 THEN
+            v_date_label := REPLACE(v_date_label,'MM',TO_CHAR(p_date,'MM'));
+        ELSIF INSTR(v_date_label,'M') &gt; 0 THEN
+            v_date_label := REPLACE(v_date_label,'M',TO_CHAR(p_date,'FMMM'));
+        END IF;
+        IF INSTR(v_date_label,'DD') &gt; 0 THEN
+            v_date_label := REPLACE(v_date_label,'DD',TO_CHAR(p_date,'DD'));
+        ELSIF INSTR(v_date_label,'D') &gt; 0 THEN
+            v_date_label := REPLACE(v_date_label,'D',TO_CHAR(p_date,'FMDD'));
+        END IF;
+    ELSIF p_period_type = 'M' THEN
+        IF TO_CHAR(p_date,'MM') = '01' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'JanKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '02' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'FebKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '03' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'MarKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '04' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'AprKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '05' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'MayKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '06' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'JunKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '07' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'JulKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '08' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'AugKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '09' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'SepKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '10' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'OctKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '11' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'NovKey' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'MM') = '12' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'DecKey' AND language_code = p_language_code;
+        END IF;
+        IF INSTR(p_format,'YYYY') &gt; 0 THEN
+            v_date_label := REPLACE(REPLACE(p_format,'YYYY',TO_CHAR(p_date,'YYYY')),'MM',v_label);
+        ELSE
+            v_date_label := REPLACE(REPLACE(p_format,'YY',TO_CHAR(p_date,'YY')),'MM',v_label);
+        END IF;
+    ELSIF p_period_type = 'Q' THEN
+        IF TO_CHAR(p_date,'Q') = '1' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'Q1Key' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'Q') = '2' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'Q2Key' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'Q') = '3' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'Q3Key' AND language_code = p_language_code;
+        ELSIF TO_CHAR(p_date,'Q') = '4' THEN
+            SELECT name INTO v_label FROM cmn_rpt_labels_v WHERE label_code = 'Q4Key' AND language_code = p_language_code;
+        END IF;
+        IF INSTR(p_format,'YYYY') &gt; 0 THEN
+            v_date_label := REPLACE(REPLACE(p_format,'YYYY',TO_CHAR(p_date,'YYYY')),'QQ',v_label);
+        ELSE
+            v_date_label := REPLACE(REPLACE(p_format,'YY',TO_CHAR(p_date,'YY')),'QQ',v_label);
+        END IF;
+    ELSIF p_period_type = 'A' THEN
+            IF INSTR(p_format,'YYYY') &gt; 0 THEN
+                v_date_label := REPLACE(p_format,'YYYY',TO_CHAR(p_date,'YYYY'));
+            ELSE
+                v_date_label := REPLACE(p_format,'YY',TO_CHAR(p_date,'YY'));
+            END IF;
+    END IF;
+    RETURN v_date_label;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

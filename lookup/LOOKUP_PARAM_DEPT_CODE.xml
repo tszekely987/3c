@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="LOOKUP_PARAM_DEPT_CODE" displayAttributeName="shortdesc" hiddenAttributeName="departcode" objectCode="" sortAttributeName="departcode" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Department browse" languageCode="en" name="Department browse"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT
+                 @SELECT:DEPARTMENTS.DEPARTCODE:DEPARTCODE@,
+                 @SELECT:DEPARTMENTS.SHORTDESC:SHORTDESC@,
+                 @SELECT:DEPARTMENTS.DESCRIPTION:DESCRIPTION@,
+                 @SELECT:(SELECT entity
+                            FROM entity
+                           WHERE id = DEPARTMENTS.entity_id):ENTITY@,
+                 @SELECT:DEPARTMENTS.LAST_UPDATED_DATE:LAST_UPDATED_DATE@
+            FROM DEPARTMENTS
+			WHERE departments.ID in ( SELECT DEPT_ID FROM LOCATIONDEPT WHERE DEPT_ID IS NOT NULL )
+           AND @FILTER@
+           @BROWSE-ONLY:
+		   AND IS_ACTIVE = 1 AND @WHERE:SECURITY:DEPARTMENT:DEPARTMENTS.ID@
+            and exists (select 1 from srm_resources r, locations l
+	                          where l.entity_id=DEPARTMENTS.entity_id
+	                          and @WHERE:PARAM:USER_ID@ = r.user_ID
+                       and @DBUSER@.PAC_FOS_IS_VALID_LOCATION_FCT(r.unique_name,l.locationid) = 1)            
+           :BROWSE-ONLY@
+             AND  (   entity_id = (SELECT ID
+                                    FROM entity
+                                   WHERE entity = (SELECT entity_code
+                                                      FROM inv_investments                                  WHERE inv_investments.ID = (@WHERE:PARAM:USER_DEF:INTEGER:inv_id@)
+                                                  )
+                                  )
+
+                 OR (
+                      (SELECT entity_code
+                         FROM inv_investments
+                        WHERE inv_investments.ID = (@WHERE:PARAM:USER_DEF:INTEGER:inv_id@)             ) IS NULL
+                     )
+                 )]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="departcode"/>
+              <displayedSuggestionAttribute value="shortdesc"/>
+              <displayedSuggestionAttribute value="description"/>
+              <displayedSuggestionAttribute value="entity"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="departcode"/>
+              <searchedSuggestionAttribute value="shortdesc"/>
+              <searchedSuggestionAttribute value="description"/>
+              <searchedSuggestionAttribute value="entity"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Department" languageCode="en" name="Select Department"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Department" languageCode="en" name="Select Department"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="departcode" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Code" languageCode="en" name="Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="shortdesc" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="entity" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Entity" languageCode="en" name="Entity"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="departcode" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Code" languageCode="en" name="Code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="shortdesc" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="entity" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="Entity" languageCode="en" name="Entity"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

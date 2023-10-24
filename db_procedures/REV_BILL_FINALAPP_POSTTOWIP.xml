@@ -1,0 +1,1470 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_BILL_FINALAPP_POSTTOWIP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_BILL_FINALAPP_POSTTOWIP" 
+(
+  invoiceno VARCHAR2,
+  userid    VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  prev_key  GLOBALPKG.STRING;
+  curr_key  GLOBALPKG.STRING;
+  max_key   GLOBALPKG.STRING;
+  COMPANY_CODE  GLOBALPKG.STRING;
+  projtype  GLOBALPKG.STRING;
+  chgsep  GLOBALPKG.STRING;
+  amountbilled  NUMBER(32,6);
+  overbill  NUMBER(32,6);
+  amountexceeded  NUMBER(32,6);
+  cTransType  GLOBALPKG.STRING;
+  nInvoiceAmount  NUMBER(32,6);
+  cClient   GLOBALPKG.STRING;
+  cInvoiceType  GLOBALPKG.STRING;
+  cGLPosted   GLOBALPKG.STRING;
+  dBillDate   DATE;
+  iRetval   INTEGER;
+  dInvoiceDate  DATE;
+  iBatchno  NUMBER;
+  nTaxAmount  NUMBER(32,6);
+  nAdminCharge  NUMBER(32,6);
+  tempVar1  NUMBER :=0;
+  /*** variables for muti-currency  ***/
+  projectId PAC_MNT_PROJECTS.ID%TYPE;
+  billingCurrencyCode PAC_MNT_PROJECTS.BILLING_CURRENCY_CODE%TYPE;
+  exr CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  ct varchar2(30);
+  fc varchar2(30);
+  tc varchar2(30);
+  vrates number(32,6);
+  exrate number(32, 6);
+  tempAmount NUMBER(32,6);
+  tempDate DATE;
+
+  ProjectCodeForBillingProject GLOBALPKG.STRING;
+  EnforceContractAmount   NUMBER(1);
+  TitleForBillingProject   GLOBALPKG.STRING;
+  v_enforceContractAmount GLOBALPKG.STRING;
+  billingPrjForInvoice NUMBER(10);
+  consolidated NUMBER(1);
+  billing_project_code GLOBALPKG.STRING;
+  v_HasSubProjects   NUMBER(1);
+  v_Status   NUMBER(1);
+
+  UF1_rowid   ROWID;
+  UF1_oval1   temp_MatchingREV_BILL_FINALAPP.transno%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT temp_MatchingREV_BILL_FINALAPP.ROWID, B.TransNo FROM ppa_Billings B, temp_MatchingREV_BILL_FINALAPP
+    WHERE B.WorkInt = temp_MatchingREV_BILL_FINALAPP.transno
+    AND B.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+    AND B.TransType = 'AY'
+    FOR UPDATE OF temp_MatchingREV_BILL_FINALAPP.transno;
+  UF2_rowid   ROWID;
+  UF2_oval1   ppa_Billings.GLPosted%TYPE;
+  UF2_oval2   ppa_Billings.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF2_oval3   ppa_Billings.LastUpdateDate%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT ppa_Billings.ROWID, 'D', REV_BILL_FINALAPP_POSTTOWIP.userid, SYSDATE FROM ppa_Billings, temp_MatchingREV_BILL_FINALAPP
+    WHERE ppa_Billings.TransNo = temp_MatchingREV_BILL_FINALAPP.transno
+    FOR UPDATE OF ppa_Billings.GLPosted, ppa_Billings.LASTUPDTDBY_RESOURCE_CODE, ppa_Billings.LastUpdateDate;
+  UF3_rowid   ROWID;
+  UF3_oval1   ppa_WIP_Values.AmountRemaining%TYPE;
+  UF3_oval2   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF3_oval3   ppa_WIP.LastUpdateDate%TYPE;
+
+  /* Multicurrency change
+  * This cursor deals with amount reamining field update of ppa_wip so update the ppa_wip_values table aswell for the
+  * multi currency changes. So that the amounts are reflected properly in all currencies.
+  * Introduced a new cursor for the values table.
+  * update the ppa_wip_values.AmountRemaining column using the same cursor
+  */
+  CURSOR UF3_cursor IS
+    SELECT ppa_WIP.ROWID ROWID_BILL, PPA_WIP_VALUES.ROWID ROWID_VALUES,
+        ( PPA_WIP_VALUES.AmountRemaining - NVL(temp_amountremainingREV_BILL_F.amount, 0) ) AMOUNT,
+        REV_BILL_FINALAPP_POSTTOWIP.userid USERID, TRUNC(SYSDATE) UPDATED_DATE, PPA_WIP_VALUES.CURRENCY_TYPE CURRENCY_TYPE
+      FROM ppa_WIP, PPA_WIP_VALUES, temp_amountremainingREV_BILL_F
+    WHERE ppa_WIP.TransNo = temp_amountremainingREV_BILL_F.applytonumber
+    AND PPA_WIP.TRANSNO = PPA_WIP_VALUES.TRANSNO
+    AND TEMP_AMOUNTREMAININGREV_BILL_F.CURRENCY_TYPE = PPA_WIP_VALUES.CURRENCY_TYPE
+    FOR UPDATE OF PPA_WIP_VALUES.AMOUNTREMAINING, ppa_WIP.LASTUPDTDBY_RESOURCE_CODE, ppa_WIP.LastUpdateDate;
+
+  UF4_rowid   ROWID;
+  UF4_oval1   ppa_WIP.Status%TYPE;
+  UF4_oval2   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF4_oval3   ppa_WIP.LastUpdateDate%TYPE;
+  CURSOR UF4_cursor IS
+    SELECT  ppa_WIP.ROWID, 0, REV_BILL_FINALAPP_POSTTOWIP.userid, SYSDATE FROM ppa_WIP, temp_amountremainingREV_BILL_F
+    WHERE ppa_WIP.TransNo = temp_amountremainingREV_BILL_F.applytonumber
+    and
+    NOT EXISTS (
+    SELECT  1
+    FROM ppa_TransBill T
+    WHERE T.ApplyTo = temp_amountremainingREV_BILL_F.applytonumber
+    and T.InvoiceNo != REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+    and T.TransType  NOT IN ('BR', 'BP', 'AY', 'MR', 'BC') )
+    FOR UPDATE OF ppa_WIP.Status, ppa_WIP.LASTUPDTDBY_RESOURCE_CODE, ppa_WIP.LastUpdateDate;
+
+  UF5_rowid   ROWID;
+  UF5_oval1   pac_mnt_projects.amountbilled%TYPE;
+  CURSOR UF5_cursor IS
+    SELECT pac_mnt_projects.ROWID ROWID_PRJ, ( NVL(amountbilled, 0) + temp_amountbilledREV_BILL_FINA.amount ) amount, CURRENCY_TYPE
+    FROM pac_mnt_projects, temp_amountbilledREV_BILL_FINA
+    WHERE pac_mnt_projects.COMPANY_CODE = temp_amountbilledREV_BILL_FINA.COMPANY_CODE
+    and pac_mnt_projects.PROJECT_CODE = temp_amountbilledREV_BILL_FINA.PROJECT_CODE
+    and temp_amountbilledREV_BILL_FINA.LEVEL_NO = 2
+    FOR UPDATE OF pac_mnt_projects.amountbilled;
+
+  UF6_rowid   ROWID;
+  UF6_oval1   ppa_WIP.InvoiceNo%TYPE;
+  UF6_oval2   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF6_oval3   ppa_WIP.LastUpdateDate%TYPE;
+  CURSOR UF6_cursor IS
+    SELECT ppa_WIP.ROWID, REV_BILL_FINALAPP_POSTTOWIP.invoiceno, REV_BILL_FINALAPP_POSTTOWIP.userid, SYSDATE FROM temp_amountbilledREV_BILL_FINA, ppa_WIP
+    WHERE ppa_WIP.COMPANY_CODE = temp_amountbilledREV_BILL_FINA.COMPANY_CODE
+    and ppa_WIP.PROJECT_CODE = temp_amountbilledREV_BILL_FINA.PROJECT_CODE
+    and ppa_WIP.Chargeable = 0
+    and NVL(TRIM(ppa_WIP.InvoiceNo), '') IS NULL
+    and ppa_WIP.TransDate &lt;= REV_BILL_FINALAPP_POSTTOWIP.dBillDate
+    and ppa_WIP.Status = 0
+    FOR UPDATE OF ppa_WIP.InvoiceNo, ppa_WIP.LASTUPDTDBY_RESOURCE_CODE, ppa_WIP.LastUpdateDate;
+
+  UF7_rowid   ROWID;
+  UF7_oval1   temp_projectsREV_BILL_FINALAPP.PROJECT_ID%TYPE;
+  CURSOR UF7_cursor IS
+    SELECT temp_projectsREV_BILL_FINALAPP.ROWID, temp_projectsREV_BILL_FINALAPP.PROJECT_ID
+    FROM temp_projectsREV_BILL_FINALAPP
+    FOR UPDATE OF temp_projectsREV_BILL_FINALAPP.BILLING_PROJECT_CODE;
+
+  UF8_rowid   ROWID;
+  UF8_oval1   temp_amountbilledREV_BILL_FINA.PROJECT_ID%TYPE;
+  CURSOR UF8_cursor IS
+    SELECT temp_amountbilledREV_BILL_FINA.ROWID, temp_amountbilledREV_BILL_FINA.PROJECT_ID
+    FROM temp_amountbilledREV_BILL_FINA
+    FOR UPDATE OF temp_amountbilledREV_BILL_FINA.BILLING_PROJECT_CODE;
+    
+  UF9_oval1   temp_amountremainingREV_BILL_F.ApplyToNumber%TYPE;
+  UF9_oval2   PPA_WIP_VALUES.AmountRemaining%TYPE;  
+  CURSOR UF9_cursor IS
+  	SELECT temp_amountremainingREV_BILL_F.ApplyToNumber, WV.AmountRemaining
+	FROM temp_amountremainingREV_BILL_F, PPA_WIP_VALUES WV
+    WHERE temp_amountremainingREV_BILL_F.Currency_Type = 'BILLING' AND
+	  	  WV.Currency_Type = temp_amountremainingREV_BILL_F.Currency_Type AND
+		  temp_amountremainingREV_BILL_F.ApplyToNumber = WV.TransNo;    
+
+  /* Multicurrency change
+  * Cursor for inserting records into invoiceheader_values so that have
+  * the invoiceamount in all currencies from PPA_TRANSBILL_VALUES
+  */
+  CURSOR invoiceAmount_curr IS
+    SELECT SUM(TV.Amount) AMOUNT, MAX(TV.EXCHANGE_ID) EXCHANGE_ID, MAX(TV.EXCHANGE_RATE) EXCHANGE_RATE,
+        TV.CURRENCY_TYPE CURRENCY_TYPE, TV.CURRENCY_CODE CURRENCY_CODE
+    FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+    WHERE T.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+    AND T.TRANSTYPE  NOT IN ('AU', 'AD', 'AY')
+    AND T.TRANSNO = TV.TRANSNO
+    GROUP BY TV.CURRENCY_TYPE, TV.CURRENCY_CODE ;
+
+  masterTransNo NUMBER(10,0);
+
+/* As a precaution, make sure that ppa_InvoiceDetails table doesn't have rows w/invoiceno */
+BEGIN
+/* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   	 Modified By   :Uma Siva
+   	 Modified Date :07/25/01
+*/
+-- get the Transtype ----
+    BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MAX(TransType)
+		INTO REV_BILL_FINALAPP_POSTTOWIP.cTransType FROM ppa_TransBill
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno AND
+		      TransType != 'MR' ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	--- Modified to call sp_reverse_billings if the transtype is 'BC'.
+	--- This is fix for bug # 44525 ---
+
+	--- If transtype is Credit Memo then  call sp_reverse_billings()---
+	IF  REV_BILL_FINALAPP_POSTTOWIP.cTransType = 'BC' THEN
+	  BEGIN
+	       sp_reverse_billings(invoiceno,userid);
+		   RETURN;
+	  END;
+	ELSE
+	  ---  If transtype is other than Credit Memo 'BC'---
+	  BEGIN
+	  BEGIN
+
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_invoiceDetails
+	WHERE invoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+/*
+Check for overbill validation
+If overbill - exit sp
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MIN(COMPANY_CODE)
+		INTO REV_BILL_FINALAPP_POSTTOWIP.COMPANY_CODE FROM ppa_TransBill
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	DELETE FROM temp_projectsREV_BILL_FINALAPP;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO  temp_projectsREV_BILL_FINALAPP (PROJECT_CODE, BILLAMOUNT, PROJECT_ID) SELECT DISTINCT T.PROJECT_CODE, SUM(TV.AMOUNT), P.ID
+     FROM ppa_TransBill T, pac_mnt_projects P, ppa_TransBill_Values TV
+		WHERE T.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+		AND T.PROJECT_CODE = P.PROJECT_CODE
+		AND T.TransType  IN ('BP', 'B')
+		AND T.TRANSNO = TV.TRANSNO
+		AND TV.CURRENCY_TYPE = 'BILLING'
+		GROUP BY T.PROJECT_CODE, P.ID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	OPEN UF7_cursor;
+	LOOP
+		FETCH UF7_cursor INTO UF7_rowid, UF7_oval1;
+		EXIT WHEN UF7_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		PAC_BIL_GET_BILLING_PROJECT_SP( UF7_oval1, REV_BILL_FINALAPP_POSTTOWIP.ProjectCodeForBillingProject, REV_BILL_FINALAPP_POSTTOWIP.EnforceContractAmount, REV_BILL_FINALAPP_POSTTOWIP.TitleForBillingProject );
+		UPDATE temp_projectsREV_BILL_FINALAPP
+		SET
+		BILLING_PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.ProjectCodeForBillingProject
+		WHERE ROWID = UF7_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF7_cursor;
+	END;
+
+	DELETE FROM temp_grp_prj_REV_BILL_FINALAPP;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO  temp_grp_prj_REV_BILL_FINALAPP (PROJECT_CODE, BILLAMOUNT) SELECT TMP.BILLING_PROJECT_CODE, SUM(TMP.BILLAMOUNT)
+		 FROM temp_projectsREV_BILL_FINALAPP TMP
+		 GROUP BY BILLING_PROJECT_CODE;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	REV_BILL_FINALAPP_POSTTOWIP.billingPrjForInvoice := StoO_rowcnt;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   RPAD( ' ', 23 ),  MIN(PROJECT_CODE),  MAX(PROJECT_CODE)
+		INTO REV_BILL_FINALAPP_POSTTOWIP.prev_key, REV_BILL_FINALAPP_POSTTOWIP.curr_key, REV_BILL_FINALAPP_POSTTOWIP.max_key FROM temp_grp_prj_REV_BILL_FINALAPP;
+		--do group by billing_project_id.
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	&lt;&lt;i_loop1&gt;&gt;
+	WHILE  REV_BILL_FINALAPP_POSTTOWIP.prev_key &lt; REV_BILL_FINALAPP_POSTTOWIP.max_key LOOP
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   type_
+      INTO REV_BILL_FINALAPP_POSTTOWIP.projtype
+      FROM pac_mnt_projects
+			WHERE COMPANY_CODE = REV_BILL_FINALAPP_POSTTOWIP.COMPANY_CODE
+			 and PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.curr_key;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		IF  REV_BILL_FINALAPP_POSTTOWIP.projtype = 'P' OR REV_BILL_FINALAPP_POSTTOWIP.projtype = 'S' THEN --or 'S'
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   BILLAMOUNT
+				INTO REV_BILL_FINALAPP_POSTTOWIP.amountbilled FROM temp_grp_prj_REV_BILL_FINALAPP T
+				WHERE T.PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.curr_key;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			--fix for bug 48575
+			IF  REV_BILL_FINALAPP_POSTTOWIP.amountbilled &gt; 0 and SUBSTR(REV_BILL_FINALAPP_POSTTOWIP.invoiceno, 1, 5)!='MATCH' THEN--remove matching condition
+			BEGIN
+				BEGIN
+				 	StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT cnts.enforce_contract_amount
+          INTO REV_BILL_FINALAPP_POSTTOWIP.v_enforceContractAmount
+          FROM projcntrts cnts, pac_mnt_projects p
+					WHERE P.COMPANY_CODE = REV_BILL_FINALAPP_POSTTOWIP.COMPANY_CODE
+		 			AND P.PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.curr_key
+		 			AND P.PROJECT_CODE = cnts.PROJECT_CODE;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						 WHEN TOO_MANY_ROWS THEN
+						 	  StoO_rowcnt := 2;
+						 WHEN NO_DATA_FOUND THEN
+						 	  StoO_rowcnt := 0;
+						 	  StoO_selcnt := 0;
+						 WHEN OTHERS THEN
+						 	  StoO_rowcnt := 0;
+							  StoO_selcnt := 0;
+							  StoO_error := SQLCODE;
+							  StoO_errmsg := SQLERRM;
+				END;
+				BEGIN
+				IF ( REV_BILL_FINALAPP_POSTTOWIP.projtype = 'P' ) OR  ( REV_BILL_FINALAPP_POSTTOWIP.projtype = 'S' AND NVL(REV_BILL_FINALAPP_POSTTOWIP.v_enforceContractAmount,0) = 1 ) THEN
+				 	sp_checkcontractamount(COMPANY_CODE=&gt;REV_BILL_FINALAPP_POSTTOWIP.COMPANY_CODE,
+				 	PROJECT_CODE=&gt;REV_BILL_FINALAPP_POSTTOWIP.curr_key,
+				 	billamount=&gt;REV_BILL_FINALAPP_POSTTOWIP.amountbilled,
+				 	amountexceeded=&gt;REV_BILL_FINALAPP_POSTTOWIP.amountexceeded);
+				END IF;
+				END;
+				BEGIN
+				IF  REV_BILL_FINALAPP_POSTTOWIP.amountexceeded &lt; 0 THEN
+				BEGIN
+					raise_application_error(-20306, 'Validation failed: Amount billed exceeded Contract/CAP amount.');
+					RETURN ;
+				END;
+				END IF;
+				END;
+			END;
+			END IF;
+		END;
+		END IF;
+
+		REV_BILL_FINALAPP_POSTTOWIP.prev_key :=  REV_BILL_FINALAPP_POSTTOWIP.curr_key;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   MIN(PROJECT_CODE)
+			INTO REV_BILL_FINALAPP_POSTTOWIP.curr_key FROM temp_projectsREV_BILL_FINALAPP
+			WHERE PROJECT_CODE &gt; REV_BILL_FINALAPP_POSTTOWIP.prev_key;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+/*
+Perform post to wip logic
+*/
+	END;
+	END LOOP;
+	REV_BILL_FINALAPP_POSTTOWIP.dInvoiceDate :=  TO_DATE(RPAD(TO_CHAR(SYSDATE,'mm/dd/yyyy'),
+	   10, ' '), 'mm/dd/yyyy');
+	REV_BILL_FINALAPP_POSTTOWIP.cGLPosted :=  'N';
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		/* Multicurrency change
+		 * Modified to get Amount from ppa_transbill_values
+		 */
+		SELECT   SUM(TV.Amount),  MAX(T.COMPANY_CODE)
+		INTO REV_BILL_FINALAPP_POSTTOWIP.nInvoiceAmount, REV_BILL_FINALAPP_POSTTOWIP.cClient
+		FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV
+		WHERE T.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+		 AND T.TRANSTYPE  NOT IN ('AU', 'AD', 'AY')
+		 AND T.TRANSNO = TV.TRANSNO
+		 AND TV.CURRENCY_TYPE = 'BILLING';
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	DELETE FROM temp_PrelimREV_BILL_FINALAPP_P;
+	DELETE FROM temp_FinalREV_BILL_FINALAPP_PO;
+	DELETE FROM temp_MatchingREV_BILL_FINALAPP;
+	DELETE FROM TEMP_PPA_INVOICEDETAILSSP_FINA;
+/* TA */
+
+  --DELETE FROM temp_applytotaxcodesREV_BILL_F;
+	/***
+	 * For Contract and Retainer Projects ( BP &amp; BR ) APPROVAL process and TAX/ADMIN charge calculations if needed are
+	 * done in SP_FINAL_APPROVE_BPBR procecdure which inserts the calculated info into
+	 * TEMP_PPA_INVOICEDETAILSSP_FINA
+	 ***/
+	IF  REV_BILL_FINALAPP_POSTTOWIP.cTransType = 'BR' OR   REV_BILL_FINALAPP_POSTTOWIP.cTransType = 'BP' THEN
+	BEGIN
+		SAVEPOINT Tran0;
+		BEGIN
+
+		 sp_final_approve_BPBR(REV_BILL_FINALAPP_POSTTOWIP.invoiceno,
+		 REV_BILL_FINALAPP_POSTTOWIP.cClient,
+		 REV_BILL_FINALAPP_POSTTOWIP.userid,
+		 REV_BILL_FINALAPP_POSTTOWIP.nInvoiceAmount,
+		 tempVar1,
+		 iRetval);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  iRetval = -1 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN0;
+			RETURN ;
+		END;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* Multicurrency Change
+		 * Getting information from the temp table and then populating the master table 'invoicedetails'
+		 *  with BILLING record as filtering criteria.
+		 */
+		INSERT INTO ppa_invoiceDetails (InvoiceNo, EntryType, LevelCode, Percentage, TaxCode,
+			   						    geocode_ship_to, geocode_ship_from, geocode_order_accepted)
+			   SELECT  InvoiceNo, EntryType, LevelCode, Percentage, TaxCode, geocode_ship_to,
+			   		   geocode_ship_from, geocode_order_accepted
+			   FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+			   WHERE TEMP_PPA_INVOICEDETAILSSP_FINA.CURRENCY_TYPE = 'BILLING' ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN0;
+			RETURN ;
+		END;
+		END IF;
+
+		/* Multicurreny change
+		 * Since TEMP_PPA_INVOICEDETAILSSP_FINA is only a temporary table store all the currency records in that table itself
+		 * instead of storing in a new values table.
+		 */
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO PPA_INVOICEDETAILS_VALUES(ID,INVOICENO, TAXABLEAMT, AMOUNT, CURRENCY_TYPE, EXCHANGE_RATE, EXCHANGE_ID, ENTRYTYPE, CURRENCY_CODE)
+			   SELECT  ppa_invoicedetails_values_s1.nextval, INVOICENO, TAXABLEAMT, AMOUNT, CURRENCY_TYPE, EXCHANGE_RATE, EXCHANGE_ID, ENTRYTYPE, CURRENCY_CODE
+			   FROM TEMP_PPA_INVOICEDETAILSSP_FINA;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN0;
+			RETURN ;
+		END;
+		END IF;
+
+
+		IF  iRetval = 0 THEN
+			COMMIT WORK;
+		ELSE
+			ROLLBACK TO SAVEPOINT Tran0;
+		END IF;
+		RETURN ;
+		/** Approval for Contract &amp; Retainer Projects  is over **/
+
+	END;
+	END IF;
+    /**********   NOT BP or BR   ****************/
+	DELETE FROM temp_amountremainingREV_BILL_F;
+	DELETE FROM temp_amountbilledREV_BILL_FINA;
+	DELETE FROM temp_tempREV_BILL_FINALAPP_POS;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+
+	--- Multi Currency change - Added Currency_type column inorder to store the amount in temp_amountremainingREV_BILL_F in all currency ---
+
+		INSERT INTO temp_amountremainingREV_BILL_F (applytonumber, amount, CURRENCY_TYPE)
+			   SELECT  T.ApplyTo, SUM(TV.AMOUNT * SIGN(INSTR( 'B BPBRAD', T.TransType) - INSTR( 'AU', T.TransType))), TV.CURRENCY_TYPE
+			   FROM ppa_TransBill T, ppa_transbill_values TV
+			   WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+			   AND T.TRANSNO = TV.TRANSNO
+			   GROUP BY ApplyTo, TV.CURRENCY_TYPE;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+
+	--- Multi Currency change get the amount of 'BILLING' record only from ppa_transbill_values as the amount populated in to
+	--- the TEMP table is used to update the amountbilled in PROJECTS view (see cursor UF5_cursor)
+
+	INSERT INTO temp_amountbilledREV_BILL_FINA (COMPANY_CODE, PROJECT_CODE, PROJECT_ID, LEVEL_NO, amount, CURRENCY_TYPE)
+	SELECT  T.COMPANY_CODE, T.PROJECT_CODE, P.ID, 1, SUM(TV.AMOUNT), TV.CURRENCY_TYPE
+     FROM ppa_TransBill T, ppa_transbill_values TV, pac_mnt_projects P
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+		 and SUBSTR(T.TransType, 1, 1) = 'B'
+		 and TV.TRANSNO = T.TRANSNO
+		 and TV.CURRENCY_TYPE = 'BILLING'
+		 and T.PROJECT_CODE = P.PROJECT_CODE
+		GROUP BY T.COMPANY_CODE, T.PROJECT_CODE, TV.CURRENCY_TYPE, P.ID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	OPEN UF8_cursor;
+	LOOP
+		FETCH UF8_cursor INTO UF8_rowid, UF8_oval1;
+		EXIT WHEN UF8_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		PAC_BIL_GET_BILLING_PROJECT_SP( UF8_oval1, REV_BILL_FINALAPP_POSTTOWIP.ProjectCodeForBillingProject, REV_BILL_FINALAPP_POSTTOWIP.EnforceContractAmount, REV_BILL_FINALAPP_POSTTOWIP.TitleForBillingProject );
+		UPDATE temp_amountbilledREV_BILL_FINA
+		SET
+		BILLING_PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.ProjectCodeForBillingProject
+		WHERE ROWID = UF8_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF8_cursor;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO temp_amountbilledREV_BILL_FINA (COMPANY_CODE, PROJECT_CODE, LEVEL_NO, amount, CURRENCY_TYPE)
+	SELECT  COMPANY_CODE, BILLING_PROJECT_CODE, 2, SUM(AMOUNT), CURRENCY_TYPE
+		 FROM temp_amountbilledREV_BILL_FINA
+		WHERE LEVEL_NO = 1
+		GROUP BY COMPANY_CODE, BILLING_PROJECT_CODE, CURRENCY_TYPE;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		 DELETE FROM temp_amountbilledREV_BILL_FINA where LEVEL_NO = 1;
+	END;
+
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   BillingDate
+		INTO REV_BILL_FINALAPP_POSTTOWIP.dBillDate FROM ppa_TransBill
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+/*  LB  07/29/98   Moved outside of transaction to prevent Sybase temp table error */
+
+    /** For Standard Projects TAX/ADMIN charge calculations if needed are
+	 *  done in ppa_ComputeAdminAndTaxes procecdure  which inserts the calculated info into
+	 *  TEMP_PPA_INVOICEDETAILSSP_FINA
+	 **/
+
+	SAVEPOINT TRAN1;
+	IF  SUBSTR(REV_BILL_FINALAPP_POSTTOWIP.invoiceno, 1, 5) != 'MATCH' THEN
+	BEGIN
+		BEGIN
+		ppa_ComputeAdminAndTaxes(REV_BILL_FINALAPP_POSTTOWIP.invoiceno, REV_BILL_FINALAPP_POSTTOWIP.userid, iRetval);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  iRetval != 0 THEN
+		BEGIN
+			raise_application_error(-20307, 'Admin/Tax Routine Failed');
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+
+      BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+	SELECT  S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, REV_BILL_FINALAPP_POSTTOWIP.userid, 'B', 'Final Approve Billings'
+		FROM DUAL
+		;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	/* LB 6/3/2001 Move out of IF End condition so that iBatchNo is not null */
+      SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	--- MultiCurrency Change - removed the monetary columns ---
+	INSERT INTO PPA_BILLINGS (TRANSNO, SourceModule, TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE, BillingDate,
+       Input_Type, Quantity, ApplyTo, ApplyToTransType, InvoiceNo, Notes,
+		   ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE, LastUpdateDate, GLPosted, BatchNo, Status, WorkInt, WorkBuf, ExternalTransNo,external_id)
+  	SELECT S_13_1_PPA_BILLINGS.nextval, SourceModule, TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code, RESOURCE_CODE, BillingDate, Input_Type,
+		   Quantity, ApplyTo, ApplyToTransType, InvoiceNo, Notes, REV_BILL_FINALAPP_POSTTOWIP.userid,
+		   TRUNC(SYSDATE), REV_BILL_FINALAPP_POSTTOWIP.userid, TRUNC(SYSDATE), REV_BILL_FINALAPP_POSTTOWIP.cGLPosted,
+		   REV_BILL_FINALAPP_POSTTOWIP.iBatchno, 0, TransNo, WorkBuf, ExternalTransNo,external_id
+		 FROM PPA_TRANSBILL
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno;
+
+   /* MultiCurrency Change
+	*  Insert the currency and amount fields in the value table for multicurrency. All the value tables have total 5 rows for each
+	*  row in the master table.
+	*/
+
+	--- get the transno of the record inserted into ppa_billins --
+	--SELECT S_13_1_PPA_BILLINGS.currval INTO rev_bill_finalapp_posttowip.masterTransNo  FROM dual;
+
+	INSERT INTO PPA_BILLING_VALUES(ID, TRANSNO, EXCHANGE_ID, AMOUNT, AMOUNTREMAINING, BILLRATE, CURRENCY_TYPE,
+		   						   CURRENCY_CODE, EXCHANGE_RATE)
+		   SELECT  PPA_BILLING_VALUES_S1.NEXTVAL, B.TRANSNO, TV.EXCHANGE_ID, TV.AMOUNT, TV.AMOUNT, TV.BILLRATE, TV.CURRENCY_TYPE,
+		   		   TV.CURRENCY_CODE, TV.EXCHANGE_RATE
+		   FROM PPA_TRANSBILL T, PPA_TRANSBILL_VALUES TV, PPA_BILLINGS B
+		   WHERE B.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+		   AND T.TRANSNO = TV.TRANSNO
+		   AND B.WORKINT = T.TRANSNO;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+/* LB  05/12/98 Updated Matching code per PTR # 9490 */
+	END;
+	END IF;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_TransBill
+		WHERE TransType = 'AY'
+		 and InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO temp_MatchingREV_BILL_FINALAPP (transno, originvoiceno)SELECT  T.TransNo, B.InvoiceNo
+			 FROM ppa_TransBill T, ppa_Billings B, billingschedule, ppa_BillingDetails
+			WHERE T.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+			 AND T.TransType = 'AY'
+			 AND B.TransNo = T.ApplyTo
+			 AND billingschedule.atf = 1
+			 and billingschedule.invoiceno = B.InvoiceNo
+			 AND ppa_BillingDetails.TransNo = B.TransNo
+			 AND ppa_BillingDetails.BillScheduleDate = B.BillingDate;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+/* 1/12/2000 Add Extra WHERE clause lines to get proper TransNo set to GLPosted = D*/
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN1;
+			RETURN ;
+		END;
+		END IF;
+/* 1/12/2000 Add Update to get proper TransNo set to GLPosted = D*/
+
+		OPEN UF1_cursor;
+		LOOP
+			FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+			EXIT WHEN UF1_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE temp_MatchingREV_BILL_FINALAPP
+			SET
+			transno = UF1_oval1
+			WHERE ROWID = UF1_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF1_cursor;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN1;
+			RETURN ;
+		END;
+		END IF;
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			 FROM temp_MatchingREV_BILL_FINALAPP );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+		BEGIN
+			OPEN UF2_cursor;
+			LOOP
+				FETCH UF2_cursor INTO UF2_rowid, UF2_oval1, UF2_oval2, UF2_oval3;
+				EXIT WHEN UF2_cursor%NOTFOUND;
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				UPDATE ppa_Billings
+				SET
+				GLPosted = UF2_oval1,
+				LASTUPDTDBY_RESOURCE_CODE = UF2_oval2,
+				LastUpdateDate = UF2_oval3
+				WHERE ROWID = UF2_rowid;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+			END LOOP;
+			CLOSE UF2_cursor;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK TO SAVEPOINT TRAN1;
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+	END;
+
+	/* Multicurrency Change
+	 * update the ppa_wip_values.AmountRemaining. Use the NATURAL record to update ppa_wip.AmountRemaining
+	 */
+	FOR REC IN UF3_cursor
+	LOOP
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		UPDATE PPA_WIP_VALUES
+		SET
+		PPA_WIP_VALUES.AmountRemaining = REC.AMOUNT
+		WHERE ROWID = REC.ROWID_VALUES ;
+
+		IF ( REC.CURRENCY_TYPE = 'NATURAL') THEN
+			UPDATE PPA_WIP
+			SET
+			LASTUPDTDBY_RESOURCE_CODE = REC.USERID,
+			LastUpdateDate = REC.UPDATED_DATE
+			WHERE ROWID = REC.ROWID_BILL ;
+		END IF;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+
+	BEGIN /*Vantive 49303 */
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	
+	OPEN UF9_cursor;
+	LOOP
+		FETCH UF9_cursor INTO UF9_oval1, UF9_oval2;
+		EXIT WHEN UF9_cursor%NOTFOUND;
+		BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			IF UF9_oval2 = 0 THEN
+			BEGIN
+			   UPDATE PPA_WIP_VALUES SET AmountRemaining = 0 WHERE TransNo = UF9_oval1;
+			END;
+			END IF;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+	CLOSE UF9_cursor;
+	END;	
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+
+	OPEN UF4_cursor;
+	LOOP
+		FETCH UF4_cursor INTO UF4_rowid, UF4_oval1, UF4_oval2, UF4_oval3;
+		EXIT WHEN UF4_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP
+		SET
+		Status = UF4_oval1,
+		LASTUPDTDBY_RESOURCE_CODE = UF4_oval2,
+		LastUpdateDate = UF4_oval3
+		WHERE ROWID = UF4_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF4_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+	IF  UPPER(SUBSTR(REV_BILL_FINALAPP_POSTTOWIP.invoiceno, 1, 5)) != 'MATCH' THEN
+	BEGIN
+		FOR REC in UF5_cursor
+		LOOP
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			--- update with the amount  in ''BILLING' currency type --
+      UPDATE pac_mnt_projects
+			SET
+			amountbilled = REC.amount
+			WHERE ROWID = REC.ROWID_PRJ;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN1;
+			RETURN ;
+		END;
+		END IF;
+/* LB  07/18/96 update nonchargeables with this invoice no */
+	END;
+	END IF;
+	OPEN UF6_cursor;
+	LOOP
+		FETCH UF6_cursor INTO UF6_rowid, UF6_oval1, UF6_oval2, UF6_oval3;
+		EXIT WHEN UF6_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_WIP
+		SET
+		ppa_WIP.InvoiceNo = UF6_oval1,
+		ppa_WIP.LASTUPDTDBY_RESOURCE_CODE = UF6_oval2,
+		ppa_WIP.LastUpdateDate = UF6_oval3
+		WHERE ROWID = UF6_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF6_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	IF  REV_BILL_FINALAPP_POSTTOWIP.cTransType = 'BC' THEN
+		REV_BILL_FINALAPP_POSTTOWIP.cInvoiceType :=  'C';
+	ELSE
+		REV_BILL_FINALAPP_POSTTOWIP.cInvoiceType :=  'I';
+	END IF;
+	--IF  NVL(REV_BILL_FINALAPP_POSTTOWIP.nInvoiceAmount, 0) &gt; 0 THEN
+	--BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+			/* Multicurrency Change
+			 * added the D.CURRENCY_TYPE = 'BILLING' criteria as the Temp table will have all the currency records
+			 */
+			SELECT   SUM(D.Amount)
+			INTO REV_BILL_FINALAPP_POSTTOWIP.nTaxAmount FROM TEMP_PPA_INVOICEDETAILSSP_FINA D
+			WHERE D.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+			 AND D.EntryType = 'T'
+			 AND D.CURRENCY_TYPE = 'BILLING' ;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+
+			/* Multicurrency Change
+			 * added the BILLING as Currency_type in the where clause since we need only the billing record from the set of 5 records.
+			 */
+			SELECT   SUM(D.Amount)
+			INTO REV_BILL_FINALAPP_POSTTOWIP.nAdminCharge FROM TEMP_PPA_INVOICEDETAILSSP_FINA D
+			WHERE D.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+			 AND D.EntryType = 'A'
+			 AND D.CURRENCY_TYPE = 'BILLING';
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+
+		/* Line Item CreditMemo Change populate amount_remaining column */
+		IF REV_BILL_FINALAPP_POSTTOWIP.billingPrjForInvoice &lt;= 1 THEN
+		BEGIN
+		   REV_BILL_FINALAPP_POSTTOWIP.consolidated := 0;
+		   SELECT PROJECT_CODE INTO  REV_BILL_FINALAPP_POSTTOWIP.billing_project_code FROM temp_grp_prj_REV_BILL_FINALAPP;
+
+		   INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+       SELECT COMPANY_CODE, PROJECT_CODE, ID, ID, ID, 0, NULL FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = REV_BILL_FINALAPP_POSTTOWIP.billing_project_code;
+
+		   PAC_BIL_GET_SUBPROJECTS_SP ( 0, REV_BILL_FINALAPP_POSTTOWIP.v_Status, REV_BILL_FINALAPP_POSTTOWIP.v_HasSubProjects ) ;
+
+		END;
+		ELSE
+		BEGIN
+		   REV_BILL_FINALAPP_POSTTOWIP.consolidated := 1;
+  		   REV_BILL_FINALAPP_POSTTOWIP.v_HasSubProjects := 0;
+		END;
+		END IF;
+
+		INSERT INTO invoiceheader (invoiceno, invtype, cmsgroupno, invoicedate, COMPANY_CODE, RESOURCE_CODE,
+					   printed, arposted, status, invoiceno_applyto, consolidated, billing_project_code, has_billing_subprojects )
+		VALUES (REV_BILL_FINALAPP_POSTTOWIP.invoiceno, REV_BILL_FINALAPP_POSTTOWIP.cInvoiceType,
+			   REV_BILL_FINALAPP_POSTTOWIP.invoiceno, REV_BILL_FINALAPP_POSTTOWIP.dInvoiceDate,
+			   REV_BILL_FINALAPP_POSTTOWIP.cClient,
+			   REV_BILL_FINALAPP_POSTTOWIP.userid, 0, 0, '9',REV_BILL_FINALAPP_POSTTOWIP.invoiceno,
+			   REV_BILL_FINALAPP_POSTTOWIP.consolidated, REV_BILL_FINALAPP_POSTTOWIP.billing_project_code,
+			   REV_BILL_FINALAPP_POSTTOWIP.v_HasSubProjects );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+/*   LB   06/10/96   PTR #4412   */
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT TRAN1;
+			RETURN ;
+		END;
+		END IF;
+
+
+		/* Multicurrency Change
+		 * update invoiceheader_values
+		 */
+		 /* START */
+		 FOR invoiceAmount_rec IN invoiceAmount_curr
+		 LOOP
+			BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+
+				--- Tax charge ----
+				SELECT   SUM(D.Amount)
+				INTO REV_BILL_FINALAPP_POSTTOWIP.nTaxAmount FROM TEMP_PPA_INVOICEDETAILSSP_FINA D
+				WHERE D.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+				 AND D.EntryType = 'T'
+				 AND D.CURRENCY_TYPE = invoiceAmount_rec.CURRENCY_TYPE;
+				--- Admin charge ----
+				SELECT   SUM(D.Amount)
+				INTO REV_BILL_FINALAPP_POSTTOWIP.nAdminCharge FROM TEMP_PPA_INVOICEDETAILSSP_FINA D
+				WHERE D.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno
+				 AND D.EntryType = 'A'
+				 AND D.CURRENCY_TYPE = invoiceAmount_rec.CURRENCY_TYPE;
+
+				INSERT INTO INVOICEHEADER_VALUES (
+					   id,
+					   invoiceno,
+					   invoiceamount,
+					   amount_remaining,
+					   taxamount,
+					   admincharge,
+					   currency_type,
+				       currency_code,
+					   exchange_id,
+					   exchange_rate)
+				VALUES (
+					   invoiceheader_values_S1.nextval,
+					   REV_BILL_FINALAPP_POSTTOWIP.invoiceno,
+					   NVL(invoiceAmount_rec.amount,0),
+					   NVL(invoiceAmount_rec.amount,0),
+					   NVL(REV_BILL_FINALAPP_POSTTOWIP.nTaxAmount,0),
+					   NVL(REV_BILL_FINALAPP_POSTTOWIP.nAdminCharge,0),
+					   invoiceAmount_rec.CURRENCY_TYPE,
+					   invoiceAmount_rec.CURRENCY_CODE,
+					   invoiceAmount_rec.EXCHANGE_ID,
+					   invoiceAmount_rec.EXCHANGE_RATE
+					   	);
+
+					StoO_rowcnt := SQL%ROWCOUNT;
+
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+			END;
+			END LOOP;
+
+			IF  StoO_error != 0 THEN
+			    BEGIN
+				ROLLBACK TO SAVEPOINT TRAN1;
+				RETURN ;
+			    END;
+		    END IF;
+			/* END */
+
+	--END;
+	--END IF;
+
+
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_invoiceDetails (InvoiceNo, EntryType, LevelCode, Percentage, TaxCode, geocode_ship_to, geocode_ship_from, geocode_order_accepted)
+	SELECT DISTINCT  InvoiceNo, EntryType, LevelCode, Percentage, TaxCode, geocode_ship_to, geocode_ship_from, geocode_order_accepted
+		 FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+		 WHERE CURRENCY_TYPE = 'BILLING';
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+
+
+	/* Multicurrency Change
+	 * insert into ppa_invoicedetails_values
+	 */
+	DELETE FROM TEMP_PPA_INVOICEDETAILS_VALUES;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO TEMP_PPA_INVOICEDETAILS_VALUES ( InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType)
+    SELECT  InvoiceNo, TaxableAmt, SUM( Amount ), currency_type, currency_code,
+		   exchange_id, exchange_rate, EntryType
+	   FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+   	   GROUP BY InvoiceNo, TaxableAmt, currency_type, currency_code, exchange_id, exchange_rate, EntryType;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+    INSERT INTO PPA_INVOICEDETAILS_VALUES (Id, InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType)
+		   SELECT  ppa_invoicedetails_values_S1.nextval, InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType
+		   FROM TEMP_PPA_INVOICEDETAILS_VALUES;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	/* Update PAC_BIL_INVOICE_TRN_DETAILS with the ppa_Billings TransNo */
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	UPDATE PAC_BIL_INVOICE_TRN_DETAILS
+	  SET TransNo = (SELECT TransNo
+	  	  		  	   FROM ppa_Billings B
+					   Where B.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno AND
+					   		 B.WorkInt = PAC_BIL_INVOICE_TRN_DETAILS.TransNo )
+  	  WHERE Invoice_No = REV_BILL_FINALAPP_POSTTOWIP.invoiceno ;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	--- delete from ppa_TransBill_values ---
+   BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TransBill_Values
+		WHERE Transno IN (SELECT ppa_TransBill.TRANSNO FROM ppa_TransBill
+		                 WHERE  ppa_TransBill.InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT TRAN1;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	--- delete from ppa_TransBill--
+	DELETE FROM ppa_TransBill
+		WHERE InvoiceNo = REV_BILL_FINALAPP_POSTTOWIP.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error = 0 THEN
+		COMMIT WORK;
+	ELSE
+		ROLLBACK TO SAVEPOINT TRAN1;
+	END IF;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+  END;
+END IF; /* Approval process for standard project is over */
+/*
+Modified By : S N
+Insert changed and call to sp_final_approve_BPBR
+and added code SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+for achieving functionality similar to select @iBatchNo = @@IDENTITY
+*/
+END REV_BILL_FINALAPP_POSTTOWIP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMS_GET_ADDIN_ITEM_DESC_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMS_GET_ADDIN_ITEM_DESC_FCT" (
+  p_item_id  in   number,
+  p_code     in   varchar2,
+  p_type       in   varchar2,
+  p_lang_code  in   varchar2 default 'en',
+  p_addin_id   in   number
+ )
+ RETURN varchar2
+IS
+  v_i18n_supported integer;
+  v_odf_pk number;
+  v_table_name varchar2(30);
+  v_desc_column varchar2(100);
+  v_dynamic_sql varchar2(500);
+  v_desc varchar2(300);
+  v_is_legacy integer;
+BEGIN
+
+  BEGIN
+    SELECT IS_LEGACY into v_is_legacy FROM CMS_CONTENT_ADDINS
+      WHERE ID = p_addin_id;
+  EXCEPTION
+    WHEN OTHERS
+      THEN
+        v_is_legacy := 0;
+  END;
+
+  IF v_is_legacy = 1 THEN
+    BEGIN
+      SELECT description into v_desc
+       FROM CMN_CAPTIONS_NLS
+       WHERE pk_id = p_item_id and
+             table_name = 'CMS_CONTENT_ADDIN_ITEMS' and
+             language_code = p_lang_code;
+      EXCEPTION
+      WHEN OTHERS
+        THEN
+          v_desc := '';
+    END;
+  ELSE
+      SELECT CMS_GET_CONTENT_ITEM_ID_FCT( p_item_id, 'CMS_CONTENT_ADDIN_ITEMS', p_code, p_type, '' ) into v_odf_pk
+      FROM DUAL;
+      BEGIN
+        SELECT i18n_supported, table_name, description_column
+          INTO v_i18n_supported, v_table_name, v_desc_column
+          FROM cms_content_types
+         WHERE type = p_type;
+      EXCEPTION
+        WHEN OTHERS
+          THEN
+            v_i18n_supported := 0;
+            v_table_name := '';
+            v_desc_column := '';
+      END;
+
+      IF v_i18n_supported = 1 THEN
+        IF p_type = 'PROCESS' THEN
+            SELECT nls.description INTO v_desc
+            FROM bpm_def_processes bdp, bpm_def_process_versions bdpv, cmn_captions_nls nls
+            WHERE bdpv.id = v_odf_pk
+            AND bdp.id = bdpv.process_id
+            AND nls.table_name = v_table_name
+            AND nls.language_code = p_lang_code
+            AND nls.pk_id = bdp.id;
+          ELSE
+            SELECT description INTO v_desc
+            FROM cmn_captions_nls
+            WHERE pk_id = v_odf_pk
+            AND table_name = v_table_name
+            AND language_code = p_lang_code;
+          END IF;
+      ELSIF p_type = 'VIEW' THEN
+        SELECT
+          CASE WHEN v.view_subtype IS NULL
+            THEN v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type
+            ELSE v.view_name || ' | ' || v.OBJECT_NAME || ' | ' || v.view_type || ' | ' || v.view_subtype
+          END INTO v_desc
+        FROM  ODF_OBJECT_CUSTOM_VIEWS_V v
+        WHERE v.language_code = p_lang_code
+        AND v.view_code = p_code;
+      ELSIF p_type = 'MENU' THEN
+        SELECT description INTO v_desc
+        FROM
+            (
+              SELECT distinct ac.description description
+              FROM cmn_menu_items mi,
+                   cmn_actions action,
+                   cmn_pages page,
+                   cmn_captions_nls ac,
+                   cmn_captions_nls pc
+              WHERE ( mi.is_hidden is null OR mi.is_hidden = 0 )
+                    AND mi.action_id = action.id
+                    AND action.page_id = page.id
+                    AND ac.pk_id = action.id
+                    AND ac.table_name = 'CMN_ACTIONS'
+                    AND ac.language_code = p_lang_code
+                    AND pc.pk_id = page.id
+                    AND pc.table_name = 'CMN_PAGES'
+                    AND pc.language_code = p_lang_code
+                    AND action.action_code = p_code
+            UNION
+            SELECT distinct ac.description description
+            FROM cmn_menu_items mi,
+                 cmn_actions action,
+                 odf_actions oa,
+                 cmn_captions_nls ac,
+                 cmn_captions_nls pc
+            WHERE ( mi.is_hidden is null OR mi.is_hidden = 0 )
+                  AND mi.action_id = action.id
+                  AND action.object_action_id = oa.id
+                  AND ac.pk_id = action.id
+                  AND ac.table_name = 'CMN_ACTIONS'
+                  AND ac.language_code = p_lang_code
+                  AND pc.pk_id = oa.id
+                  AND pc.table_name = 'ODF_ACTIONS'
+                  AND pc.language_code = p_lang_code
+                  AND action.action_code = p_code
+            UNION
+            SELECT distinct ac.description description
+            FROM cmn_menu_items mi,
+                 cmn_actions action,
+                 cmn_captions_nls ac
+            WHERE ( mi.is_hidden is null OR mi.is_hidden = 0 )
+                  AND mi.action_id = action.id
+                  AND ( action.page_id is null OR action.page_id = 0 )
+                  AND ( action.object_action_id is null OR  action.object_action_id = 0 )
+                  AND ac.pk_id = action.id
+                  AND ac.table_name = 'CMN_ACTIONS'
+                  AND ac.language_code = p_lang_code
+                  AND action.action_code = p_code
+            );
+      ELSE
+        v_dynamic_sql := 'SELECT ' || v_desc_column || ' FROM ' || v_table_name || ' WHERE id = ' || v_odf_pk;
+        EXECUTE IMMEDIATE v_dynamic_sql INTO v_desc;
+      END IF;
+  END IF;
+  RETURN v_desc;
+
+EXCEPTION
+  WHEN OTHERS
+    THEN
+      RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

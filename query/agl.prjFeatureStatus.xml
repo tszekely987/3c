@@ -1,0 +1,757 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="agl.prjFeatureStatus" isUserPortletAvailable="0" source="agl.ca.com">
+            
+            
+            
+            
+            <nls description="Feature Status" languageCode="en" name="Feature Status"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:FEATURE:t.prid:dim_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:t.prid:task_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:t.prprojectid:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:t.prexternalid:task_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:t.prname:task_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:t.prwbssequence:wbs_sequence@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_pln_start:pln_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_pln_finish:pln_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_act_start:act_start@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_act_finish:act_finish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_id:feature_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_state:agl_state@,	   
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_prelim_est:prelim_est@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:odf_t.agl_tsk_release:release@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:FEATURE:(SELECT LISTAGG(m.milestone_name, '; ' ) WITHIN GROUP (ORDER BY m.milestone_name)
+                                                  FROM   odf_multi_valued_lookups mvl
+                                                         INNER JOIN int_agl_milestones m ON m.milestone_id = mvl.value 
+                                                  WHERE  mvl.attribute = 'agl_tsk_milestones'  
+                                                  AND    mvl.pk_id = t.prid):milestones@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_est_stypts,0):est_stypts@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_est_usrsty,0):est_usrsty@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_acp_stypts,0):acp_stypts@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_acp_usrsty,0):acp_usrsty@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_pctdon_stc,0) * 100:pctdon_stc@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:@NVL@(odf_t.agl_tsk_pctdon_plest,0) * 100:pctdon_plest@,	   
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_t.agl_tsk_risk_score:risk_score@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_t.agl_tsk_value_score:value_score@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:odf_t.agl_tsk_wsjf_score:wsjf_score@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:10:no_of_stages@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:ROUND((@NVL@(odf_t.agl_tsk_pctdon_plest,0) * 100 / 10),0):current_stage@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:CASE WHEN @NVL@(odf_t.agl_tsk_pln_start,t.prstart) >  @SYSDATE@ THEN 100
+                                            WHEN @NVL@(odf_t.agl_tsk_pln_start,t.prstart) <= @SYSDATE@ THEN ROUND((@NVL@(odf_t.agl_tsk_pctdon_plest,0) * 100),0)
+                                       ELSE 0 END:current_stage_sl@
+FROM  prtask t  
+      INNER JOIN odf_ca_task odf_t ON odf_t.id = t.prid
+WHERE odf_t.agl_tsk_id IS NOT NULL
+AND   odf_t.agl_tsk_story_id IS NULL
+AND   (odf_t.agl_tsk_ordinal IS NULL OR odf_t.agl_tsk_ordinal = 0)
+AND   t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND  (@WHERE:PARAM:USER_DEF:STRING:release@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:release@ = odf_t.agl_tsk_release)
+AND  (@WHERE:PARAM:USER_DEF:INTEGER:milestone@ IS NULL 
+      OR @WHERE:PARAM:USER_DEF:INTEGER:milestone@ IN (SELECT mvl.value FROM odf_multi_valued_lookups mvl
+                                                      WHERE  mvl.pk_id = odf_t.id
+                                                      AND    mvl.attribute = 'agl_tsk_milestones'))
+AND   @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Task Internal ID" languageCode="en" name="Task Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_id" required="false">
+              
+              
+              
+              
+              <nls description="Task ID" languageCode="en" name="Task ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="task_name" required="false">
+              
+              <nls description="Feature" languageCode="en" name="Feature"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wbs_sequence" required="false">
+              
+              
+              
+              
+              <nls description="WBS Sequence" languageCode="en" name="WBS Sequence"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pln_start" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile Planned Start" languageCode="en" name="Agile Planned Start"/>
+              
+            </attribute>
+            <attribute id="pln_finish" required="false">
+              
+              
+              
+              
+              <nls description="Agile Planned Finish" languageCode="en" name="Agile Planned Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_start" required="false">
+              
+              
+              
+              
+              <nls description="Agile Actual Start" languageCode="en" name="Agile Actual Start"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="act_finish" required="false">
+              
+              <nls description="Agile Actual Finish" languageCode="en" name="Agile Actual Finish"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="feature_id" required="false">
+              
+              
+              
+              
+              <nls description="Feature ID" languageCode="en" name="Feature ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="agl_state" required="false">
+              
+              
+              
+              
+              <nls description="Agile State" languageCode="en" name="Agile State"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="prelim_est" required="false">
+              
+              <nls description="Agile Preliminary Estimate" languageCode="en" name="Agile Preliminary Estimate"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="release" required="false">
+              
+              
+              
+              
+              <nls description="Agile Release" languageCode="en" name="Agile Release"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="milestones" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile Milestones" languageCode="en" name="Agile Milestones"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="est_stypts" required="false">
+              
+              
+              
+              
+              <nls description="Estimated Story Points" languageCode="en" name="Estimated Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="est_usrsty" required="false">
+              
+              
+              
+              
+              <nls description="Estimated User Stories" languageCode="en" name="Estimated User Stories"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="acp_stypts" required="false">
+              
+              
+              
+              
+              <nls description="Accepted Story Points" languageCode="en" name="Accepted Story Points"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="acp_usrsty" required="false">
+              
+              
+              
+              
+              <nls description="Accepted User Stories" languageCode="en" name="Accepted User Stories"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pctdon_stc" required="false">
+              
+              
+              
+              
+              <nls description="% Done by Story Count" languageCode="en" name="% Done by Story Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="25" lo="-999" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="75" lo="25" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="999" lo="75" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="pctdon_plest" required="false">
+              
+              
+              
+              
+              
+              <nls description="% Done By Agile Plan Estimate" languageCode="en" name="% Done By Agile Plan Estimate"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="25" lo="-999" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="75" lo="25" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="999" lo="75" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="risk_score" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Agile Risk Score" languageCode="en" name="Agile Risk Score"/>
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="value_score" required="false">
+              
+              
+              
+              
+              <nls description="Agile Value Score" languageCode="en" name="Agile Value Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="wsjf_score" required="false">
+              
+              
+              
+              
+              <nls description="WSJF Score" languageCode="en" name="WSJF Score"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="no_of_stages" required="false">
+              
+              
+              
+              
+              <nls description="Number of Stages" languageCode="en" name="Number of Stages"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="current_stage" required="false">
+              
+              
+              
+              
+              <nls description="Current Stage" languageCode="en" name="Current Stage"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="current_stage_sl" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Current Stage Color" languageCode="en" name="Current Stage Color"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="25" lo="0" mappingCode="mapping-1" typeCode="red"/>
+                <mapping hi="75" lo="25" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="75" mappingCode="mapping-3" typeCode="green"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_release" lookup="AGL_RELEASES" required="false">
+              
+              
+              <nls description="Agile Release Filter" languageCode="en" name="Agile Release Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_milestone" lookup="AGL_MILESTONES" required="false">
+              
+              
+              
+              
+              <nls description="Agile Milestone Filter" languageCode="en" name="Agile Milestone Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

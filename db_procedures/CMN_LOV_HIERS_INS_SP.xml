@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOV_HIERS_INS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_LOV_HIERS_INS_SP" (
+     P_LOV_TYPE                           IN   VARCHAR2,
+     P_PARENT_LOV_TYPE           IN    VARCHAR2,
+     P_CREATED_BY                      IN    NUMBER
+   )
+   IS
+      V_NEW_LEVEL                 NUMBER;
+      V_PARENT_LOV_TYPE    VARCHAR2( 255 );
+      V_LOV_TYPE                   VARCHAR2( 255 );
+      
+   BEGIN
+       
+       V_NEW_LEVEL := 0;
+       
+       V_LOV_TYPE := CMN_LOOKUP_TYPE_CASE_FCT(P_LOV_TYPE);
+       
+       IF P_PARENT_LOV_TYPE IS NOT NULL THEN
+        V_PARENT_LOV_TYPE := TRIM( P_PARENT_LOV_TYPE );
+        IF V_PARENT_LOV_TYPE IS NOT NULL AND LENGTH( V_PARENT_LOV_TYPE ) &gt; 0 THEN
+           /* Now insert one row for each ancestor */
+           INSERT INTO CMN_LOV_FLAT_HIERS
+                         (LOV_TYPE,
+                          PARENT_LOV_TYPE,
+                          LOV_LEVEL,
+                          CREATED_DATE,
+                          CREATED_BY,
+                          LAST_UPDATED_DATE,
+                          LAST_UPDATED_BY
+                         )
+                SELECT V_LOV_TYPE,
+                       PARENT_LOV_TYPE,
+                       LOV_LEVEL,
+                       SYSDATE,
+                       P_CREATED_BY,
+                       SYSDATE,
+                       P_CREATED_BY
+                  FROM CMN_LOV_FLAT_HIERS
+                 WHERE LOV_TYPE = V_PARENT_LOV_TYPE;
+                 
+             SELECT MAX(LOV_LEVEL) INTO V_NEW_LEVEL
+             FROM CMN_LOV_FLAT_HIERS
+             WHERE LOV_TYPE = V_LOV_TYPE;             
+         END IF;
+      END IF;
+      
+         -- Increment the current level.
+         V_NEW_LEVEL := V_NEW_LEVEL + 1;
+         
+         INSERT INTO CMN_LOV_FLAT_HIERS 
+                         ( LOV_TYPE,
+                          PARENT_LOV_TYPE,
+                          LOV_LEVEL,
+                          CREATED_DATE,
+                          CREATED_BY,
+                          LAST_UPDATED_DATE,
+                          LAST_UPDATED_BY
+                     )
+              VALUES (
+                 V_LOV_TYPE,
+                 V_LOV_TYPE,
+                 V_NEW_LEVEL,
+                 SYSDATE,
+                 P_CREATED_BY,
+                 SYSDATE,
+                 P_CREATED_BY
+              );      
+   END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

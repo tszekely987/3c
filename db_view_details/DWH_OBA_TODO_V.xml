@@ -1,0 +1,13 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_OBA_TODO_V">
+    <indexes/>
+    <text_length>1839</text_length>
+    <text>select oba_todos.id odf_pk, NVL(OBA_TODOS.ID, 0) as todo_key, NVL(OBA_TODOS.ID, 0) as clarity_todo_key, oba_todos.CODE as todo_id, oba_todos.NAME as todo_name, oba_todos.completed as is_completed, CMN_DATE_TRUNC_FCT(OBA_TODOS.due_date) as due_date, oba_todos.blocked as is_blocked, oba_todos.blocked_reason as blocked_reason, oba_todos.link_url as link_url, (CASE WHEN OBA_TODOS.completed =1 THEN '2' ELSE (CASE WHEN OBA_TODOS.blocked = 1 then '1' else '0' END) END) as todo_status_key, (select NAME from cmn_lookups_v where language_code = dataw_context.language_code and lookup_type = 'LOOKUP_TODO_STATUS' and rownum = 1 and LOOKUP_CODE = (CASE WHEN OBA_TODOS.completed =1 THEN '2' ELSE (CASE WHEN OBA_TODOS.blocked = 1 then '1' else '0' END) END)) as status_caption, ASSOC.ASSOC_INSTANCE_ID as assoc_object_key, ASSOC.ASSOC_OBJECT_ALIAS as assoc_object_type, ASSOC.ASSOC_PARENT_ID as assoc_parent_key, ASSOC.ASSOC_PARENT_ALIAS as assoc_parent_type, OBA_TODOS.CREATED_DATE as clarity_created_date, OBA_TODOS.LAST_UPDATED_DATE as clarity_updated_date, NVL(OWNER.ID,0) as owner_key, 
+        OWNER.FULL_NAME
+      owner_caption, CREATED.ID as created_by_key, 
+        CREATED.FULL_NAME
+      dwh_created_by_caption, UPDATED.ID as updated_by_key, 
+        UPDATED.FULL_NAME
+      dwh_updated_by_caption, dataw_context.language_code, dataw_context.id language_id from oba_todos oba_todos inner join cmn_languages dataw_context on dataw_context.id = dataw_context.id  LEFT OUTER JOIN oba_associations ASSOC ON OBA_TODOS.ID = ASSOC.SRC_INSTANCE_ID AND ASSOC.SRC_OBJECT_ALIAS = 'obaTodos' LEFT OUTER JOIN srm_resources OWNER ON OBA_TODOS.owner = OWNER.ID JOIN srm_resources CREATED ON OBA_TODOS.CREATED_BY = CREATED.USER_ID JOIN srm_resources UPDATED ON OBA_TODOS.LAST_UPDATED_BY = UPDATED.USER_ID  where 1 = 1 and dataw_context.is_dw_enabled=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

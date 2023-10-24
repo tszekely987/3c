@@ -1,0 +1,768 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.prjCurrentIssuesLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Issues Listing (Instance = Project)" languageCode="en" name="Issues Listing"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT 	DISTINCT 
+        @SELECT:DIM:USER_DEF:IMPLIED:ISSUE:i.odf_pk:issue_int_id@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.pk_id:proj_int_id@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.pk_unique_name:proj_id@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.pk_name:proj_name@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:@UPPER@(inv.odf_object_code):investment_type_upper@,		
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.rim_risk_issue_code:issue_id@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.name:issue_name@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.description:description@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.resolution:resolution@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:category.name:category@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:CASE WHEN i.priority_code = 'LOW' THEN 1 
+                                                     WHEN i.priority_code = 'MEDIUM' THEN 2 
+                                                     WHEN i.priority_code = 'HIGH' THEN 3 ELSE NULL END:priority_sl@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:priority.name:priority@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:status.name:status@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:r.full_name:assigned_to@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:r.email:assigned_email@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.created_by:created_by@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.created_date:created_date@,                     
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.target_resolve_date:target_resolve_date@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.resolved_date:resolved_date@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.updated_by:last_updated_by@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:ISSUE:i.last_updated_date:last_updated_date@,
+        @SELECT:METRIC:USER_DEF:IMPLIED:@DBUSER@.CMN_DATEDIFF_FCT(@DBUSER@.COP_DATE_TRUNC_FCT(@SYSDATE@), @DBUSER@.COP_DATE_TRUNC_FCT(i.target_resolve_date)):schedule_sl@
+FROM    ODF_ISSUE_V2 i
+INNER   JOIN  inv_investments inv 
+              ON inv.id = i.pk_id                                                     
+LEFT    OUTER JOIN SRM_RESOURCES r 
+              ON   i.assigned_to = r.user_id
+LEFT    OUTER JOIN  CMN_LOOKUPS_V status
+              ON    status.lookup_code = i.status_code
+              AND   status.lookup_type = 'RIM_STATUS' 
+              AND   status.language_code =  @WHERE:PARAM:LANGUAGE@ 
+LEFT    OUTER JOIN  CMN_LOOKUPS_V category
+              ON    category.lookup_code = i.category_type
+              AND   category.lookup_type = 'RIM_CATEGORY_TYPE' 
+              AND   category.language_code =  @WHERE:PARAM:LANGUAGE@ 
+LEFT    OUTER JOIN  CMN_LOOKUPS_V priority
+              ON    priority.lookup_code = i.priority_code
+              AND   priority.lookup_type = 'RIM_PRIORITY' 
+              AND   priority.language_code =  @WHERE:PARAM:LANGUAGE@
+WHERE   i.status_code NOT IN ('CLOSED','RESOLVED') 
+AND     i.pk_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND     i.priority_code = @NVL@(@WHERE:PARAM:XML:STRING:/data/Priority/@value@,i.priority_code)
+AND     ((i.category_type IS NULL) OR (@WHERE:PARAM:USER_DEF:STRING:i.category_type:CATEGORY@))
+AND     ((i.status_code IS NULL)   OR (@WHERE:PARAM:USER_DEF:STRING:i.status_code:STATUS@))
+AND     ((i.assigned_to IS NULL)   OR (@WHERE:PARAM:USER_DEF:INTEGER:i.assigned_to:ASSIGNED_TO@))
+AND     @WHERE:SECURITY:PROJECT:i.pk_id@                    
+AND     @FILTER@]]></nsql>
+            <attribute id="issue_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Issue Internal ID" languageCode="en" name="Issue Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_id" required="false">
+              
+              
+              
+              
+              <nls description="Project ID" languageCode="en" name="Project ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_name" required="false">
+              
+              
+              
+              
+              <nls description="Project" languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="issue_id" required="false">
+              
+              
+              
+              
+              <nls description="Issue ID" languageCode="en" name="Issue ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="issue_name" required="false">
+              
+              
+              
+              
+              
+              <nls description="Issue" languageCode="en" name="Issue"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="description" required="false">
+              
+              
+              
+              
+              <nls description="Description" languageCode="en" name="Description"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resolution" required="false">
+              
+              
+              
+              
+              <nls description="Resolution" languageCode="en" name="Resolution"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="category" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Category" languageCode="en" name="Category"/>
+            </attribute>
+            <attribute id="priority_sl" lookup="COP_PORTLET_RIM_PRIORITY" required="false">
+              
+              
+              
+              
+              <nls description="Priority" languageCode="en" name="Priority"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="1"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="2"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="3"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="priority" required="false">
+              
+              
+              
+              
+              <nls description="Priority Name" languageCode="en" name="Priority Name"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="status" required="false">
+              
+              
+              
+              
+              <nls description="Status" languageCode="en" name="Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assigned_to" required="false">
+              
+              
+              
+              
+              
+              <nls description="Owner" languageCode="en" name="Owner"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="assigned_email" required="false">
+              
+              
+              
+              
+              <nls description="Owner Email" languageCode="en" name="Owner Email"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_by" required="false">
+              
+              
+              
+              
+              <nls description="Created By" languageCode="en" name="Created By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="created_date" required="false">
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Created Date" languageCode="en" name="Created Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="target_resolve_date" required="false">
+              
+              
+              
+              
+              <nls description="Target Resolution Date" languageCode="en" name="Target Resolution Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="resolved_date" required="false">
+              
+              
+              
+              
+              <nls description="Resolved Date" languageCode="en" name="Resolved Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_updated_by" required="false">
+              
+              
+              
+              
+              
+              <nls description="Updated By" languageCode="en" name="Updated By"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="last_updated_date" required="false">
+              
+              
+              
+              
+              <nls description="Last Updated Date" languageCode="en" name="Last Updated Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="schedule_sl" required="false">
+              
+              
+              
+              
+              <nls description="Schedule" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="1" lo="-100000" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="3" lo="1" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100000" lo="3" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_category" lookup="RIM_CATEGORY_TYPE" required="false">
+              
+              
+              
+              
+              
+              <nls description="Category Filter" languageCode="en" name="Category Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_status" lookup="RIM_STATUS" required="false">
+              
+              
+              
+              
+              <nls description="Status Filter" languageCode="en" name="Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_assigned_to" lookup="RIM_BROWSE_USER" required="false">
+              
+              
+              
+              
+              <nls description="Owner Filter" languageCode="en" name="Owner Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.teamMailTo" code="assignedEmail">
+                
+                
+                
+                
+                <nls description="Owner Email" languageCode="en" name="Owner Email"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="assigned_email" dataSource="data" paramCode="~mailto~"/>
+              </link>
+              <link action="itl.issueObject" code="issue">
+                
+                
+                
+                
+                <nls description="Issue Properties" languageCode="en" name="Issue Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/page/@space" dataSource="input" paramCode="ui.page.space"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="issue_int_id" dataSource="data" paramCode="odf_pk"/>
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectOverview" code="projectOverview">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="projectProperties">
+                
+                
+                
+                
+                <nls description="Project Properties" languageCode="en" name="Project Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

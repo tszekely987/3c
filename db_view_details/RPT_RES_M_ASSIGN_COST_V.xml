@@ -1,0 +1,55 @@
+<ClarityDBViewQuery>
+  <QueryResult code="RPT_RES_M_ASSIGN_COST_V">
+    <indexes/>
+    <text_length>2548</text_length>
+    <text>SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID,
+       a.prID ASSIGNMENT_ID,
+       a.team_id TEAM_ID, 
+       s.slice_date MONTH_START_DATE,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEACTCURVE' THEN
+          (CASE WHEN r.resource_type &lt;= 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ACTUAL_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEESTCURVE' THEN
+          (CASE WHEN r.resource_type &lt;= 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) ETC_HOURS,
+       0 BASELINE_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEACTCURVE'
+                       THEN s.slice * cst.cost_rate ELSE 0 END,0)) ACTUAL_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEESTCURVE'
+                       THEN s.slice * cst.cost_rate ELSE 0 END,0)) ETC_COST,
+       0 BASELINE_COST
+FROM   prAssignment a
+       INNER JOIN prTask t ON a.prTaskID = t.prID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_blb_slices s ON a.prID = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+       LEFT OUTER JOIN nbi_proj_res_rates_and_costs cst ON t.prProjectID = cst.project_id AND
+                       t.prID = cst.task_id AND a.team_id = cst.team_id AND
+                       s.slice_date BETWEEN cst.from_date AND cst.to_date
+WHERE (sr.request_name IN ('MONTHLYRESOURCEACTCURVE','MONTHLYRESOURCEESTCURVE'))
+GROUP BY t.prProjectID, t.prID, a.team_id, a.prID, s.slice_date
+UNION ALL
+SELECT t.prProjectID PROJECT_ID,
+       t.prID TASK_ID, 
+       a.TEAM_ID,
+       a.prID ASSIGNMENT_ID,
+       s.slice_date MONTH_START_DATE,
+       0 ACTUAL_HOURS,
+       0 ETC_HOURS,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYRESOURCEBASECURVE' THEN
+          (CASE WHEN r.resource_type &lt;= 1 THEN s.slice ELSE 0 END) ELSE 0 END,0)) BASELINE_HOURS,
+       0 ACTUAL_COST,
+       0 ETC_COST,
+       SUM(NVL(CASE WHEN sr.request_name = 'MONTHLYBASEASSIGNCOSTS' THEN s.slice ELSE 0 END,0)) BASELINE_COST
+FROM   prTask t
+       INNER JOIN prAssignment a ON t.prID = a.prTaskID
+       INNER JOIN srm_resources r ON a.prResourceID = r.id
+       INNER JOIN prj_baseline_details bd ON a.prID = bd.object_id
+       INNER JOIN prj_blb_slices s ON bd.id = s.prj_object_id
+       INNER JOIN prj_blb_slicerequests sr ON s.slice_request_id = sr.id
+WHERE (sr.request_name IN ('MONTHLYRESOURCEBASECURVE','MONTHLYBASEASSIGNCOSTS'))
+AND   (bd.object_type = 'ASSIGNMENT')
+AND   (bd.is_current = 1)
+GROUP BY t.prProjectID, t.prID, a.team_id, a.prID, s.slice_date
+ </text>
+  </QueryResult>
+</ClarityDBViewQuery>

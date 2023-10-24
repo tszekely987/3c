@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PREPARE_PROJ_DEF_DATA_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PREPARE_PROJ_DEF_DATA_SP" 
+ (P_RESOURCE_COLS_NUM NUMBER,
+  P_SCHEDULER_PREP NUMBER,
+  P_INCREMENTAL_ONLY NUMBER)
+AS
+   V_LABOR_RATE_MATRIX           NUMBER;
+   V_LABOR_COST_MATRIX           NUMBER;
+   V_MATERIALS_MATRIX            NUMBER;
+   V_EQUIPMENT_MATRIX            NUMBER;
+   V_EXPENSE_MATRIX              NUMBER;
+   V_EXCHANGE_RATE_TYPE VARCHAR2( 30 );
+   V_LABOR_EXCH_RATE_TYPE VARCHAR2( 30 );
+   V_EXPENSE_EXCH_RATE_TYPE VARCHAR2( 30 );
+   V_MATER_EXCH_RATE_TYPE VARCHAR2( 30 );
+   V_EQUIP_EXCH_RATE_TYPE VARCHAR2( 30 );
+
+   V_DEFAULT_LABOR_RATE_MATRIX   NUMBER;
+   V_DEFAULT_LABOR_COST_MATRIX   NUMBER;
+   V_DEFAULT_MATERIALS_MATRIX    NUMBER;
+   V_DEFAULT_EQUIPMENT_MATRIX    NUMBER;
+   V_DEFAULT_EXPENSE_MATRIX      NUMBER;
+   V_DEF_LABOR_EXCH_RATE_TYPE VARCHAR2(30);
+   V_DEF_EXPENSE_EXCH_RATE_TYPE VARCHAR2(30);
+   V_DEF_MATER_EXCH_RATE_TYPE VARCHAR2(30);
+   V_DEF_EQUIP_EXCH_RATE_TYPE VARCHAR2(30);
+
+   V_ENTITY_LABOR_RATE_MATRIX   NUMBER;
+   V_ENTITY_LABOR_COST_MATRIX   NUMBER;
+   V_ENTITY_MATERIALS_MATRIX    NUMBER;
+   V_ENTITY_EQUIPMENT_MATRIX    NUMBER;
+   V_ENTITY_EXPENSE_MATRIX      NUMBER;
+   V_ENTITY_LABOR_EXCH_RATE_TYPE VARCHAR2(30);
+   V_ENTITY_EXP_EXCH_RATE_TYPE VARCHAR2(30);
+   V_ENTITY_MATER_EXCH_RATE_TYPE VARCHAR2(30);
+   V_ENTITY_EQUIP_EXCH_RATE_TYPE VARCHAR2(30);   
+   V_ENTITY                      VARCHAR2(30);
+
+   V_RATE_MATRIX_KEY             NUMBER;
+   V_COST_MATRIX_KEY             NUMBER;
+   V_CONTINUE                    INTEGER;
+   V_FROM_DATE                   DATE;
+   V_TO_DATE                     DATE;
+   V_PROJ_RES_FROM_DATE                   DATE;
+   V_PROJ_RES_TO_DATE                     DATE;
+   V_NEXT_TO_DATE                DATE;
+   V_SLICE_FROM                  DATE;
+   V_SLICE_TO                    DATE;
+   V_PROJECT_ID                  NUMBER;
+   V_PROJECT_CODE            VARCHAR2(60);
+   V_MATRIX_COUNT            INTEGER;
+   V_FIRST_ROW                   INTEGER;
+
+   STOO_SELCNT                   INTEGER;
+   STOO_ERROR                    INTEGER;
+   STOO_ROWCNT                   INTEGER;
+   STOO_ERRMSG                   GLOBALPKG.STRING;
+
+   CURSOR C_NBI_PROJECTS_REC
+   IS
+   SELECT  INV.ID "PROJECT_ID",
+                 PAC.PROJECT_CODE "PROJECT_CODE",
+                 INV.SCHEDULE_START "FROM_DATE",
+                 INV.SCHEDULE_FINISH "TO_DATE",
+                 PAC.TRANSRATESOURCELABOR,
+                 PAC.TRANSCOSTSOURCELABOR,
+                 PAC.TRANSRATESOURCEEQUIPMENT,
+                 PAC.TRANSRATESOURCEMATERIALS,
+                 PAC.TRANSRATESOURCEEXPENSES,
+                 PAC.LABOR_EXCHANGE_RATE_TYPE "LABOR_EXCHANGE_RATE_TYPE",
+                 PAC.EXPENSE_EXCHANGE_RATE_TYPE "EXPENSE_EXCHANGE_RATE_TYPE",
+                 PAC.MATERIALS_EXCHANGE_RATE_TYPE "MATERIALS_EXCHANGE_RATE_TYPE",
+                 PAC.EQUIPMENT_EXCHANGE_RATE_TYPE "EQUIPMENT_EXCHANGE_RATE_TYPE",
+                 INV.ENTITY_CODE "ENTITY_CODE"
+    FROM INV_INVESTMENTS INV,
+		 PAC_MNT_PROJECTS PAC
+     WHERE PAC.ID (+) = INV.ID
+	 AND INV.is_active=1
+     AND ( P_INCREMENTAL_ONLY=0 OR (P_INCREMENTAL_ONLY=1 AND INV.ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)))
+     ORDER BY  INV.ID;
+
+   CURSOR C_NBI_PRJ_RES_TYPES_REC (P_PROJECT_ID NUMBER)
+   IS
+      SELECT   SR.RESOURCE_TYPE "RESOURCE_TYPE"
+            FROM  SRM_RESOURCES SR,
+               PRTEAM E
+      -- right now we are calculating ALL projects, whether they are financially enabled or not...
+      --   which requires defaults are setup to get rates/costs for non-financial projects
+      --       PAC_MNT_PROJECTS FP,
+      WHERE  E.PRPROJECTID =  P_PROJECT_ID
+      AND      E.PRRESOURCEID = SR.ID
+      AND ( P_INCREMENTAL_ONLY=0 OR (P_INCREMENTAL_ONLY=1 AND E.PRPROJECTID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)))
+      GROUP BY SR.RESOURCE_TYPE;
+
+   CURSOR C_NBI_PRJ_RES_REC (P_PROJECT_ID NUMBER, P_RESOURCE_TYPE NUMBER)
+   IS
+      SELECT *
+            FROM     TEMP_NBI_PROJ_RESOURCES TNPR
+      WHERE    TNPR.PROJECT_ID = P_PROJECT_ID
+      AND      TNPR.RESOURCE_TYPE = P_RESOURCE_TYPE
+      AND ( P_INCREMENTAL_ONLY=0 OR (P_INCREMENTAL_ONLY=1 AND TNPR.PROJECT_ID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+-- No need to sort since all resources will be processed sooner or later
+--	  ORDER BY TNPR.RESOURCE_ID;
+
+BEGIN
+
+   -- Check if there are any matrices
+    SELECT COUNT(*)
+      INTO V_MATRIX_COUNT
+      FROM PPA_MATRIX
+      WHERE MATRIXTYPE &lt;&gt; 'G';
+
+   IF  V_MATRIX_COUNT = 0 THEN
+      FOR C_NBI_PROJECTS_DATA IN C_NBI_PROJECTS_REC
+      LOOP
+        V_PROJECT_ID := C_NBI_PROJECTS_DATA.PROJECT_ID;
+        V_PROJECT_CODE := C_NBI_PROJECTS_DATA.PROJECT_CODE;
+
+       BEGIN
+          STOO_SELCNT := 0;
+          STOO_ERROR := 0;
+          STOO_ROWCNT := 0;
+
+          SELECT MIN_SLICE_DATE,
+                        MAX_SLICE_DATE
+          INTO     V_SLICE_FROM,
+                   V_SLICE_TO
+          FROM  TEMP_NBI_SLICE_DATA
+          WHERE   PROJECT_ID = V_PROJECT_ID;
+
+          STOO_ROWCNT := SQL%ROWCOUNT;
+       EXCEPTION
+          WHEN NO_DATA_FOUND
+          THEN
+             STOO_ROWCNT := 0;
+             STOO_SELCNT := 0;
+          WHEN OTHERS
+          THEN
+             STOO_ERROR := SQLCODE;
+             STOO_ERRMSG := SQLERRM;
+             RAISE_APPLICATION_ERROR (-20030, 'The dates cannot be found from Slice table.  ' || STOO_ERRMSG);
+             RETURN;
+       END;
+
+          V_FROM_DATE := C_NBI_PROJECTS_DATA.FROM_DATE;
+          V_TO_DATE := C_NBI_PROJECTS_DATA.TO_DATE;
+
+          IF     V_SLICE_FROM IS NOT NULL
+             AND V_SLICE_FROM &lt; V_FROM_DATE
+          THEN
+             V_FROM_DATE := V_SLICE_FROM;
+          END IF;
+
+          IF     V_SLICE_TO IS NOT NULL
+             AND V_SLICE_TO &gt; V_TO_DATE
+          THEN
+             V_TO_DATE := V_SLICE_TO;
+          END IF;
+
+         V_FROM_DATE := TO_DATE (TO_CHAR (V_FROM_DATE, 'MM/DD/YYYY'), 'MM/DD/YYYY');
+         V_TO_DATE := TO_DATE (TO_CHAR (V_TO_DATE, 'MM/DD/YYYY'), 'MM/DD/YYYY');
+
+         INSERT INTO TEMP_NBI_PROJ_DATES
+            (PROJECT_ID, FROM_DATE, TO_DATE)
+            SELECT V_PROJECT_ID, V_FROM_DATE, V_TO_DATE
+            FROM DUAL;
+     END LOOP;
+   ELSE
+
+      /* Populate the list of unique resources and projects */
+        INSERT /*+ APPEND */ INTO TEMP_NBI_PROJ_RESOURCES
+      (PROJECT_ID, RESOURCE_ID, RESOURCE_TYPE, PROJECT_CODE, RESOURCE_CODE)
+        SELECT DISTINCT
+                   T.PRPROJECTID,
+                   T.PRRESOURCEID,
+                   R.RESOURCE_TYPE,
+                   UPPER( I.CODE ),
+                   R.UNIQUE_NAME
+              FROM
+                   SRM_RESOURCES R,
+                   PRTEAM T,
+                   INV_INVESTMENTS I
+             WHERE  T.PRPROJECTID = I.ID
+             AND R.ID = T.PRRESOURCEID
+			 AND I.is_active=1 
+             AND ( P_INCREMENTAL_ONLY=0 OR (P_INCREMENTAL_ONLY=1 AND T.PRPROJECTID IN (SELECT ID FROM TEMP_INCREMENTAL_ONLY_PROJECTS)));
+             COMMIT;
+   EXECUTE IMMEDIATE 'CREATE UNIQUE INDEX TEMP_NBI_PROJ_RESOURCES_U1
+    ON TEMP_NBI_PROJ_RESOURCES(PROJECT_CODE, RESOURCE_CODE, RESOURCE_TYPE)';
+   EXECUTE IMMEDIATE 'CREATE INDEX TEMP_NBI_PROJ_RESOURCES_N1
+    ON TEMP_NBI_PROJ_RESOURCES(PROJECT_ID, RESOURCE_TYPE)';
+
+    -- get the default matrices and exchange rate types
+       BEGIN
+          STOO_ROWCNT := 0;
+          STOO_SELCNT := 0;
+          STOO_ERROR := 0;
+
+          SELECT   TRANSRATESRCLBR,
+                   TRANSRATESRCLBR,
+                   TRANSRATESRCMTL,
+                   TRANSRATESRCEQUIP,
+                   TRANSRATESRCEXPENSE,
+                   NVL( LABOR_EXCHANGE_RATE_TYPE, 'AVERAGE' ),
+                   NVL( EXPENSE_EXCHANGE_RATE_TYPE, 'AVERAGE' ),
+                   NVL( MATERIALS_EXCHANGE_RATE_TYPE, 'AVERAGE' ),
+                   NVL( EQUIPMENT_EXCHANGE_RATE_TYPE, 'AVERAGE' )
+          INTO
+                   V_DEFAULT_LABOR_RATE_MATRIX,
+                   V_DEFAULT_LABOR_COST_MATRIX,
+                   V_DEFAULT_MATERIALS_MATRIX,
+                   V_DEFAULT_EQUIPMENT_MATRIX,
+                   V_DEFAULT_EXPENSE_MATRIX,
+                   V_DEF_LABOR_EXCH_RATE_TYPE,
+                   V_DEF_EXPENSE_EXCH_RATE_TYPE,
+                   V_DEF_MATER_EXCH_RATE_TYPE,
+                   V_DEF_EQUIP_EXCH_RATE_TYPE
+          FROM     NAMEOPTIONS;
+
+          STOO_ROWCNT := SQL%ROWCOUNT;
+       EXCEPTION
+          WHEN OTHERS
+          THEN
+             STOO_ERROR := SQLCODE;
+             STOO_ERRMSG := SQLERRM;
+             RAISE_APPLICATION_ERROR (-20875, 'Error reading values from NAMEOPTIONS!  ' || STOO_ERRMSG);
+             RETURN;
+       END;
+
+      FOR C_NBI_PROJECTS_DATA IN C_NBI_PROJECTS_REC
+      LOOP
+
+        V_PROJECT_ID := C_NBI_PROJECTS_DATA.PROJECT_ID;
+        V_PROJECT_CODE := C_NBI_PROJECTS_DATA.PROJECT_CODE;
+        V_LABOR_RATE_MATRIX := C_NBI_PROJECTS_DATA.TRANSRATESOURCELABOR;
+        V_LABOR_COST_MATRIX := C_NBI_PROJECTS_DATA.TRANSCOSTSOURCELABOR;
+        V_MATERIALS_MATRIX := C_NBI_PROJECTS_DATA.TRANSRATESOURCEMATERIALS;
+        V_EQUIPMENT_MATRIX := C_NBI_PROJECTS_DATA.TRANSRATESOURCEEQUIPMENT;
+        V_EXPENSE_MATRIX := C_NBI_PROJECTS_DATA.TRANSRATESOURCEEXPENSES;
+        V_LABOR_EXCH_RATE_TYPE := C_NBI_PROJECTS_DATA.LABOR_EXCHANGE_RATE_TYPE;
+        V_EXPENSE_EXCH_RATE_TYPE := C_NBI_PROJECTS_DATA.EXPENSE_EXCHANGE_RATE_TYPE;
+        V_MATER_EXCH_RATE_TYPE := C_NBI_PROJECTS_DATA.MATERIALS_EXCHANGE_RATE_TYPE;
+        V_EQUIP_EXCH_RATE_TYPE := C_NBI_PROJECTS_DATA.EQUIPMENT_EXCHANGE_RATE_TYPE;
+        V_FROM_DATE := C_NBI_PROJECTS_DATA.FROM_DATE;
+        V_TO_DATE := C_NBI_PROJECTS_DATA.TO_DATE;
+        V_ENTITY := C_NBI_PROJECTS_DATA.ENTITY_CODE;
+
+        BEGIN
+          STOO_ROWCNT := 0;
+          STOO_SELCNT := 0;
+          STOO_ERROR := 0;
+
+          SELECT   TRANS_RATE_SOURCE_LABOR,
+                   TRANS_COST_SOURCE_LABOR,
+                   TRANS_RATE_SOURCE_MATERIALS,
+                   TRANS_RATE_SOURCE_EQUIPMENT,
+                   TRANS_RATE_SOURCE_EXPENSE,
+                   NVL( EXCHANGE_RATE_TYPE_LABOR, 'AVERAGE' ),
+                   NVL( EXCHANGE_RATE_TYPE_EXPENSE, 'AVERAGE' ),
+                   NVL( EXCHANGE_RATE_TYPE_MATERIALS, 'AVERAGE' ),
+                   NVL( EXCHANGE_RATE_TYPE_EQUIPMENT, 'AVERAGE' )
+          INTO
+                   V_ENTITY_LABOR_RATE_MATRIX,
+                   V_ENTITY_LABOR_COST_MATRIX,
+                   V_ENTITY_MATERIALS_MATRIX,
+                   V_ENTITY_EQUIPMENT_MATRIX,
+                   V_ENTITY_EXPENSE_MATRIX,
+                   V_ENTITY_LABOR_EXCH_RATE_TYPE,
+                   V_ENTITY_EXP_EXCH_RATE_TYPE,
+                   V_ENTITY_MATER_EXCH_RATE_TYPE,
+                   V_ENTITY_EQUIP_EXCH_RATE_TYPE
+          FROM     ENTITY
+          WHERE ENTITY = V_ENTITY;
+
+          STOO_ROWCNT := SQL%ROWCOUNT;
+       EXCEPTION
+          WHEN NO_DATA_FOUND
+          THEN
+             STOO_ROWCNT := 0;
+             STOO_SELCNT := 0;
+          WHEN OTHERS
+          THEN
+             STOO_ERROR := SQLCODE;
+             STOO_ERRMSG := SQLERRM;
+             RAISE_APPLICATION_ERROR (-20875, 'Error reading values from ENTITY!  ' || STOO_ERRMSG);
+             RETURN;
+       END;
+
+       BEGIN
+          STOO_SELCNT := 0;
+          STOO_ERROR := 0;
+          STOO_ROWCNT := 0;
+
+          SELECT MIN_SLICE_DATE,
+                        MAX_SLICE_DATE
+          INTO     V_SLICE_FROM,
+                   V_SLICE_TO
+          FROM  TEMP_NBI_SLICE_DATA
+          WHERE   PROJECT_ID = V_PROJECT_ID;
+
+          STOO_ROWCNT := SQL%ROWCOUNT;
+       EXCEPTION
+          WHEN NO_DATA_FOUND
+          THEN
+             STOO_ROWCNT := 0;
+             STOO_SELCNT := 0;
+          WHEN OTHERS
+          THEN
+             STOO_ERROR := SQLCODE;
+             STOO_ERRMSG := SQLERRM;
+             RAISE_APPLICATION_ERROR (-20030, 'The dates cannot be found from Slice table.  ' || STOO_ERRMSG);
+             RETURN;
+       END;
+
+          IF     V_SLICE_FROM IS NOT NULL
+             AND V_SLICE_FROM &lt; V_FROM_DATE
+          THEN
+             V_FROM_DATE := V_SLICE_FROM;
+          END IF;
+
+          IF     V_SLICE_TO IS NOT NULL
+             AND V_SLICE_TO &gt; V_TO_DATE
+          THEN
+             V_TO_DATE := V_SLICE_TO;
+          END IF;
+
+         V_FROM_DATE := TO_DATE (TO_CHAR (V_FROM_DATE, 'MM/DD/YYYY'), 'MM/DD/YYYY');
+         V_TO_DATE := TO_DATE (TO_CHAR (V_TO_DATE, 'MM/DD/YYYY'), 'MM/DD/YYYY');
+
+       FOR C_NBI_PRJ_RES_TYPES_DATA IN C_NBI_PRJ_RES_TYPES_REC (V_PROJECT_ID)
+       LOOP
+
+        -- determine the rate/cost matrix and the exchange rate type for the current resource type,
+
+          BEGIN
+             STOO_SELCNT := 0;
+             STOO_ERROR := 0;
+             STOO_ROWCNT := 0;
+             SELECT   DECODE (
+                         C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                         0, NVL (V_LABOR_RATE_MATRIX, NVL(V_ENTITY_LABOR_RATE_MATRIX, V_DEFAULT_LABOR_RATE_MATRIX)),
+                         1, NVL (V_EQUIPMENT_MATRIX, NVL(V_ENTITY_EQUIPMENT_MATRIX, V_DEFAULT_EQUIPMENT_MATRIX)),
+                         2, NVL (V_MATERIALS_MATRIX, NVL(V_ENTITY_MATERIALS_MATRIX, V_DEFAULT_MATERIALS_MATRIX)),
+                         3, NVL (V_EXPENSE_MATRIX, NVL(V_ENTITY_EXPENSE_MATRIX, V_DEFAULT_EXPENSE_MATRIX))
+                      ),
+                      DECODE (
+                         C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                         0, NVL (V_LABOR_COST_MATRIX, NVL(V_ENTITY_LABOR_COST_MATRIX, V_DEFAULT_LABOR_COST_MATRIX)),
+                         1, NVL (V_EQUIPMENT_MATRIX, NVL(V_ENTITY_EQUIPMENT_MATRIX, V_DEFAULT_EQUIPMENT_MATRIX)),
+                         2, NVL (V_MATERIALS_MATRIX, NVL(V_ENTITY_MATERIALS_MATRIX, V_DEFAULT_MATERIALS_MATRIX)),
+                         3, NVL (V_EXPENSE_MATRIX, NVL(V_ENTITY_EXPENSE_MATRIX, V_DEFAULT_EXPENSE_MATRIX))
+                      ),
+                      DECODE (
+                         C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                         0, NVL ( V_LABOR_EXCH_RATE_TYPE, NVL(V_ENTITY_LABOR_EXCH_RATE_TYPE, V_DEF_LABOR_EXCH_RATE_TYPE )),
+                         1, NVL ( V_EQUIP_EXCH_RATE_TYPE, NVL(V_ENTITY_EQUIP_EXCH_RATE_TYPE, V_DEF_EQUIP_EXCH_RATE_TYPE )),
+                         2, NVL ( V_MATER_EXCH_RATE_TYPE, NVL(V_ENTITY_MATER_EXCH_RATE_TYPE, V_DEF_MATER_EXCH_RATE_TYPE )),
+                         3, NVL ( V_EXPENSE_EXCH_RATE_TYPE, NVL(V_ENTITY_EXP_EXCH_RATE_TYPE, V_DEF_EXPENSE_EXCH_RATE_TYPE ))
+                      )
+             INTO
+                    V_RATE_MATRIX_KEY,
+                    V_COST_MATRIX_KEY,
+                    V_EXCHANGE_RATE_TYPE
+             FROM     DUAL;
+
+             STOO_ROWCNT := SQL%ROWCOUNT;
+          EXCEPTION
+             WHEN OTHERS
+             THEN
+                STOO_ERROR := SQLCODE;
+                STOO_ERRMSG := SQLERRM;
+                RAISE_APPLICATION_ERROR (-20115, 'Error while validating matrix.  ' || STOO_ERRMSG);
+                RETURN;
+          END;
+
+       IF P_RESOURCE_COLS_NUM = 0
+       THEN
+            IF P_SCHEDULER_PREP = 0
+            THEN
+              V_PROJ_RES_FROM_DATE := V_FROM_DATE;
+              FOR C_PROJ_RES_DATE_DATA IN
+                ( SELECT DISTINCT TRANSITION_DATE
+                FROM TEMP_NBI_MATRIX_DATA TNMD
+                WHERE
+                  NVL( TNMD.PROJECT_CODE, V_PROJECT_CODE ) =
+                        V_PROJECT_CODE
+                  AND  TNMD.MATRIXKEY IN
+                        ( V_RATE_MATRIX_KEY, V_COST_MATRIX_KEY)
+                  AND  TNMD.TRANSITION_DATE BETWEEN
+                        V_FROM_DATE AND V_TO_DATE
+                  ORDER BY TRANSITION_DATE)
+              LOOP
+                V_PROJ_RES_TO_DATE := C_PROJ_RES_DATE_DATA.TRANSITION_DATE;
+
+                INSERT INTO NBI_PRJ_MATRIX_DATES
+                            ( PROJECT_ID, RESOURCE_TYPE, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE )
+                   SELECT
+                            V_PROJECT_ID,
+                            C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                            V_PROJ_RES_FROM_DATE,
+                            V_PROJ_RES_TO_DATE,
+                            V_EXCHANGE_RATE_TYPE
+                     FROM     DUAL;
+                 V_PROJ_RES_FROM_DATE := V_PROJ_RES_TO_DATE + 1 ;
+               END LOOP;
+
+               IF V_PROJ_RES_FROM_DATE &lt;= V_TO_DATE THEN
+                   INSERT INTO NBI_PRJ_MATRIX_DATES
+                            ( PROJECT_ID, RESOURCE_TYPE, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE)
+                   SELECT
+                            V_PROJECT_ID,
+                            C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                            V_PROJ_RES_FROM_DATE,
+                            V_TO_DATE,
+                            V_EXCHANGE_RATE_TYPE
+                     FROM     DUAL;
+                 END IF;
+           ELSE
+           /* Preparing for the scheduler. Ignore project dates */
+              V_FIRST_ROW := 1;
+              FOR C_PROJ_RES_DATE_DATA IN
+                ( SELECT DISTINCT TRANSITION_DATE
+                FROM TEMP_NBI_MATRIX_DATA TNMD
+                WHERE
+                  NVL( TNMD.PROJECT_CODE, V_PROJECT_CODE ) =
+                        V_PROJECT_CODE
+                  AND  TNMD.MATRIXKEY IN
+                        ( V_RATE_MATRIX_KEY, V_COST_MATRIX_KEY)
+                  ORDER BY TRANSITION_DATE)
+              LOOP
+                V_PROJ_RES_TO_DATE := C_PROJ_RES_DATE_DATA.TRANSITION_DATE;
+
+                IF V_FIRST_ROW = 1 THEN
+                  V_FIRST_ROW := 0;
+                ELSE
+                    INSERT INTO NBI_PRJ_MATRIX_DATES
+                                ( PROJECT_ID, RESOURCE_TYPE, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE )
+                       SELECT
+                                V_PROJECT_ID,
+                                C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE,
+                                V_PROJ_RES_FROM_DATE,
+                                V_PROJ_RES_TO_DATE,
+                                V_EXCHANGE_RATE_TYPE
+                         FROM     DUAL;
+                 END IF;
+                 V_PROJ_RES_FROM_DATE := V_PROJ_RES_TO_DATE + 1 ;
+               END LOOP;
+
+           END IF;
+       ELSE
+	       FOR C_NBI_PRJ_RES_DATA IN C_NBI_PRJ_RES_REC (
+	           V_PROJECT_ID, C_NBI_PRJ_RES_TYPES_DATA.RESOURCE_TYPE)
+	       LOOP
+
+                    IF P_SCHEDULER_PREP = 0
+                    THEN
+        	              V_PROJ_RES_FROM_DATE := V_FROM_DATE;
+
+        	              FOR C_PROJ_RES_DATE_DATA IN
+        	                ( SELECT DISTINCT TRANSITION_DATE
+        	                FROM TEMP_NBI_MATRIX_DATA TNMD
+        	                WHERE
+        	                  NVL( TNMD.RESOURCE_CODE, C_NBI_PRJ_RES_DATA.RESOURCE_CODE) =
+        	                        C_NBI_PRJ_RES_DATA.RESOURCE_CODE
+        	                  AND  NVL( TNMD.PROJECT_CODE, C_NBI_PRJ_RES_DATA.PROJECT_CODE ) =
+        	                        C_NBI_PRJ_RES_DATA.PROJECT_CODE
+        	                  AND  TNMD.MATRIXKEY IN
+        	                        ( V_RATE_MATRIX_KEY, V_COST_MATRIX_KEY)
+        	                  AND  TNMD.TRANSITION_DATE BETWEEN
+        	                        V_FROM_DATE AND V_TO_DATE
+        	                  ORDER BY TRANSITION_DATE)
+        	              LOOP
+        	                V_PROJ_RES_TO_DATE := C_PROJ_RES_DATE_DATA.TRANSITION_DATE;
+
+
+        	                INSERT INTO NBI_PRJ_MATRIX_DATES
+        	                            ( PROJECT_ID, RESOURCE_ID, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE)
+        	                   SELECT
+        	                            V_PROJECT_ID,
+        	                            C_NBI_PRJ_RES_DATA.RESOURCE_ID,
+        	                            V_PROJ_RES_FROM_DATE,
+        	                            V_PROJ_RES_TO_DATE,
+        	                            V_EXCHANGE_RATE_TYPE
+        	                     FROM     DUAL;
+        	                 V_PROJ_RES_FROM_DATE := V_PROJ_RES_TO_DATE + 1 ;
+        	               END LOOP;
+
+        	               IF V_PROJ_RES_FROM_DATE &lt;= V_TO_DATE THEN
+        	                   INSERT INTO NBI_PRJ_MATRIX_DATES
+        	                            ( PROJECT_ID, RESOURCE_ID, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE )
+        	                   SELECT
+        	                            V_PROJECT_ID,
+        	                            C_NBI_PRJ_RES_DATA.RESOURCE_ID,
+        	                            V_PROJ_RES_FROM_DATE,
+        	                            V_TO_DATE,
+        	                            V_EXCHANGE_RATE_TYPE
+        	                     FROM     DUAL;
+        	                 END IF;
+        	       ELSE
+                         /* Preparing for the scheduler. Ignore project dates */
+                            V_FIRST_ROW := 1;
+
+        	              FOR C_PROJ_RES_DATE_DATA IN
+        	                ( SELECT DISTINCT TRANSITION_DATE
+        	                FROM TEMP_NBI_MATRIX_DATA TNMD
+        	                WHERE
+        	                  NVL( TNMD.RESOURCE_CODE, C_NBI_PRJ_RES_DATA.RESOURCE_CODE) =
+        	                        C_NBI_PRJ_RES_DATA.RESOURCE_CODE
+        	                  AND  NVL( TNMD.PROJECT_CODE, C_NBI_PRJ_RES_DATA.PROJECT_CODE ) =
+        	                        C_NBI_PRJ_RES_DATA.PROJECT_CODE
+        	                  AND  TNMD.MATRIXKEY IN
+        	                        ( V_RATE_MATRIX_KEY, V_COST_MATRIX_KEY)
+        	                  ORDER BY TRANSITION_DATE)
+        	              LOOP
+        	                V_PROJ_RES_TO_DATE := C_PROJ_RES_DATE_DATA.TRANSITION_DATE;
+
+                              IF V_FIRST_ROW = 1 THEN
+                                V_FIRST_ROW := 0;
+                              ELSE
+              	                INSERT INTO NBI_PRJ_MATRIX_DATES
+              	                            ( PROJECT_ID, RESOURCE_ID, FROM_DATE, TO_DATE, EXCHANGE_RATE_TYPE )
+              	                   SELECT
+              	                            V_PROJECT_ID,
+              	                            C_NBI_PRJ_RES_DATA.RESOURCE_ID,
+              	                            V_PROJ_RES_FROM_DATE,
+              	                            V_PROJ_RES_TO_DATE,
+              	                            V_EXCHANGE_RATE_TYPE
+              	                     FROM     DUAL;
+              	          END IF;
+        	                 V_PROJ_RES_FROM_DATE := V_PROJ_RES_TO_DATE + 1 ;
+        	               END LOOP;
+
+        	       END IF;
+	            END LOOP;
+	        END IF;
+          END LOOP;
+       END LOOP;
+
+   END IF;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

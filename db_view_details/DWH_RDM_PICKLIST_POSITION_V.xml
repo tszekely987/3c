@@ -1,0 +1,46 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_RDM_PICKLIST_POSITION_V">
+    <indexes/>
+    <text_length>2275</text_length>
+    <text>SELECT ((plc.id || pld.id) || i.id) || '0000000' AS picklist_position_key,
+    plc.id AS picklist_context_key,
+    plc.object_code AS object_code_key,
+   (SELECT nls.name
+           FROM cmn_captions_nls nls
+           WHERE nls.table_name = 'ODF_OBJECTS' AND nls.pk_id = o.id AND nls.language_code = lang.language_code) AS object_code,
+    plc.is_active,
+	PLC.OBJECT_CODE || PLD.ID || L.LOOKUP_CODE PICKLIST_KEY,
+    pld.id AS picklist_def_key,
+    pld.name AS picklist,
+    lt.id AS lookup_type_key,
+   (SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+           WHERE cmn_captions_nls.table_name = 'CMN_LOOKUP_TYPES' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = lt.id) AS lookup_type,
+    l.lookup_code AS lookup_code_key,
+   (SELECT cmn_captions_nls.name
+           FROM cmn_captions_nls
+           WHERE cmn_captions_nls.table_name = 'CMN_LOOKUPS' AND cmn_captions_nls.language_code = lang.language_code AND cmn_captions_nls.pk_id = l.id) AS lookup_code,
+    i.roadmap_id AS roadmap_key,
+    r.name AS roadmap_name,
+    i.id AS roadmap_item_key,
+    i.name AS roadmap_item_name,
+    ip.position,
+    lang.language_code_key,
+    lang.language_code,
+    GREATEST(ip.last_updated_date, pld.last_updated_date, l.last_updated_date, i.last_updated_date) AS clarity_updated_date,
+    GREATEST(ip.created_date, pld.created_date, l.created_date, i.created_date) AS clarity_created_date
+FROM   odf_picklist_contexts plc
+       INNER JOIN (SELECT l_1.id AS language_code_key,
+                          l_1.language_code
+                   FROM   cmn_languages l_1
+                   WHERE  l_1.is_dw_enabled = 1) lang ON 1 = 1
+       INNER JOIN odf_item_positions ip ON plc.id = ip.context_id 
+       INNER JOIN odf_objects_v o ON plc.object_code = o.code AND o.language_code = lang.language_code 
+       INNER JOIN odf_picklist_defs pld ON plc.id = pld.context_id AND ip.picklist_def_id = pld.id
+       INNER JOIN cmn_lookup_types lt ON pld.lookup_type = lt.lookup_type  
+       INNER JOIN cmn_lookups l ON lt.lookup_type = l.lookup_type and ip.lookup_id = l.id 
+       INNER JOIN rdm_roadmap_items i ON ip.instance_id = i.id
+       INNER JOIN rdm_roadmaps r ON i.roadmap_id = r.id
+  WHERE plc.object_code = 'rdm_roadmap_item'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

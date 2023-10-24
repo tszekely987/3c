@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_DELRES_CREDITS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_DELRES_CREDITS_SP" (resourceCreditId   NUMBER)
+  AS
+
+UF1_oval1 				PAC_CHG_RESCREDIT_DATES.ID%TYPE;
+CURSOR UF1_cursor IS
+	SELECT PAC_CHG_RESCREDIT_DATES.ID
+	FROM PAC_CHG_RESCREDIT_DATES
+	WHERE PAC_CHG_RESCREDIT_DATES.RESOURCE_CREDIT_ID = PAC_CHG_DELRES_CREDITS_SP.resourceCreditId;
+
+BEGIN
+	 OPEN UF1_cursor;
+	 LOOP
+		 FETCH UF1_cursor INTO UF1_oval1;
+		 EXIT WHEN UF1_cursor%NOTFOUND;
+		 BEGIN
+	  	   	  DELETE FROM PAC_CHG_RESCREDIT_DETAILS WHERE RES_CREDIT_DATES_ID = UF1_oval1;
+		 END;
+	 END LOOP;
+	 CLOSE UF1_cursor;
+	 DELETE FROM PAC_CHG_RESCREDIT_DATES WHERE RESOURCE_CREDIT_ID = PAC_CHG_DELRES_CREDITS_SP.resourceCreditId;
+	 DELETE FROM PAC_CHG_RESOURCE_CREDITS WHERE ID = PAC_CHG_DELRES_CREDITS_SP.resourceCreditId;
+
+END PAC_CHG_DELRES_CREDITS_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

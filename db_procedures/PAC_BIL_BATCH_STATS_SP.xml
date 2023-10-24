@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_BATCH_STATS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_BATCH_STATS_SP" 
+(
+  bBillRunKey   NUMBER,
+  bPrintRunKey  NUMBER,
+  RC1   IN OUT Pac_Bil_Batch_Stats_Sppkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  iInvCount INTEGER;
+  tempVar1  GLOBALPKG.STRING :='B';
+  tempVar2  GLOBALPKG.STRING :='M';
+  tempVar3  GLOBALPKG.STRING :='I';
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	DELETE FROM TEMP_TEMPPAC_BIL_BATCH_STATS_S;
+	BEGIN
+	Pac_Bil_Batch_Summ_Stats_Sp(Pac_Bil_Batch_Stats_Sp.bBillRunKey,
+	 Pac_Bil_Batch_Stats_Sp.bPrintRunKey);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	Pac_Bil_Batch_Detail_Stats_Sp(Pac_Bil_Batch_Stats_Sp.bBillRunKey,
+	 tempVar1);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	Pac_Bil_Batch_Detail_Stats_Sp(Pac_Bil_Batch_Stats_Sp.bBillRunKey,
+	 tempVar2);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	Pac_Bil_Batch_Detail_Stats_Sp(Pac_Bil_Batch_Stats_Sp.bPrintRunKey,
+	 tempVar3);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	OPEN RC1 FOR
+	SELECT * FROM TEMP_TEMPPAC_BIL_BATCH_STATS_S;
+	/*[SPCONV-ERR(38)]:DROP TABLE temp_tempPAC_BIL_BATCH_STATS_S statement ignored*/
+END Pac_Bil_Batch_Stats_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

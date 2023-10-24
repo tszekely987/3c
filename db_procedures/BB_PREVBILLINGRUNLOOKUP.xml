@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>BB_PREVBILLINGRUNLOOKUP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."BB_PREVBILLINGRUNLOOKUP" 
+(
+  IN_RUNDATE  DATE,
+  IN_BILLER   VARCHAR2,
+  IN_BILLERID VARCHAR2,
+  IN_RUNKEY   VARCHAR2,
+  RC1  IN OUT BB_PREVBILLINGRUNLOOKUPPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	DELETE FROM temp_tempbb_PrevBillingRunLook;
+	DELETE FROM temp_InvCountbb_PrevBillingRun;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_tempbb_PrevBillingRunLook(
+		   		RUNDATE,
+				OPERATOR,
+				OPERATORID,
+				BILLRUNKEY,
+				INVNOGEN)
+		SELECT  B.ActionDate,
+        R.FULL_NAME, -- RTRIM(E.lastname) || ', ' || E.firstname,
+				B.UserID,
+				B.BillingRunKey,
+				LTRIM(TO_CHAR(ROUND(TO_NUMBER(B.InvNumbersGenerated),0)))
+    FROM bb_BillingRun B, pac_mnt_resources E, SRM_RESOURCES R, SRM_CONTACTS C
+		WHERE B.CompletionStatus = 'N'
+		and E.RESOURCE_CODE (+) = B.UserID
+     and E.ID = R.ID
+     and R.ID = C.PRINCIPAL_ID (+)
+     AND C.PRINCIPAL_TYPE (+) = 'RESOURCE'
+		AND TRUNC(B.ACTIONDATE) = NVL(TRUNC(IN_RUNDATE),TRUNC(B.ACTIONDATE))
+		AND E.RESOURCE_CODE like RTRIM(IN_BILLERID) ||'%'
+    AND R.LAST_NAME LIKE RTRIM(IN_BILLER) ||'%'
+		AND TO_CHAR(B.BILLINGRUNKEY) LIKE IN_RUNKEY ||'%';
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_InvCountbb_PrevBillingRun(
+		   		BILLRUNKEY,
+				INVCOUNT)
+		SELECT  BT.BillingRunKey,
+				COUNT(*)
+		FROM bb_BillTracking BT
+		WHERE BT.ActionType = 'B'
+		GROUP BY BT.BillingRunKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	NULL;
+	OPEN RC1 FOR
+	SELECT T.RunDate "Run Date",
+		   C.InvCount "Inv Count",
+		   T.Operator,
+		   T.OperatorID "Oper. ID",
+		   LTRIM(TO_CHAR(T.BillRunKey)) "Run Key",
+		   T.InvNoGen "Inv Num Gen"
+	FROM temp_tempbb_PrevBillingRunLook T, temp_InvCountbb_PrevBillingRun C
+	WHERE C.BillRunKey = T.BillRunKey
+	and C.InvCount &gt; 0
+	ORDER BY 1 , 3 , 5 ;
+	NULL;
+	NULL;
+END bb_PrevBillingRunLookup;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>IS_CUSTOMER_DB</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."IS_CUSTOMER_DB" 
+RETURN NUMBER
+IS
+  v_is_customer_db INTEGER;
+  v_base_version VARCHAR2(100);
+  v_release_version VARCHAR2(100);
+BEGIN
+
+    SELECT count(*)
+    INTO v_base_version
+    FROM cmn_install_history
+    WHERE install_type = 'release_marker'
+    AND install_id = 'base_version';
+    
+    SELECT count(*) into v_release_version
+    FROM cmn_install_history
+    WHERE install_type = 'release_marker'
+    AND install_id = 'release_version';
+
+    IF( v_base_version = 0 or v_release_version &gt; 0 )
+    THEN
+      v_is_customer_db := 1;
+    ELSE
+      v_is_customer_db := 0;
+    END IF;
+    
+  RETURN v_is_customer_db;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

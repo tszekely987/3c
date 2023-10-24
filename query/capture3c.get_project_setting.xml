@@ -1,0 +1,600 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="capture3c.get_project_setting" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="capture3c.get_project_setting"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT
+	@SELECT:DIM:USER_DEF:IMPLIED:CODES:SETTING_ID:CODE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:SETTING:SETTING@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:RAW_VALUE:RAW_VALUE@,
+	@SELECT:DIM_PROP:USER_DEF:IMPLIED:CODES:DISPLAY_VALUE:DISPLAY_VALUE@
+FROM (
+	-- To convert to SQL replace @NVL@ with NVL (Oracle) ISNULL (MSSQL)
+	-- LEFT COLUMN
+	SELECT
+			'PRJ_DEFAULT_LOAD_PATTERN' AS setting_id
+			, 'Default Load Pattern' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, cmn_lookups_v.name AS display_value
+			FROM cmn_options, cmn_option_values, cmn_lookups_v
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DEFAULT_LOAD_PATTERN'
+					AND cmn_lookups_v.is_active = 1
+					AND cmn_lookups_v.language_code = 'en'
+					AND cmn_lookups_v.lookup_type = 'prAssignmentPattern'
+					AND CAST(cmn_lookups_v.lookup_enum AS VARCHAR(500)) = cmn_option_values.value
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRGUIDELINES' AS setting_id
+			, 'Guidelines URL' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					prsite.prguidelines AS raw_value
+					, prsite.prguidelines AS display_value
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'FIRST_MONTH_FISCAL_YEAR' AS setting_id
+			, 'First Month of Financial Quarter' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_option_values.value AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'Jan'
+							WHEN cmn_option_values.value = '2' THEN 'Feb'
+							WHEN cmn_option_values.value = '3' THEN 'Mar'
+							WHEN cmn_option_values.value = '4' THEN 'Apr'
+							WHEN cmn_option_values.value = '5' THEN 'May'
+							WHEN cmn_option_values.value = '6' THEN 'Jun'
+							WHEN cmn_option_values.value = '7' THEN 'Jul'
+							WHEN cmn_option_values.value = '8' THEN 'Aug'
+							WHEN cmn_option_values.value = '9' THEN 'Sep'
+							WHEN cmn_option_values.value = '10' THEN 'Oct'
+							WHEN cmn_option_values.value = '11' THEN 'Nov'
+							WHEN cmn_option_values.value = '12' THEN 'Dec'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.option_code = 'FIRST_MONTH_FISCAL_YEAR'
+					AND  cmn_options.id = cmn_option_values.option_id
+					AND  cmn_option_values.component_id IS NULL
+					AND  cmn_option_values.user_id IS NULL
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRWEEKSTART' AS setting_id
+			, 'First Day of Work Week' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(prsite.prweekstart AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN prsite.prweekstart = 0 THEN 'Sun'
+							WHEN prsite.prweekstart = 1 THEN 'Mon'
+							WHEN prsite.prweekstart = 2 THEN 'Tue'
+							WHEN prsite.prweekstart = 3 THEN 'Wed'
+							WHEN prsite.prweekstart = 4 THEN 'Thu'
+							WHEN prsite.prweekstart = 5 THEN 'Fri'
+							WHEN prsite.prweekstart = 6 THEN 'Sat'
+							ELSE 'N/A'
+						END AS display_value
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_EFFORT_DISP_UNIT' AS setting_id
+			, 'Default Display Unit for Work Effort' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = 'hours' THEN 'Hours'
+							WHEN cmn_option_values.value = 'days' THEN 'Days'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_EFFORT_DISP_UNIT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_CHG_ENABLE_PRJ_CHARGECODE' AS setting_id
+			, 'Enable Investment-specific Charge Codes' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_CHG_ENABLE_PRJ_CHARGECODE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'RIM_NOTIFY_ON_DELETE' AS setting_id
+			, 'Notify on Delete of Risk/Issue/Change Requests' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'RIM_NOTIFY_ON_DELETE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'SCH_EXPORT_CUR_BASELINE_ONLY' AS setting_id
+			, 'Only Export Current Baselines When Opening Investments in a Scheduler' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'SCH_EXPORT_CUR_BASELINE_ONLY'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'MSP_ASSIGN_UNITS_MAPPING' AS setting_id
+			, 'MSP Assignment Units Mapping with PPM Assignment ''Max % Load''' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'MSP_ASSIGN_UNITS_MAPPING'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'MSP_LIGHTWEIGHT_SAVEAS' AS setting_id
+			, 'MSP Lightweight Transfer on Initial ''Save As'' from MSP' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'MSP_LIGHTWEIGHT_SAVEAS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'AGL_INTEGRATION_OWNER' AS setting_id
+			, 'Agile Integration Owner' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CAST(cmn_option_values.value AS VARCHAR(1000)) AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'AGL_INTEGRATION_OWNER'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'ALLOW_DELETE_INV_WITH_ACTUALS' AS setting_id
+			, 'Allow Marked Investments with Timesheet and Transaction Data to be Deleted' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'ALLOW_DELETE_INV_WITH_ACTUALS'
+			) lj ON 1=1
+
+	-- RIGHT COLUMN
+	UNION ALL
+
+	SELECT
+			'PRROUNDALLOCPCT' AS setting_id
+			, 'Round Allocations to Nearest %' AS setting
+			, lj.raw_value
+			, lj.display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(prsite.prroundallocpct AS VARCHAR(1000)) AS raw_value
+					, CAST((prsite.prroundallocpct * 100) AS VARCHAR(1000)) AS display_value
+			FROM prsite
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_DISABLE_EFFORTTASK_CREATE' AS setting_id
+			, 'Allow Effort Task Creation' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'true') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_option_values.value AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '0' THEN 'true'
+							WHEN cmn_option_values.value IS NULL THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DISABLE_EFFORTTASK_CREATE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_DISABLE_TASK_REASSIGN' AS setting_id
+			, 'Reassign Tasks when replacing Role' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'true') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					cmn_option_values.value AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '0' THEN 'true'
+							WHEN cmn_option_values.value IS NULL THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_DISABLE_TASK_REASSIGN'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_EDIT_ALLOC_WHEN_LOCKED' AS setting_id
+			, 'Allow Edit of Allocations when Investment is Locked' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_EDIT_ALLOC_WHEN_LOCKED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_FORCE_OTENTRY_WHEN_HDBKD' AS setting_id
+			, 'Automatically Open Staff Members for Time Entry' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'Never') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '0' THEN 'Never'
+							WHEN cmn_option_values.value = '1' THEN 'When Hard-Booked'
+							WHEN cmn_option_values.value = 'approved' THEN 'When Request Status is Approved'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_FORCE_OTENTRY_WHEN_HDBKD'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_SHOW_TASKS_WHEN_HDBKD' AS setting_id
+			, 'Show Tasks in Organizer' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'When Assigned') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '0' THEN 'When Assigned'
+							WHEN cmn_option_values.value = '1' THEN 'When Hard-Booked'
+							WHEN cmn_option_values.value = 'approved' THEN 'When Request Status is Approved'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_SHOW_TASKS_WHEN_HDBKD'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'STAFF_TO_PARTICIPANTS_ENABLED' AS setting_id
+			, 'Automatically Add Staff Members As Investment Participant' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'When Added to Investment') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = 'false' THEN 'Never'
+							WHEN cmn_option_values.value = 'true' THEN 'When Added to Investment'
+							WHEN cmn_option_values.value = 'hard' THEN 'When Hard-Booked'
+							WHEN cmn_option_values.value = 'approved' THEN 'When Request Status is Approved'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'STAFF_TO_PARTICIPANTS_ENABLED'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_ENF_HARD_BOOKING_RIGHTS' AS setting_id
+			, 'Require Resource - Hard Book right to add participants' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_ENF_HARD_BOOKING_RIGHTS'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_HIDE_SYSTEM_GROUPS_OPTION' AS setting_id
+			, 'Hide System Groups option when adding participants' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_HIDE_SYSTEM_GROUPS_OPTION'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_OVERRIDE_REQ_APPROVE' AS setting_id
+			, 'Allow Override Requisition Approval' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_OVERRIDE_REQ_APPROVE'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_ALLOW_MIXED_BOOK' AS setting_id
+			, 'Allow Mixed Booking' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_ALLOW_MIXED_BOOK'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_RES_TO_ROLE_DEFAULT' AS setting_id
+			, 'Convert resources to roles when using templates (default)' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'false') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '1' THEN 'true'
+							ELSE 'false'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_RES_TO_ROLE_DEFAULT'
+			) lj ON 1=1
+
+	UNION ALL
+
+	SELECT
+			'PRJ_REQ_BOOK_DECREMENT_VALUE' AS setting_id
+			, 'Requisition Booking' AS setting
+			, lj.raw_value
+			, @NVL@(lj.display_value, 'Use Allocation Percentage') AS display_value
+	FROM dual d
+	LEFT JOIN (
+			SELECT
+					CAST(cmn_option_values.value AS VARCHAR(1000)) AS raw_value
+					, CASE
+							WHEN cmn_option_values.value = '0' THEN 'Use Allocation Percentage'
+							WHEN cmn_option_values.value = '1' THEN 'Use Available Work Units'
+							ELSE 'N/A'
+						END AS display_value
+			FROM cmn_options, cmn_option_values
+			WHERE cmn_options.id = cmn_option_values.option_id
+					AND cmn_option_values.component_id IS NULL
+					AND cmn_option_values.user_id IS NULL
+					AND cmn_options.option_code = 'PRJ_REQ_BOOK_DECREMENT_VALUE'
+			) lj ON 1=1
+) d
+WHERE @FILTER@]]></nsql>
+            <attribute id="code" required="false"/>
+            <attribute id="setting" required="false"/>
+            <attribute id="raw_value" required="false"/>
+            <attribute id="display_value" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

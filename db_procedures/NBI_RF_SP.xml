@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_RF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_RF_SP" PROCEDURE	NBI_RF_SP
+AS
+V_STMT            VARCHAR2 (200);
+v_u1_index_ts_name VARCHAR2(255);
+v_u1_index_exists      NUMBER;
+
+  TYPE NBI_R_FACTS_ARRAY IS TABLE OF NBI_R_FACTS_V%ROWTYPE INDEX BY BINARY_INTEGER;
+
+  NBI_R_FACTS_DATA NBI_R_FACTS_ARRAY;
+
+  CURSOR NBI_R_FACTS_CURSOR IS
+    SELECT RESOURCE_ID, FACT_DATE, AVAILABLE_HOURS, ETC_HOURS, ACTUAL_HOURS, BASE_HOURS, ALLOCATED_HOURS
+    FROM NBI_R_FACTS_V;
+
+  BEGIN
+  EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_R_FACTS';
+
+  -- Handle the indexes
+  SELECT  COUNT(1)  into v_u1_index_exists
+    FROM   user_indexes
+    WHERE table_name = 'NBI_R_FACTS'
+    AND index_name='NBI_R_FACTS_U1';
+
+  IF v_u1_index_exists &gt; 0 THEN
+    SELECT tablespace_name  into v_u1_index_ts_name FROM   user_indexes
+        WHERE      table_name = 'NBI_R_FACTS' AND index_name='NBI_R_FACTS_U1';
+    CMN_DROP_INDEX_SP('NBI_R_FACTS_U1');
+  END IF;
+
+  V_STMT := 'DONE DROPPING INDEXES';
+  DBMS_OUTPUT.PUT_LINE (V_STMT);
+  --UPDATE NBI_RUN_LOGS SET INFO='BEFORE INSERT NBI_PRT_FACTS', START_DATE=SYSDATE;
+  -- Use APPEND_VALUES as part of INSERT with BULK Operation.
+  OPEN NBI_R_FACTS_CURSOR;
+    LOOP
+      FETCH NBI_R_FACTS_CURSOR
+      BULK COLLECT INTO NBI_R_FACTS_DATA LIMIT 50000;
+      FORALL I IN 1..NBI_R_FACTS_DATA.COUNT
+      INSERT /*+ APPEND_VALUES */ INTO NBI_R_FACTS VALUES NBI_R_FACTS_DATA(I);
+      COMMIT;
+      EXIT WHEN NBI_R_FACTS_CURSOR%NOTFOUND;
+    END LOOP;
+  CLOSE NBI_R_FACTS_CURSOR;
+  COMMIT;
+
+--UPDATE NBI_RUN_LOGS SET INFO='AFTER INSERT', START_DATE=SYSDATE WHERE INFO LIKE 'BEFORE INSERT%';
+  DBMS_OUTPUT.PUT_LINE (V_STMT);
+
+  V_STMT := 'CREATING INDICES';
+  DBMS_OUTPUT.PUT_LINE (V_STMT);
+  CMN_CREATE_INDEX_SP('NBI_R_FACTS','NBI_R_FACTS_U1','UNIQUE','FACT_DATE, RESOURCE_ID',v_u1_index_ts_name);
+  V_STMT := 'DONE INDICES';
+  DBMS_OUTPUT.PUT_LINE (V_STMT);
+
+EXCEPTION
+   WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20000,'Error in NBI_RF_SP - ' || V_STMT || ': ' || SQLERRM);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

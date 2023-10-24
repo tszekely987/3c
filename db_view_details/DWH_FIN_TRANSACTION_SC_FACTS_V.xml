@@ -1,0 +1,24 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FIN_TRANSACTION_SC_FACTS_V">
+    <indexes/>
+    <text_length>1235</text_length>
+    <text>SELECT w.investment_id investment_key,
+       w.transno transaction_key,
+       CAST (w.transdate - TO_DATE ('01/01/2000', 'MM/DD/YYYY') + 1000000 AS INTEGER) period_key,
+       CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN 1 ELSE w.quantity END quantity,
+       CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.actualcost END home_actual_cost_rate,
+       wv.totalcost home_actual_cost,
+       CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.billrate END home_revenue_rate,
+       wv.totalamount home_revenue,
+       CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.actualcost END billing_actual_cost_rate,
+       wv.totalcost billing_actual_cost,
+       CASE WHEN w.transtype = 'L' AND t.transtype IN ('M','X') THEN w.quantity ELSE wv.billrate END billing_revenue_rate,
+       wv.totalamount billing_revenue,
+       w.lastupdatedate clarity_updated_date
+FROM   rpt_calendar c
+       INNER JOIN ppa_wip w ON w.transdate = c.start_date
+       INNER JOIN ppa_wip_values wv ON (w.transno = wv.transno AND wv.currency_type = 'HOME')
+       INNER JOIN transclass t ON w.transclass = t.transclass
+WHERE  c.period_type = 'DAILY'</text>
+  </QueryResult>
+</ClarityDBViewQuery>

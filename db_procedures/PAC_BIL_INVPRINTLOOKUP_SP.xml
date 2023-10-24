@@ -1,0 +1,643 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_INVPRINTLOOKUP_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_INVPRINTLOOKUP_SP" 
+(
+  cUserID                   VARCHAR2,
+  in_cLocationID            VARCHAR2 DEFAULT NULL,
+  in_cDepartCode            VARCHAR2 DEFAULT NULL,
+  in_cClient                VARCHAR2 DEFAULT NULL,
+  in_cProject               VARCHAR2 DEFAULT NULL,
+  in_iPrintedFlag           NUMBER DEFAULT 2,
+  in_dFromDate              DATE DEFAULT NULL,
+  in_dToDate                DATE DEFAULT NULL,
+  dOverrideDate             DATE DEFAULT NULL,
+  in_HasBilllingSubProjects VARCHAR2,
+  v_LANGUAGE_CODE           VARCHAR2,
+  RC1                IN OUT PAC_BIL_INVPRINTLOOKUP_SPPkg.RCT1
+)
+AS
+  cLocationID   GLOBALPKG.STRING;
+  cDepartCode   GLOBALPKG.STRING;
+  cClient       GLOBALPKG.STRING;
+  cProject      GLOBALPKG.STRING;
+  iPrintedFlag  INTEGER;
+  cBiller       GLOBALPKG.STRING :=null;
+  StoO_selcnt   INTEGER;
+  StoO_error    INTEGER;
+  StoO_rowcnt   INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg     GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  dFromDate       DATE;
+  dToDate       DATE;
+  iGrouping       NUMBER;
+  cInternalUserId           NUMBER;
+  report_id                 NUMBER;
+  bHasGlobalRight           NUMBER;
+  cDecimalSep     GLOBALPKG.STRING;
+  cThousandSep    GLOBALPKG.STRING;
+  cMultProjectText  GLOBALPKG.STRING;
+  cNoYesText      GLOBALPKG.STRING;
+  iSQLShortDateFmt  NUMBER(10,0);
+  v_HasBilllingSubProjects GLOBALPKG.STRING;
+  UF1_rowid       ROWID;
+  UF1_oval1   TEMP_PAC_BIL_INVPRINTLOOKUP.PROJECT_NAME%TYPE;
+tempId					 NUMBER(10);
+tempBPCode				 GLOBALPKG.STRING;
+tempEnfCtrAmt			 NUMBER(1);
+tempTitle				 GLOBALPKG.STRING;
+tempStatus				 VARCHAR(20);
+tempHasSubPrjs			 NUMBER(1);
+V_STMT VARCHAR2( 4000 );
+V_STMT1 VARCHAR2( 4000 );
+V_STMT2 VARCHAR2( 4000 );
+V_SQL_WHERE_CLIENT_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_BILLER_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_LOC_CLAUSE	 VARCHAR2( 1000 );
+V_SQL_WHERE_DEPT_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_PRJ_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_DATE_CLAUSE VARCHAR2( 1000 );
+V_SQL_WHERE_DATE_CLAUSE1 VARCHAR2( 1000 );
+
+  billing_project_code GLOBALPKG.STRING;
+
+  CURSOR UF1_cursor IS
+    SELECT TEMP_PAC_BIL_INVPRINTLOOKUP.ROWID, INV.NAME
+	  FROM pac_mnt_projects P, 
+	       TEMP_PAC_BIL_INVPRINTLOOKUP,
+		   INV_INVESTMENTS INV
+    WHERE INV.ID = P.ID
+	and P.COMPANY_CODE = TEMP_PAC_BIL_INVPRINTLOOKUP.COMPANY_CODE
+    and P.PROJECT_CODE = TEMP_PAC_BIL_INVPRINTLOOKUP.MinProject
+    and TEMP_PAC_BIL_INVPRINTLOOKUP.MinProject = TEMP_PAC_BIL_INVPRINTLOOKUP.MaxProject
+    FOR UPDATE OF TEMP_PAC_BIL_INVPRINTLOOKUP.PROJECT_NAME;
+
+
+  UF2_rowid   ROWID;
+  UF2_oval1   TEMP_PAC_BIL_INVPRINTLOOKUP.INVOICENO%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT TEMP_PAC_BIL_INVPRINTLOOKUP.ROWID, TEMP_PAC_BIL_INVPRINTLOOKUP.INVOICENO
+    FROM TEMP_PAC_BIL_INVPRINTLOOKUP
+    WHERE consolidated = 0
+    FOR UPDATE OF TEMP_PAC_BIL_INVPRINTLOOKUP.MinProject, TEMP_PAC_BIL_INVPRINTLOOKUP.MaxProject;
+  CURSOR projects_cursor IS
+    SELECT ID FROM PAC_MNT_PROJECTS WHERE NLS_UPPER(PROJECT_CODE)
+ like NLS_UPPER(RTRIM(PAC_BIL_INVPRINTLOOKUP_SP.in_cProject)) escape '\';
+
+BEGIN
+	cLocationID := RTRIM(in_cLocationID);
+	cDepartCode := RTRIM(in_cDepartCode);
+	cClient := RTRIM(in_cClient);
+	cProject := RTRIM(in_cProject);
+	iPrintedFlag := RTRIM(in_iPrintedFlag);
+	dFromDate := TRUNC(in_dFromDate);
+	dToDate := TRUNC(in_dToDate);
+
+    v_HasBilllingSubProjects := in_HasBilllingSubProjects;
+
+	IF v_HasBilllingSubProjects = 'A' Then
+	  v_HasBilllingSubProjects := NULL;
+	End If;
+
+
+	DELETE FROM TEMP_PAC_BIL_INVPRINTLOOKUP;
+	IF  NVL(iPrintedFlag, 2) = 2 THEN
+		iPrintedFlag :=  NULL;
+	END IF;
+	/*IF  NVL(in_dFromDate, '') IS NULL THEN
+		BEGIN
+			dFromDate :=  TO_DATE('1990-01-01', 'YYYY-MM-DD');
+		END;
+	END IF;
+	IF  NVL(in_dToDate, '') IS NULL THEN
+		BEGIN
+			 dToDate :=  TO_DATE('2199-12-31', 'YYYY-MM-DD');			
+		END;
+	END IF;*/
+
+    IF  NVL(dFromDate, '') IS NULL THEN
+        BEGIN
+        V_SQL_WHERE_DATE_CLAUSE := ' AND 1=1 ';
+        V_SQL_WHERE_DATE_CLAUSE1 := ' AND 1=1 ';
+        END;
+    else
+        BEGIN
+        V_SQL_WHERE_DATE_CLAUSE := ' AND I.INVOICEDATE BETWEEN  :1  AND ';
+        V_SQL_WHERE_DATE_CLAUSE1 := ' AND I.INVOICEDATE BETWEEN  :3  AND ';
+        END;
+    END IF;
+    IF  NVL(dToDate, '') IS NULL THEN
+        BEGIN
+        V_SQL_WHERE_DATE_CLAUSE := ' AND 1=1 ';
+        V_SQL_WHERE_DATE_CLAUSE1 := ' AND 1=1 ';
+        --dToDate :=  TO_DATE('2199-12-31', 'YYYY-MM-DD');
+        END;
+    else
+        BEGIN
+        V_SQL_WHERE_DATE_CLAUSE := V_SQL_WHERE_DATE_CLAUSE || ' :2 ';
+        V_SQL_WHERE_DATE_CLAUSE1 := V_SQL_WHERE_DATE_CLAUSE1 || ' :4 ';
+        END;
+    END IF;
+
+
+	
+IF cClient IS NOT NULL THEN
+BEGIN
+    cClient := '%' || cClient || '%';
+    V_SQL_WHERE_CLIENT_CLAUSE :=  ' AND  I.COMPANY_CODE  LIKE '''|| cClient || '''';
+END;
+ELSE
+BEGIN
+	cClient := '%';
+    V_SQL_WHERE_CLIENT_CLAUSE :=  ' AND  I.COMPANY_CODE  LIKE '''|| cClient || '''';
+END;
+END IF;
+
+IF cBiller IS NOT NULL THEN
+BEGIN
+    cBiller := '%' || cClient || '%';
+    V_SQL_WHERE_BILLER_CLAUSE :=  ' AND I.RESOURCE_CODE  LIKE '''|| cBiller || '''';
+END;
+ELSE
+BEGIN
+	cBiller := '%';
+    V_SQL_WHERE_BILLER_CLAUSE :=  ' AND  I.RESOURCE_CODE  LIKE '''|| cBiller || '''';
+END;
+END IF;
+
+IF cLocationID IS NOT NULL THEN
+BEGIN
+    cLocationID := '%' || cLocationID || '%';
+    V_SQL_WHERE_LOC_CLAUSE :=  ' AND C.locationid  LIKE '''|| cLocationID || ''' ';
+END;
+ELSE
+BEGIN
+	cLocationID := '%';
+    V_SQL_WHERE_LOC_CLAUSE :=  ' AND  C.locationid LIKE '''|| cLocationID || ''' ';
+END;
+END IF;
+
+IF cDepartCode IS NOT NULL THEN
+BEGIN
+    cDepartCode := '%' || cDepartCode || '%';
+    V_SQL_WHERE_DEPT_CLAUSE :=  ' AND C.departcode  LIKE '''|| cDepartCode || '''';
+END;
+ELSE
+BEGIN
+	cDepartCode := '%';
+    V_SQL_WHERE_DEPT_CLAUSE := ' AND  C.departcode  LIKE '''|| cDepartCode || '''';
+END;
+END IF;
+
+IF cProject IS NOT NULL THEN
+BEGIN
+   V_SQL_WHERE_PRJ_CLAUSE := ' AND B.PROJECT_CODE IN ( SELECT PROJECT_CODE FROM TEMP_BIL_SUBPROJECTS) ';
+END;
+ELSE
+BEGIN
+	--and B.PROJECT_CODE like NVL(cProject, B.PROJECT_CODE)
+	V_SQL_WHERE_PRJ_CLAUSE := ' AND 1=1';
+END;
+END IF;
+
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+        bHasGlobalRight := 0;
+
+    	select  user_id
+    	into    cInternalUserId
+    	from    srm_resources
+    	where   unique_name = cUserID;
+    
+    	BEGIN
+    	StoO_error := 0;
+    	select 1
+    	into   bHasGlobalRight
+    	from dual
+    	where  exists (SELECT object_id
+                   FROM   cmn_sec_chk_user_r_v0
+                   WHERE  object_id = 51560
+                   AND    user_id = cInternalUserId
+                   AND    permission_code = 'READ' );
+    	EXCEPTION
+      	WHEN NO_DATA_FOUND
+      	THEN
+        	NULL;
+      	WHEN OTHERS
+      	THEN
+        	StoO_error := SQLCODE;
+        	StoO_errmsg := SQLERRM;
+    	END;
+
+	/*** MultiCurrency Change - get all the monetary values from invoiceheader_values corresponding to BILLING  currency type record ***/
+	IF ( PAC_BIL_INVPRINTLOOKUP_SP.cProject IS NOT NULL ) THEN
+	BEGIN
+		 FOR projects_rec IN projects_cursor
+		 LOOP
+		 PAC_BIL_GET_BILLING_PROJECT_SP( projects_rec.id,  PAC_BIL_INVPRINTLOOKUP_SP.tempBPCode,  PAC_BIL_INVPRINTLOOKUP_SP.tempEnfCtrAmt,  PAC_BIL_INVPRINTLOOKUP_SP.tempTitle);
+		 DELETE FROM TEMP_BIL_SUBPROJECTS;
+		 INSERT INTO TEMP_BIL_SUBPROJECTS (  COMPANY_CODE, PROJECT_CODE,PROJECT_ID, MASTER_PROJECT_ID, BILLING_PROJECT_ID, BILL_AMOUNT, PROJECT_STATUS  )
+		 SELECT COMPANY_CODE, PROJECT_CODE, ID, ID, ID, 0, NULL FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE = PAC_BIL_INVPRINTLOOKUP_SP.tempBPCode;
+		 PAC_BIL_GET_SUBPROJECTS_SP ( 0, PAC_BIL_INVPRINTLOOKUP_SP.tempStatus, PAC_BIL_INVPRINTLOOKUP_SP.tempHasSubPrjs );
+
+		V_STMT1 := 'INSERT INTO  TEMP_PAC_BIL_INVPRINTLOOKUP (
+		   		InvoiceNo,cmsgroupno,InvoiceDate,InvoiceAmount,Biller,COMPANY_NAME,COMPANY_CODE,
+				MinProject,MaxProject,Printed,locationid,status,reprint,billingdate,billing_currency_code,
+				HAS_BILLING_SUBPROJECTS,CONSOLIDATED)
+				SELECT	I.invoiceno,I.CMSGROUPNO,I.invoicedate,
+						IV.invoiceamount + NVL(IV.taxamount, 0) + NVL(IV.admincharge, 0),
+						I.RESOURCE_CODE,C.COMPANY_NAME,	I.COMPANY_CODE,
+		   				MIN(B.PROJECT_CODE),MAX(B.PROJECT_CODE),SUM(I.printed * 1),	C.locationid,
+		   				DECODE(I.printed, 0, ''Unprinted'', 1, ''Printed''),
+						I.printed,B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED
+				FROM	PAC_MNT_PROJECTS P,PPA_BILLINGS B, INVOICEHEADER I, CLNTSUPP C, 
+						INVOICEHEADER_VALUES IV
+				WHERE		B.COMPANY_CODE = P.COMPANY_CODE
+						 AND B.PROJECT_CODE = P.PROJECT_CODE
+						 AND B.COMPANY_CODE= C.COMPANY_CODE
+						 AND B.TransType  IN (''B'', ''BR'', ''BP'')
+						 AND C.COMPANY_CODE = I.COMPANY_CODE
+						 AND I.INVOICENO = IV.INVOICENO
+						 AND B.InvoiceNo = I.invoiceno		
+						 AND I.invtype = ''I''
+						 AND I.printed = NVL('''||iPrintedFlag||''', I.printed)	                       
+						 AND IV.CURRENCY_TYPE = ''BILLING''
+						 AND I.invoiceno NOT LIKE ''MATCH%''
+                         AND NOT EXISTS (SELECT  1
+		 	 	 		 FROM BILLINGSCHEDULE BS
+						 WHERE BS.invoiceno = I.invoiceno
+						 AND BS.atf = 1 )
+						AND  ('|| bHasGlobalRight||' = 1)';
+
+V_STMT2 := ' SELECT	I.invoiceno,I.CMSGROUPNO,I.invoicedate,
+						IV.invoiceamount + NVL(IV.taxamount, 0) + NVL(IV.admincharge, 0),
+						I.RESOURCE_CODE,C.COMPANY_NAME,	I.COMPANY_CODE,
+		   				MIN(B.PROJECT_CODE),MAX(B.PROJECT_CODE),SUM(I.printed * 1),	C.locationid,
+		   				DECODE(I.printed, 0, ''Unprinted'', 1, ''Printed''),
+						I.printed,B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED
+				FROM	PAC_MNT_PROJECTS P,PPA_BILLINGS B, INVOICEHEADER I, CLNTSUPP C, cmn_sec_chk_user_inst_v0 inv0,
+						INVOICEHEADER_VALUES IV
+				WHERE		B.COMPANY_CODE = P.COMPANY_CODE
+						 AND B.PROJECT_CODE = P.PROJECT_CODE
+						 AND B.COMPANY_CODE= C.COMPANY_CODE
+						 AND B.TransType  IN (''B'', ''BR'', ''BP'')
+						 AND C.COMPANY_CODE = I.COMPANY_CODE
+						 AND I.INVOICENO = IV.INVOICENO
+						 AND B.InvoiceNo = I.invoiceno		
+						 AND I.invtype = ''I''
+						 AND I.printed = NVL('''||iPrintedFlag||''', I.printed)	                      
+						 AND IV.CURRENCY_TYPE = ''BILLING''
+						 AND I.invoiceno NOT LIKE ''MATCH%''
+                        AND NOT EXISTS (SELECT  1
+		 	 	 		 FROM BILLINGSCHEDULE BS
+						 WHERE BS.invoiceno = I.invoiceno
+						 AND BS.atf = 1 )
+                         and inv0.object_id = 51560
+							 AND inv0.user_id ='|| cInternalUserId ||' 
+							 AND inv0.permission_code = ''READ''
+							 AND inv0.object_instance_id = P.ID';
+
+IF (dFromDate IS NOT NULL AND dToDate IS NOT NULL) THEN
+    EXECUTE IMMEDIATE V_STMT1 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE||V_SQL_WHERE_DATE_CLAUSE
+			|| ' GROUP BY  	I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED'
+            ||' UNION ' || V_STMT2 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE||V_SQL_WHERE_DATE_CLAUSE1
+			|| ' GROUP BY I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED' USING dFromDate,dToDate,dFromDate,dToDate;
+ELSE
+    EXECUTE IMMEDIATE V_STMT1 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE
+			|| ' GROUP BY  	I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED'
+            ||' UNION ' || V_STMT2 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE
+			|| ' GROUP BY I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED';
+END IF;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	END LOOP;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	ELSE
+	BEGIN
+	V_STMT1 := 'INSERT INTO  TEMP_PAC_BIL_INVPRINTLOOKUP (
+		   		InvoiceNo,cmsgroupno,InvoiceDate,InvoiceAmount,Biller,COMPANY_NAME,COMPANY_CODE,
+				MinProject,MaxProject,Printed,locationid,status,reprint,billingdate,billing_currency_code,
+				HAS_BILLING_SUBPROJECTS,CONSOLIDATED)
+				SELECT	I.invoiceno,I.CMSGROUPNO,I.invoicedate,
+						IV.invoiceamount + NVL(IV.taxamount, 0) + NVL(IV.admincharge, 0),
+						I.RESOURCE_CODE,C.COMPANY_NAME,	I.COMPANY_CODE,
+		   				MIN(B.PROJECT_CODE),MAX(B.PROJECT_CODE),SUM(I.printed * 1),	C.locationid,
+		   				DECODE(I.printed, 0, ''Unprinted'', 1, ''Printed''),
+						I.printed,B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED
+				FROM	PAC_MNT_PROJECTS P,PPA_BILLINGS B, INVOICEHEADER I, CLNTSUPP C, 
+						INVOICEHEADER_VALUES IV
+				WHERE		B.COMPANY_CODE = P.COMPANY_CODE
+						 AND B.PROJECT_CODE = P.PROJECT_CODE
+						 AND B.COMPANY_CODE= C.COMPANY_CODE
+						 AND B.TransType  IN (''B'', ''BR'', ''BP'')
+						 AND C.COMPANY_CODE = I.COMPANY_CODE
+						 AND I.INVOICENO = IV.INVOICENO
+						 AND B.InvoiceNo = I.invoiceno		
+						 AND I.invtype = ''I''
+						 AND I.printed = NVL('''||iPrintedFlag||''', I.printed)	
+						 AND IV.CURRENCY_TYPE = ''BILLING''
+						 AND I.invoiceno NOT LIKE ''MATCH%''
+                         AND NOT EXISTS (SELECT  1
+		 	 	 		 FROM BILLINGSCHEDULE BS
+						 WHERE BS.invoiceno = I.invoiceno
+						 AND BS.atf = 1 )
+						AND  ('|| bHasGlobalRight||' = 1)';
+
+V_STMT2 := ' SELECT	I.invoiceno,I.CMSGROUPNO,I.invoicedate,
+						IV.invoiceamount + NVL(IV.taxamount, 0) + NVL(IV.admincharge, 0),
+						I.RESOURCE_CODE,C.COMPANY_NAME,	I.COMPANY_CODE,
+		   				MIN(B.PROJECT_CODE),MAX(B.PROJECT_CODE),SUM(I.printed * 1),	C.locationid,
+		   				DECODE(I.printed, 0, ''Unprinted'', 1, ''Printed''),
+						I.printed,B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED
+				FROM	PAC_MNT_PROJECTS P,PPA_BILLINGS B, INVOICEHEADER I, CLNTSUPP C, cmn_sec_chk_user_inst_v0 inv0,
+						INVOICEHEADER_VALUES IV
+				WHERE		B.COMPANY_CODE = P.COMPANY_CODE
+						 AND B.PROJECT_CODE = P.PROJECT_CODE
+						 AND B.COMPANY_CODE= C.COMPANY_CODE
+						 AND B.TransType  IN (''B'', ''BR'', ''BP'')
+						 AND C.COMPANY_CODE = I.COMPANY_CODE
+						 AND I.INVOICENO = IV.INVOICENO
+						 AND B.InvoiceNo = I.invoiceno		
+						 AND I.invtype = ''I''
+						 AND I.printed = NVL('''||iPrintedFlag||''', I.printed)	
+						 AND IV.CURRENCY_TYPE = ''BILLING''
+						 AND I.invoiceno NOT LIKE ''MATCH%''
+						AND NOT EXISTS (SELECT  1
+		 	 	 		 FROM BILLINGSCHEDULE BS
+						 WHERE BS.invoiceno = I.invoiceno
+						 AND BS.atf = 1 )
+                         and inv0.object_id = 51560
+							 AND inv0.user_id ='|| cInternalUserId ||' 
+							 AND inv0.permission_code = ''READ''
+							 AND inv0.object_instance_id = P.ID';
+
+
+IF (dFromDate IS NOT NULL AND dToDate IS NOT NULL) THEN
+    EXECUTE IMMEDIATE V_STMT1 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE||V_SQL_WHERE_DATE_CLAUSE
+			|| ' GROUP BY  	I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED'
+            ||' UNION ' || V_STMT2 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE||V_SQL_WHERE_DATE_CLAUSE1
+			|| ' GROUP BY I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED' USING dFromDate,dToDate,dFromDate,dToDate;
+ELSE
+    EXECUTE IMMEDIATE V_STMT1 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE
+			|| ' GROUP BY  	I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED'
+            ||' UNION ' || V_STMT2 || V_SQL_WHERE_CLIENT_CLAUSE || V_SQL_WHERE_BILLER_CLAUSE ||V_SQL_WHERE_LOC_CLAUSE ||V_SQL_WHERE_DEPT_CLAUSE||V_SQL_WHERE_PRJ_CLAUSE
+			|| ' GROUP BY I.invoiceno,I.CMSGROUPNO,I.invoicedate,IV.invoiceamount,
+				IV.taxamount,IV.admincharge,I.RESOURCE_CODE,C.COMPANY_NAME,I.COMPANY_CODE,
+				C.locationid,I.printed,	B.billingdate,P.BILLING_CURRENCY_CODE,I.HAS_BILLING_SUBPROJECTS,I.CONSOLIDATED';
+END IF;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	END IF;
+	END;
+
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		SELECT BILLING_PROJECT_CODE INTO PAC_BIL_INVPRINTLOOKUP_SP.billing_project_code FROM INVOICEHEADER WHERE INVOICENO = UF2_oval1;
+		UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+		SET
+		MinProject = PAC_BIL_INVPRINTLOOKUP_SP.billing_project_code,
+		MaxProject = PAC_BIL_INVPRINTLOOKUP_SP.billing_project_code
+		WHERE ROWID = UF2_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+		SET
+		PROJECT_NAME = UF1_oval1
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+
+	iGrouping :=  NVL(iGrouping, 3);
+	cDecimalSep :=  NVL(cDecimalSep, '.');
+	cThousandSep :=  NVL(cThousandSep, ',');
+	IF  iGrouping &lt; 2 THEN
+		iGrouping :=  3;
+	END IF;
+
+	BEGIN
+	 SELECT   NAME
+	 INTO cMultProjectText
+	 FROM CMN_LOOKUPS_V
+	 WHERE LOOKUP_TYPE = 'PAC_BILLING_MISC_VALUES'
+	  	   AND LOOKUP_CODE = 'MULTIPLEPROJECTS'
+	  	   AND LANGUAGE_CODE = v_LANGUAGE_CODE;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+	SET PROJECT_NAME = cMultProjectText
+	WHERE CONSOLIDATED = 1 ;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+	SET FmtInvAmount = LTRIM(TO_CHAR(InvoiceAmount));
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  cDecimalSep != '.' THEN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+		SET FmtInvAmount = Replace(FmtInvAmount, '.', cDecimalSep);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+  SET FmtInvAmount = Cmn_Replace_Fct(FmtInvAmount,INSTR( FmtInvAmount, cDecimalSep) - iGrouping, 0, cThousandSep)
+  WHERE InvoiceAmount &gt;= POWER(10, iGrouping);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+  SET FmtInvAmount = Cmn_Replace_Fct(FmtInvAmount,INSTR( FmtInvAmount, cThousandSep) - iGrouping, 0, cThousandSep)
+  WHERE InvoiceAmount &gt;= POWER(10, iGrouping * 2);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+        SELECT ID into report_id FROM CMN_SCH_JOB_DEFINITIONS CCHD,CLNTSUPP CLSP WHERE
+								CCHD.IS_SYSTEM_VISIBLE=1
+								AND CCHD.JOB_CODE =CLSP.INVOICE_TEMPLATE
+                                AND CLSP.COMPANY_CODE = cClient;
+      
+
+	UPDATE TEMP_PAC_BIL_INVPRINTLOOKUP
+	SET invtype = 0, rptid = report_id;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  NVL(dOverrideDate, '') IS NULL THEN
+	BEGIN
+		OPEN RC1 FOR
+		SELECT InvoiceNo,
+			   InvoiceDate "Date",
+			   InvoiceAmount "Amount",
+			   COMPANY_NAME "COMPANY_NAME",
+			   PROJECT_NAME "PROJECT_NAME",
+			   Biller "Biller",
+			   RTRIM(SUBSTR(cNoYesText, 1 + ( 3 * SIGN(Printed) ), 3)) "Printed",
+			   NULL "OverrideDate",
+			   COMPANY_CODE "COMPANY_CODE",
+			   minProject "PROJECT_CODE",
+			   locationid "Location",
+			   status "Status",
+			   reprint,
+			   invtype,
+			   rptid,
+			   cmsgroupno,
+			   billing_currency_code,
+			   HAS_BILLING_SUBPROJECTS
+		FROM TEMP_PAC_BIL_INVPRINTLOOKUP
+		WHERE HAS_BILLING_SUBPROJECTS = NVL( v_HasBilllingSubProjects, HAS_BILLING_SUBPROJECTS)
+		ORDER BY 1 , 2 , 4 , 5 ;
+	END;
+	ELSE
+	BEGIN
+		OPEN RC1 FOR
+		SELECT InvoiceNo,
+			   InvoiceDate "Date",
+			   InvoiceAmount "Amount",
+			   COMPANY_NAME "COMPANY_NAME",
+			   PROJECT_NAME "PROJECT_NAME",
+			   Biller "Biller",
+			   RTRIM(SUBSTR(cNoYesText, 1 + ( 3 * SIGN(Printed) ), 3)) "Printed",
+			   dOverrideDate "OverrideDate",
+			   COMPANY_CODE "COMPANY_CODE",
+			   minProject "PROJECT_CODE",
+			   locationid "Location",
+			   status "Status",
+			   reprint,
+			   invtype,
+			   rptid,
+			   cmsgroupno,
+			   billing_currency_code,
+			   HAS_BILLING_SUBPROJECTS
+		FROM TEMP_PAC_BIL_INVPRINTLOOKUP
+		WHERE HAS_BILLING_SUBPROJECTS = NVL( v_HasBilllingSubProjects, HAS_BILLING_SUBPROJECTS)
+		ORDER BY 1 , 2 , 4 , 5 ;
+	END;
+	END IF;
+
+END PAC_BIL_INVPRINTLOOKUP_SP;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

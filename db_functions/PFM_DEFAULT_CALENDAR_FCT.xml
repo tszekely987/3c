@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_DEFAULT_CALENDAR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_DEFAULT_CALENDAR_FCT" ( p_start DATE, p_period_type VARCHAR, p_periods NUMBER )
+   RETURN PFM_CALENDAR
+IS
+ v_calendar PFM_CALENDAR;
+ v_start DATE;
+ v_finish DATE;
+BEGIN
+  v_calendar := PFM_CALENDAR();
+  for idx in 1..p_periods loop
+    v_calendar.extend(1);
+    CASE
+      WHEN p_period_type='DAY' or p_period_type = 'DAILY' THEN
+        v_start := trunc( p_start, 'DDD' ) + ((idx-1)*1);
+        v_finish := v_start+1;
+      WHEN p_period_type='WEEK' or p_period_type = 'WEEKLY' THEN
+      -- TODO: this needs to start on period from site calendar
+        v_start := trunc( p_start, 'DAY' ) + 1 +((idx-1)*7);  -- monday for now
+        v_finish := v_start+7;
+      WHEN p_period_type='MONTH' or p_period_type = 'MONTHLY' THEN
+        v_start := add_months(trunc( p_start, 'MONTH' ),(idx-1)*1);
+        v_finish := add_months(v_start,1);
+      WHEN p_period_type='QUARTER' or p_period_type = 'QUARTERLY' THEN
+        v_start := add_months(trunc( p_start, 'Q' ),(idx-1)*3);
+        v_finish := add_months(v_start,3);
+      WHEN p_period_type='YEAR' or p_period_type = 'YEARLY' or p_period_type = 'ANNUALLY' THEN
+        v_start := add_months(trunc( p_start, 'YEAR' ),(idx-1)*12);
+        v_finish := add_months(v_start,12);
+      ELSE -- just default to a week
+        v_start := trunc( p_start, 'DAY' ) + 1 + ((idx-1)*7); -- Monday for now
+        v_finish := v_start+7;
+    END CASE ;
+    v_calendar(idx) := PFM_PERIOD( idx, v_start, v_finish, 'period here', 1);
+  end loop;
+  return v_calendar;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

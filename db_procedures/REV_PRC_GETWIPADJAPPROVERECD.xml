@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_GETWIPADJAPPROVERECD</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_GETWIPADJAPPROVERECD" (
+adjustgroupno 	NUMBER ,
+reverse_ 	NUMBER  DEFAULT NULL,
+temp_rc1 IN	OUT REV_PRC_GETWIPADJAPPRECDTLPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+/* temp_RC1 	REV_PRC_GETWIPADJAPPRECDTLPkg.RCT1; - MOVED this as a parameter as it
+ needs to be returned as a result set. */
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+
+	IF  NVL(REV_PRC_GETWIPADJAPPROVERECD.reverse_, 1) = 1 THEN
+		BEGIN
+		REV_PRC_GETWIPADJAPPRECDTL(adjustgroupno=&gt;REV_PRC_GETWIPADJAPPROVERECD.adjustgroupno,
+		 reverse_=&gt;1,
+		 RC1=&gt;temp_RC1);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+/* Need to uncomment this later when Mark D has a fix for handling 2 resultsets
+	EXEC REV_PRC_GETWIPADJAPPRECDTL @adjustgroupno = @adjustgroupno, @reverse = 1
+                 */
+	ELSE
+	BEGIN
+		BEGIN
+		REV_PRC_GETWIPADJAPPRECDTL(adjustgroupno=&gt;REV_PRC_GETWIPADJAPPROVERECD.adjustgroupno,
+		 reverse_=&gt;0,
+		 RC1=&gt;temp_RC1);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END IF;
+END REV_PRC_GETWIPADJAPPROVERECD;
+/*
+  MOdified By :Deva
+  Changes  	  : Defined variable temp_RC1 REV_PRC_GETWIPADJAPPRECDTLPkg.RCT1
+  			  	and passed to procedure REV_PRC_GETWIPADJAPPRECDTL
+*/
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

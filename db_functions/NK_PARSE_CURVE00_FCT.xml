@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_PARSE_CURVE00_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_PARSE_CURVE00_FCT" ( P_CURVE IN CLOB )
+RETURN NK_CURVE
+IS
+ IDX NUMBER;
+ V_IDX NUMBER;
+ V_S_IDX NUMBER;
+ V_R_IDX NUMBER;
+ V_START NUMBER;
+ V_S_START NUMBER;
+ V_SEGMENT_START INTEGER;
+ V_SEGMENT_FINISH INTEGER;
+ V_RATE FLOAT;
+ V_CURVE VARCHAR2(32000);
+ V_SEGMENT VARCHAR2(32000);
+ V_DATES VARCHAR2(12);
+ V_OUTPUT_CURVE NK_CURVE;
+
+BEGIN
+
+  V_OUTPUT_CURVE := NK_CURVE(2,1,0,null);
+  V_OUTPUT_CURVE.SEGMENTS := NK_SEGMENTS();
+
+  -- convert the clob to a varchar2(32000) if possible
+  IF( LENGTH(P_CURVE) &lt; 32000 ) THEN
+    V_CURVE := P_CURVE;
+  END IF;
+
+  IDX := 0;
+  V_IDX := 1;
+  V_R_IDX :=1;
+  V_S_IDX :=1;
+  V_START := 1;
+  V_S_START :=1;
+
+  IF( V_CURVE IS NOT NULL ) THEN
+    V_IDX := INSTR( V_CURVE , '|', 1,1);
+  ELSE
+    V_IDX := INSTR( P_CURVE , '|', 1,1);
+  END IF;
+  WHILE V_IDX &gt; 0
+    LOOP
+      V_R_IDX :=1;
+      V_S_IDX :=1;
+      V_S_START :=1;
+      IF( V_CURVE IS NOT NULL ) THEN
+        V_SEGMENT := SUBSTR( V_CURVE, V_START, V_IDX - V_START );
+      ELSE
+        V_SEGMENT := SUBSTR( P_CURVE, V_START, V_IDX - V_START );
+      END IF;
+      V_R_IDX:=INSTR( V_SEGMENT, '@', 1,1);
+      V_RATE := TO_NUMBER(SUBSTR(V_SEGMENT,1,V_R_IDX-V_S_START) );
+      V_SEGMENT:=SUBSTR(V_SEGMENT,V_R_IDX+1);
+      V_S_IDX:=INSTR( V_SEGMENT, ':', 1,1);
+      WHILE V_S_IDX &gt; 0
+        LOOP
+          V_DATES := SUBSTR(V_SEGMENT,V_S_START,V_S_IDX-V_S_START);
+          V_SEGMENT_START := TO_NUMBER( SUBSTR( V_DATES, 1, 5) );
+          V_SEGMENT_FINISH := V_SEGMENT_START+TO_NUMBER(SUBSTR( V_DATES, 7) );
+          IDX := IDX + 1;
+          V_OUTPUT_CURVE.SEGMENTS.EXTEND(1);
+          V_OUTPUT_CURVE.SEGMENTS(IDX) := NK_SEGMENT( V_SEGMENT_START,V_SEGMENT_FINISH,0,0,V_RATE,0,null,null,null );
+          V_OUTPUT_CURVE.SEGMENTS(IDX).SEGMENT_SUM := NK_SEGMENT_SUM_JULIAN_FCT(V_OUTPUT_CURVE.SEGMENTS(IDX));
+          V_OUTPUT_CURVE.CURVE_SUM := V_OUTPUT_CURVE.CURVE_SUM + V_OUTPUT_CURVE.SEGMENTS(IDX).SEGMENT_SUM;
+          V_S_IDX := V_S_IDX + 1;
+          V_S_START := V_S_IDX;
+          V_S_IDX := INSTR( V_SEGMENT, ':', V_S_IDX,1);
+        END LOOP;
+      -- DO NOT REPOSITION IF IDX &lt; 0 SINCE PARSING IS DONE
+      IF( V_IDX &gt; 0 ) THEN
+        V_IDX := V_IDX + 1;
+        V_START := V_IDX;
+        IF( V_CURVE IS NOT NULL ) THEN
+          V_IDX := INSTR( V_CURVE, '|', V_IDX,1);
+        ELSE
+          V_IDX := INSTR( P_CURVE, '|', V_IDX,1);
+        END IF;
+      END IF;
+    END LOOP;
+
+  RETURN V_OUTPUT_CURVE;
+  END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

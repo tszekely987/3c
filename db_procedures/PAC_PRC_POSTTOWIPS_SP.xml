@@ -1,0 +1,1367 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_PRC_POSTTOWIPS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_PRC_POSTTOWIPS_SP" 
+(
+  batchuser            VARCHAR2,
+  in_datef             VARCHAR2,
+  in_datet             VARCHAR2,
+  codetype             VARCHAR2,
+  in_code              VARCHAR2,
+  in_clntcode          VARCHAR2,
+  in_sourceModule   IN PPA_TRANSCONTROL.SOURCEMODULE%TYPE DEFAULT NULL,
+  labor                VARCHAR2,
+  material             VARCHAR2,
+  equipment            VARCHAR2,
+  expense              VARCHAR2,
+  poc                  VARCHAR2,
+  batch                VARCHAR2 DEFAULT NULL,
+  recalculate_currency VARCHAR2,
+  in_sourcemodulelist  VARCHAR2 DEFAULT NULL,
+  in_voucherlist       VARCHAR2 DEFAULT NULL,
+  in_resourcelist      VARCHAR2 DEFAULT NULL
+)
+--Log
+--fix by Uma for bug #47164
+AS
+  iTypeOfPost                  INTEGER := 1;
+  p_transno                    INTEGER := 0;
+  code                         GLOBALPKG.STRING;
+  cCOMPANY_CODE                GLOBALPKG.STRING;
+  cLocationID                  GLOBALPKG.STRING;
+  cProject                     GLOBALPKG.STRING;
+  cResource_Code               GLOBALPKG.STRING;
+  cIncurredBy			Globalpkg.STRING;
+  v_sourceModule               PPA_TRANSCONTROL.SOURCEMODULE%TYPE;
+  StoO_selcnt                  INTEGER;
+  StoO_error                   INTEGER;
+  StoO_rowcnt                  INTEGER;
+  StoO_rowcnt_wip              INTEGER;
+  StoO_rowcnt_wipvalues        INTEGER;
+  StoO_crowcnt                 INTEGER := 0;
+  StoO_fetchstatus             INTEGER := 0;
+  StoO_errmsg                  GLOBALPKG.STRING;
+  StoO_sqlstatus               INTEGER;
+  iBatchNo                     NUMBER;
+  cExternalBatchID             GLOBALPKG.STRING;
+  iSourceModuleExclude         NUMBER(3,0);
+  bSelectiveBatches            NUMBER;
+  iRowsPosted                  NUMBER;
+  iError                       NUMBER;
+  iLength                      NUMBER;
+  iSubVal                      NUMBER;
+  V_SPID                       GLOBALPKG.STRING;
+  datef                        DATE;
+  datet                        DATE;
+--  UF1_rowid                    ROWID;
+--  UF1_oval1                    apdetails.transactionno%TYPE;
+--  UF1_oval2                    apdetails.transource%TYPE;
+
+  /*checkin start*/
+  temp_transno                 ppa_WIP.TRANSNO%type;
+  temp_date                    date;
+  exr_rate                     CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_actualcost               CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  exr_stdcost                  CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  /*exr CMN_EXCHANGERATE_PKG.exchangeRateForTranAndWipTAB;*/
+  currencyType                 varchar2(30);
+  fromCurrency                 varchar2(30);
+  toCurrency                   varchar2(30);
+  convertedAmount              number;
+  temp_cost_Exchange_Rate      number;
+  temp_rate_Exchange_Rate      number;
+  temp_rate_exchange_ID        number;
+  temp_cost_exchange_ID        number;
+  exchangeRateType             varchar2(30);
+  projectId                    pac_mnt_projects.id%TYPE;
+  LABOR_EXCHANGE_RATE_TYPE     pac_mnt_projects.LABOR_EXCHANGE_RATE_TYPE%TYPE;
+  EXPENSE_EXCHANGE_RATE_TYPE   pac_mnt_projects.EXPENSE_EXCHANGE_RATE_TYPE%TYPE;
+  MATERIALS_EXCHANGE_RATE_TYPE pac_mnt_projects.MATERIALS_EXCHANGE_RATE_TYPE%TYPE ;
+  EQUIPMENT_EXCHANGE_RATE_TYPE pac_mnt_projects.EQUIPMENT_EXCHANGE_RATE_TYPE%TYPE;
+  temp_Amount                  ppa_transcontrol_values.amount%TYPE ;
+  tempCurrencyCode             ppa_transcontrol_values.currency_code%TYPE;
+  temp_BillRate                ppa_transcontrol_values.billrate%TYPE;
+  temp_Price                   ppa_transcontrol_values.price%TYPE;
+  temp_FactorAmount            ppa_transcontrol_values.factoramount%type;
+  temp_Burden                  ppa_transcontrol_values.burden%type;
+  temp_Overhead                ppa_transcontrol_values.overhead%type;
+  temp_TotalAmount             ppa_transcontrol_values.totalamount%type;
+  temp_ActualCost              ppa_transcontrol_values.actualcost%type;
+  temp_StdCost                 ppa_transcontrol_values.stdcost%type;
+  temp_TotalCost               ppa_transcontrol_values.totalcost%type;
+  temp_EmplyActualCost         ppa_transcontrol_values.actualcost%type;
+  temp_EmplyStdcost            ppa_transcontrol_values.stdcost%type;
+  temp_AmountRemaining         ppa_wip_values.AMOUNTREMAINING%type;
+  temp_rate_currency_code      ppa_transcontrol_values.rate_currency_code%type;
+  temp_cost_currency_code      ppa_transcontrol_values.actcost_currency_code%type;
+  temp_natural_BillRate        ppa_transcontrol_values.natural_billrate%type;
+  temp_natural_stdcost         ppa_transcontrol_values.natural_stdcost%type;
+  temp_natural_actualcost      ppa_transcontrol_values.natural_actualcost%type;
+  vAmount                      ppa_transcontrol_values.amount%TYPE;
+  vCurrencyPrecision           CMN_CURRENCIES.CURRENCY_PRECISION%type;
+  
+  -- Declared an exception variable.
+  IS_NULL_EXCEPTION EXCEPTION;
+
+  --Declared a local cursor. This cursor has financial transaction information which are posted to WIP.
+
+  CURSOR GET_TRANSACTION_INFO
+  IS
+     SELECT
+            PAC_IMP_ACTUALS_EXPORT_S1.NEXTVAL ID,
+      T.TASK_ID TASK_ID,
+      R.ID RESOURCE_ID,
+      T.TransNo TRANS_NO,
+      T.TRANSDATE TRANS_DATE,
+      T.Quantity QUANTITY,
+      V.AMOUNT AMOUNT,
+      --V.TOTALCOST
+      CONVERT_TO_PROJ_CURR(T.TransNo, 'PPA_TRANSCONTROL') TOTAL_COST_IN_PRJ_CURR
+    FROM PPA_TRANSCONTROL T, PPA_TRANSCONTROLAPINFO TINFO, PPA_TRANSCONTROL_VALUES V, PAC_MNT_RESOURCES R,
+              (
+                SELECT ID FROM
+                  (
+                    SELECT to_number(regexp_substr(in_sourcemodulelist,'[^,]+', 1, LEVEL)) ID
+                    FROM dual
+                    CONNECT BY regexp_substr(in_sourcemodulelist, '[^,]+', 1, LEVEL) IS NOT NULL
+                  )
+              ) sourceinput,
+              (
+                select to_number(substr(id, instr(id,';')+1)) id from
+                (
+                  SELECT trim(ID) ID FROM
+                  (
+                    SELECT regexp_substr(in_voucherlist,'[^,]+', 1, LEVEL) ID
+                    FROM dual
+                    CONNECT BY regexp_substr(in_voucherlist, '[^,]+', 1, LEVEL) IS NOT NULL
+                  )
+                )
+              ) voucherinput,
+              (
+                SELECT trim(ID) ID FROM
+                  (
+                    SELECT regexp_substr(in_resourcelist,'[^;]+', 1, LEVEL) ID
+                    FROM dual
+                    CONNECT BY regexp_substr(in_resourcelist, '[^;]+', 1, LEVEL) IS NOT NULL
+                  )
+              ) resourceinput
+     WHERE T.TransNo = NVL(p_transno, T.TransNo)
+     and T.TransNo = V.TRANSNO
+     and V.CURRENCY_TYPE='HOME'
+     and TRUNC(T.TransDate) &gt;= TRUNC(datef)
+     and TRUNC(T.TransDate) &lt;= TRUNC(datet)
+     AND PAC_FOS_IS_VALID_LOCATION_FCT(batchuser, t.locationid) = 1
+     AND (sourceinput.ID     is null OR T.sourcemodule   = sourceinput.ID     )
+     AND (voucherinput.ID    is null OR TINFO.id  = voucherinput.ID    )
+     AND (resourceinput.ID   is null OR T.RESOURCE_CODE  = resourceinput.ID    )
+     -- if no sourceModule is passed in then short the sourceModule comparison
+     AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule)
+   and (RTRIM(T.COMPANY_CODE) = RTRIM(NVL(cCOMPANY_CODE, T.COMPANY_CODE)) OR RTRIM(T.COMPANY_CODE) IS NULL)
+         and RTRIM(T.PROJECT_CODE) = RTRIM(NVL(cProject,T.PROJECT_CODE))
+         and RTRIM(T.RESOURCE_CODE) = RTRIM(NVL(cResource_Code,T.RESOURCE_CODE))
+         and RTRIM(T.LocationID) = RTRIM(NVL(cLocationID,T.LocationID))
+         and NVL(T.ExternalBatchID, ' ') = NVL(cExternalBatchID,NVL(T.ExternalBatchID, ' '))
+         and T.TransType IN (labor, material, equipment, expense)
+     and T.SourceModule != iSourceModuleExclude
+     AND T.RESOURCE_CODE = R.RESOURCE_CODE
+    AND T.SOURCEMODULE &lt;&gt; 51
+     AND T.PPA_TRANSCONTROLAPINFO_ID = TINFO.ID(+)
+     AND NVL(TINFO.INCURRED_BY, ' ') = NVL( cIncurredBy, NVL( TINFO.INCURRED_BY, ' ') ) ;
+
+  /* added */
+  temp_stdCost_Currency_Code   ppa_transcontrol_values.STDCOST_CURRENCY_CODE%TYPE;
+  --nCostRuleCode                VARCHAR2(30);
+  bUseCostPlus                 NUMBER;
+  costPlus                     PAC_MNT_PROJECTS.COSTPLUS%TYPE;
+  /* added */
+
+  /*checkin end
+  CURSOR UF1_cursor IS
+  SELECT D.ROWID, W.WIPTransNo, 'W'
+    FROM ppa_WIPPostWork W, apdetails D
+   WHERE W.ProcessID = (SELECT userenv('SESSIONID') FROM DUAL)
+     and D.transactionno = W.TCTransNo
+     and D.transource = 'T'
+     FOR UPDATE OF D.transactionno, D.transource;
+  UF2_rowid   ROWID;
+  UF2_oval1   apdetailsaccts.transactionno%TYPE;
+  UF2_oval2   apdetailsaccts.transource%TYPE;
+
+  CURSOR UF2_cursor IS
+  SELECT A.ROWID, W.WIPTransNo, 'W'
+    FROM ppa_WIPPostWork W, apdetailsaccts A
+   WHERE W.ProcessID = (SELECT userenv('SESSIONID') FROM DUAL)
+     and A.transactionno = W.TCTransNo
+     and A.transource = 'T'
+     FOR UPDATE OF A.transactionno, A.transource;
+  */
+BEGIN
+  BEGIN
+    -- Since post to WIP action should not be used by more than one user at the same time,
+    -- WIPPROCESSCONTROL table is locked exclusively until the action is completed.
+	  -- WIPPROCESSCONTROL table is not used for data, but it is used for handling concurrency.
+	  LOCK TABLE WIPPROCESSCONTROL IN EXCLUSIVE MODE NOWAIT;
+	  EXCEPTION
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				IF StoO_error = -54 THEN
+				  ROLLBACK WORK;
+				  raise_application_error(-20885, 'Post to WIP is currently used by another user. Please try again later.');
+				END IF;
+	END;
+
+	datef := TO_DATE(SUBSTR(in_datef,1,10), 'YYYY-MM-DD');
+	datet := TO_DATE(SUBSTR(in_datet,1,10), 'YYYY-MM-DD');
+
+	-- This variable will be used in the crieteria for retrieving the transactions
+  v_sourceModule := NVL(in_sourceModule, 1);
+
+  iSourceModuleExclude := 0;
+  bSelectiveBatches := 0;
+	code := RTRIM(in_code);
+	cCOMPANY_CODE := RTRIM(in_clntcode);
+	SELECT userenv('SESSIONID') INTO V_SPID FROM DUAL;--use user env replace spid view
+
+  IF NVL(p_transno, 0) = 0 THEN
+		p_transno :=  NULL;
+	END IF;
+
+  IF NVL(RTRIM(cCOMPANY_CODE), ' ') = ' ' THEN
+		cCOMPANY_CODE :=  NULL;
+	END IF;
+
+  IF codetype = 'Batches' THEN
+    cExternalBatchID := code;
+	ELSE
+    cExternalBatchID := NULL;
+	END IF;
+
+  IF codetype = 'Locations' THEN
+    cLocationID := code;
+	ELSE
+    cLocationID := NULL;
+	END IF;
+
+  IF codetype = 'Clients' THEN
+    cCOMPANY_CODE := code;
+	END IF;
+
+  IF codetype = 'Projects' THEN
+		BEGIN
+      iSubVal  := INSTR( code, ':');
+      cProject := SUBSTR(code, iSubVal + 1);
+		END;
+	ELSE
+    cProject := NULL;
+	END IF;
+
+  IF codetype = 'Employees' THEN
+    cResource_Code := code;
+	ELSE
+    cResource_Code := NULL;
+	END IF;
+
+ IF codetype = 'IncurredBy' THEN
+	   cIncurredBy := code ;
+	ELSE
+	   cIncurredBy := NULL ;
+	END IF ;
+
+  IF INSTR( batch, 'BATCH') = 0 THEN
+		iSourceModuleExclude :=  2;
+	ELSE
+    BEGIN
+      IF INSTR( batch, 'ALL') = 0 THEN
+        BEGIN
+          bSelectiveBatches :=  1;
+        END;
+      END IF;
+    END;
+  END IF;
+
+/***************************************************************
+ wipprocesslock is used in sql server version, but not oracle...
+  BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+    UPDATE wipprocesslock
+       SET column1 = '1';
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				ROLLBACK WORK;
+				raise_application_error(SQLCODE, SQLERRM);
+		END;
+****************************************************************/
+
+  BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+    DELETE FROM ppa_WIPPostWork
+     WHERE ProcessID = V_SPID;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				ROLLBACK WORK;
+				raise_application_error(SQLCODE, SQLERRM);
+  END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget,PostProcess)
+    VALUES (S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, batchuser, 'W', 'POST TO WIP');
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      NULL;
+    WHEN OTHERS THEN
+	    StoO_error := SQLCODE;
+	    StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20254, 'Unable to insert into ppa_PostingBatch! batch user ' || batchuser);
+      RETURN;
+		END;
+  END IF;
+
+  SELECT S_307_1_PPA_POSTINGBATCH.currval
+    INTO iBatchNo
+    FROM dual;
+
+  IF bSelectiveBatches = 0 THEN
+    BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			StoO_rowcnt_wip := 0;
+			
+      BEGIN
+        /* Removed obsolute amount columns - Sanjay - 10/03/01 */
+        INSERT INTO ppa_WIP (
+           TransNo,
+           SourceModule,
+				   TransType,
+				   BatchNo,
+				   ENTRY_RESOURCE_CODE,
+				   EntryDate,
+				   LASTUPDTDBY_RESOURCE_CODE,
+				   LastUpdateDate,
+				   ExternalBatchID,
+				   ExternalTransNo,
+				   LocationID,
+				   DepartCode,
+				   Entity,
+				   TransDate,
+				   COMPANY_CODE,
+				   PROJECT_CODE,
+				   INVESTMENT_ID,
+           Charge_Code,
+           Input_Type,
+           Charge_Code_id,
+           Input_Type_id,
+           EmplyLocationID,
+           EmplyDepartID,
+           Trans_Class_id,
+           resource_class_id,
+           ROLE_CODE_ID,
+           USER_VAL1_ID,
+           USER_VAL2_ID,
+				   RESOURCE_CODE,
+				   Quantity,
+				   CostRuleCode,
+				   BurdenCode,
+				   OverheadCode,
+				   Chargeable,
+				   Notes,
+				   InvoiceNo,
+				   EmplyHomeLocation,
+				   EmplyHomeDepart,
+				   ProjectType,
+				   ClientClass,
+				   ProjectClass,
+           --CostClass,
+				   TransClass,
+           resource_class,
+				   WIPClass,
+				   WorkInt,
+				   WorkBuf,
+				   Status,
+				   ApplyTo,
+           GLPosted,
+           EXTERNAL_ID,
+           EXTERNAL_SOURCE_ID,
+           TASK_ID,
+           PROJECT_LOCATION,
+           PROJECT_DEPARTMENT,
+           ROLE_CODE,
+           PPA_WIPAPINFO_ID,
+           USER_LOV1,
+           USER_LOV2,
+           EXPENSE_TYPE,
+           WORKINT_SOURCE,
+           MONTH_BEGIN,
+           MONTH_END,
+           COST_TYPE,
+           RESOURCE_ID       
+      )
+      SELECT
+           S_54_1_PPA_WIP.NEXTVAL,  
+           SourceModule,
+				   TransType,
+				   iBatchNo,
+				   ENTRY_RESOURCE_CODE,
+				   EntryDate,
+				   batchuser,
+				   sysdate,
+				   ExternalBatchID,
+				   NVL(ExternalTransNo, TransNo),
+				   T.LocationID,
+				   T.DepartCode,
+				   Entity,
+				   TransDate,
+				   COMPANY_CODE,
+				   PROJECT_CODE,
+				   I.ID,
+           Charge_Code,
+           Input_Type,
+       (select prid from prchargecode where prexternalid = Charge_Code),
+       (select prid from prtypecode where prexternalid = Input_Type),
+       (select id from LOCATIONS where locationid = EmplyHomeLocation),
+       (select id from DEPARTMENTS where departcode = EmplyHomeDepart),
+       (select id from transclass where transclass = T.TransClass),
+       (select id from pac_fos_resource_class where resource_class = T.resource_class),
+       (select id from srm_resources where UNIQUE_NAME = T.ROLE_CODE),
+       (select id from CMN_LOOKUPS where LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV1' and lookup_code = T.USER_LOV1),
+       (select id from CMN_LOOKUPS where LOOKUP_TYPE = 'PRTIMEENTRY_USER_LOV2' and lookup_code = T.USER_LOV2),
+				   T.RESOURCE_CODE,
+				   Quantity,
+				   CostRuleCode,
+				   T.BurdenCode,
+				   T.OverheadCode,
+				   Chargeable,
+				   T.Notes,
+				   InvoiceNo,
+				   EmplyHomeLocation,
+				   EmplyHomeDepart,
+				   ProjectType,
+				   ClientClass,
+				   ProjectClass,
+           --CostClass,
+				   T.TransClass,
+           T.resource_class,
+				   WIPClass,
+				   TransNo,
+				   WorkBuf,
+				   0 "Status",
+				   0 "ApplyTo",
+           'N' "GLPosted",
+           EXTERNAL_ID,
+           EXTERNAL_SOURCE_ID,
+           T.TASK_ID,
+           T.PROJECT_LOCATION,
+           T.PROJECT_DEPARTMENT,
+           T.ROLE_CODE,
+           T.PPA_TRANSCONTROLAPINFO_ID,
+           T.USER_LOV1,
+           T.USER_LOV2,
+           T.EXPENSE_TYPE,
+           'PPA_TRANSCONTROL',
+           ADD_MONTHS(LAST_DAY(TransDate),-1)+1,
+           LAST_DAY(TransDate)+1,
+           T.COST_TYPE,
+           R.ID       
+      FROM PAC_MNT_RESOURCES R, PPA_TRANSCONTROL T, PPA_TRANSCONTROLAPINFO TINFO, INV_INVESTMENTS I,
+                    (
+                      SELECT ID FROM
+                        (
+                          SELECT to_number(regexp_substr(in_sourcemodulelist,'[^,]+', 1, LEVEL)) ID
+                          FROM dual
+                          CONNECT BY regexp_substr(in_sourcemodulelist, '[^,]+', 1, LEVEL) IS NOT NULL
+                        )
+                    ) sourceinput,
+                    (
+                      select to_number(substr(id, instr(id,';')+1)) id from
+                      (
+                        SELECT trim(ID) ID FROM
+                        (
+                          SELECT regexp_substr(in_voucherlist,'[^,]+', 1, LEVEL) ID
+                          FROM dual
+                          CONNECT BY regexp_substr(in_voucherlist, '[^,]+', 1, LEVEL) IS NOT NULL
+                        )
+                      )
+                    ) voucherinput,
+                    (
+                      SELECT trim(ID) ID FROM
+                        (
+                          SELECT regexp_substr(in_resourcelist,'[^;]+', 1, LEVEL) ID
+                          FROM dual
+                          CONNECT BY regexp_substr(in_resourcelist, '[^;]+', 1, LEVEL) IS NOT NULL
+                        )
+                    ) resourceinput
+      WHERE T.TransNo = NVL(p_transno, T.TransNo)
+        AND UPPER(I.CODE) = UPPER(T.PROJECT_CODE)
+        and TRUNC(T.TransDate) &gt;= TRUNC(datef)
+        and TRUNC(T.TransDate) &lt;= TRUNC(datet)
+        AND PAC_FOS_IS_VALID_LOCATION_FCT(batchuser, t.locationid) = 1
+        -- if no sourceModule is passed in then short the sourceModule comparison
+        AND ( 1=v_sourceModule OR t.SOURCEMODULE = in_sourceModule )
+        AND (sourceinput.ID     is null OR T.sourcemodule   = sourceinput.ID     )
+        AND (voucherinput.ID    is null OR TINFO.id  = voucherinput.ID    )
+        AND (resourceinput.ID   is null OR T.RESOURCE_CODE  = resourceinput.ID    )
+        and (RTRIM(T.COMPANY_CODE) = RTRIM(NVL(cCOMPANY_CODE, T.COMPANY_CODE)) OR RTRIM(T.COMPANY_CODE) IS NULL)
+        and RTRIM(T.PROJECT_CODE) = RTRIM(NVL(cProject,T.PROJECT_CODE))
+        and RTRIM(T.RESOURCE_CODE) = RTRIM(NVL(cResource_Code,T.RESOURCE_CODE))
+        and RTRIM(T.LocationID) = RTRIM(NVL(cLocationID,T.LocationID))
+        and NVL(T.ExternalBatchID, ' ') = NVL(cExternalBatchID,NVL(T.ExternalBatchID, ' '))
+        and T.TransType IN (labor, material, equipment, expense)
+        AND T.SOURCEMODULE != iSourceModuleExclude
+	    AND T.PPA_TRANSCONTROLAPINFO_ID = TINFO.ID(+)
+	    AND NVL(TINFO.INCURRED_BY, ' ') = NVL( cIncurredBy, NVL( TINFO.INCURRED_BY, ' ') )
+        AND T.RESOURCE_CODE = R.RESOURCE_CODE;
+        
+        /* 11/16/2001 Removing OR condition for POC for performance. We do not need POC any longer */
+        /* OR SUBSTR(T.ExternalBatchID, 1, 3) = poc */
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+			StoO_rowcnt_wip := StoO_rowcnt;			
+			StoO_error := SQLCODE;
+
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+				    null;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+					ROLLBACK WORK;
+					raise_application_error(-20255, 'Error inserting into ppa_WIP!' || StoO_errmsg );
+          RETURN;
+			END;
+
+      IF StoO_error = 0 THEN
+        BEGIN
+          /*checkin start*/
+          if recalculate_currency = '1' then
+            BEGIN
+              declare cursor transaction_cursor is
+              select transno, transdate,transtype, project_code, chargeable, projecttype, quantity, costrulecode, charge_code, input_type
+               FROM PPA_TRANSCONTROL T,PPA_TRANSCONTROLAPINFO TINFO
+               WHERE T.TransNo = NVL(p_transno, T.TransNo)
+                 and TRUNC(T.TransDate) &gt;= TRUNC(datef)
+                 and TRUNC(T.TransDate) &lt;= TRUNC(datet)
+                 AND PAC_FOS_IS_VALID_LOCATION_FCT(batchuser, t.locationid) = 1
+                 -- if no sourceModule is passed in then short the sourceModule comparison
+                 AND (1 = v_sourceModule OR t.SOURCEMODULE = in_sourceModule )
+                 and (RTRIM(T.COMPANY_CODE) = RTRIM(NVL(cCOMPANY_CODE, T.COMPANY_CODE)) OR RTRIM(T.COMPANY_CODE) IS NULL)
+                 and RTRIM(T.PROJECT_CODE) = RTRIM(NVL(cProject, T.PROJECT_CODE))
+                 and RTRIM(T.RESOURCE_CODE) = RTRIM(NVL(cResource_Code, T.RESOURCE_CODE))
+                 and RTRIM(T.LocationID) = RTRIM(NVL(cLocationID, T.LocationID))
+                 and NVL(T.ExternalBatchID, ' ') = NVL(cExternalBatchID, NVL(T.ExternalBatchID, ' '))
+                 and T.TransType  IN (labor, material, equipment, expense)
+                AND T.SOURCEMODULE != iSourceModuleExclude
+		  AND T.PPA_TRANSCONTROLAPINFO_ID = TINFO.ID(+)
+		  AND NVL(TINFO.INCURRED_BY, ' ') = NVL( cIncurredBy, NVL( TINFO.INCURRED_BY, ' ') ) ;
+		  
+                 /* 11/16/2001 Removing OR condition for POC for performance. We do not need POC any longer */
+                 /* OR SUBSTR(T.ExternalBatchID, 1, 3) = poc */
+
+              BEGIN
+                FOR transaction_rec IN transaction_cursor LOOP
+
+                  select id, LABOR_EXCHANGE_RATE_TYPE,EXPENSE_EXCHANGE_RATE_TYPE, MATERIALS_EXCHANGE_RATE_TYPE, EQUIPMENT_EXCHANGE_RATE_TYPE
+                    into projectId,LABOR_EXCHANGE_RATE_TYPE, EXPENSE_EXCHANGE_RATE_TYPE, MATERIALS_EXCHANGE_RATE_TYPE, EQUIPMENT_EXCHANGE_RATE_TYPE
+                    from pac_mnt_projects
+                   where project_code =  transaction_rec.project_code;
+
+                  BEGIN
+                    SELECT rate_currency_code,
+                           actcost_currency_code,
+                           stdcost_currency_code,
+                           natural_billrate,
+                           natural_stdcost,
+                           natural_actualcost,
+                           /* added */
+                           factoramount,
+                           burden,
+                           overhead
+                           /* added */
+                      into temp_rate_currency_code,
+                           temp_cost_currency_code,
+                           temp_stdCost_Currency_Code,
+                           temp_natural_BillRate,
+                           temp_natural_stdcost,
+                           temp_natural_actualcost,
+                           /* added */
+                           temp_factoramount,
+                           temp_burden,
+                           temp_overhead
+                           /* added */
+                      from ppa_transcontrol_values
+                     where transno = transaction_rec.transno and currency_type = 'NATURAL';
+
+                    EXCEPTION
+                      WHEN OTHERS THEN
+                        ROLLBACK WORK;
+                        raise_application_error(SQLCODE, SQLERRM);
+                  END;
+
+                  BEGIN
+                    select transno
+                      into temp_transno
+                      from ppa_wip
+                     where ppa_wip.WORKINT = transaction_rec.transno
+                       AND workint_source = 'PPA_TRANSCONTROL';
+
+                    EXCEPTION
+                      WHEN OTHERS THEN
+                        ROLLBACK WORK;
+                        raise_application_error(SQLCODE, SQLERRM);
+                  END;
+
+                  if transaction_rec.transtype = 'L' then
+                    exchangeRateType := LABOR_EXCHANGE_RATE_TYPE;
+                  END IF;
+
+                  if transaction_rec.transtype = 'M' then
+                    exchangeRateType := MATERIALS_EXCHANGE_RATE_TYPE;
+                  END IF;
+
+                  if transaction_rec.transtype = 'Q' then
+                    exchangeRateType := EQUIPMENT_EXCHANGE_RATE_TYPE;
+                  END IF;
+
+                  if transaction_rec.transtype = 'X' then
+                    exchangeRateType := EXPENSE_EXCHANGE_RATE_TYPE;
+                  END IF;
+
+                  Select sysdate
+                    into temp_date
+                    from dual;
+
+                  BEGIN
+                    exr_rate := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT
+                                      ( projectId,
+                                        transaction_rec.transdate,
+                                        temp_rate_currency_code,
+                                        temp_natural_BillRate,
+                                        exchangeRateType );
+                    EXCEPTION
+                      WHEN OTHERS THEN
+                      ROLLBACK WORK;
+                      raise_application_error(SQLCODE, SQLERRM);
+                  END;
+
+                  BEGIN
+                    exr_actualcost := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT
+                                        (projectId,
+                                         transaction_rec.transdate,
+                                         temp_cost_currency_code,
+                                         temp_natural_actualcost ,--to be done later..it can be either actaul cost or standard cost
+                                         exchangeRateType );
+                    EXCEPTION
+                       WHEN OTHERS THEN
+                         ROLLBACK WORK;
+                         raise_application_error(SQLCODE, SQLERRM);
+                  END;
+
+                  if (temp_stdCost_Currency_Code is not null) then
+                    BEGIN
+                      exr_stdcost := CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT
+                                      (projectId,
+                                       transaction_rec.transdate,
+                                       temp_stdCost_Currency_Code,
+                                       temp_natural_stdcost ,--to be done later..it can be either actaul cost or standard cost
+                                       exchangeRateType );
+                      EXCEPTION
+                        WHEN OTHERS THEN
+                          ROLLBACK WORK;
+                          raise_application_error(SQLCODE, SQLERRM);
+                    END;
+                 end if;
+
+                 for i in 1 .. exr_rate.count
+                 loop
+                   currencyType := exr_rate(i).currencyTYPE;
+                   fromCurrency := exr_rate(i).fromCurrencyCode;
+                   toCurrency := exr_rate(i).toCurrencyCode;
+                   temp_BillRate := exr_rate(i).convertedAmount;
+                   temp_rate_Exchange_Rate := exr_rate(i).exchangeRate;
+                   temp_rate_Exchange_ID := exr_rate(i).exchangeRateID;
+
+                   temp_ActualCost := exr_actualcost(i).convertedAmount;--to be done later
+                   temp_cost_Exchange_Rate := exr_actualcost(i).exchangeRate;
+                   temp_cost_Exchange_ID := exr_actualcost(i).exchangeRateID;
+
+                   if (temp_stdCost_Currency_Code is not null) then
+                     temp_stdcost := exr_stdcost(i).convertedAmount;
+                   else
+                     temp_stdcost := 0;
+                   end if;
+
+                   /**** added *****/
+                   IF UPPER(currencyType) = 'NATURAL' THEN
+                     BEGIN
+                      IF temp_cost_currency_code != temp_rate_currency_code THEN
+                        /* convert the actual cost to rate currency code */
+                        BEGIN
+                          temp_ActualCost := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                transaction_rec.transdate,
+                                                temp_cost_currency_code,
+                                                temp_rate_currency_code,
+                                                temp_natural_actualcost,
+                                                exchangeRateType );
+                          EXCEPTION
+                            WHEN OTHERS THEN
+                              ROLLBACK WORK;
+                              raise_application_error(SQLCODE, SQLERRM);
+                     END;
+                   END IF;
+
+                   IF temp_stdCost_Currency_Code IS NOT NULL AND
+                      (temp_stdCost_Currency_Code != temp_rate_currency_code) THEN
+                      /* convert the std. cost to rate currency code */
+                      BEGIN
+                        temp_stdcost := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                          transaction_rec.transdate,
+                                          temp_stdcost_currency_code,
+                                          temp_rate_currency_code,
+                                          temp_natural_stdcost,
+                                          exchangeRateType );
+                        EXCEPTION
+                          WHEN OTHERS THEN
+                            ROLLBACK WORK;
+                            raise_application_error(SQLCODE, SQLERRM);
+                      END;
+                    END IF;
+
+                  EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                      ROLLBACK WORK;
+                      raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+                    WHEN OTHERS THEN
+                      StoO_error := SQLCODE;
+                      StoO_errmsg := SQLERRM;
+                      ROLLBACK WORK;
+                      raise_application_error(-20083,'Exchange Rate for RATE currency code to COST currency code is not available');
+                 END;
+               END IF;
+
+               /**** added ****/
+               -- call here procedure to calculate the burden, factor and overhead amt.
+
+               -- check if the cost plus rule is null or not
+               select COSTPLUS into costPlus from PAC_MNT_PROJECTS where transaction_rec.PROJECT_CODE = PAC_MNT_PROJECTS.PROJECT_CODE ;
+
+               IF ((costPlus = 1) and (transaction_rec.COSTRULECODE IS NOT NULL)) THEN
+                 bUseCostPlus := 1;
+               ELSE
+                 bUseCostPlus := 0;
+               END IF;
+
+               /* compute all the amount and get the flag that it is based on actual cost or std. cost */
+               Ppa_Computemarkup( bUseCostPlus,
+							   transaction_rec.costrulecode,
+                 transaction_rec.charge_code,
+                 transaction_rec.input_type,
+							   transaction_rec.transtype,
+							   temp_ActualCost,
+							   transaction_rec.quantity,
+							   temp_stdcost,
+							   temp_natural_BillRate,
+							   temp_Amount,
+							   temp_factoramount,
+							   temp_burden,
+							   temp_overhead,
+                 --nCostRuleCode,
+                 temp_rate_currency_code,
+                 temp_cost_currency_code,
+                 transaction_rec.transdate,
+                 transaction_rec.project_code
+							  );
+
+              select CURRENCY_PRECISION into vCurrencyPrecision from CMN_CURRENCIES where CURRENCY_CODE = toCurrency;
+
+              temp_totalamount := round(transaction_rec.quantity * temp_billrate + temp_burden + temp_overhead + temp_factoramount, vCurrencyPrecision);
+
+              vAmount := round(transaction_rec.quantity * temp_BillRate,vCurrencyPrecision);
+              temp_TotalCost := round( transaction_rec.quantity * temp_ActualCost,vCurrencyPrecision);
+              temp_AmountRemaining := round( transaction_rec.Chargeable * SIGN(ABS(ASCII(transaction_rec.ProjectType) - 73)) * (temp_TotalAmount ),vCurrencyPrecision);
+
+              BEGIN
+                INSERT INTO PPA_WIP_VALUES (ID,
+                    TRANSNO,
+										CURRENCY_TYPE,
+										CURRENCY_CODE,
+										RATE_EXCHANGE_ID,
+										RATE_EXCHANGE_RATE,
+										RATE_CURRENCY_CODE,
+										NATURAL_BILLRATE,
+										BillRate ,
+										amount,
+										COST_EXCHANGE_ID,
+										COST_EXCHANGE_RATE,
+										COST_CURRENCY_CODE,
+										/* added */
+										STDCOST_CURRENCY_CODE,
+										/* added */
+										NATURAL_ACTUALCOST,
+										NATURAL_STDCOST,
+                    ActualCost,
+                    StdCost,
+                    totalCost,
+                    Price,
+                    FactorAmount,
+                    Burden,
+                    overhead,
+                    TotalAmount,
+                    EmplyActualCost,
+										EmplyStdcost,
+										AmountRemaining
+                   )
+                VALUES (
+                    PPA_WIP_VALUES_S1.NEXTVAL,
+										temp_transno ,
+										currencyType,
+										toCurrency,
+										temp_rate_exchange_ID,
+										temp_rate_exchange_rate ,
+										temp_rate_currency_code,
+										temp_natural_billrate,
+										temp_BillRate,
+										vAmount,
+										temp_cost_exchange_ID,
+										temp_cost_exchange_rate ,
+										temp_cost_currency_code,
+										/* added */
+										temp_stdcost_currency_code,
+										/* added */
+										temp_natural_ActualCost,
+										temp_natural_StdCost,
+                    temp_ActualCost,
+                    temp_StdCost,
+										temp_TotalCost,
+										1 , --:1:2:3price hardcoed since it is obsolete
+										temp_FactorAmount,  --:4:5:6to be done after ppa_getrate is changed to accomodate multi-currency -Factor percent * totalcost
+                    temp_Burden, --:7:8:9Burden percent * totalcost,
+                    temp_overhead, --:10:11:12Overhead percent * totalcost,
+										temp_TotalAmount,
+                    0,--:13:14:15tempEmplyActualCost,
+                    0,--:16:17:18tempEmplyStdcost,
+										temp_AmountRemaining
+									);
+          EXCEPTION
+          WHEN OTHERS THEN
+            ROLLBACK WORK;
+            raise_application_error(SQLCODE, SQLERRM);
+        END;
+
+        end loop;
+      END LOOP ;
+    END;
+  END;
+ELSE
+  BEGIN
+    insert into ppa_wip_values (id,
+	 			 						transno,
+										currency_type,
+										currency_code,
+										RATE_CURRENCY_CODE,
+										cost_CURRENCY_CODE,
+										/* added */
+										STDCOST_CURRENCY_CODE,
+										/* added */
+										rate_exchange_rate,
+										RATE_EXCHANGE_id,
+										cost_exchange_rate,
+										cost_EXCHANGE_id,
+										natural_billrate,
+                    BillRate,
+										amount,
+                    Price,
+                    FactorAmount,
+                    Burden,
+                    overhead,
+                    TotalAmount,
+										natural_actualcost,
+                    ActualCost,
+										natural_stdcost,
+                    StdCost,
+                    totalCost,
+                    EmplyActualCost,
+										EmplyStdcost,
+										AmountRemaining
+                   )
+                   (select PPA_WIP_VALUES_S1.NEXTVAL,
+										w.TRANSNO,
+										X.currency_type,
+										X.currency_code,
+										x.RATE_CURRENCY_CODE,
+										x.actcost_CURRENCY_CODE,
+										/* added */
+										x.STDCOST_CURRENCY_CODE,
+										/* added */
+										X.rate_exchange_rate,
+										x.RATE_EXCHANGE_id,
+										X.cost_exchange_rate,
+										x.cost_EXCHANGE_id,
+										x.natural_billrate,
+										X.BillRate ,
+										x.amount,
+										X.Price ,
+                    X.FactorAmount,
+                    X.Burden,
+                    X.overhead,
+                    X.TotalAmount,
+										x.natural_actualcost,
+                    X.ActualCost,
+										x.natural_stdcost,
+                    X.StdCost,
+                    X.totalCost,
+                    X.EmplyActualCost,
+                    X.EmplyStdcost,
+                    round(T.Chargeable * SIGN(ABS(ASCII(T.ProjectType) - 73)) * (X.TotalAmount), CURRENCY_PRECISION) "AmountRemaining"
+               from ppa_transcontrol_values X,
+                    ppa_TransControl T,
+                    PPA_TRANSCONTROLAPINFO TINFO,
+                    ppa_wip w, CMN_CURRENCIES c
+              WHERE X.TRANSNO = T.TRANSNO
+				 --and w.EXTERNALTRANSNO = t.TRANSNO
+                and w.WORKINT = t.TRANSNO
+                and w.WORKINT_SOURCE = 'PPA_TRANSCONTROL'
+                and T.TransNo = NVL(p_transno, T.TransNo)
+                and TRUNC(T.TransDate) &gt;= TRUNC(datef)
+                and TRUNC(T.TransDate) &lt;= TRUNC(datet)
+                AND PAC_FOS_IS_VALID_LOCATION_FCT(batchuser, t.locationid) = 1
+                and (RTRIM(T.COMPANY_CODE) = RTRIM(NVL(cCOMPANY_CODE, T.COMPANY_CODE)) OR RTRIM(T.COMPANY_CODE) IS NULL)
+                and RTRIM(T.PROJECT_CODE) = RTRIM(NVL(cProject,T.PROJECT_CODE))
+                and RTRIM(T.RESOURCE_CODE) = RTRIM(NVL(cResource_Code,T.RESOURCE_CODE))
+                and RTRIM(T.LocationID) = RTRIM(NVL(cLocationID,T.LocationID))
+                and NVL(T.ExternalBatchID, ' ') = NVL(cExternalBatchID,NVL(T.ExternalBatchID, ' '))
+                and T.TransType  IN (labor, material, equipment, expense)
+                and T.SourceModule != iSourceModuleExclude
+               AND c.CURRENCY_CODE = X.currency_code
+		 AND T.PPA_TRANSCONTROLAPINFO_ID = TINFO.ID(+)
+		 AND NVL(TINFO.INCURRED_BY, ' ') = NVL( cIncurredBy, NVL( TINFO.INCURRED_BY, ' ') ) );
+
+                  StoO_rowcnt_wipvalues := SQL%ROWCOUNT;                 
+                  IF NVL(stoo_rowcnt_wipvalues, 0) != 0 THEN  --protect against zeror division
+                    IF (stoo_rowcnt_wip != stoo_rowcnt_wipvalues / 5) THEN
+                      raise_application_error
+                             (-20669,
+                              'Error inserting matching records'
+                             );
+                    END IF;
+                  ELSIF (NVL(stoo_rowcnt_wip, 0)!= 0) THEN
+                    raise_application_error
+                           (-20669,
+                            'Error inserting matching records'
+                           );
+                  END IF;
+                 /* 11/16/2001 Removing OR condition for POC for performance. We do not need POC any longer */
+                 /* OR SUBSTR(T.ExternalBatchID, 1, 3) = poc */
+        		EXCEPTION
+			    WHEN OTHERS THEN
+				ROLLBACK WORK;
+				raise_application_error(SQLCODE, SQLERRM);
+      END;
+    END IF;
+/*checkin end*/
+
+/*
+             Pac_Trn_Insert_Wip_Supp(iTypeOfPost, batchuser, p_transno, datef, datet,
+                                     cCOMPANY_CODE, cProject, clocationid, cExternalBatchID,
+                                     labor, material, equipment, expense,
+                                     iSourceModuleExclude, poc, iBatchNo);
+*/
+
+			 END;
+     END IF;
+
+     BEGIN
+				-- all the transactions other than Niku Time has to be posted to the project side, to do this
+				-- insert the transactions into the interface table
+
+          FOR V_TRANSACTION IN GET_TRANSACTION_INFO
+          LOOP
+            -- checking if total_cost_in_project_currecy is null
+            IF V_TRANSACTION.TOTAL_COST_IN_PRJ_CURR IS NOT NULL THEN
+            BEGIN
+					INSERT INTO PAC_IMP_ACTUALS_EXPORT(
+		           		   ID,
+						   TASK_ID,
+						   RESOURCE_ID,
+						   TRANSNO,
+						   TRANSACTION_DATE,
+						   QUANTITY,
+                 AMOUNT,
+                 TOT_COST_PRJ_CURR
+                  ) VALUES (V_TRANSACTION.ID , V_TRANSACTION.TASK_ID , V_TRANSACTION.RESOURCE_ID , V_TRANSACTION.TRANS_NO , V_TRANSACTION.TRANS_DATE , V_TRANSACTION.QUANTITY , V_TRANSACTION.AMOUNT , V_TRANSACTION.TOTAL_COST_IN_PRJ_CURR );
+		        END;
+		        ELSE
+		        -- if total_cost_in_project_currecy is null it means there is no proper exchange rate defined.
+		        -- in order to through an exception
+		        BEGIN
+              RAISE IS_NULL_EXCEPTION;
+		        END;
+		        END IF;
+
+          END LOOP;
+
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+						    null;
+						WHEN IS_NULL_EXCEPTION THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+							ROLLBACK WORK;
+							raise_application_error(-20100, 'No exchange rate found.' || StoO_errmsg );
+							RETURN ;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+							ROLLBACK WORK;
+							raise_application_error(-20255, 'Error inserting into PAC_IMP_ACTUALS_EXPORT!' || StoO_errmsg );
+							RETURN ;
+				END;
+			END;
+		ELSE
+      		RAISE_APPLICATION_ERROR(-29999, 'This code path should never get executed');
+		END IF;
+		iRowsPosted :=  StoO_rowcnt;
+		iError :=  StoO_error;
+		IF  iError != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20255, '3) Error inserting into ppa_WIP!' || StoO_errmsg  );
+			RETURN ;
+		END;
+		END IF;
+
+    IF p_transno &gt; 0 THEN
+			SELECT S_54_1_PPA_WIP.currval INTO p_transno FROM dual;
+		END IF;
+
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      INSERT INTO ppa_WIPPostWork (ProcessID, TCTransNo, WIPTransNo)
+      SELECT V_SPID, WorkInt, TransNo
+        FROM ppa_WIP
+        WHERE BatchNo = iBatchNo
+          AND workint_source = 'PPA_TRANSCONTROL';
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error != 0 THEN
+      BEGIN
+		    ROLLBACK WORK;
+        raise_application_error(-20256, 'Error inserting into WorkTable!');
+        RETURN;
+      END;
+		END IF;
+
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      INSERT INTO ppa_WIPAPInfo (ID, VENDOR_CODE, VoucherNo, PONo, DOCUMENT_TYPE, INCURRED_BY, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+      SELECT A.ID, A.VENDOR_CODE, A.VoucherNo, A.PONo, A.DOCUMENT_TYPE, A.INCURRED_BY, A.CREATED_DATE, A.CREATED_BY, A.LAST_UPDATED_DATE, A.LAST_UPDATED_BY
+        FROM ppa_TransControlAPInfo A
+       WHERE A.id in ( select distinct W.PPA_WIPAPINFO_ID
+                         from ppa_wip W, ppa_WIPPostWork WP
+                        where WP.ProcessID = V_SPID
+                          AND W.transno = WP.WIPTransNo
+                     )
+			AND A.ID NOT IN (SELECT ID FROM PPA_WIPAPINFO);
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          ROLLBACK WORK;
+          raise_application_error(-20257, 'Error inserting ppa_WIPAPInfo records!');
+          RETURN;
+        END;
+      END IF;
+
+/*
+		OPEN UF1_cursor;
+		LOOP
+			FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2;
+			EXIT WHEN UF1_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE apdetails D
+			SET
+			transactionno = UF1_oval1,
+			transource = UF1_oval2
+			WHERE ROWID = UF1_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF1_cursor;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20258, 'Error updating apdetails!');
+			RETURN ;
+		END;
+		END IF;
+		OPEN UF2_cursor;
+		LOOP
+			FETCH UF2_cursor INTO UF2_rowid, UF2_oval1, UF2_oval2;
+			EXIT WHEN UF2_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE apdetailsaccts A
+			SET
+			transactionno = UF2_oval1,
+			transource = UF2_oval2
+			WHERE ROWID = UF2_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF2_cursor;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20259, 'Error updating apdetailsaccts!');
+			RETURN ;
+		END;
+		END IF;
+*/
+		
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+    UPDATE ppa_WIP
+       SET ApplyTo = TransNo
+     WHERE BatchNo = iBatchNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20261, 'Error updating WIP ApplyTo numbers!');
+			RETURN ;
+		END;
+		END IF;
+
+      /* setting ACTUALS_OUT_OF_DATE flag to 1 for re-populating actuals when accessing from costplans */
+      UPDATE FIN_PLANS
+       SET ACTUALS_OUT_OF_DATE = 1
+       WHERE OBJECT_ID IN (SELECT DISTINCT W.INVESTMENT_ID FROM PPA_WIP W, ppa_TransControl T
+                           WHERE W.workint_source = 'PPA_TRANSCONTROL'
+                           and W.workint = T.TRANSNO);
+
+      /* setting ACTUALS_OUT_OF_DATE flag to 1 for re-populating investment actuals when running sync job */
+      UPDATE FIN_FINANCIALS
+       SET ACTUALS_OUT_OF_DATE = 1
+       WHERE ID IN (SELECT DISTINCT F.ID FROM PPA_WIP W, ppa_TransControl T, FIN_FINANCIALS F, odf_object_instance_mapping M
+                           WHERE W.workint_source = 'PPA_TRANSCONTROL'
+                           and M.primary_object_instance_id = W.INVESTMENT_ID
+                           and F.id = M.secondary_object_instance_id
+                           and W.workint = T.TRANSNO);
+
+
+    /*checkin start delete corresponding transactions in transcontrol_values*/
+    BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      DELETE from ppa_TransControl_values
+       WHERE TRANSNO IN (SELECT workint FROM PPA_WIP WHERE workint_source = 'PPA_TRANSCONTROL');
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+		END;
+
+    IF StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+      raise_application_error(-20263, 'Error deleting TransControl_values records!  StoO_errmsg'|| StoO_errmsg);
+      RETURN;
+		END;
+		END IF;
+
+		/*checkin end*/
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE  ppa_TransControl
+			WHERE transno IN
+			(SELECT workint from ppa_wip WHERE workint_source = 'PPA_TRANSCONTROL');
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+  END;
+  
+  BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+    DELETE ppa_TransControlAPInfo
+			WHERE ROWID IN
+      (SELECT A.ROWID FROM ppa_TransControlAPInfo A
+      WHERE A.id in ( select distinct W.PPA_WIPAPINFO_ID
+                        from ppa_wip W, ppa_WIPPostWork WP
+                       where WP.ProcessID = V_SPID AND
+                             W.transno = WP.WIPTransNo
+							  )
+	  AND  A.ID NOT IN (SELECT PPA_TRANSCONTROLAPINFO_ID FROM PPA_TRANSCONTROL WHERE PPA_TRANSCONTROLAPINFO_ID is not null)
+			);
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20260, 'Error deleting TransControlAPInfo records!');
+			RETURN ;
+		END;
+		END IF;
+
+  IF StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+      raise_application_error(-20262, 'Error deleting TransControl records!');
+      RETURN;
+		END;
+  END IF;
+
+/*
+    BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE  batchheader
+			WHERE batchheader.endcycledate &lt;= SYSDATE
+			 and
+			NOT EXISTS (
+		SELECT  1
+			 FROM ppa_TransControl
+			WHERE ppa_TransControl.ExternalBatchID = batchheader.batchid );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			raise_application_error(-20263, 'Error deleting batchheader records!');
+			RETURN ;
+		END;
+		END IF;
+*/
+
+		BEGIN
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      DELETE FROM ppa_WIPPostWork
+       WHERE ProcessID = V_SPID;
+
+      StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          ROLLBACK WORK;
+          raise_application_error(SQLCODE, SQLERRM);
+		END;
+
+    COMMIT WORK;
+
+    IF NVL(p_transno, 0) = 0 THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+		END IF;
+END PAC_PRC_POSTTOWIPS_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

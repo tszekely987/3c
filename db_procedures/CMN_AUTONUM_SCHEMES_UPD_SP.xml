@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_AUTONUM_SCHEMES_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_AUTONUM_SCHEMES_UPD_SP" (
+   P_ID        IN NUMBER,
+   P_NAME      IN VARCHAR2,
+   P_IS_ACTIVE IN INTEGER
+)
+IS
+   CURSOR c_segments_update
+   IS
+      SELECT   SEG.ID,
+               SEG.SEGMENT_CODE,
+               SEG.LENGTH,
+               SEG.NEXT_VALUE,
+               SEG.TEXT_VALUE
+      FROM     CMN_AUTONUM_SCHEMES SCH,
+               CMN_AUTONUM_SCHEME_SEGMENTS SEG
+      WHERE    SCH.ID = SEG.SCHEME_ID
+	  AND      SCH.ID = P_ID
+      ORDER BY SEG.POSITION;
+
+   V_NEW_NEXT_ID    VARCHAR2 (240);
+   V_SEG_ID         NUMBER;
+   V_SEG_CODE       VARCHAR2 (40);
+   V_SEG_LENGTH     INTEGER;
+   V_SEG_NEXT_VALUE NUMBER;
+   V_SEG_TEXT_VALUE VARCHAR2 (80);
+   V_NAME           VARCHAR2 (80);
+   V_IS_ACTIVE      INTEGER;
+BEGIN
+
+   IF P_ID IS NULL
+   THEN
+      RETURN;
+   END IF;
+
+   -- Get scheme name and active flag if they are not specified
+   IF P_NAME IS NULL
+   THEN
+      SELECT NAME
+      INTO   V_NAME
+      FROM   CMN_AUTONUM_SCHEMES
+      WHERE  ID = P_ID;
+
+      SELECT IS_ACTIVE
+      INTO   V_IS_ACTIVE
+      FROM   CMN_AUTONUM_SCHEMES
+      WHERE  ID = P_ID;
+   ELSE
+      V_NAME      := P_NAME;
+      V_IS_ACTIVE := P_IS_ACTIVE;
+   END IF;
+
+   -- Calculate the new next id for this scheme
+   OPEN c_segments_update;
+   FETCH c_segments_update INTO V_SEG_ID, V_SEG_CODE, V_SEG_LENGTH,
+                         V_SEG_NEXT_VALUE, V_SEG_TEXT_VALUE;
+   WHILE (c_segments_update%FOUND)
+   LOOP
+      IF V_SEG_CODE IN ('TEXT', 'CREATE_DATE', 'PARENT_REF')
+      THEN
+         V_NEW_NEXT_ID := V_NEW_NEXT_ID || V_SEG_TEXT_VALUE;
+      ELSE
+         IF V_SEG_CODE = 'NUMERIC'
+         THEN
+            V_SEG_TEXT_VALUE := V_SEG_NEXT_VALUE;
+         ELSE
+            -- Convert numeric value to alphanumeric value
+            V_SEG_TEXT_VALUE := CMN_AUTONUM_TO_ALPHANUM_FCT(V_SEG_NEXT_VALUE);
+         END IF;
+
+        V_SEG_TEXT_VALUE := LPAD(V_SEG_TEXT_VALUE,V_SEG_LENGTH,'0');
+
+         V_NEW_NEXT_ID := V_NEW_NEXT_ID || V_SEG_TEXT_VALUE;
+      END IF;
+
+      -- Process next segment
+      FETCH c_segments_update INTO V_SEG_ID, V_SEG_CODE, V_SEG_LENGTH,
+                            V_SEG_NEXT_VALUE, V_SEG_TEXT_VALUE;
+   END LOOP;
+   CLOSE c_segments_update;
+
+   -- Next Value cannot be NULL
+   IF V_NEW_NEXT_ID IS NULL
+   THEN
+      V_NEW_NEXT_ID := ' ';
+   END IF;
+
+   -- Now, update the new next id for this scheme
+   UPDATE CMN_AUTONUM_SCHEMES
+   SET    NAME              = V_NAME,
+          IS_ACTIVE         = V_IS_ACTIVE,
+          NEXT_VALUE        = V_NEW_NEXT_ID,
+          LAST_UPDATED_DATE = SYSDATE
+   WHERE  ID                = P_ID;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

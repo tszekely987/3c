@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="COP_PORTLET_TIMESHEET_PERIOD" displayAttributeName="timeperiod" hiddenAttributeName="prid" objectCode="" sortAttributeName="timeperiod" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Portlet Timesheet Period Browse" languageCode="en" name="Portlet Timesheet Period Browse"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[SELECT @SELECT:TP.PRID:PRID@,
+       @SELECT:TP.PRUID:UNIQUE_CODE@,
+       @SELECT:TP.PRSTART:PRSTART@,
+       @SELECT:TP.PRFINISH-1:PRFINISH@,
+       @SELECT:CONVERT(CHAR(10),TP.PRSTART,120) + ' - ' + CONVERT(CHAR(10),TP.PRFINISH-1,120):TIMEPERIOD@
+FROM   PRTIMEPERIOD TP
+WHERE (@WHERE:PARAM:USER_DEF:DATE:START_DATE@ IS NULL OR TP.PRSTART >= @WHERE:PARAM:USER_DEF:DATE:START_DATE@)
+AND   (@WHERE:PARAM:USER_DEF:DATE:END_DATE@ IS NULL OR TP.PRFINISH <= @WHERE:PARAM:USER_DEF:DATE:END_DATE@)
+AND    @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT @SELECT:TP.PRID:PRID@,
+       @SELECT:TP.PRUID:UNIQUE_CODE@,
+       @SELECT:TP.PRSTART:PRSTART@,
+       @SELECT:TP.PRFINISH-1:PRFINISH@,
+       @SELECT:TO_CHAR(TP.PRSTART, 'YYYY-MM-DD') @+@ ' - ' @+@ TO_CHAR((TP.PRFINISH-1), 'YYYY-MM-DD'):TIMEPERIOD@
+FROM   PRTIMEPERIOD TP
+WHERE (@WHERE:PARAM:USER_DEF:DATE:START_DATE@ IS NULL OR TP.PRSTART >= @WHERE:PARAM:USER_DEF:DATE:START_DATE@)
+AND   (@WHERE:PARAM:USER_DEF:DATE:END_DATE@ IS NULL OR TP.PRFINISH <= @WHERE:PARAM:USER_DEF:DATE:END_DATE@)
+AND    @FILTER@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT @SELECT:TP.PRID:PRID@,
+       @SELECT:TP.PRUID:UNIQUE_CODE@,
+       @SELECT:TP.PRSTART:PRSTART@,
+       @SELECT:TP.PRFINISH - cast('1 days' as interval):PRFINISH@,
+       @SELECT:TO_CHAR(TP.PRSTART, 'YYYY-MM-DD') @+@ ' - ' @+@ TO_CHAR((TP.PRFINISH - cast('1 days' as interval)), 'YYYY-MM-DD'):TIMEPERIOD@
+FROM   PRTIMEPERIOD TP
+WHERE (TP.PRSTART >= @WHERE:PARAM:USER_DEF:DATE:START_DATE@ OR @WHERE:PARAM:USER_DEF:DATE:START_DATE@@CASTAS@date IS  NULL)
+AND   (TP.PRFINISH <= @WHERE:PARAM:USER_DEF:DATE:END_DATE@ OR @WHERE:PARAM:USER_DEF:DATE:END_DATE@@CASTAS@date IS  NULL)
+AND    @FILTER@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="timeperiod"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="timeperiod"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select a Time Period"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Select Time Periods"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="param_end_date" defaultValue="" order="2" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Finish Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="param_start_date" defaultValue="" order="1" widgetType="datepicker">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Start Date"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="1" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="prid"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="timeperiod" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="Time Period"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

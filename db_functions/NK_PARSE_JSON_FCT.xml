@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_PARSE_JSON_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_PARSE_JSON_FCT" ( P_CURVE IN CLOB )
+RETURN NK_CURVE
+IS
+  V_OUTPUT_CURVE NK_CURVE;
+  V_SEGMENT NK_SEGMENT;
+  V_EXCEPTION NK_EXCEPTION;
+  V_SHIFT NK_SHIFT;
+  l_curve_object json_object_t;
+  l_segments_arr json_array_t;
+  l_segment_object json_object_t;
+  l_arr json_array_t;
+  l_shifts_arr json_array_t;
+  l_object json_object_t;
+
+BEGIN
+
+  V_OUTPUT_CURVE := NK_CURVE(2,0,0,null);
+  if(p_curve IS null) THEN
+    RETURN v_output_curve;
+  END IF;
+
+  -- parse the curve
+  l_curve_object := json_object_t.parse(p_curve);
+  V_OUTPUT_CURVE.curve_type := l_curve_object.get_number('curve_type');
+  V_OUTPUT_CURVE.curve_sum := l_curve_object.get_number('curve_sum');
+  V_OUTPUT_CURVE.default_rate := l_curve_object.get_number('default_rate');
+
+  -- iterate through the segments
+  l_segments_arr := l_curve_object.get_array('segments');
+  if(l_segments_arr IS NOT NULL) THEN
+    V_OUTPUT_CURVE.SEGMENTS := NK_SEGMENTS();
+	FOR i IN 0 .. l_segments_arr.get_size - 1 LOOP
+	  l_segment_object := TREAT(l_segments_arr.get(i) AS JSON_OBJECT_T);
+
+      -- create and populate the segment
+      V_SEGMENT := NK_SEGMENT(0,0,0,0,0,0,null,null,null);
+      V_SEGMENT.SEGMENT_START := l_segment_object.get_number('segment_start');
+      V_SEGMENT.SEGMENT_FINISH := l_segment_object.get_number('segment_finish');
+      V_SEGMENT.START_TOD := l_segment_object.get_number('start_tod');
+      V_SEGMENT.FINISH_TOD := l_segment_object.get_number('finish_tod');
+      V_SEGMENT.RATE := l_segment_object.get_number('rate');
+      V_SEGMENT.SEGMENT_SUM := l_segment_object.get_number('segment_sum');
+
+      -- iterate through work week totals if present
+      l_arr := l_segment_object.get_array('work_week_totals');
+      if(l_arr IS NOT null) THEN
+        V_SEGMENT.WORK_WEEK_TOTALS := NK_WORK_WEEK_TOTALS(0,0,0,0,0,0,0);
+        FOR j IN 0 .. l_arr.get_size - 1 LOOP
+          V_SEGMENT.WORK_WEEK_TOTALS(j+1) := l_arr.get_number(j);
+        END LOOP;
+      END IF;
+
+      -- iterate through exceptions if present
+      l_arr := l_segment_object.get_array('exceptions');
+      if(l_arr IS NOT null) THEN
+        V_SEGMENT.EXCEPTIONS := NK_EXCEPTIONS();
+        --dbms_output.put_line('excp'|| l_excp_arr.stringify);
+        FOR j IN 0 .. l_arr.get_size - 1 LOOP
+          l_object := TREAT(l_arr.get(j) AS JSON_OBJECT_T);
+          V_EXCEPTION := NK_EXCEPTION(0,0,0,null);
+          V_EXCEPTION.START_DATE := l_object.get_number('start_date');
+          V_EXCEPTION.FINISH_DATE := l_object.get_number('finish_date');
+          V_EXCEPTION.TOTAL := l_object.get_number('total');
+
+          -- handle shifts here
+          l_shifts_arr := l_object.get_array('shifts');
+          IF(l_shifts_arr IS NOT NULL) THEN
+            V_EXCEPTION.SHIFTS := NK_SHIFTS();
+            FOR k IN 0 .. l_shifts_arr.get_size - 1 LOOP
+              l_object := TREAT(l_shifts_arr.get(k) AS JSON_OBJECT_T);
+              V_SHIFT := NK_SHIFT(0,0,0);
+              V_SHIFT.DAY_OF_WEEK := 0;
+              V_SHIFT.START_TOD := l_object.get_number('start_tod');
+              V_SHIFT.FINISH_TOD := l_object.get_number('finish_tod');
+              V_EXCEPTION.SHIFTS.EXTEND(1);
+              V_EXCEPTION.SHIFTS(k+1) := V_SHIFT;
+            END LOOP;
+          END IF;
+
+          V_SEGMENT.EXCEPTIONS.EXTEND(1);
+          V_SEGMENT.EXCEPTIONS(j+1) := V_EXCEPTION;
+        END LOOP;
+      END IF;
+
+      -- iterate through shifts if present
+      l_arr := l_segment_object.get_array('shifts');
+      if(l_arr IS NOT null) then
+        V_SEGMENT.SHIFTS := NK_SHIFTS();
+        FOR j IN 0 .. l_arr.get_size - 1 LOOP
+          l_object := TREAT(l_arr.get(j) AS JSON_OBJECT_T);
+          V_SHIFT := NK_SHIFT(0,0,0);
+          V_SHIFT.DAY_OF_WEEK := l_object.get_number('day_of_week');
+          V_SHIFT.START_TOD := l_object.get_number('start_tod');
+          V_SHIFT.FINISH_TOD := l_object.get_number('finish_tod');
+          V_SEGMENT.SHIFTS.EXTEND(1);
+          V_SEGMENT.SHIFTS(j+1) := V_SHIFT;
+        END LOOP;
+      END IF;
+
+      -- add the segment
+      V_OUTPUT_CURVE.SEGMENTS.EXTEND(1);
+      V_OUTPUT_CURVE.SEGMENTS(i+1) := V_SEGMENT;
+
+    END LOOP;
+
+  END IF;
+  RETURN v_output_curve;
+-- safety check ... if anything goes wrong just return an empty curve
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NK_CURVE(2,0,0,null);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

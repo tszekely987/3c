@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PC_BILLINGDETAILALLOCATION</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PC_BILLINGDETAILALLOCATION" (
+cUserID 	VARCHAR2 ,
+iBillSessionKey 	NUMBER ,
+cCOMPANY_CODE 	VARCHAR2 ,
+cPROJECT_CODE 	VARCHAR2 ,
+cTransType 	VARCHAR2 ,
+nBillAmount 	NUMBER ,
+nAdjAmount 	NUMBER ,
+nAmtRemaining NUMBER,
+cBillFlags 	VARCHAR2  DEFAULT 'N')
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+nAmountFactor 	NUMBER;
+nAmount 	NUMBER;
+nAllocBillAmt 	NUMBER;
+nAllocAdjAmt 	NUMBER;
+nCurrentAmountRemaining NUMBER;
+nTotalAmountRemaining	NUMBER := 0;
+iCount 	NUMBER;
+iNegatives 	NUMBER := 0;
+iLup  NUMBER;
+iMinSeq		INTEGER;
+dCutoffDate 	DATE;
+dFromDate 		DATE;
+bApprove		INTEGER;
+iRowID			ROWID;
+
+CURSOR BillingDetailAlloc_cursor IS
+  SELECT ROWID, AMTREMAIN
+   FROM TEMP_BILLINGDETAILALLOC
+	 WHERE SIGN( AmtRemain ) = SIGN( nAmtRemaining )
+	 ORDER BY TRANSDATE,
+	 	   	  RESOURCE_CODE
+	FOR UPDATE OF SEQNO;
+
+BEGIN
+	NULL;
+	 IF nAmtRemaining &lt; 0 THEN 
+	 	iNegatives := 1;
+	 END IF;  
+	/*[SPCONV-ERR(21)]:(set NOCOUNT) Manual conversion required*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   CutoffDate,
+				 FROMDATE
+		INTO pc_BillingDetailAllocation.dCutoffDate,
+			 pc_BillingDetailAllocation.dFromDate
+		FROM pc_BillingSession
+		WHERE BillingSessionKey = pc_BillingDetailAllocation.iBillSessionKey;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   SUM(BillAmount),  SUM(AdjustAmount),  COUNT(*)
+		INTO pc_BillingDetailAllocation.nAllocBillAmt, pc_BillingDetailAllocation.nAllocAdjAmt, pc_BillingDetailAllocation.iCount FROM pc_BillingDetailAllocations
+		WHERE BillingSessionKey = pc_BillingDetailAllocation.iBillSessionKey
+		 and TransType = pc_BillingDetailAllocation.cTransType
+		 and COMPANY_CODE = pc_BillingDetailAllocation.cCOMPANY_CODE
+		 and PROJECT_CODE = pc_BillingDetailAllocation.cPROJECT_CODE
+		 and SIGN( AmountRemaining ) = SIGN( nAmtRemaining ) ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  pc_BillingDetailAllocation.iCount &gt; 0 THEN
+	BEGIN
+		IF  NVL(pc_BillingDetailAllocation.nAllocBillAmt, 0) = pc_BillingDetailAllocation.nBillAmount AND   NVL(pc_BillingDetailAllocation.nAllocAdjAmt, 0) = pc_BillingDetailAllocation.nAdjAmount THEN
+			RETURN ;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE FROM pc_BillingDetailAllocations
+			WHERE BillingSessionKey = pc_BillingDetailAllocation.iBillSessionKey
+			 and TransType = pc_BillingDetailAllocation.cTransType
+			 and COMPANY_CODE = pc_BillingDetailAllocation.cCOMPANY_CODE
+			 and PROJECT_CODE = pc_BillingDetailAllocation.cPROJECT_CODE
+			 and SIGN( AmountRemaining ) = SIGN( nAmtRemaining );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END IF;
+	IF  pc_BillingDetailAllocation.nBillAmount = 0 AND   pc_BillingDetailAllocation.nAdjAmount = 0 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		/* MC Changes
+		 * Changed the where condition from PPA_WIP.AMOUNTREMAINING TO PPA_WIP_VALUES.AMOUNTREMAINING while checking for &gt; 0  and even all the amount fields
+		 * are from values table instead of master table.
+		 */
+		INSERT INTO pc_BillingDetailAllocations (BillingSessionKey, TransType, TransNo, TotalAmount, Quantity, Rate, AmountRemaining, BillAmount, AdjustAmount, BillFlags, ProjectType, COMPANY_CODE, PROJECT_CODE)
+		SELECT  pc_BillingDetailAllocation.iBillSessionKey, pc_BillingDetailAllocation.cTransType,
+			   W.TransNo, WV.TotalAmount, W.Quantity, WV.BillRate, WV.AmountRemaining,
+			   0, 0, pc_BillingDetailAllocation.cBillFlags, W.ProjectType, pc_BillingDetailAllocation.cCOMPANY_CODE,
+			   pc_BillingDetailAllocation.cPROJECT_CODE
+			 FROM ppa_WIP W,
+			      PPA_WIP_VALUES WV
+			WHERE WV.TRANSNO = W.TRANSNO
+           	 AND WV.CURRENCY_TYPE = 'BILLING'
+			 AND W.COMPANY_CODE = pc_BillingDetailAllocation.cCOMPANY_CODE
+			 and W.PROJECT_CODE = pc_BillingDetailAllocation.cPROJECT_CODE
+			 and W.TransType = pc_BillingDetailAllocation.cTransType
+			 and WV.AMOUNTREMAINING != 0
+--			 and SIGN( WV.AMOUNTREMAINING ) = SIGN( nAmtRemaining )
+			 and W.TransDate BETWEEN NVL( pc_BillingDetailAllocation.dFromDate, W.TransDate) AND
+			 						 NVL( pc_BillingDetailAllocation.dCutoffDate, W.TransDate)
+ 			 and W.Status = 0
+			 and W.Chargeable = 1;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END;
+	ELSE
+	BEGIN
+--deleted idt1
+
+		/*[SPCONV-ERR(102)]:CREATE TABLE TEMP_BILLINGDETAILALLOC statement passed to ddl file*/
+		DELETE FROM TEMP_BILLINGDETAILALLOC ;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		/* MC Changes
+		 * Changed the where condition from PPA_WIP.AMOUNTREMAINING TO PPA_WIP_VALUES.AMOUNTREMAINING while checking for &gt; 0  and even all the amount fields
+		 * are from values table instead of master table.
+		 */
+		INSERT INTO TEMP_BILLINGDETAILALLOC (SEQNO, TransNo, TotalAmount, Quantity, Rate, AmtRemain, BillAmount, AdjAmount, RunningTotal, ProjectType, COMPANY_CODE, PROJECT_CODE, TransDate, RESOURCE_CODE)
+		 SELECT  0, W.TransNo, WV.TotalAmount, W.Quantity, WV.BillRate, WV.AmountRemaining,
+			   0, 0, 0, W.ProjectType, pc_BillingDetailAllocation.cCOMPANY_CODE, pc_BillingDetailAllocation.cPROJECT_CODE,
+			   W.TransDate, W.RESOURCE_CODE
+			 FROM ppa_WIP W,
+			      PPA_WIP_VALUES WV
+			WHERE WV.TRANSNO = W.TRANSNO
+           	 AND WV.CURRENCY_TYPE = 'BILLING'
+			 AND W.COMPANY_CODE = pc_BillingDetailAllocation.cCOMPANY_CODE
+			 and W.PROJECT_CODE = pc_BillingDetailAllocation.cPROJECT_CODE
+			 and W.TransType = pc_BillingDetailAllocation.cTransType
+			 and WV.AMOUNTREMAINING != 0
+--			 and SIGN( WV.AMOUNTREMAINING ) = SIGN( nAmtRemaining )
+			 and W.Status = 0
+ 			 and W.TransDate BETWEEN NVL( pc_BillingDetailAllocation.dFromDate, W.TransDate) AND
+							 		 NVL( pc_BillingDetailAllocation.dCutoffDate, W.TransDate)
+ 			 and W.Chargeable = 1 ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+
+		OPEN BillingDetailAlloc_cursor;
+		LOOP
+      FETCH BillingDetailAlloc_cursor INTO iRowID, nCurrentAmountRemaining ;
+      EXIT WHEN BillingDetailAlloc_cursor%NOTFOUND;
+
+      nTotalAmountRemaining := nTotalAmountRemaining + NVL( nCurrentAmountRemaining, 0);
+
+      BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE TEMP_BILLINGDETAILALLOC
+				SET SEQNO = temp_temppc_BillingDetailA_SEQ.nextval
+			WHERE ROWID = iRowID;
+
+			StoO_rowcnt := SQL%ROWCOUNT;
+
+			EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+
+      /* Big Time performance help here to only look at the rows which are needed.
+			   Can't do it when negatives involved since we won't know where we are with our totals */
+			IF iNegatives = 0 Then
+			  IF nTotalAmountRemaining &gt; pc_BillingDetailAllocation.nBillAmount + ABS( pc_BillingDetailAllocation.nAdjAmount ) Then
+			    EXIT;
+			  End If;
+			Else
+			  IF nTotalAmountRemaining &lt; pc_BillingDetailAllocation.nBillAmount - ABS( pc_BillingDetailAllocation.nAdjAmount ) Then
+			    EXIT;
+			  End If;
+			End If;
+
+    END LOOP;
+		CLOSE BillingDetailAlloc_cursor;
+
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   COUNT(*)
+			INTO pc_BillingDetailAllocation.iCount
+			FROM TEMP_BILLINGDETAILALLOC
+			WHERE SEQNO &gt; 0;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		pc_BillingDetailAllocation.iLup :=  1;
+		pc_BillingDetailAllocation.iCount :=  NVL(pc_BillingDetailAllocation.iCount,
+		   0);
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE TEMP_BILLINGDETAILALLOC
+		SET RunningTotal = (SELECT NVL(SUM(T2.AmtRemain),0)
+		FROM TEMP_BILLINGDETAILALLOC T2
+		WHERE T2.SeqNo &lt;= TEMP_BILLINGDETAILALLOC.SeqNo AND
+		      T2.SeqNo &gt; 0 )
+		WHERE SeqNo &gt; 0 ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT MIN(SeqNo) INTO iMinSeq
+			  FROM TEMP_BILLINGDETAILALLOC
+			  WHERE SeqNo &gt; 0 ;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+
+		IF  pc_BillingDetailAllocation.nBillAmount != 0 THEN
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MAX(SeqNo)
+				INTO pc_BillingDetailAllocation.iLup
+				FROM TEMP_BILLINGDETAILALLOC
+				WHERE ABS(RunningTotal) &lt;= ABS(pc_BillingDetailAllocation.nBillAmount) AND
+				      SeqNo &gt; 0 ;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  NVL(pc_BillingDetailAllocation.iLup, 0) &gt; 0 THEN
+			BEGIN
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				UPDATE TEMP_BILLINGDETAILALLOC
+				SET BillAmount = AmtRemain
+				WHERE SeqNo &lt;= pc_BillingDetailAllocation.iLup AND
+				      SeqNo &gt; 0 ;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   RunningTotal
+					INTO pc_BillingDetailAllocation.nAmount FROM TEMP_BILLINGDETAILALLOC
+					WHERE SeqNo = pc_BillingDetailAllocation.iLup AND
+					      SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+
+				IF  ( pc_BillingDetailAllocation.iLup - iMinSeq + 1 ) &lt; pc_BillingDetailAllocation.iCount THEN
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET BillAmount = pc_BillingDetailAllocation.nBillAmount - pc_BillingDetailAllocation.nAmount
+					WHERE SeqNo = ( pc_BillingDetailAllocation.iLup + 1 ) AND
+					      SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				ELSE
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET BillAmount = BillAmount + ( pc_BillingDetailAllocation.nBillAmount
+					   - pc_BillingDetailAllocation.nAmount )
+					WHERE SeqNo = pc_BillingDetailAllocation.iLup AND
+					      SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+			END;
+			ELSE
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				UPDATE TEMP_BILLINGDETAILALLOC
+				SET BillAmount = pc_BillingDetailAllocation.nBillAmount
+				WHERE SeqNo = iMinSeq;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+			END IF;
+		END;
+		END IF;
+		IF  pc_BillingDetailAllocation.nAdjAmount != 0 THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE TEMP_BILLINGDETAILALLOC
+			SET RunningTotal = (SELECT NVL(SUM(T2.AmtRemain - T2.BillAmount),0)
+			    FROM TEMP_BILLINGDETAILALLOC T2
+			WHERE T2.SeqNo &lt;= TEMP_BILLINGDETAILALLOC.SeqNo AND
+			      SeqNo &gt; 0 )
+			WHERE SeqNo &gt; 0 ;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MAX(SeqNo)
+				INTO pc_BillingDetailAllocation.iLup
+				FROM TEMP_BILLINGDETAILALLOC
+				WHERE ABS(RunningTotal) &lt;= ABS(pc_BillingDetailAllocation.nAdjAmount) AND
+				      SeqNo &gt; 0 ;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			IF  NVL(pc_BillingDetailAllocation.iLup, 0) &gt; 0 THEN
+			BEGIN
+				IF  pc_BillingDetailAllocation.nAdjAmount &lt; 0 THEN
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET AdjAmount = AmtRemain - BillAmount
+					WHERE SeqNo &lt;= pc_BillingDetailAllocation.iLup
+					 and ABS(RunningTotal) &gt; 0
+					 and SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				ELSE
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET AdjAmount = BillAmount - AmtRemain
+					WHERE SeqNo &lt;= pc_BillingDetailAllocation.iLup
+					 and ABS(RunningTotal) &gt; 0
+					 and SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+				BEGIN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error  := 0;
+					SELECT   RunningTotal
+					INTO pc_BillingDetailAllocation.nAmount
+					FROM TEMP_BILLINGDETAILALLOC
+					WHERE SeqNo = pc_BillingDetailAllocation.iLup AND
+					      SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN TOO_MANY_ROWS THEN
+							StoO_rowcnt := 2;
+						WHEN NO_DATA_FOUND THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+						WHEN OTHERS THEN
+							StoO_rowcnt := 0;
+							StoO_selcnt := 0;
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+				END;
+				IF  ( pc_BillingDetailAllocation.iLup - iMinSeq + 1 ) &lt; pc_BillingDetailAllocation.iCount THEN
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET AdjAmount = AdjAmount + ( pc_BillingDetailAllocation.nAdjAmount
+					   + pc_BillingDetailAllocation.nAmount )
+					WHERE SeqNo = ( pc_BillingDetailAllocation.iLup + 1 );
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				ELSE
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET AdjAmount = AdjAmount + ( pc_BillingDetailAllocation.nAdjAmount
+					   + pc_BillingDetailAllocation.nAmount )
+					WHERE SeqNo = pc_BillingDetailAllocation.iLup;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+				IF  pc_BillingDetailAllocation.nAdjAmount &lt; 0 THEN
+					BEGIN
+					StoO_error   := 0;
+					StoO_rowcnt  := 0;
+					UPDATE TEMP_BILLINGDETAILALLOC
+					SET AdjAmount = 0 - AdjAmount
+					WHERE AdjAmount &gt; 0 AND
+					      SeqNo &gt; 0 ;
+					StoO_rowcnt := SQL%ROWCOUNT;
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+				END IF;
+			END;
+			ELSE
+				BEGIN
+				StoO_error   := 0;
+				StoO_rowcnt  := 0;
+				UPDATE TEMP_BILLINGDETAILALLOC
+				SET AdjAmount = pc_BillingDetailAllocation.nAdjAmount
+				WHERE SeqNo = iMinSeq;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN NO_DATA_FOUND THEN
+						NULL;
+					WHEN OTHERS THEN
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+				END;
+			END IF;
+		END;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO pc_BillingDetailAllocations (BillingSessionKey, TransType, TransNo, TotalAmount, Quantity, Rate, AmountRemaining, BillAmount, AdjustAmount, BillFlags, ProjectType, COMPANY_CODE, PROJECT_CODE)SELECT  pc_BillingDetailAllocation.iBillSessionKey, pc_BillingDetailAllocation.cTransType,
+			   TransNo, TotalAmount, Quantity, Rate, AmtRemain, BillAmount, AdjAmount,
+			   pc_BillingDetailAllocation.cBillFlags, ProjectType, COMPANY_CODE, PROJECT_CODE
+			 FROM TEMP_BILLINGDETAILALLOC
+			 WHERE TEMP_BILLINGDETAILALLOC.TransNo NOT IN (SELECT TransNo FROM pc_BillingDetailAllocations WHERE
+			 	   								   	   	  		  BillingSessionKey = pc_BillingDetailAllocation.iBillSessionKey );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		DELETE FROM TEMP_BILLINGDETAILALLOC;
+	END;
+	END IF;
+END pc_BillingDetailAllocation;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

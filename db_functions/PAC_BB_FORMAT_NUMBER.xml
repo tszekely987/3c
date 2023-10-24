@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_BB_FORMAT_NUMBER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_BB_FORMAT_NUMBER" 
+(
+  cValue    VARCHAR2,
+  cLanguage VARCHAR2
+)
+RETURN VARCHAR2
+IS
+  cRetValue  VARCHAR2(128);
+  cDecimal   CHAR(1);
+  cThousands CHAR(1);
+  iDecSepPos INT;
+  iThousPos  INT;
+BEGIN
+  -- if the # is all *'s, then there was an overflow so we should leave it alone
+  IF cValue = RTRIM(LPAD(' ', LENGTH(cValue), '*')) THEN
+    RETURN cValue;
+  END IF;
+
+  -- !!!!!!!!!!! how are Japanese numbers formatted???
+  SELECT DECODE(cLanguage, 'fr', ',', 'de', ',', 'es', ',', '.'),
+         DECODE(cLanguage, 'fr', '.', 'de', '.', 'es', '.', ',')
+    INTO cDecimal,
+         cThousands
+    FROM DUAL;
+
+  cRetValue := cValue;
+
+  -- Remove any leading 0's
+  WHILE SUBSTR(cRetValue, 1, 1) = '0'
+    LOOP
+      cRetValue := SUBSTR(cRetValue, 2, LENGTH(cRetValue) - 1);
+    END LOOP;
+
+  -- first determine the position of the decimal separator
+  --   and replace it with the appropriate separator (if necessary)
+  SELECT INSTR(cRetValue, '.', 1)
+    INTO iDecSepPos
+	FROM DUAL;
+
+  IF iDecSepPos &gt; 0 THEN
+    BEGIN
+      IF cDecimal != '.' THEN
+        cRetValue := CMN_REPLACE_FCT(cRetValue, iDecSepPos, 1, cDecimal);
+	  END IF;
+    END;
+  ELSE
+    BEGIN
+      SELECT INSTR(cRetValue, ',', 1)
+        INTO iDecSepPos
+		FROM DUAL;
+
+      IF iDecSepPos &gt; 0 AND cDecimal != ',' THEN
+        cRetValue := CMN_REPLACE_FCT(cRetValue, iDecSepPos, 1, cDecimal);
+	  END IF;
+    END;
+  END IF;
+
+  -- figure out where we need to start placing thousandths separators
+  IF iDecSepPos = 0 THEN
+    iThousPos := LENGTH(cRetValue) - 3;
+  ELSE
+    iThousPos := iDecSepPos - 3;
+  END IF;
+
+  -- put in the thousandths separators
+  WHILE iThousPos &gt; 1 AND SUBSTR(cRetValue, iThousPos, 1) != ' '
+    LOOP
+      cRetValue := CMN_REPLACE_FCT(cRetValue, iThousPos, 0, cThousands);
+
+      iThousPos := iThousPos - 3;
+    END LOOP;
+
+  -- return our nicely formatted number...
+  RETURN cRetValue;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

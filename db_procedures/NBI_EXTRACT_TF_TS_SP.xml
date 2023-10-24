@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_EXTRACT_TF_TS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_EXTRACT_TF_TS_SP" 
+AS
+   CURSOR C_PROJECTS
+   IS
+      /* Should look at is_active of NBI_PM_PTF, not at NBI_FM_PTF
+         because NBI_FM_PTF is processed first and if there is any
+         exception thrown then data may not have been updated in NBI_PM_PTF
+         for the projects that are updated in NBI_FM_PTF.
+      */
+      SELECT PROJECT_ID PROJECT_ID
+        FROM NBI_PROJECT_CURRENT_FACTS
+       WHERE IS_ACTIVE &lt;&gt; 0
+      UNION
+      SELECT nbi_projects.project_id project_id
+        FROM nbi_project_current_facts nbi_projects, nbi_pm_pt_facts nbi_pm_ptf,
+             nbi_dim_calendar_time t 
+       WHERE nbi_projects.project_id = nbi_pm_ptf.project_id
+         AND nbi_projects.is_active = 0
+         AND nbi_pm_ptf.is_active &lt;&gt; 0
+         AND nbi_pm_ptf.calendar_time_key = t.time_key
+         AND t.hierarchy_level = 'MONTH'
+         AND (nbi_pm_ptf.project_id, t.period_end_date) IN 
+                  (SELECT nbi_pm_ptf1.project_id project_id, MAX(t1.period_end_date) 
+                        FROM nbi_pm_pt_facts nbi_pm_ptf1, nbi_dim_calendar_time t1 
+                        WHERE nbi_pm_ptf1.calendar_time_key = t1.time_key AND t1.hierarchy_level = 'MONTH' 
+                        GROUP BY nbi_pm_ptf1.project_id)
+      UNION
+           SELECT PROJECT_ID PROJECT_ID
+             FROM NBI_PROJECT_CURRENT_FACTS NBI_PROJECTS
+            WHERE IS_ACTIVE = 0
+              AND NOT EXISTS (SELECT 'NOT EXISTS'
+                                FROM NBI_PM_PT_FACTS NBI_PM_PTF
+                               WHERE NBI_PROJECTS.PROJECT_ID =
+                                        NBI_PM_PTF.PROJECT_ID)
+       ORDER BY 1;
+
+   V_PERIODS_TO_ROLL_UP          INTEGER := 8;   /* Must be divisible by 4 */
+   V_LAST_CURVE_DATE             DATE;
+   V_EXTRACT_PM_TFS              INTEGER;
+   V_EXTRACT_FM_TFS              INTEGER;
+   V_EXTRACT_R_TFS               INTEGER;
+   V_STMT                        VARCHAR2(200);
+   V_CURRENT_PERIOD              VARCHAR2(100);
+   V_CURRENT_WEEK                VARCHAR2(100);
+   V_CURRENT_MONTH               VARCHAR2(100);
+   V_PRIOR_WEEK                  VARCHAR2(100);
+   V_PRIOR_MONTH                 VARCHAR2(100);
+   V_START_TIME                  DATE;
+   V_DURATION                    NUMBER;
+BEGIN
+   DBMS_OUTPUT.ENABLE (1000000);
+
+   V_STMT := 'Calling NBI_VALIDATE_SETTINGS_SP';
+   NBI_VALIDATE_SETTINGS_SP;
+
+   V_STMT := 'Truncating NBI_ROLLUP_SQL';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_ROLLUP_SQL';
+   V_STMT := 'Truncating NBI_PM_PROJECT_TIME_SUMMARY';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_PM_PROJECT_TIME_SUMMARY';
+   V_STMT := 'Truncating NBI_FM_PROJECT_TIME_SUMMARY';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_FM_PROJECT_TIME_SUMMARY';
+   V_STMT := 'Truncating NBI_RESOURCE_TIME_SUMMARY';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   EXECUTE IMMEDIATE 'TRUNCATE TABLE NBI_RESOURCE_TIME_SUMMARY';
+-----------------------------------------------------------------
+-- Set Cursor sharing to force
+-----------------------------------------------------------------
+   V_STMT := 'Setting cursor_sharing to force';
+   EXECUTE IMMEDIATE 'alter session set cursor_sharing = force';
+   V_STMT := 'Select last curve date';
+   SELECT MAX (TRUNC (FROM_DATE) + NUM_PERIODS)
+     INTO V_LAST_CURVE_DATE
+     FROM PRJ_BLB_SLICEREQUESTS
+    WHERE REQUEST_NAME IN ('DAILYRESOURCEACTCURVE',
+                'DAILYRESOURCEBASECURVE',
+                'DAILYRESOURCEESTCURVE',
+                'DAILYRESOURCEAVAILCURVE',
+                'DAILYRESOURCEALLOCCURVE'
+               )
+      AND PERIOD = 0;
+   V_STMT := 'Determine current fiscal period';
+   SELECT PERIOD_KEY
+     INTO V_CURRENT_PERIOD
+     FROM NBI_DIM_FISCAL_TIME
+    WHERE HIERARCHY_LEVEL = 'PERIOD'
+      AND TRUNC (SYSDATE) BETWEEN PERIOD_START_DATE AND PERIOD_END_DATE - 1;
+   V_STMT := 'Determine current week';
+   SELECT TO_CHAR (SYSDATE, 'YYYY') ||
+          '-WEEK' ||
+          LPAD (TO_CHAR (SYSDATE, 'IW'), 2, 0)
+     INTO V_CURRENT_WEEK
+     FROM DUAL;
+   V_STMT := 'Determine prior week';
+   SELECT TO_CHAR (TRUNC (SYSDATE) - 7, 'YYYY') ||
+          '-WEEK' ||
+          LPAD (TO_CHAR (TRUNC (SYSDATE) - 7, 'IW'), 2, 0)
+     INTO V_PRIOR_WEEK
+     FROM DUAL;
+   V_STMT := 'Determine current month';
+   SELECT TO_CHAR (SYSDATE, 'YYYY') || '-' || TO_CHAR (SYSDATE, 'MM')
+     INTO V_CURRENT_MONTH
+     FROM DUAL;
+   V_STMT := 'Determine prior month';
+   SELECT NVL (MAX (MONTH_KEY), V_CURRENT_MONTH)
+     INTO V_PRIOR_MONTH
+     FROM NBI_DIM_CALENDAR_TIME
+    WHERE HIERARCHY_LEVEL = 'MONTH'
+      AND (YEAR || MONTH) =
+             (SELECT DECODE ((MONTH - 1), 0, (YEAR - 1), YEAR) ||
+                     DECODE ((MONTH - 1), 0, 12, (MONTH - 1))
+                FROM NBI_DIM_CALENDAR_TIME
+               WHERE TIME_KEY = V_CURRENT_MONTH);
+   SELECT NVL (VALUE, -9)
+     INTO V_EXTRACT_FM_TFS
+     FROM CMN_OPTION_VALUES
+    WHERE OPTION_ID = (SELECT ID
+                         FROM CMN_OPTIONS
+                        WHERE OPTION_CODE = 'NBI_EXTRACT_FM_PTFS');
+   SELECT NVL (VALUE, -9)
+     INTO V_EXTRACT_PM_TFS
+     FROM CMN_OPTION_VALUES
+    WHERE OPTION_ID = (SELECT ID
+                         FROM CMN_OPTIONS
+                        WHERE OPTION_CODE = 'NBI_EXTRACT_PM_PTFS');
+   V_STMT := 'Selecting RTFS option value';
+   SELECT NVL (VALUE, -9)
+     INTO V_EXTRACT_R_TFS
+     FROM CMN_OPTION_VALUES
+    WHERE OPTION_ID = (SELECT ID
+                         FROM CMN_OPTIONS
+                        WHERE OPTION_CODE = 'NBI_EXTRACT_RTFS');
+   V_STMT := 'Rolling up NBI_FM_PT_FACTS and NBI_PM_PT_FACTS';
+   DBMS_OUTPUT.PUT_LINE (V_STMT);
+   V_START_TIME := SYSDATE;
+
+   FOR C_REC IN C_PROJECTS
+   LOOP
+      IF V_EXTRACT_FM_TFS = 1
+      THEN
+         NBI_FM_PTF_SP (C_REC.PROJECT_ID, V_CURRENT_PERIOD);
+      END IF;
+
+      IF V_EXTRACT_PM_TFS = 1
+      THEN
+         NBI_PM_PTF_SP (
+            C_REC.PROJECT_ID,
+            V_CURRENT_WEEK,
+            V_CURRENT_MONTH,
+            V_PRIOR_WEEK,
+            V_PRIOR_MONTH
+         );
+      END IF;
+
+      COMMIT;
+   END LOOP;
+
+   V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+   DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+
+   IF V_EXTRACT_PM_TFS = 1
+   THEN
+      V_STMT := 'Analyzing NBI_PM_PT_FACTS';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      --EXECUTE IMMEDIATE 'analyze table nbi_pm_pt_facts estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('nbi_pm_pt_facts');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Rolling up NBI_PM_PROJECT_TIME_SUMMARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      NBI_PM_PROJECT_TIME_SUMMARY_SP (V_PERIODS_TO_ROLL_UP);
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Analyzing NBI_PM_PROJECT_TIME_SUMMARARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+     -- EXECUTE IMMEDIATE 'analyze table nbi_pm_project_time_summary estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('nbi_pm_project_time_summary');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      COMMIT;
+   END IF;
+
+   IF V_EXTRACT_FM_TFS = 1
+   THEN
+      V_STMT := 'Analyzing NBI_FM_PT_FACTS';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      --EXECUTE IMMEDIATE 'analyze table nbi_fm_pt_facts estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('nbi_fm_pt_facts');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Rolling up NBI_FM_PROJECT_TIME_SUMMARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      NBI_FM_PROJECT_TIME_SUMMARY_SP (V_PERIODS_TO_ROLL_UP);
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Analyzing NBI_FM_PROJECT_TIME_SUMMARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      --EXECUTE IMMEDIATE 'analyze table nbi_fm_project_time_summary estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('nbi_fm_project_time_summary');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      COMMIT;
+   END IF;
+
+-----------------------------------------------------------------
+-- Rollup NBI_RT_FACTS table into NBI_RESOURCE_TIME_SUMMARY
+-----------------------------------------------------------------
+   IF V_EXTRACT_R_TFS = 1
+   THEN
+      V_STMT := 'Rolling up NBI_RT_FACTS';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      NBI_RTF_SP (V_PERIODS_TO_ROLL_UP, V_LAST_CURVE_DATE);
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Analyzing NBI_RT_FACTS';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      --EXECUTE IMMEDIATE 'analyze table nbi_rt_facts estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('nbi_rt_facts');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Rolling up NBI_RESOURCE_TIME_SUMMARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      NBI_RESOURCE_TIME_SUMMARY_SP (V_PERIODS_TO_ROLL_UP, V_LAST_CURVE_DATE);
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      V_STMT := 'Analyzing NBI_RESOURCE_TIME_SUMMARY';
+      DBMS_OUTPUT.PUT_LINE (V_STMT);
+      V_START_TIME := SYSDATE;
+      --EXECUTE IMMEDIATE 'analyze table NBI_RESOURCE_TIME_SUMMARY estimate statistics sample 20 percent';
+	  CMN_GATHER_TABLE_STATS_SP('NBI_RESOURCE_TIME_SUMMARY');
+      V_DURATION := ROUND ((SYSDATE - V_START_TIME) * 24 * 60, 2);
+      DBMS_OUTPUT.PUT_LINE ('Time: ' || V_DURATION);
+      COMMIT;
+   END IF;
+
+-----------------------------------------------------------------
+-- Reset cursor sharing
+-----------------------------------------------------------------
+   V_STMT := 'Setting cursor_sharing back to exact';
+   EXECUTE IMMEDIATE 'alter session set cursor_sharing = exact';
+   COMMIT;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      EXECUTE IMMEDIATE 'alter session set cursor_sharing = exact';
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_EXTRACT_TF_TS_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

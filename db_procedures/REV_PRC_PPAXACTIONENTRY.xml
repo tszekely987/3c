@@ -1,0 +1,750 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_PRC_PPAXACTIONENTRY</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_PRC_PPAXACTIONENTRY" (
+  COMPANY_CODE  VARCHAR2 ,
+  PROJECT_CODE   VARCHAR2 ,
+  CHARGE_CODE   VARCHAR2 ,
+  RESOURCE_CODE   VARCHAR2 ,
+  costkeylevel6   VARCHAR2 ,
+  costkeylevel7   VARCHAR2 ,
+  input_type   VARCHAR2 ,
+  sourcemodule  NUMBER ,
+  locationid  VARCHAR2 ,
+  departcode  VARCHAR2 ,
+  transactiondate   DATE ,
+  transactiondate2  DATE ,
+  in_unitquantity   IN NUMBER,
+  LASTUPDTDBY_RESOURCE_CODE   VARCHAR2 ,
+  notes   VARCHAR2 ,
+  MATLVENDORCODE  VARCHAR2,
+  matlvoucherno   VARCHAR2 ,
+  matlponumber  VARCHAR2 ,
+  matlitemnumber  VARCHAR2 ,
+  documentType  VARCHAR2 ,
+  transtype   VARCHAR2 ,
+  in_TransClass    IN VARCHAR2,
+  in_bCalcNewRate   NUMBER,
+  aptotalcost   NUMBER,
+  unitpriceoverride   NUMBER,
+  transactionnumber   IN OUT NUMBER,
+  errorflag   IN OUT NUMBER,
+  discount  NUMBER DEFAULT NULL,
+  BatchNo   NUMBER  DEFAULT NULL,
+  iExternalTransNo  NUMBER  DEFAULT NULL,
+  ENTRY_RESOURCE_CODE   VARCHAR2  DEFAULT NULL,
+  cAdjType  VARCHAR2,
+  cLanguageCode VARCHAR2 DEFAULT 'en',
+  in_rateCurrency IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_ActualCostCurrency IN CMN_CURRENCIES.CURRENCY_CODE%TYPE,
+  in_TransNo IN NUMBER DEFAULT NULL,
+  in_TaskID IN NUMBER DEFAULT NULL,
+  in_roleCode      IN VARCHAR2 DEFAULT NULL,
+  in_userLov1      IN VARCHAR2 DEFAULT NULL,
+  in_userLov2      IN VARCHAR2 DEFAULT NULL,
+  in_expenseType   IN VARCHAR2 DEFAULT NULL,
+  apinfoId   IN PPA_TRANSWIPADJUST.APINFO_ID%TYPE
+)
+AS
+  T_BATCHNO   PPA_TRANSWIPADJUST.BATCHNO%TYPE;
+  unitquantity      NUMERIC(32,6);
+  dTransdate        DATE;
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  chargeable        NUMBER(25,0);
+  emplyhomelocation       GLOBALPKG.STRING;
+  emplyhomedepartment       GLOBALPKG.STRING;
+  emplystdcost      NUMBER(32,6);
+  emplyactualcost   NUMBER(32,6);
+  transratesourcelabor   PAC_MNT_PROJECTS.transratesourcelabor%type;
+  transratesourcematerials PAC_MNT_PROJECTS.transratesourcematerials%type;
+  transratesourceequipment  PAC_MNT_PROJECTS.transratesourceequipment%type;
+  currentrevision   NUMBER(25,0);
+  budgetlevelmaterials      NUMBER(25,0);
+  labor     NUMBER(25,0);
+  ratesource        NUMBER;
+  rate      NUMBER(32,6);
+  stdcost   NUMBER(32,6);
+  actualcost        NUMBER(32,6);
+  emplyratelocation         GLOBALPKG.STRING;
+  transratelocation         NUMBER;
+  udf1      GLOBALPKG.STRING;
+  udf2      GLOBALPKG.STRING;
+  udf3      GLOBALPKG.STRING;
+  budgetlevel       NUMBER;
+  price     NUMBER(32,6);
+  amount    NUMBER(32,6);
+  --minutecalc        NUMBER(32,6);
+  applyto   GLOBALPKG.STRING;
+  applyflatpercent  GLOBALPKG.STRING;
+  applyamount       NUMBER(32,6);
+  factoramount      NUMBER(32,6);
+  unitsmodified     NUMBER(32,6);
+
+  budgetexists      NUMBER;
+  clientlevel       NUMBER := 1;
+  projectlevel      NUMBER := 2;
+  costlevel         NUMBER := 3;
+  emplylevel        NUMBER := 4;
+  translocation     GLOBALPKG.STRING;
+  transdept         GLOBALPKG.STRING;
+  sourceentity      GLOBALPKG.STRING;
+  sourcelocation    GLOBALPKG.STRING;
+  sourcedepartment  GLOBALPKG.STRING;
+  clientlocation    GLOBALPKG.STRING;
+  clientdept        GLOBALPKG.STRING;
+  budgetlocation    GLOBALPKG.STRING;
+  budgetdepartment  GLOBALPKG.STRING;
+  clntclass         GLOBALPKG.STRING;
+  projclass         GLOBALPKG.STRING;
+  resourceclass        GLOBALPKG.STRING;
+  wipclass  GLOBALPKG.STRING;
+  entity    GLOBALPKG.STRING;
+  transclass        GLOBALPKG.STRING;
+  totalcost         NUMERIC(32,6);
+  amountremaining   NUMERIC(32,6);
+  override  NUMBER(25,0);
+  defaultemployee         GLOBALPKG.STRING;
+  defaultcharge_code   GLOBALPKG.STRING;
+  mindec    NUMERIC(32,6);
+  test      GLOBALPKG.STRING;
+  sourcetable       GLOBALPKG.STRING;
+  userdefinedcode   GLOBALPKG.STRING;
+  totalamount       NUMERIC(32,6);
+  transdescription  GLOBALPKG.STRING;
+  costsource        NUMBER(25,0);
+  locationsource    NUMBER(25,0);
+  deptsource        NUMBER(25,0);
+  return_code       NUMBER(25,0);
+  burdenamount    NUMERIC(32,6);
+  overheadamount    NUMERIC(32,6);
+  costplusrule      GLOBALPKG.STRING;
+  mtxrate   NUMBER(32,6);
+  mtxstdcost        NUMBER(32,6);
+  mtxactualcost     NUMBER(32,6);
+  apply_to_actualstd_cost   GLOBALPKG.STRING;
+  ctransdate        GLOBALPKG.STRING;
+  ratefound         NUMBER(25,0);
+  newtransactionno  NUMBER;
+  costoverride      NUMBER(25,0);
+  iSiteRequired     NUMBER(25,0);
+  P_PROJECT_CODE   GLOBALPKG.STRING;
+  T_PROJECT_CODE   GLOBALPKG.STRING;
+  P_CHARGE_CODE   GLOBALPKG.STRING;
+  T_CHARGE_CODE   GLOBALPKG.STRING;
+  P_RESOURCE_CODE   GLOBALPKG.STRING;
+  T_RESOURCE_CODE   GLOBALPKG.STRING;
+  P_costkeylevel6   GLOBALPKG.STRING;
+  P_costkeylevel7   GLOBALPKG.STRING;
+  p_input_type   GLOBALPKG.STRING;
+  Temp_Rc                   PPA_GETRATEPkg.RCT1;
+  projectratelabor                PAC_MNT_PROJECTS.projectratelabor%type;
+  projectratematerials           PAC_MNT_PROJECTS.projectratematerials%type;
+  projectrateequipment           PAC_MNT_PROJECTS.projectrateequipment%type;
+  projlocationid                         PAC_MNT_PROJECTS.locationid%type;
+  projdepartcode                         PAC_MNT_PROJECTS.departcode%type;
+  budgeted                       PAC_MNT_PROJECTS.budget%type;
+  budgetlevellabor               PAC_MNT_PROJECTS.budgetlevellabor%type;
+  projectcostlabor               PAC_MNT_PROJECTS.projectcostlabor%type;
+  projectstdcostlabor             PAC_MNT_PROJECTS.projectstdcostlabor%type;
+  transratelocationlabor            PAC_MNT_PROJECTS.transratelocationlabor%type;
+  projectcostmaterials           PAC_MNT_PROJECTS.projectcostmaterials%type;
+  projectstdcostmaterials        PAC_MNT_PROJECTS.projectstdcostmaterials%type;
+  transratelocationmaterials        PAC_MNT_PROJECTS.transratelocationmaterials%type;
+  budgetlevelequipment           PAC_MNT_PROJECTS.budgetlevelequipment%type;
+  projectcostequipment            PAC_MNT_PROJECTS.projectcostequipment%type;
+  projectstdcostequipment        PAC_MNT_PROJECTS.projectstdcostequipment%type;
+  transratelocationequipment        PAC_MNT_PROJECTS.transratelocationequipment%type;
+  projecttype                    PAC_MNT_PROJECTS.type_%type;
+  overrideequipment              PAC_MNT_PROJECTS.transrateoverrideequipment%type;
+  overridematerials              PAC_MNT_PROJECTS.transrateoverridematerials%type;
+  overridelabor                     PAC_MNT_PROJECTS.transrateoverridelabor%type;
+  transcostsourcelabor           PAC_MNT_PROJECTS.transcostsourcelabor%type;
+  transcostsourcematerials       PAC_MNT_PROJECTS.transcostsourcematerials%type;
+  transcostsourceequipment       PAC_MNT_PROJECTS.transcostsourceequipment%type;
+  costplus                  PAC_MNT_PROJECTS.costplus%type;
+  transratesourceexpenses        PAC_MNT_PROJECTS.transratesourceexpenses%type;
+  transcostsourceexpenses        PAC_MNT_PROJECTS.transcostsourceexpenses%type;
+  transratelocationexpenses         PAC_MNT_PROJECTS.transratelocationexpenses%type;
+  overrideexpenses               PAC_MNT_PROJECTS.transrateoverrideexpenses%type;
+  v_rateCurrency VARCHAR2(30);
+
+  dummyRateCurCode CMN_CURRENCIES.CURRENCY_CODE%TYPE;
+  dummyCostCurCode CMN_CURRENCIES.CURRENCY_CODE%TYPE;
+  P_TRANSTYPE       GLOBALPKG.STRING ;
+  costcodetranstype       GLOBALPKG.STRING;
+
+BEGIN
+
+   	transclass := in_TransClass;
+    P_TRANSTYPE := TRANSTYPE ;
+    p_input_type := input_type;
+    P_PROJECT_CODE := PROJECT_CODE;
+    P_CHARGE_CODE := CHARGE_CODE;
+    P_RESOURCE_CODE := RESOURCE_CODE;
+	P_costkeylevel6 := costkeylevel6;
+    P_costkeylevel7 := costkeylevel7;
+	REV_PRC_PPAXACTIONENTRY.unitquantity := REV_PRC_PPAXACTIONENTRY.in_unitquantity;
+	REV_PRC_PPAXACTIONENTRY.errorflag :=  0;
+	REV_PRC_PPAXACTIONENTRY.totalamount :=  0;
+	REV_PRC_PPAXACTIONENTRY.amount :=  0;
+	REV_PRC_PPAXACTIONENTRY.factoramount :=  0;
+	REV_PRC_PPAXACTIONENTRY.burdenamount :=  0;
+	REV_PRC_PPAXACTIONENTRY.overheadamount :=  0;
+	REV_PRC_PPAXACTIONENTRY.T_BATCHNO := BatchNo ;
+
+    v_rateCurrency := TRIM(in_rateCurrency);
+
+  REV_PRC_PPAXACTIONENTRY.T_PROJECT_CODE :=  REV_PRC_PPAXACTIONENTRY.P_PROJECT_CODE;
+
+	BEGIN
+	SP_PPASETCOSTEMPLOYEE(REV_PRC_PPAXACTIONENTRY.costlevel,
+	 REV_PRC_PPAXACTIONENTRY.emplylevel,
+   	 REV_PRC_PPAXACTIONENTRY.P_CHARGE_CODE,
+	 REV_PRC_PPAXACTIONENTRY.P_RESOURCE_CODE,
+	 REV_PRC_PPAXACTIONENTRY.P_costkeylevel6,
+	 REV_PRC_PPAXACTIONENTRY.p_costkeylevel7,
+   	 REV_PRC_PPAXACTIONENTRY.p_input_type,
+	 REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE,
+   	 REV_PRC_PPAXACTIONENTRY.T_CHARGE_CODE);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+		SELECT transtype
+		INTO costcodetranstype
+		FROM transclass
+		WHERE TRANSCLASS=in_TransClass;
+	EXCEPTION
+	   WHEN NO_DATA_FOUND THEN
+	   		RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction class.' );
+	   WHEN OTHERS THEN
+			RAISE_APPLICATION_ERROR(-20952, 'Invalid transaction Class.' );
+	END;
+
+  /* Validate the transaction class and resource type if the user manually types in transaction class of some other type */
+	BEGIN
+		StoO_selcnt := 0 ;
+		SELECT 1
+		into StoO_selcnt
+    FROM SRM_RESOURCES
+    WHERE UNIQUE_NAME = REV_PRC_PPAXACTIONENTRY.RESOURCE_CODE
+    AND RESOURCE_TYPE = (SELECT DECODE( costcodetranstype ,'L',0,'Q',1,'M',2,'X',3) FROM DUAL ) ;
+	EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+			RAISE_APPLICATION_ERROR(-20518, 'Invalid resource.' );
+		WHEN OTHERS THEN
+		    StoO_error := SQLCODE;
+		    StoO_errmsg := SQLERRM;
+			RAISE_APPLICATION_ERROR(-20518, 'Internal Server Error : Invalid resource.' );
+	END;
+
+	-- Get the chargeable field.Also used to check if inputtype exists.
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    SELECT  IS_CHARGEABLE
+    INTO REV_PRC_PPAXACTIONENTRY.chargeable
+    FROM PRTYPECODE
+    WHERE PREXTERNALID = REV_PRC_PPAXACTIONENTRY.p_INPUT_TYPE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+		RAISE_APPLICATION_ERROR(-20360, 'INPUT TYPE data NOT FOUND IN PRTYPECODE' );
+		RETURN ;
+	END IF;
+	-- Check if the charge_code exists.
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+    	SELECT  1 into StoO_selcnt
+    	FROM DUAL
+    	WHERE EXISTS (
+    	SELECT 1 FROM PRCHARGECODE WHERE PREXTERNALID = REV_PRC_PPAXACTIONENTRY.P_CHARGE_CODE
+		AND PRISOPEN != 0 AND (PRPROJECTID IS NULL OR PRPROJECTID =
+					 	  	  (SELECT ID FROM PAC_MNT_PROJECTS WHERE PROJECT_CODE= REV_PRC_PPAXACTIONENTRY.PROJECT_CODE)));
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+	END;
+	IF  StoO_selcnt = 0 THEN
+		REV_PRC_PPAXACTIONENTRY.errorflag :=  -1;
+		RETURN ;
+	END IF;
+	-- Get the location and department of the resource.
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT locationid,  departcode,  actualcost,
+			   standardcost
+		INTO REV_PRC_PPAXACTIONENTRY.emplyhomelocation, REV_PRC_PPAXACTIONENTRY.emplyhomedepartment, REV_PRC_PPAXACTIONENTRY.emplyactualcost,
+		 REV_PRC_PPAXACTIONENTRY.emplystdcost
+		FROM PAC_MNT_RESOURCES
+		WHERE RESOURCE_CODE = REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+		REV_PRC_PPAXACTIONENTRY.errorflag :=  -2;
+		RETURN ;
+	END;
+	END IF;
+	-- Check to see if the transaction date falls in between the hire and termination date.
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE NOT EXISTS (
+    SELECT  1 FROM PAC_MNT_RESOURCES R, SRM_RESOURCES S
+		WHERE
+    ( REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE = R.RESOURCE_CODE
+      AND R.RESOURCE_CODE = S.UNIQUE_NAME
+      AND REV_PRC_PPAXACTIONENTRY.transactiondate
+          BETWEEN NVL(S.DATE_OF_HIRE, TO_DATE('01/01/1900', 'mm/dd/yyyy')) AND
+                  NVL(S.DATE_OF_TERMINATION ,TO_DATE('01/01/2999', 'mm/dd/yyyy')) )
+     );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		REV_PRC_PPAXACTIONENTRY.errorflag :=  -15;
+		RETURN ;
+	END;
+	END IF;
+	END;
+
+	/****  get transaction rate PROJECT_CODE/chgorder info  ****/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   transratesourcelabor,  transratesourcematerials,  transratesourceequipment,
+		  projectratelabor,  projectratematerials,  projectrateequipment,  locationid,  departcode,
+		  currentrevision,  budget,  budgetlevellabor,  projectcostlabor,  projectstdcostlabor,
+		  transratelocationlabor,  budgetlevelmaterial,  projectcostmaterials,  projectstdcostmaterials,
+		  transratelocationmaterials,  budgetlevelequipment,  projectcostequipment,  projectstdcostequipment,
+		  transratelocationequipment,  type_,  transrateoverrideequipment,  transrateoverridematerials,
+		  transrateoverridelabor,  transcostsourcelabor,  transcostsourcematerials,  transcostsourceequipment,
+		  costplus,  transratesourceexpenses,  transcostsourceexpenses,
+		  transratelocationexpenses,  transrateoverrideexpenses
+		INTO REV_PRC_PPAXACTIONENTRY.transratesourcelabor, REV_PRC_PPAXACTIONENTRY.transratesourcematerials, REV_PRC_PPAXACTIONENTRY.transratesourceequipment,
+		 REV_PRC_PPAXACTIONENTRY.projectratelabor, REV_PRC_PPAXACTIONENTRY.projectratematerials, REV_PRC_PPAXACTIONENTRY.projectrateequipment, REV_PRC_PPAXACTIONENTRY.projlocationid, REV_PRC_PPAXACTIONENTRY.projdepartcode,
+		 REV_PRC_PPAXACTIONENTRY.currentrevision, REV_PRC_PPAXACTIONENTRY.budgeted, REV_PRC_PPAXACTIONENTRY.budgetlevellabor, REV_PRC_PPAXACTIONENTRY.projectcostlabor, REV_PRC_PPAXACTIONENTRY.projectstdcostlabor,
+		 REV_PRC_PPAXACTIONENTRY.transratelocationlabor, REV_PRC_PPAXACTIONENTRY.budgetlevelmaterials, REV_PRC_PPAXACTIONENTRY.projectcostmaterials, REV_PRC_PPAXACTIONENTRY.projectstdcostmaterials,
+		 REV_PRC_PPAXACTIONENTRY.transratelocationmaterials, REV_PRC_PPAXACTIONENTRY.budgetlevelequipment, REV_PRC_PPAXACTIONENTRY.projectcostequipment, REV_PRC_PPAXACTIONENTRY.projectstdcostequipment,
+		 REV_PRC_PPAXACTIONENTRY.transratelocationequipment, REV_PRC_PPAXACTIONENTRY.projecttype, REV_PRC_PPAXACTIONENTRY.overrideequipment, REV_PRC_PPAXACTIONENTRY.overridematerials,
+		 REV_PRC_PPAXACTIONENTRY.overridelabor, REV_PRC_PPAXACTIONENTRY.transcostsourcelabor, REV_PRC_PPAXACTIONENTRY.transcostsourcematerials, REV_PRC_PPAXACTIONENTRY.transcostsourceequipment,
+		 REV_PRC_PPAXACTIONENTRY.costplus, REV_PRC_PPAXACTIONENTRY.transratesourceexpenses, REV_PRC_PPAXACTIONENTRY.transcostsourceexpenses,
+		 REV_PRC_PPAXACTIONENTRY.transratelocationexpenses, REV_PRC_PPAXACTIONENTRY.overrideexpenses
+    FROM PAC_MNT_PROJECTS
+		WHERE PROJECT_CODE = REV_PRC_PPAXACTIONENTRY.T_PROJECT_CODE
+		 AND (COMPANY_CODE = REV_PRC_PPAXACTIONENTRY.COMPANY_CODE OR COMPANY_CODE IS NULL);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+		REV_PRC_PPAXACTIONENTRY.errorflag :=  -3;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+		IF  REV_PRC_PPAXACTIONENTRY.costcodetranstype = 'L' THEN
+		BEGIN
+			REV_PRC_PPAXACTIONENTRY.ratesource :=  REV_PRC_PPAXACTIONENTRY.transratesourcelabor;
+			REV_PRC_PPAXACTIONENTRY.costsource :=  REV_PRC_PPAXACTIONENTRY.transcostsourcelabor;
+			REV_PRC_PPAXACTIONENTRY.transratelocation :=  REV_PRC_PPAXACTIONENTRY.transratelocationlabor;
+			REV_PRC_PPAXACTIONENTRY.rate :=  REV_PRC_PPAXACTIONENTRY.projectratelabor;
+			REV_PRC_PPAXACTIONENTRY.actualcost :=  REV_PRC_PPAXACTIONENTRY.projectcostlabor;
+			REV_PRC_PPAXACTIONENTRY.stdcost :=  REV_PRC_PPAXACTIONENTRY.projectstdcostlabor;
+			REV_PRC_PPAXACTIONENTRY.budgetlevel :=  REV_PRC_PPAXACTIONENTRY.budgetlevellabor;
+			REV_PRC_PPAXACTIONENTRY.override :=  REV_PRC_PPAXACTIONENTRY.overridelabor;
+		END;
+		ELSE
+			IF  REV_PRC_PPAXACTIONENTRY.costcodetranstype = 'M' THEN
+			BEGIN
+				REV_PRC_PPAXACTIONENTRY.ratesource :=  REV_PRC_PPAXACTIONENTRY.transratesourcematerials;
+				REV_PRC_PPAXACTIONENTRY.costsource :=  REV_PRC_PPAXACTIONENTRY.transcostsourcematerials;
+				REV_PRC_PPAXACTIONENTRY.transratelocation :=  REV_PRC_PPAXACTIONENTRY.transratelocationmaterials;
+				REV_PRC_PPAXACTIONENTRY.rate :=  REV_PRC_PPAXACTIONENTRY.projectratematerials;
+				REV_PRC_PPAXACTIONENTRY.actualcost :=  REV_PRC_PPAXACTIONENTRY.projectcostmaterials;
+				REV_PRC_PPAXACTIONENTRY.stdcost :=  REV_PRC_PPAXACTIONENTRY.projectstdcostmaterials;
+				REV_PRC_PPAXACTIONENTRY.budgetlevel :=  REV_PRC_PPAXACTIONENTRY.budgetlevelmaterials;
+				REV_PRC_PPAXACTIONENTRY.override :=  REV_PRC_PPAXACTIONENTRY.overridematerials;
+			END;
+			ELSE
+				IF  REV_PRC_PPAXACTIONENTRY.costcodetranstype = 'Q' THEN
+				BEGIN
+					REV_PRC_PPAXACTIONENTRY.ratesource :=  REV_PRC_PPAXACTIONENTRY.transratesourceequipment;
+					REV_PRC_PPAXACTIONENTRY.costsource :=  REV_PRC_PPAXACTIONENTRY.transcostsourceequipment;
+					REV_PRC_PPAXACTIONENTRY.transratelocation :=  REV_PRC_PPAXACTIONENTRY.transratelocationequipment;
+					REV_PRC_PPAXACTIONENTRY.rate :=  REV_PRC_PPAXACTIONENTRY.projectrateequipment;
+					REV_PRC_PPAXACTIONENTRY.actualcost :=  REV_PRC_PPAXACTIONENTRY.projectcostequipment;
+					REV_PRC_PPAXACTIONENTRY.stdcost :=  REV_PRC_PPAXACTIONENTRY.projectstdcostequipment;
+					REV_PRC_PPAXACTIONENTRY.budgetlevel :=  REV_PRC_PPAXACTIONENTRY.budgetlevelequipment;
+					REV_PRC_PPAXACTIONENTRY.override :=  REV_PRC_PPAXACTIONENTRY.overrideequipment;
+				END;
+				ELSE
+					IF  REV_PRC_PPAXACTIONENTRY.costcodetranstype = 'X' THEN
+					BEGIN
+						REV_PRC_PPAXACTIONENTRY.ratesource :=  REV_PRC_PPAXACTIONENTRY.transratesourceexpenses;
+						REV_PRC_PPAXACTIONENTRY.costsource :=  REV_PRC_PPAXACTIONENTRY.transcostsourceexpenses;
+						REV_PRC_PPAXACTIONENTRY.transratelocation :=  REV_PRC_PPAXACTIONENTRY.transratelocationexpenses;
+						REV_PRC_PPAXACTIONENTRY.override :=  REV_PRC_PPAXACTIONENTRY.overrideexpenses;
+					END;
+					END IF;
+					END IF;
+					END IF;
+				END IF;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   locationid,  departcode
+			INTO REV_PRC_PPAXACTIONENTRY.clientlocation, REV_PRC_PPAXACTIONENTRY.clientdept
+			FROM CLNTSUPP
+			WHERE CLNTSUPP.COMPANY_CODE = REV_PRC_PPAXACTIONENTRY.COMPANY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		IF  REV_PRC_PPAXACTIONENTRY.rate IS NULL THEN
+			REV_PRC_PPAXACTIONENTRY.rate :=  0;
+		END IF;
+		IF  REV_PRC_PPAXACTIONENTRY.stdcost IS NULL THEN
+			REV_PRC_PPAXACTIONENTRY.stdcost :=  0;
+		END IF;
+		IF  REV_PRC_PPAXACTIONENTRY.actualcost IS NULL THEN
+			REV_PRC_PPAXACTIONENTRY.actualcost :=  0;
+		END IF;
+			IF  REV_PRC_PPAXACTIONENTRY.p_costkeylevel7 = 'PPAVALIDATION' THEN
+			BEGIN
+				RETURN ;
+			END;
+			END IF;
+			IF  NVL(REV_PRC_PPAXACTIONENTRY.stdcost, 0) = 0 THEN
+
+				REV_PRC_PPAXACTIONENTRY.stdcost :=  REV_PRC_PPAXACTIONENTRY.actualcost;
+			END IF;
+				REV_PRC_PPAXACTIONENTRY.costplus :=  0;
+
+			IF  ( REV_PRC_PPAXACTIONENTRY.amount &gt;= NVL(REV_PRC_PPAXACTIONENTRY.discount, 0))
+				AND ( NVL(REV_PRC_PPAXACTIONENTRY.discount, 0) ) &gt; 0 THEN
+			BEGIN
+				REV_PRC_PPAXACTIONENTRY.amount :=  REV_PRC_PPAXACTIONENTRY.amount
+				   							   	   - NVL(REV_PRC_PPAXACTIONENTRY.discount, 0);
+
+				IF  REV_PRC_PPAXACTIONENTRY.unitquantity = 0 THEN
+					REV_PRC_PPAXACTIONENTRY.rate :=  REV_PRC_PPAXACTIONENTRY.amount;
+				ELSE
+					REV_PRC_PPAXACTIONENTRY.rate :=  ROUND(REV_PRC_PPAXACTIONENTRY.amount
+                             / REV_PRC_PPAXACTIONENTRY.unitquantity, 2);
+				END IF;
+			END;
+			END IF;
+
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   sourcefieldentity,  sourcefieldlocation,  sourcefielddepartment
+				INTO REV_PRC_PPAXACTIONENTRY.sourceentity, REV_PRC_PPAXACTIONENTRY.sourcelocation, REV_PRC_PPAXACTIONENTRY.sourcedepartment
+				FROM NAMEOPTIONS;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+				IF  REV_PRC_PPAXACTIONENTRY.sourcelocation = 'CL' THEN
+					REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.clientlocation;
+				ELSE
+					IF  REV_PRC_PPAXACTIONENTRY.sourcelocation = 'PL' THEN
+						REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.projlocationid;
+					ELSE
+						IF  REV_PRC_PPAXACTIONENTRY.sourcelocation = 'EL' THEN
+							REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.emplyhomelocation;
+						ELSE
+							IF  REV_PRC_PPAXACTIONENTRY.sourcelocation = 'CCL' THEN
+								REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.projlocationid;
+							ELSE
+								IF  REV_PRC_PPAXACTIONENTRY.sourcelocation = 'RL' THEN
+								BEGIN
+									REV_PRC_PPAXACTIONENTRY.locationsource :=  REV_PRC_PPAXACTIONENTRY.transratelocation;
+									IF  REV_PRC_PPAXACTIONENTRY.locationsource = REV_PRC_PPAXACTIONENTRY.clientlevel THEN
+										REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.clientlocation;
+									ELSE
+										IF  REV_PRC_PPAXACTIONENTRY.locationsource = REV_PRC_PPAXACTIONENTRY.emplylevel THEN
+											REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.emplyhomelocation;
+										ELSE
+											IF  REV_PRC_PPAXACTIONENTRY.locationsource = REV_PRC_PPAXACTIONENTRY.projectlevel
+												OR   REV_PRC_PPAXACTIONENTRY.locationsource = REV_PRC_PPAXACTIONENTRY.costlevel THEN
+												REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.projlocationid;
+											ELSE
+												IF  REV_PRC_PPAXACTIONENTRY.locationsource = 101 THEN
+													REV_PRC_PPAXACTIONENTRY.translocation :=  REV_PRC_PPAXACTIONENTRY.budgetlocation;
+												END IF;
+											END IF;
+										END IF;
+									END IF;
+								END;
+								END IF;
+								END IF;
+								END IF;
+							END IF;
+						END IF;
+					IF  REV_PRC_PPAXACTIONENTRY.sourcedepartment = 'CD' THEN
+						REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.clientdept;
+					ELSE
+						IF  REV_PRC_PPAXACTIONENTRY.sourcedepartment = 'PD' THEN
+							REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.projdepartcode;
+						ELSE
+							IF  REV_PRC_PPAXACTIONENTRY.sourcedepartment = 'ED' THEN
+								REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.emplyhomedepartment;
+							ELSE
+								IF  REV_PRC_PPAXACTIONENTRY.sourcedepartment = 'CCD' THEN
+									REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.projdepartcode;
+								ELSE
+									IF  REV_PRC_PPAXACTIONENTRY.sourcedepartment = 'RD' THEN
+									BEGIN
+										REV_PRC_PPAXACTIONENTRY.deptsource :=  REV_PRC_PPAXACTIONENTRY.transratelocation;
+										IF  REV_PRC_PPAXACTIONENTRY.deptsource = REV_PRC_PPAXACTIONENTRY.clientlevel THEN
+											REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.clientdept;
+										ELSE
+											IF  REV_PRC_PPAXACTIONENTRY.deptsource = REV_PRC_PPAXACTIONENTRY.emplylevel THEN
+												REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.emplyhomedepartment;
+											ELSE
+												IF  REV_PRC_PPAXACTIONENTRY.deptsource = REV_PRC_PPAXACTIONENTRY.projectlevel OR   REV_PRC_PPAXACTIONENTRY.deptsource = REV_PRC_PPAXACTIONENTRY.costlevel THEN
+													REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.projdepartcode;
+												ELSE
+													IF  REV_PRC_PPAXACTIONENTRY.deptsource = 101 THEN
+														REV_PRC_PPAXACTIONENTRY.transdept :=  REV_PRC_PPAXACTIONENTRY.budgetdepartment;
+													END IF;
+												END IF;
+											END IF;
+										END IF;
+									END;
+									END IF;
+									END IF;
+									END IF;
+								END IF;
+							END IF;
+						--END IF;
+					BEGIN
+					SP_GETCLASSES_OUTPUT(COMPANY_CODE=&gt;REV_PRC_PPAXACTIONENTRY.COMPANY_CODE,
+					 PROJECT_CODE=&gt;REV_PRC_PPAXACTIONENTRY.T_PROJECT_CODE,
+					 CHARGE_CODE=&gt;REV_PRC_PPAXACTIONENTRY.T_CHARGE_CODE,
+					 RESOURCE_CODE=&gt;REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE,
+					 clntclass=&gt;REV_PRC_PPAXACTIONENTRY.clntclass,
+					 projclass=&gt;REV_PRC_PPAXACTIONENTRY.projclass,
+           	 		 resource_class=&gt;REV_PRC_PPAXACTIONENTRY.resourceclass,
+					 wipclass=&gt;REV_PRC_PPAXACTIONENTRY.wipclass);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+					BEGIN
+					SP_GETENTITY_OUTPUT(COMPANY_CODE=&gt;REV_PRC_PPAXACTIONENTRY.COMPANY_CODE,
+					 PROJECT_CODE=&gt;REV_PRC_PPAXACTIONENTRY.T_PROJECT_CODE,
+					 emplycodeinit=&gt;REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE,
+					 entity=&gt;REV_PRC_PPAXACTIONENTRY.entity);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+
+					REV_PRC_PPAXACTIONENTRY.price :=  REV_PRC_PPAXACTIONENTRY.rate;
+					REV_PRC_PPAXACTIONENTRY.amount :=  ROUND(REV_PRC_PPAXACTIONENTRY.unitquantity
+                                 * REV_PRC_PPAXACTIONENTRY.rate, 2);
+					REV_PRC_PPAXACTIONENTRY.totalamount :=  REV_PRC_PPAXACTIONENTRY.amount
+					   + NVL(REV_PRC_PPAXACTIONENTRY.factoramount, 0) + NVL(REV_PRC_PPAXACTIONENTRY.burdenamount, 0)
+					   + NVL(REV_PRC_PPAXACTIONENTRY.overheadamount, 0);
+					SAVEPOINT TransEntry;
+					BEGIN
+
+
+					REV_PRC_PPAXACTIONENTRY01(REV_PRC_PPAXACTIONENTRY.P_TRANSTYPE,
+					 REV_PRC_PPAXACTIONENTRY.unitquantity,
+					 REV_PRC_PPAXACTIONENTRY.cAdjType,
+					 REV_PRC_PPAXACTIONENTRY.amountremaining,
+					 REV_PRC_PPAXACTIONENTRY.sourcemodule,
+					 REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE,
+					 REV_PRC_PPAXACTIONENTRY.translocation,
+					 REV_PRC_PPAXACTIONENTRY.transdept,
+					 REV_PRC_PPAXACTIONENTRY.entity,
+					 REV_PRC_PPAXACTIONENTRY.transactiondate,
+					 REV_PRC_PPAXACTIONENTRY.transactiondate2,
+					 REV_PRC_PPAXACTIONENTRY.COMPANY_CODE,
+					 REV_PRC_PPAXACTIONENTRY.P_PROJECT_CODE,
+           			 REV_PRC_PPAXACTIONENTRY.P_CHARGE_CODE,
+					 REV_PRC_PPAXACTIONENTRY.T_RESOURCE_CODE,
+					 REV_PRC_PPAXACTIONENTRY.P_costkeylevel6,
+					 REV_PRC_PPAXACTIONENTRY.p_costkeylevel7,
+           			 REV_PRC_PPAXACTIONENTRY.p_input_type,
+					 REV_PRC_PPAXACTIONENTRY.chargeable,
+					 in_bCalcNewRate,
+					 REV_PRC_PPAXACTIONENTRY.unitpriceoverride,
+					 REV_PRC_PPAXACTIONENTRY.price,
+					 REV_PRC_PPAXACTIONENTRY.aptotalcost,
+					 REV_PRC_PPAXACTIONENTRY.stdcost,
+					 REV_PRC_PPAXACTIONENTRY.totalcost,
+					 REV_PRC_PPAXACTIONENTRY.factoramount,
+					 REV_PRC_PPAXACTIONENTRY.amount,
+					 REV_PRC_PPAXACTIONENTRY.totalamount,
+					 REV_PRC_PPAXACTIONENTRY.emplyactualcost,
+					 REV_PRC_PPAXACTIONENTRY.emplystdcost,
+					 REV_PRC_PPAXACTIONENTRY.emplyhomelocation,
+					 REV_PRC_PPAXACTIONENTRY.budgeted,
+					 REV_PRC_PPAXACTIONENTRY.LASTUPDTDBY_RESOURCE_CODE,
+					 REV_PRC_PPAXACTIONENTRY.projecttype,
+					 REV_PRC_PPAXACTIONENTRY.notes,
+					 REV_PRC_PPAXACTIONENTRY.MATLVENDORCODE,
+					 REV_PRC_PPAXACTIONENTRY.matlvoucherno,
+					 REV_PRC_PPAXACTIONENTRY.matlponumber,
+					 REV_PRC_PPAXACTIONENTRY.matlitemnumber,
+					 documentType,
+					 REV_PRC_PPAXACTIONENTRY.clntclass,
+					 REV_PRC_PPAXACTIONENTRY.projclass,
+           	 	     REV_PRC_PPAXACTIONENTRY.resourceclass,
+					 REV_PRC_PPAXACTIONENTRY.wipclass,
+					 REV_PRC_PPAXACTIONENTRY.costcodetranstype,
+					 REV_PRC_PPAXACTIONENTRY.transclass,
+					 REV_PRC_PPAXACTIONENTRY.burdenamount,
+					 REV_PRC_PPAXACTIONENTRY.overheadamount,
+					 REV_PRC_PPAXACTIONENTRY.errorflag,
+					 REV_PRC_PPAXACTIONENTRY.newtransactionno,
+					 REV_PRC_PPAXACTIONENTRY.T_BatchNo,
+					 REV_PRC_PPAXACTIONENTRY.iExternalTransNo,
+					 REV_PRC_PPAXACTIONENTRY.ENTRY_RESOURCE_CODE,
+					 REV_PRC_PPAXACTIONENTRY.cLanguageCode,
+           			 REV_PRC_PPAXACTIONENTRY.v_rateCurrency,
+					 REV_PRC_PPAXACTIONENTRY.in_ActualCostCurrency,
+           			 REV_PRC_PPAXACTIONENTRY.in_TransNo,
+           			 REV_PRC_PPAXACTIONENTRY.in_TaskID,
+           			 REV_PRC_PPAXACTIONENTRY.in_roleCode,
+           			 REV_PRC_PPAXACTIONENTRY.in_userLov1,
+           			 REV_PRC_PPAXACTIONENTRY.in_userLov2,
+           			 REV_PRC_PPAXACTIONENTRY.in_expenseType,
+					 apinfoId
+           );
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+							ROLLBACK ;
+							RAISE_APPLICATION_ERROR( SQLCODE, SQLERRM ) ;
+					END;
+					IF  REV_PRC_PPAXACTIONENTRY.errorflag != 0 THEN
+					BEGIN
+						ROLLBACK ;
+						RETURN ;
+					END;
+					END IF;
+					REV_PRC_PPAXACTIONENTRY.transactionnumber :=  REV_PRC_PPAXACTIONENTRY.newtransactionno;
+END REV_PRC_PPAXACTIONENTRY;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

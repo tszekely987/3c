@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>OBS_UNITS_INS_T1</code>
+          <table_name>PRJ_OBS_UNITS</table_name>
+          <trigger_type>BEFORE EACH ROW</trigger_type>
+          <triggering_event>INSERT</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."OBS_UNITS_INS_T1" 
+BEFORE INSERT
+ON PRJ_OBS_UNITS
+REFERENCING NEW AS NEW OLD AS OLD
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+   PRAGMA AUTONOMOUS_TRANSACTION;
+begin
+	--
+	--	First to this unit itself
+	--
+	lock table obs_units_flat_by_mode in exclusive mode;
+
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+	values (:new.id, 'OBS_UNIT_ONLY', :new.id);
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+	values (:new.id, 'OBS_UNIT_AND_CHILDREN', :new.id);
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+	values (:new.id, 'OBS_UNIT_CHILD_AND_ANCESTORS', :new.id);
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+	values (:new.id, 'OBS_UNIT_AND_ANCESTORS', :new.id);
+	
+	--
+	--	Now do the parent, and its parents, and its parents.....
+	--
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+		select 	linked_unit_id,'OBS_UNIT_AND_CHILDREN', :new.id
+		from		obs_units_flat_by_mode
+		where		unit_id = :new.parent_id
+		and			unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+		select 	linked_unit_id,'OBS_UNIT_CHILD_AND_ANCESTORS', :new.id
+		from		obs_units_flat_by_mode
+		where		unit_id = :new.parent_id
+		and			unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+		select 	:new.id,'OBS_UNIT_AND_ANCESTORS', linked_unit_id
+		from		obs_units_flat_by_mode
+		where		unit_id = :new.parent_id
+		and			unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+	insert into obs_units_flat_by_mode (unit_id, unit_mode, linked_unit_id)
+		select 	:new.id,'OBS_UNIT_CHILD_AND_ANCESTORS', linked_unit_id
+		from		obs_units_flat_by_mode
+		where		unit_id = :new.parent_id
+		and			unit_mode = 'OBS_UNIT_AND_ANCESTORS';
+	
+	commit;
+	--
+	--	A new unit does not have any children
+	--
+exception
+   when others
+   then
+      rollback;
+end;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

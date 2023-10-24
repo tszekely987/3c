@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_SUM_SLICES_ROW_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_SUM_SLICES_ROW_FCT" ( p_curve NK_CURVE, p_calendar CRV_CALENDAR )
+RETURN NK_SLICES_ROWS PIPELINED
+--PARALLEL_ENABLE ( PARTITION p_cursor BY ANY )
+IS
+  TYPE t_ARR IS VARRAY(100) OF NUMBER;
+  ARR t_ARR;
+  TOTAL_PERIODS NUMBER := 0;
+  v_curve_start PLS_INTEGER; v_curve_finish PLS_INTEGER;
+  v_empty_row NK_SLICES_ROW := NK_SLICES_ROW(null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,
+                                             null,null,null,null,null,null,null,null,null,null,null,null);
+
+BEGIN
+
+  if(p_curve IS NULL OR p_curve.segments IS NULL OR p_curve.segments.count = 0 OR p_calendar IS null) THEN
+    pipe row(v_empty_row);
+    RETURN;
+  END IF;
+
+  v_curve_start := p_curve.segments(1).segment_start;
+  v_curve_finish := p_curve.segments(p_curve.segments.count).segment_finish;
+
+  IF(  (p_calendar(1).julian_start &gt; p_curve.segments(p_curve.segments.count).segment_finish )
+    OR (p_calendar(1).julian_start = p_curve.segments(p_curve.segments.count).segment_finish and p_curve.segments(p_curve.segments.count).finish_tod = 0)
+    OR (p_calendar(p_calendar.count).julian_finish &lt; p_curve.segments(1).segment_start)) THEN
+    pipe row(v_empty_row);
+    RETURN;
+  END IF;
+
+  arr := t_arr();
+  arr.extend(100);
+
+  FOR rec IN (SELECT period, slice FROM NK_SUM_SLICES_FCT(p_curve, p_calendar)) LOOP
+    arr(rec.period) := rec.slice;
+    total_periods := total_periods + rec.slice;
+  END LOOP;
+    pipe row( NK_SLICES_ROW( p_curve.curve_sum, total_periods,
+                           arr(1), arr(2), arr(3), arr(4), arr(5), arr(6), arr(7), arr(8), arr(9), arr(10),
+                           arr(11), arr(12), arr(13), arr(14), arr(15), arr(16), arr(17), arr(18), arr(19), arr(20),
+                           arr(21), arr(22), arr(23), arr(24), arr(25), arr(26), arr(27), arr(28), arr(29), arr(30),
+                           arr(31), arr(32), arr(33), arr(34), arr(35), arr(36), arr(37), arr(38), arr(39), arr(40),
+                           arr(41), arr(42), arr(43), arr(44), arr(45), arr(46), arr(47), arr(48), arr(49), arr(50),
+                           arr(51), arr(52), arr(53), arr(54), arr(55), arr(56), arr(57), arr(58), arr(59), arr(60),
+                           arr(61), arr(62), arr(63), arr(64), arr(65), arr(66), arr(67), arr(68), arr(69), arr(70),
+                           arr(71), arr(72), arr(73), arr(74), arr(75), arr(76), arr(77), arr(78), arr(79), arr(80),
+                           arr(81), arr(82), arr(83), arr(84), arr(85), arr(86), arr(87), arr(88), arr(89), arr(90),
+                           arr(91), arr(92), arr(93), arr(94), arr(95), arr(96), arr(97), arr(98), arr(99), arr(100)));
+
+  return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

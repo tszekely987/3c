@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CLB_VALIDATE_FILE_PERMS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CLB_VALIDATE_FILE_PERMS_SP" (
+    p_user_id           in     number
+  )
+  is
+
+    v_global_security_view_exists number;
+    v_instance_sec_view_exists    number;
+    v_user_has_global_rights      number;
+    v_security_sql                varchar(4000);
+    v_instance_sql                varchar(4000);
+    v_instancewhere_sql           varchar(4000);
+    v_delete_sql                  varchar(4000);
+    v_object                      varchar(300);
+    v_object_dms_folder           varchar(300);
+    cursor attachment_enabled_objects_cur
+    is      select  distinct pa.assoc_obj_type code
+            from    clb_dms_files fi, clb_dms_folders fo, clb_dms_folders pa, clb_temp_search_ids ids, clb_dms_versions vi
+            where ids.is_attachment = 1 and ids.id = vi.id and fi.parent_folder_id = fo.id and fo.parent_folder_id = pa.id
+            and vi.file_id = fi.id;
+  begin
+
+    -- Set is_attachment 1 on rows created from ODF attachments
+    update clb_temp_search_ids set is_attachment = 1 where id in (select vi.id version_id from clb_dms_files fi,
+    clb_dms_folders fo, clb_dms_versions vi where fi.parent_folder_id = fo.id and vi.file_id =
+    fi.id and fo.ASSOC_OBJ_TYPE not in ('KS','Projects','Resources','Companies','NAME') and fo.XDM_ITEM_STATUS is null);
+
+    --
+    -- Remove ids from clb_temp_search_ids that are for ODF attachments to which the
+    -- user does not have access
+    --
+    --
+    -- loop over all the attachment enabled objects
+    --
+
+    FOR aeo IN attachment_enabled_objects_cur
+    loop
+
+      v_object := aeo.code;
+      v_object_dms_folder := v_object;
+
+      if ( v_object_dms_folder = 'Projects' ) then
+        v_object := 'project';
+      end if;
+      if ( v_object_dms_folder = 'Resources' ) then
+        v_object := 'resource';
+      end if;
+      if ( v_object_dms_folder = 'Companies' ) then
+        v_object := 'company';
+      end if;
+
+      select  count(*)
+      into    v_instance_sec_view_exists
+      from    user_views
+      where   upper(view_name) = upper('odfsec_' || v_object || '_v2' );
+
+      select  count(*)
+      into    v_global_security_view_exists
+      from    user_views
+      where   upper(view_name) = upper('odfsec_' || v_object || '_v' );
+
+      if ( (v_global_security_view_exists = 1) or (v_instance_sec_view_exists = 1) ) then
+        v_user_has_global_rights := 0;
+        if ( v_global_security_view_exists = 1 ) then
+          v_security_sql := 'select count(*) from odfsec_' || v_object || '_v gs where gs.user_id = :1';
+          execute immediate v_security_sql into v_user_has_global_rights using p_user_id;
+          end if;
+        if (v_user_has_global_rights = 0) then
+            v_instance_sql := 'select vi.id version_id from clb_dms_files fi, clb_dms_folders fo, clb_dms_versions vi, clb_dms_folders pa';
+            v_instancewhere_sql := ' where fi.parent_folder_id = fo.id and vi.file_id = fi.id and fo.parent_folder_id = pa.id  and pa.assoc_obj_type = ''' || v_object_dms_folder || '''';
+
+            if ( v_instance_sec_view_exists = 1 ) then
+              v_security_sql := v_instance_sql || ', odfsec_' || v_object || '_v2 gs';
+              v_security_sql := v_security_sql || v_instancewhere_sql || ' and gs.user_id = :1';
+              v_security_sql := v_security_sql || ' and fo.assoc_obj_id = gs.object_instance_id';
+            end if;
+
+            v_instance_sql :=  v_instance_sql || v_instancewhere_sql;
+            v_delete_sql := 'delete clb_temp_search_ids where is_attachment = 1 and id in (' || v_instance_sql || ')';
+
+            if ( v_instance_sec_view_exists = 1 ) then
+              --Consider using MINUS operator instead of not in - id in ( v_instance_sql MINUS v_security_sql )
+              v_delete_sql := v_delete_sql || ' and id not in (' || v_security_sql || ')';
+            end if;
+            execute immediate v_delete_sql using p_user_id;
+        end if;
+      end if;
+    end loop;
+  end;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

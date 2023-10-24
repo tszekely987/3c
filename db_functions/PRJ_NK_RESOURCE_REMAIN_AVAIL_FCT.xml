@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_NK_RESOURCE_REMAIN_AVAIL_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_NK_RESOURCE_REMAIN_AVAIL_FCT" (p_resource_id INTEGER, p_start TIMESTAMP DEFAULT NULL, p_finish TIMESTAMP DEFAULT NULL)
+   RETURN NUMBER
+IS
+ v_return    NUMBER;
+ v_resourceid INTEGER;
+ v_start timestamp;
+ v_finish timestamp;
+
+BEGIN
+  v_return := 0;
+
+  if(p_resource_id is null) then
+    return v_return;
+  end if;
+  v_resourceid := p_resource_id;
+
+  /*
+    overriding the start/finish date of the investment?
+  */
+  if(p_start is not null) then
+    v_start := p_start;
+  end if;
+
+  if(p_finish is not null) then
+    v_finish := p_finish;
+  end if;
+
+  /*
+    Truncate the start date and check for a time portion on the finish date, if found then truncate and add 1 day (midnight date)
+    if still null then assign max start/finish dates
+  */
+  if(v_start is not null) then
+    v_start := TRUNC(v_start,'DDD');
+  else
+    v_start := CRV_DATE_FROM_JULIAN_FCT(2);
+  end if;
+
+  if(v_finish is not null) then
+    IF(EXTRACT(HOUR FROM V_FINISH) &gt; 0) THEN
+      V_FINISH := TRUNC(V_FINISH, 'DDD') + 1;
+    ELSE
+      V_FINISH := TRUNC(V_FINISH, 'DDD');
+    END IF;
+  else
+    v_finish := CRV_DATE_FROM_JULIAN_FCT(65535);
+  end if;
+
+  -- get the availability - demand using the sql curves
+  select nk_sum_fct(odf_nk_odf_pravailcurve, v_start, v_finish) - nk_sum_fct(odf_nk_total_alloc, v_start, v_finish) into v_return
+    from prj_resources
+   where prid = v_resourceid;
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_CM_ISSUEA_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_CM_ISSUEA_SP" 
+(
+  invoiceno    VARCHAR2,
+  vInvamt      VARCHAR2,
+  newinvoiceno VARCHAR2 DEFAULT NULL,
+  userid       VARCHAR2 DEFAULT NULL
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  testcode  GLOBALPKG.STRING;
+  returncode  GLOBALPKG.STRING;
+  invoiceamount   NUMBER(32,6);
+  in_invoiceno    VARCHAR2(16);
+  billingapproval   INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+    in_invoiceno := PAC_BIL_CM_ISSUEA_SP.invoiceno;
+
+	invoiceamount :=  TO_NUMBER(vInvamt, '999999999999.99');
+	BEGIN
+	PAC_BIL_CM_VALDINVAMT_SP(in_invoiceno, invoiceamount, returncode);
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	IF  returncode = '21000' THEN
+		raise_application_error (-20012, 'Some transaction have been archived. So invoice cannot be credited.');
+	ELSE
+		IF  returncode = '23000' THEN
+			raise_application_error (-20013, 'PROJECT_CODE is closed. PROJECT_CODE status must be changed to HOLD or OPEN to issue a credit memo.');
+		ELSE
+			IF  returncode = '24000' THEN
+				raise_application_error (-20014, 'The scheduled bill has Matching Entries against it. Reverse Matchings can be done using this form before issuing a Credit Memo.');
+
+			ELSE
+				IF  returncode = '25000' THEN
+				raise_application_error (-20015, 'A credit memo has already been issued for this invoice by another user.');
+				ELSE
+				BEGIN
+				    BEGIN
+
+					DELETE FROM TEMP_BIL_CREDIT_MEMO_GENERATE ;
+
+                    INSERT INTO TEMP_BIL_CREDIT_MEMO_GENERATE
+	  		        ( APPLYTO, TRANSTYPE, COMPANY_CODE,PROJECT_CODE,
+            CHARGE_CODE, RESOURCE_CODE, BILLINGDATE, INPUT_TYPE,ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+   			          LASTUPDATEDATE, INVOICENO,NOTES, QUANTITY, WORKINT, WORKBUF, APPLYTOTRANSTYPE)
+				    SELECT  TransNo, SUBSTR('BCADAUMR', INSTR( 'B AUADAY', TransType), 2), COMPANY_CODE, PROJECT_CODE,
+              Charge_Code, RESOURCE_CODE, BillingDate, Input_Type, userid, SYSDATE, userid,
+			   		  SYSDATE, newinvoiceno, Notes, Quantity, WorkInt, WorkBuf, TransType
+				    FROM ppa_Billings
+				    WHERE InvoiceNo = in_invoiceno AND
+				  	      TransType  IN ('B', 'AU', 'AD', 'AY') AND
+			  			  Status = 0 ;
+
+  					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+
+					BEGIN
+					sp_creditmemo (in_invoiceno, newinvoiceno, userid);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+
+					BEGIN
+					PAC_PRC_BILLINGAPP_SP(in_invoiceno, userid, billingapproval);
+					EXCEPTION
+						WHEN NO_DATA_FOUND THEN
+							NULL;
+						WHEN OTHERS THEN
+							StoO_error := SQLCODE;
+							StoO_errmsg := SQLERRM;
+					END;
+
+					IF  billingapproval = 1 THEN
+					BEGIN
+						BEGIN
+						sp_reverse_billings(newinvoiceno,
+						 					userid);
+						EXCEPTION
+							WHEN NO_DATA_FOUND THEN
+								NULL;
+							WHEN OTHERS THEN
+								StoO_error := SQLCODE;
+								StoO_errmsg := SQLERRM;
+						END;
+					END;
+					ELSE
+						raise_application_error (-20016, 'A credit memo has been issued, but final approve failed.');
+
+					END IF;
+				END;
+				END IF;
+				END IF;
+			END IF;
+		END IF;
+END PAC_BIL_CM_ISSUEA_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

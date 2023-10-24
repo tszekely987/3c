@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_BILLAPPROVE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_BILLAPPROVE_SP" 
+(
+  approve            VARCHAR2,
+  COMPANY_CODE       VARCHAR2,
+  PROJECT_CODE       VARCHAR2,
+  billdate           DATE,
+  amount             NUMBER,
+  invoiceno          VARCHAR2 DEFAULT NULL,
+  notes              VARCHAR2,
+  emplevel           NUMBER,
+  costlevel          NUMBER,
+  changeorder        VARCHAR2 DEFAULT NULL,
+  username           VARCHAR2,
+  billingScheduleKey NUMBER
+)
+AS
+  StoO_selcnt        INTEGER;
+  StoO_error         INTEGER;
+  StoO_rowcnt        INTEGER;
+  StoO_crowcnt       INTEGER := 0;
+  StoO_fetchstatus   INTEGER := 0;
+  StoO_errmsg        GLOBALPKG.STRING;
+  StoO_sqlstatus     INTEGER;
+  newinvno           GLOBALPKG.STRING;
+  /* approve Y/N */
+  --determine invoice number
+  temp_rc            Sp_Billingapprovalpkg.RCT1;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	IF  NVL(RTRIM(Pac_Bil_Billapprove_Sp.invoiceno), '') IS NULL THEN
+	BEGIN
+		BEGIN
+		SELECT to_char(REVMGR_TEMP_INVOICENO_S1.NEXTVAL) INTO Pac_Bil_Billapprove_Sp.newinvno FROM DUAL;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END;
+	ELSE
+		Pac_Bil_Billapprove_Sp.newinvno :=  Pac_Bil_Billapprove_Sp.invoiceno;
+	END IF;
+	BEGIN
+	Sp_Postbill(
+	 COMPANY_CODE=&gt;Pac_Bil_Billapprove_Sp.COMPANY_CODE,
+	 MASTER_PROJECT_CODE=&gt;Pac_Bil_Billapprove_Sp.PROJECT_CODE,
+	 changeorder =&gt; NULL,
+	 in_amount=&gt;Pac_Bil_Billapprove_Sp.amount,
+	 invoiceno=&gt;Pac_Bil_Billapprove_Sp.newinvno,
+	 billdate=&gt;Pac_Bil_Billapprove_Sp.billdate,
+	 notes=&gt;Pac_Bil_Billapprove_Sp.notes,
+	 LASTUPDTDBY_RESOURCE_CODE=&gt;Pac_Bil_Billapprove_Sp.username,
+	 emplevel=&gt;4,
+	 costlevel=&gt;3,
+	 billingScheduleKey=&gt;Pac_Bil_Billapprove_Sp.billingScheduleKey);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		/*WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;*/
+	END;
+	BEGIN
+	Sp_Billingapproval(invoiceno=&gt;Pac_Bil_Billapprove_Sp.newinvno,
+	 RESOURCE_CODE=&gt;Pac_Bil_Billapprove_Sp.username,
+	 COMPANY_CODE=&gt;Pac_Bil_Billapprove_Sp.COMPANY_CODE,
+	 PROJECT_CODE=&gt;Pac_Bil_Billapprove_Sp.PROJECT_CODE,
+	 option_=&gt;2,
+	 rc1=&gt;temp_Rc);
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  Pac_Bil_Billapprove_Sp.approve = 'Y' THEN
+	BEGIN
+		BEGIN
+		REV_BILL_FINALAPP_POSTTOWIP(invoiceno=&gt;Pac_Bil_Billapprove_Sp.newinvno,
+		 userid=&gt;Pac_Bil_Billapprove_Sp.username);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				RAISE_APPLICATION_ERROR( StoO_error, StoO_errmsg );
+		END;
+	END;
+	END IF;
+END Pac_Bil_Billapprove_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

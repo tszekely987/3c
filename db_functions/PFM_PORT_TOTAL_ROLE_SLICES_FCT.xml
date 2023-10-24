@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_PORT_TOTAL_ROLE_SLICES_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_PORT_TOTAL_ROLE_SLICES_FCT" (p_portfolio NUMBER, p_plan NUMBER, p_attr_name VARCHAR, p_period_type VARCHAR, p_periods NUMBER, p_start DATE, p_cal_type VARCHAR DEFAULT 'DEFAULT', p_entity NUMBER DEFAULT 0 )
+   RETURN PFM_SLICES PIPELINED
+IS
+ v_slices PFM_SLICES;
+ v_calendar PFM_CALENDAR;
+ v_last_processed NUMBER;
+
+BEGIN
+  -- get the calendar definition
+  v_calendar := PFM_CALENDAR_FCT( p_start, p_period_type, p_periods, p_cal_type, p_entity );
+  v_last_processed := 0;
+
+  FOR ao_rec IN (
+      select port.id, port.clob_curve from pfm_clob_curves port, PFM_ROLE_CAPACITY rc
+        where port.object_id = rc.role_id and rc.portfolio_id = port.id and rc.plan_id = port.plan_id
+        and port.attribute = 'ROLE_CAPACITY' and port.table_name = 'PFM_PORTFOLIOS' and port.id = p_portfolio
+        and port.plan_id = p_plan
+  )
+  LOOP
+    -- get the slices
+    IF ( ao_rec.clob_curve IS NOT NULL ) THEN
+      v_slices := PFM_SLICES_FCT( ao_rec.id, ao_rec.clob_curve, v_calendar );
+      FOR i IN v_slices.FIRST..v_slices.LAST LOOP
+        pipe row( v_slices(i) );
+      END LOOP;
+    END IF;
+  END LOOP;
+
+  RETURN;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

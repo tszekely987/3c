@@ -1,0 +1,731 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.qry.prjStatusReport" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Status Report Indicators" languageCode="en" name="Status Report Indicators"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT DISTINCT 
+       @SELECT:DIM:USER_DEF:IMPLIED:STATUSREPORT:sr.odf_pk:dim_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.odf_pk:sr_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.odf_parent_id:project_int_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:odf_proj.name:project_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.name:report_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.cop_report_update:report_update_desc@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.cop_report_date:report_date@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.cop_key_accomplish:key_accomplish@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.cop_upcoming_act:upcoming_act@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:sr.cop_project_manager:project_manager@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:r.user_id:mgr_id@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:STATUSREPORT:r.full_name:manager_name@, 
+       @SELECT:METRIC:USER_DEF:IMPLIED:sr.COP_OVERALL_STATUS:overall_status@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:sr.COP_SCHEDULE_STATUS:schedule_status@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:sr.COP_SCOPE_STATUS:scope_status@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:sr.COP_COST_EFT_STATUS:cost_effort_status@
+FROM   odf_cop_prj_statusrpt_v2 sr
+INNER  JOIN  cop_prj_statusrpt_latest_v lsr 
+       ON    lsr.investment_id = sr.odf_parent_id
+       AND   lsr.report_id = sr.odf_pk 
+       AND   lsr.report_order = 1 
+INNER  JOIN  odf_project_v2 odf_proj 
+       ON    odf_proj.odf_pk = sr.odf_parent_id
+       AND   odf_proj.odf_pk = @NVL@(@WHERE:PARAM:XML:INTEGER:/data/id/@value@,sr.odf_parent_id)
+LEFT   OUTER JOIN srm_resources r
+             ON   sr.cop_project_manager = r.user_id 
+LEFT   OUTER JOIN prj_obs_associations assoc 
+             ON   sr.odf_parent_id = assoc.record_id 
+             AND  @UPPER@(assoc.table_name) = 'SRM_PROJECTS'
+LEFT   OUTER JOIN prj_obs_units_flat flat 
+             ON   assoc.unit_id = flat.unit_id  
+             AND  flat.branch_unit_id = @WHERE:PARAM:USER_DEF:INTEGER:obs@
+WHERE  (@WHERE:PARAM:USER_DEF:INTEGER:p_managerid@ IS NULL OR @WHERE:PARAM:USER_DEF:INTEGER:p_managerid@ = sr.cop_project_manager)
+AND    (@WHERE:PARAM:USER_DEF:STRING:p_projtype@ IS NULL   OR @WHERE:PARAM:USER_DEF:STRING:p_projtype@ = odf_proj.obj_request_type)
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:p_status@ IS NULL    OR @WHERE:PARAM:USER_DEF:INTEGER:p_status@ = CASE WHEN odf_proj.status = 1 THEN 1 WHEN odf_proj.status = 5 THEN 1 ELSE 0 END) 
+AND    (@WHERE:PARAM:USER_DEF:INTEGER:obs@ IS NULL         OR @WHERE:PARAM:USER_DEF:INTEGER:obs@ = flat.branch_unit_id)
+AND    @WHERE:PARAM:USER_DEF:INTEGER:odf_proj.is_active:active_filter@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:odf_proj.is_template:template_filter@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:odf_proj.is_program:program_filter@
+AND    @WHERE:SECURITY:PROJECT:odf_proj.odf_pk@
+AND    @FILTER@]]></nsql>
+            <attribute id="dim_id" required="false">
+              
+              
+              
+              
+              <nls description="Dimension Key" languageCode="en" name="Dimension Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="sr_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Status Report Internal ID" languageCode="en" name="Status Report Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_int_id" lookup="SCH_BROWSE_PROJECT" required="false">
+              
+              
+              
+              
+              <nls description="Project Filter" languageCode="en" name="Project Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_name" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="Project"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="report_name" required="false">
+              
+              
+              
+              
+              <nls description="Status Report" languageCode="en" name="Status Report"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="report_update_desc" required="false">
+              
+              
+              
+              
+              <nls description="Status Report Update" languageCode="en" name="Status Report Update"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="report_date" required="false">
+              
+              
+              
+              
+              <nls description="Report Date" languageCode="en" name="Report Date"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="key_accomplish" required="false">
+              
+              <nls description="Key Accomplishments" languageCode="en" name="Key Accomplishments"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="upcoming_act" required="false">
+              
+              
+              
+              
+              <nls description="Upcoming Activities" languageCode="en" name="Upcoming Activities"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="project_manager" required="false">
+              
+              <nls description="Project Manager Internal ID" languageCode="en" name="Project Manager Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="mgr_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Internal ID" languageCode="en" name="Project Manager Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="manager_name" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager" languageCode="en" name="Project Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="overall_status" required="false">
+              
+              
+              
+              
+              <nls description="Overall Status" languageCode="en" name="Overall Status"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping hi="40" lo="0" mappingCode="mapping-1" typeCode="green"/>
+                <mapping hi="90" lo="40" mappingCode="mapping-2" typeCode="yellow"/>
+                <mapping hi="100" lo="90" mappingCode="mapping-3" typeCode="red"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="schedule_status" lookup="OBJ_STATUSREPORT_STATUS_ENUM" required="false">
+              
+              
+              
+              
+              <nls description="Schedule Status" languageCode="en" name="Schedule"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="10"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="20"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="30"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="scope_status" lookup="OBJ_STATUSREPORT_STATUS_ENUM" required="false">
+              
+              
+              
+              
+              <nls description="Scope Status" languageCode="en" name="Scope"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="10"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="20"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="30"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="cost_effort_status" lookup="OBJ_STATUSREPORT_STATUS_ENUM" required="false">
+              
+              
+              
+              
+              <nls description="Cost and Effort Status" languageCode="en" name="Cost and Effort"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              <displayMapping defaultTypeCode="white" type="color">
+                <mapping mappingCode="mapping-1" typeCode="green" value="10"/>
+                <mapping mappingCode="mapping-2" typeCode="yellow" value="20"/>
+                <mapping mappingCode="mapping-3" typeCode="red" value="30"/>
+              </displayMapping>
+            </attribute>
+            <attribute id="param_template_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Template Filter" languageCode="en" name="Template Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_program_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Program Filter" languageCode="en" name="Program Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_active_filter" lookup="COP_PORTLET_BOOLEAN" required="false">
+              
+              
+              
+              
+              <nls description="Active Filter" languageCode="en" name="Active Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="OBS Filter" languageCode="en" name="OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_managerid" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Project Manager Filter" languageCode="en" name="Project Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_projtype" lookup="OBJ_IDEA_PROJECT_TYPE" required="false">
+              
+              
+              
+              
+              <nls description="Project Type Filter" languageCode="en" name="Project Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_p_status" lookup="INVESTMENT_OBJ_STATUS" required="false">
+              
+              <nls description="Project Status Filter" languageCode="en" name="Project Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="projmgr.editResource" code="odmd.lnk.resProp">
+                
+                
+                
+                
+                <nls description="Resource Properties" languageCode="en" name="Resource Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/id/@value" dataSource="input" paramCode="return_id"/>
+                <linkParam dataRef="mgr_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+              </link>
+              <link action="projmgr.projectOverview" code="project_Link">
+                
+                
+                
+                
+                <nls description="Project Overview" languageCode="en" name="Project Overview"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="projmgr.projectProperties" code="statusReport">
+                
+                
+                
+                
+                <nls description="Status Report List view" languageCode="en" name="Status Report List view"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="project_int_id" dataSource="static" paramCode="id"/>
+                <linkParam dataRef="projectCreate.subObjList.cop_prj_statusrpt" dataSource="static" paramCode="odf_view"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="odf_pk"/>
+                <linkParam dataRef="project" dataSource="static" paramCode="parentObjectCode"/>
+                <linkParam dataRef="project" dataSource="static" paramCode="odf_concrete_parent_object_code"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="odf_parent_id"/>
+                <linkParam dataRef="project_int_id" dataSource="data" paramCode="odf_cncrt_parent_id"/>
+              </link>
+              <link action="odf.cop_prj_statusrptProperties" code="statusReportProp">
+                
+                
+                
+                
+                <nls description="Status Report Properties" languageCode="en" name="Status Report Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="mainnav.work" dataSource="static" paramCode="ui.page.space"/>
+                <linkParam dataRef="cop_prj_statusrpt" dataSource="static" paramCode="odf_code"/>
+                <linkParam dataRef="/data/odf_view/@value" dataSource="input" paramCode="parent_odf_view"/>
+                <linkParam dataRef="dim_id" dataSource="data" paramCode="odf_pk"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

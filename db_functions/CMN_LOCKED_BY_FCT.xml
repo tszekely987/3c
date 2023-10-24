@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOCKED_BY_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_LOCKED_BY_FCT" (
+   P_TABLE_NAME   VARCHAR2,
+   P_LOCK_NAME    VARCHAR2,
+   P_RECORD_ID    NUMBER
+)
+   RETURN NUMBER
+/* Description:
+   ------------
+   This function returns the user id of the user that holds
+   the lock. If there is no lock it will return 0. 
+
+   Return Values:
+   --------------
+   0 if there is no lock or any other error occurred.
+   &lt;user_id&gt; if there is a lock
+
+*/
+IS
+   V_USER_ID                     NUMBER;
+BEGIN
+   SELECT   NVL (MAX (PRUSERID), -9)
+   INTO     V_USER_ID
+   FROM     PRLOCK
+   WHERE    PRTABLENAME = P_TABLE_NAME
+   AND      PRNAME = P_LOCK_NAME
+   AND      PRRECORDID = P_RECORD_ID;
+
+   IF V_USER_ID &gt;= 0
+   THEN
+      RETURN (V_USER_ID);
+   ELSE
+      RETURN (0);
+   END IF;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RETURN (-1);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

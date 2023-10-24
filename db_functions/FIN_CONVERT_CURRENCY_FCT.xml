@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>FIN_CONVERT_CURRENCY_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."FIN_CONVERT_CURRENCY_FCT" (
+      AMOUNT                     NUMBER,
+      EXCHANGERATETYPEP          varchar2,
+      EFFECTIVEDATE              DATE,
+      FROMCURRENCY               varchar2,
+      TOCURRENCYCODE             varchar2
+)
+RETURN NUMBER
+IS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+
+      VEXCHANGERATEID            NUMBER                                     := NULL;
+      VEXCHANGERATE              NUMBER                                     := 1;
+      VCURRENCYPRECISION         NUMBER                                     := 1;
+      VCONVERTEDAMOUNT           NUMBER                                     := 0;
+    
+      EUROEXCHANGERATEFROMTABV   CMN_EXCHANGERATE_PKG.EUROEXCHANGERATETAB;
+      EUROEXCHANGERATETOTABV     CMN_EXCHANGERATE_PKG.EUROEXCHANGERATETAB;
+      TRIANGULATIONRECORDV       CMN_EXCHANGERATE_PKG.TRIANGULATIONRECORD;
+      --EXCHANGERATETYPEP          CMN_LOOKUPS.LOOKUP_CODE%TYPE;
+      EXCHANGERATEREC            CMN_EXCHANGE_RATES%ROWTYPE;
+    RETAINPRECISIONMODE    NUMBER; -- retain precision change
+
+BEGIN
+           BEGIN
+           
+            /* Start the conversion process.
+               First check whether any of these currencies, fromCurrency from the parameter, or the
+               toCurrencyCode got from the entity cursor belongs to the euro union
+             */
+
+            EUROEXCHANGERATEFROMTABV := CMN_EXCHANGERATE_PKG.CMN_EXCHANGE_GET_EURO_FCT (FROMCURRENCY);
+            EUROEXCHANGERATETOTABV := CMN_EXCHANGERATE_PKG.CMN_EXCHANGE_GET_EURO_FCT (TOCURRENCYCODE);
+      RETAINPRECISIONMODE := CMN_GET_RETAIN_PRECISION_FCT();
+
+            /* If either of the currencies are euro union currencies then do the triangulation and get the
+               triangulated amount
+            */
+
+            IF (   EUROEXCHANGERATEFROMTABV (1).ISEURO = 1
+                OR EUROEXCHANGERATETOTABV (1).ISEURO = 1)
+            THEN
+               TRIANGULATIONRECORDV :=
+                  CMN_EXCHANGERATE_PKG.CMN_EURO_TRIANGULATION_FCT (FROMCURRENCY, TOCURRENCYCODE, AMOUNT, EXCHANGERATETYPEP, EFFECTIVEDATE);
+               VCONVERTEDAMOUNT := TRIANGULATIONRECORDV.CONVERTEDAMOUNT;
+               VEXCHANGERATEID := TRIANGULATIONRECORDV.EXCHANGERATEID;
+               VEXCHANGERATE := TRIANGULATIONRECORDV.CONVRATE;
+            ELSE
+               /* If neither of the currencies are euro union currencies then go to the CMN_EXCHANGE_RATES table
+                  and get the appropriate record
+                */
+
+               EXCHANGERATEREC :=
+                       CMN_EXCHANGERATE_PKG.CMN_EXCH_NONTRIANGULATION_FCT (EFFECTIVEDATE, FROMCURRENCY, TOCURRENCYCODE, EXCHANGERATETYPEP);
+               VEXCHANGERATEID := EXCHANGERATEREC.ID;
+               VEXCHANGERATE := EXCHANGERATEREC.RATE;
+               /* Find out whether the calculation method is MULTIPLY or DIVIDE and compute the converted amount */
+
+               VCURRENCYPRECISION := 0;
+               VCURRENCYPRECISION := CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT (TOCURRENCYCODE);
+
+               IF (EXCHANGERATEREC.CALCULATION_METHOD = 'MULTIPLY')
+               THEN
+             -- retain precision change
+           IF( 1 = RETAINPRECISIONMODE ) THEN
+                       VCONVERTEDAMOUNT := ROUND ( (NVL (AMOUNT, 0) * NVL (EXCHANGERATEREC.RATE, 1)), VCURRENCYPRECISION);
+             ELSE
+               VCONVERTEDAMOUNT := NVL (AMOUNT, 0) * NVL (EXCHANGERATEREC.RATE, 1);
+           END IF;     
+               ELSE
+             IF ( 1 = RETAINPRECISIONMODE ) THEN
+                       VCONVERTEDAMOUNT := ROUND ( (NVL (AMOUNT, 0) / NVL (EXCHANGERATEREC.RATE, 1)), VCURRENCYPRECISION);
+             ELSE
+               VCONVERTEDAMOUNT := NVL (AMOUNT, 0) / NVL (EXCHANGERATEREC.RATE, 1);
+           END IF;   
+               END IF;
+            END IF;
+
+         RETURN VCONVERTEDAMOUNT;
+         EXCEPTION
+            WHEN NO_DATA_FOUND
+            THEN
+        RETURN NULL;
+               --RAISE_APPLICATION_ERROR (-20077, 'Exchange Rate Not Found for HOME Currency ');
+         END;
+
+END FIN_CONVERT_CURRENCY_FCT;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

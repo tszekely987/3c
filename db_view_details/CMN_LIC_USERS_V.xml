@@ -1,0 +1,107 @@
+<ClarityDBViewQuery>
+  <QueryResult code="CMN_LIC_USERS_V">
+    <indexes/>
+    <text_length>3432</text_length>
+    <text>select distinct dist_lic_users.USER_ID,dist_lic_users.LIC_RIGHT_TYPE,dist_lic_users.LICENCE_PRIORITY,dist_lic_users.RIGHT_ID from (
+	select r.principal_id user_id, l.lic_right_type, l.licence_priority, r.right_id right_id 
+	from cmn_sec_assgnd_right r, cmn_lic_right_v l 
+	where r.right_id = l.id 
+	and r.principal_type = 'USER' 
+	and r.instance_type = 'SYSTEM' 
+	union all 
+	-- 
+	-- Global rights granted to a group 
+	-- 
+	select ug.user_id, l.lic_right_type, l.licence_priority,gh.group_id right_id 
+	from cmn_sec_user_groups ug, cmn_lic_right_v l, cmn_sec_group_hierarchies gh, cmn_sec_groups g 
+	where gh.group_id = l.id 
+	and ug.group_id = gh.parent_group_id 
+	and g.id = ug.group_id 
+	and g.is_active = 1 
+	union all 
+	-- 
+	-- Global rights granted to an OBS Unit 
+	-- 
+	select r.user_id user_id, l.lic_right_type, l.licence_priority,os.right_id right_id 
+	from cmn_lic_right_v l, 
+	cmn_sec_assgnd_right os, 
+	obs_unit_entities_v ou, 
+	srm_resources r 
+	where os.principal_type = ou.unit_mode 
+	and os.principal_id = ou.unit_id 
+	and os.instance_type = 'SYSTEM' 
+	and os.right_id = l.id 
+	and ou.instance_id = r.id 
+	and ou.table_name = 'SRM_RESOURCES' 
+	union all 
+	-- 
+	-- OBS rights granted to a user 
+	-- 
+	select r.principal_id user_id, l.lic_right_type, l.licence_priority, r.right_id right_id 
+	from cmn_sec_assgnd_right r, cmn_lic_right_v l 
+	where r.right_id = l.id 
+	and r.principal_type = 'USER' 
+	and r.instance_type like 'OBS%' 
+	union all 
+	-- 
+	-- OBS rights granted to a group 
+	-- 
+	select ug.user_id, l.lic_right_type, l.licence_priority,r.right_id right_id 
+	from cmn_sec_assgnd_right r, cmn_lic_right_v l,cmn_sec_user_groups ug, cmn_sec_groups g 
+	where r.right_id = l.id 
+	and r.principal_type = 'GROUP' 
+	and r.principal_id = ug.group_id 
+	and r.instance_type != 'SYSTEM' 
+	and g.id = ug.group_id 
+	and g.is_active = 1 
+	union all 
+	-- 
+	-- OBS rights granted to an OBS Unit 
+	-- 
+	select r.user_id user_id, l.lic_right_type, l.licence_priority,os.right_id right_id 
+	from cmn_sec_assgnd_right os, 
+	obs_unit_entities_v ou, 
+	srm_resources r, 
+	cmn_lic_right_v l 
+	where os.principal_type = ou.unit_mode 
+	and os.principal_id = ou.unit_id 
+	and os.instance_type like 'OBS%' 
+	and os.right_id = l.id 
+	and ou.instance_id = r.id 
+	and ou.table_name = 'SRM_RESOURCES' 
+	union all 
+	-- 
+	-- Instance rights granted to a user 
+	-- 
+	select principal_id user_id, l.lic_right_type, l.licence_priority,l.id right_id 
+	from cmn_sec_assgnd_obj_perm aop, cmn_lic_right_v l 
+	where aop.principal_type = 'USER' 
+	and l.id = aop.right_id 
+	union all 
+	-- 
+	-- Instance rights granted to a group 
+	-- 
+	select ug.user_id,l.lic_right_type, l.licence_priority,l.id right_id 
+	from cmn_sec_assgnd_obj_perm aop, cmn_lic_right_v l, cmn_sec_user_groups ug, cmn_sec_groups g 
+	where aop.principal_type = 'GROUP' 
+	and l.id = aop.right_id 
+	and aop.principal_id = ug.group_id 
+	and g.id = ug.group_id 
+	and g.is_active = 1 
+	union all 
+	-- 
+	--(continued from previous comment) -- Instance rights granted to an OBS Unit 
+	-- 
+	select r.user_id user_id, l.lic_right_type, l.licence_priority,os.right_id right_id 
+	from cmn_sec_assgnd_right os, 
+	obs_unit_entities_v ou, 
+	srm_resources r, 
+	cmn_lic_right_v l 
+	where os.principal_type = ou.unit_mode 
+	and os.principal_id = ou.unit_id 
+	and os.instance_type = 'INSTANCE' 
+	and os.right_id = l.id 
+	and ou.instance_id = r.id 
+	and ou.table_name = 'SRM_RESOURCES' ) dist_lic_users</text>
+  </QueryResult>
+</ClarityDBViewQuery>

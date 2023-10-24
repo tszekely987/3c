@@ -1,0 +1,1065 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_REVERSE_BILLINGS</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_REVERSE_BILLINGS" 
+(
+  invoiceno     VARCHAR2,
+  RESOURCE_CODE VARCHAR2
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  arposted  NUMBER(3,0);
+  applytoinvoice  GLOBALPKG.STRING;
+  nCreditAmount NUMBER(32,6);
+  cdate   GLOBALPKG.STRING;
+  invoicedate   DATE;
+  iBatchNo  NUMBER;
+  BillScheduleDate  DATE;
+  UF1_rowid   ROWID;
+  UF1_values_rowid  ROWID;
+  UF1_oval1   ppa_wip_values.AmountRemaining%TYPE;
+  UF1_oval2   ppa_WIP.Status%TYPE;
+  UF1_oval3   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF1_oval4   ppa_WIP.LastUpdateDate%TYPE;
+  UF1_oval5   ppa_wip_values.currency_type%TYPE;
+  /*** variables for MultiCurrency changes ***/
+  projectId pac_mnt_projects.ID%TYPE;
+  billingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  exr CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  ct varchar2(30);
+  fc varchar2(30);
+  tc varchar2(30);
+  vrates number;
+  exrate number;
+  tempAmount NUMBER(32, 6);
+  tempDate  DATE;
+  remainingAmount NUMBER;
+  iMatchReverseCount NUMBER;
+  v_HasBillingSubProjects NUMBER;
+  v_BillingProjectCode GLOBALPKG.STRING;
+  v_CompanyCode    GLOBALPKG.STRING;
+  v_CurrProjectCode    GLOBALPKG.STRING;
+  v_CurrProjectID      NUMBER;
+  v_CurrBillingProjectCode GLOBALPKG.STRING;
+  v_EnforceContractAmount NUMBER;
+  v_ProjectTitle GLOBALPKG.STRING;
+
+  CURSOR UF1_cursor IS
+    SELECT  ppa_WIP.ROWID,ppa_wip_values.ROWID, ppa_wip_values.AmountRemaining + temp_invoiceamountsp_reverse_b.totalamount,
+        0, sp_reverse_billings.RESOURCE_CODE, SYSDATE, temp_invoiceamountsp_reverse_b.CURRENCY_TYPE
+    FROM ppa_WIP, temp_invoiceamountsp_reverse_b,ppa_wip_values
+    WHERE ppa_WIP.TransNo = temp_invoiceamountsp_reverse_b.applytonumber
+    AND ppa_WIP.TransType = temp_invoiceamountsp_reverse_b.applytotranstype
+    AND ppa_wip.TRANSNO = ppa_wip_values.TRANSNO
+    AND ppa_wip_values.CURRENCY_TYPE = temp_invoiceamountsp_reverse_b.CURRENCY_TYPE
+    FOR UPDATE OF ppa_wip_values.AmountRemaining, ppa_WIP.Status, ppa_WIP.LASTUPDTDBY_RESOURCE_CODE, ppa_WIP.LastUpdateDate;
+  UF2_rowid ROWID;
+  UF2_values_rowid ROWID;
+  UF2_oval1   ppa_billing_values.AmountRemaining%TYPE;
+  UF2_oval2   ppa_Billings.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF2_oval3   ppa_Billings.LastUpdateDate%TYPE;
+  UF2_oval4   ppa_wip_values.currency_type%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT  ppa_Billings.ROWID,ppa_billing_values.ROWID, ppa_billing_values.AmountRemaining + temp_invoiceamountsp_reverse_b.totalamount,
+        sp_reverse_billings.RESOURCE_CODE, SYSDATE, temp_invoiceamountsp_reverse_b.CURRENCY_TYPE
+    FROM ppa_Billings, temp_invoiceamountsp_reverse_b,ppa_billing_values
+    WHERE ppa_Billings.TransNo = temp_invoiceamountsp_reverse_b.applytonumber
+    AND ppa_Billings.TransType = temp_invoiceamountsp_reverse_b.applytotranstype
+    AND ppa_billings.TRANSNO = ppa_billing_values.TRANSNO
+    AND ppa_billing_values.CURRENCY_TYPE = temp_invoiceamountsp_reverse_b.CURRENCY_TYPE
+    FOR UPDATE OF ppa_billing_values.AmountRemaining, ppa_Billings.LASTUPDTDBY_RESOURCE_CODE, ppa_Billings.LastUpdateDate;
+  UF3_rowid   ROWID;
+  UF3_oval1   billingschedule.billed%TYPE;
+  CURSOR UF3_cursor IS
+    SELECT billingschedule.ROWID, 0 FROM billingschedule, temp_invoicesp_reverse_billing
+    WHERE billingschedule.COMPANY_CODE = temp_invoicesp_reverse_billing.COMPANY_CODE
+    and billingschedule.PROJECT_CODE = temp_invoicesp_reverse_billing.PROJECT_CODE
+    and billingschedule.billdate = sp_reverse_billings.BillScheduleDate
+    and temp_invoicesp_reverse_billing.transtype  IN ('BP', 'BR')
+    FOR UPDATE OF billingschedule.billed;
+  UF4_rowid   ROWID;
+  UF4_oval1   pac_mnt_projects.amountbilled%TYPE;
+  CURSOR UF4_cursor IS
+    SELECT pac_mnt_projects.ROWID, NVL(pac_mnt_projects.amountbilled, 0) - temp_amountbilledsp_reverse_bi.amountbilled
+    FROM temp_amountbilledsp_reverse_bi, pac_mnt_projects
+    WHERE pac_mnt_projects.COMPANY_CODE = temp_amountbilledsp_reverse_bi.COMPANY_CODE
+    AND pac_mnt_projects.PROJECT_CODE = temp_amountbilledsp_reverse_bi.PROJECT_CODE
+    AND temp_amountbilledsp_reverse_bi.CURRENCY_TYPE = 'BILLING'
+    FOR UPDATE OF pac_mnt_projects.amountbilled;
+  UF5_rowid   ROWID;
+  UF5_oval1   ppa_Billings.GLPosted%TYPE;
+  UF5_oval2   ppa_Billings.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF5_oval3   ppa_Billings.LastUpdateDate%TYPE;
+  CURSOR UF5_cursor IS
+    SELECT ppa_Billings.ROWID, 'D', sp_reverse_billings.RESOURCE_CODE, SYSDATE FROM temp_invoicesp_reverse_billing, ppa_Billings
+    WHERE ppa_Billings.ApplyTo = temp_invoicesp_reverse_billing.transactionno
+    and temp_invoicesp_reverse_billing.glposted = 'D'
+    FOR UPDATE OF ppa_Billings.GLPosted, ppa_Billings.LASTUPDTDBY_RESOURCE_CODE, ppa_Billings.LastUpdateDate;
+
+  CURSOR GET_MASTER_BILL_PROJECTS_CSR IS
+      SELECT DISTINCT p.ID, p.PROJECT_CODE
+      FROM temp_invoicesp_reverse_billing t,
+        PAC_MNT_PROJECTS p
+      WHERE t.project_code = p.project_code ;
+
+  IV_CSR_ExchangeID     NUMBER;
+  IV_CSR_AmountReversed NUMBER(32, 6);
+  IV_CSR_CurrencyType   Varchar(30);
+  IV_CSR_CurrencyCode   Varchar(30);
+  IV_CSR_ExchangeRate   NUMBER(32, 6);
+  IV_CSR_TaxAmount      NUMBER(32, 6);
+  IV_CSR_AdminCharge    NUMBER(32, 6);
+
+  CURSOR Invoiceheader_Values_CSR IS
+    SELECT exchange_id,
+        SUM(TotalAmount),
+        invoiceheader_values.currency_type,
+        invoiceheader_values.currency_code,
+        exchange_rate,
+        NVL(taxamount,0),
+        NVL(admincharge,0)
+    FROM invoiceheader_values,
+      temp_invoicesp_reverse_billing
+    WHERE invoiceheader_values.invoiceno = sp_reverse_billings.applytoinvoice
+    AND invoiceheader_values.currency_type = temp_invoicesp_reverse_billing.CURRENCY_TYPE
+    AND SubStr( TRANSTYPE, 1, 1) = 'B'
+    GROUP BY exchange_id,
+          invoiceheader_values.currency_type,
+        invoiceheader_values.currency_code,
+        exchange_rate,
+        NVL(taxamount,0),
+        NVL(admincharge,0) ;
+
+BEGIN
+
+   select count(*) into StoO_rowcnt from ppa_transbill;
+   	sp_reverse_billings.invoicedate :=  TRUNC(SYSDATE);
+	DELETE FROM temp_invoicesp_reverse_billing;
+	DELETE FROM temp_invoiceamountsp_reverse_b;
+	DELETE FROM temp_amountbilledsp_reverse_bi;
+	DELETE FROM TEMP_PPA_INVOICEDETAILSSP_FINA;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	/*** (Muti currency to do when we add the values tables ppa_Billings_values).
+	/*** 1.The below table (temp_invoicesp_reverse_billing) is to be modified to store the currency_type .
+	/*** 2. Select amount, billing_currency_type from ppa_transbill_values ***/
+	INSERT INTO temp_invoicesp_reverse_billing(
+				TRANSACTIONDATE, TRANSACTIONNO, APPLYTONUMBER, TRANSTYPE,
+				INVOICENO, TOTALAMOUNT, COMPANY_CODE, PROJECT_CODE, GLPOSTED, APPLYTOTRANSTYPE,CURRENCY_TYPE,
+				BILLING_PROJECT_ID)
+		SELECT  B.BillingDate, B.TransNo, B.ApplyTo, B.TransType,
+				B.InvoiceNo, BV.Amount, B.COMPANY_CODE, B.PROJECT_CODE, B.GLPosted, B.ApplyToTransType,BV.CURRENCY_TYPE,
+				P.BILLING_PROJECT_ID
+		FROM ppa_TransBill T, ppa_Billings B,ppa_billing_values BV, PAC_MNT_PROJECTS P
+		WHERE T.InvoiceNo = sp_reverse_billings.invoiceno
+		and T.ApplyTo = B.TransNo
+		and B.TRANSNO = BV.TRANSNO
+		and B.PROJECT_CODE = P.PROJECT_CODE ;
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	  OPEN GET_MASTER_BILL_PROJECTS_CSR;
+	  LOOP
+		FETCH GET_MASTER_BILL_PROJECTS_CSR INTO v_CurrProjectID, v_CurrProjectCode ;
+		EXIT WHEN GET_MASTER_BILL_PROJECTS_CSR%NOTFOUND;
+
+	    BEGIN
+		  /* Get Top Level Billing Project */
+		  PAC_BIL_GET_BILLING_PROJECT_SP( v_CurrProjectID, v_CurrBillingProjectCode, v_EnforceContractAmount, v_ProjectTitle ) ;
+        END;
+
+	    BEGIN
+	      StoO_error   := 0;
+	      StoO_rowcnt  := 0;
+	      UPDATE temp_invoicesp_reverse_billing
+	        SET BILLING_PROJECT_CODE = v_CurrBillingProjectCode
+			WHERE PROJECT_CODE = v_CurrProjectCode;
+	      StoO_rowcnt := SQL%ROWCOUNT;
+	      EXCEPTION
+		    WHEN NO_DATA_FOUND THEN
+			  NULL;
+		    WHEN OTHERS THEN
+			  StoO_error := SQLCODE;
+			  StoO_errmsg := SQLERRM;
+	    END;
+	  END LOOP ;
+	  CLOSE GET_MASTER_BILL_PROJECTS_CSR ;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_invoiceamountsp_reverse_b(
+		   		APPLYTONUMBER, TOTALAMOUNT, APPLYTOTRANSTYPE, CURRENCY_TYPE)
+		SELECT  applytonumber, SUM(totalamount * SIGN(INSTR( 'B ADAY', transtype) - INSTR( 'AU', transtype))), applytotranstype, currency_type
+		FROM temp_invoicesp_reverse_billing
+		GROUP BY applytonumber, applytotranstype,currency_type;
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   distinct invoiceno
+		INTO sp_reverse_billings.applytoinvoice FROM temp_invoicesp_reverse_billing;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	IF  sp_reverse_billings.applytoinvoice IS NULL THEN
+		RETURN ;
+	END IF;
+	SAVEPOINT tran1;
+
+	BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+	  SELECT HAS_BILLING_SUBPROJECTS,
+		     BILLING_PROJECT_CODE,
+			 COMPANY_CODE
+	    INTO v_HasBillingSubProjects,
+	  	     v_BillingProjectCode,
+			 v_CompanyCode
+		FROM INVOICEHEADER
+		WHERE INVOICENO = sp_reverse_billings.applytoinvoice ;
+
+	  EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+		  v_HasBillingSubProjects := 0;
+		WHEN OTHERS THEN
+		  StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	/* 9/17/2001 Changed for line item credit memos */
+	UPDATE ppa_Billings
+	SET Status = 2,
+	LASTUPDTDBY_RESOURCE_CODE = sp_reverse_billings.RESOURCE_CODE,
+	LastUpdateDate = SYSDATE
+	WHERE TransNo IN ( SELECT TRANSACTIONNO FROM temp_invoicesp_reverse_billing where currency_type='BILLING');
+
+	UPDATE ppa_billing_values
+	SET amountremaining = 0
+	where Transno IN ( SELECT TRANSACTIONNO FROM temp_invoicesp_reverse_billing where currency_type='BILLING');
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	/* Update the ppa_wip from natural currency and populate the values table with all the currency types.*/
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid,UF1_values_rowid, UF1_oval1, UF1_oval2, UF1_oval3, UF1_oval4,UF1_oval5;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		IF ( UF1_oval5 = 'NATURAL') THEN
+			UPDATE ppa_WIP
+			SET	Status = UF1_oval2,
+			LASTUPDTDBY_RESOURCE_CODE = UF1_oval3,
+			LastUpdateDate = UF1_oval4
+			WHERE ROWID = UF1_rowid;
+		END IF;
+
+		UPDATE ppa_wip_values
+		SET amountremaining = UF1_oval1
+		WHERE ROWID = UF1_values_rowid;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+/* 12/14/98 PTR # 10527 */
+	END;
+	END IF;
+
+	/* Update the ppa_billing_values */
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_values_rowid, UF2_oval1, UF2_oval2, UF2_oval3, UF2_oval4;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		UPDATE ppa_billing_values
+		SET amountremaining = UF2_oval1
+		WHERE ROWID = UF2_values_rowid;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+/*  BPs and BRs  */
+	END;
+	END IF;
+
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM temp_invoicesp_reverse_billing
+		WHERE temp_invoicesp_reverse_billing.transtype  IN ('BP', 'BR')
+		   );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+/* PTR # 11421 3/29/99 */
+		BEGIN
+
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   BillScheduleDate
+			INTO sp_reverse_billings.BillScheduleDate
+			FROM ppa_BillingDetails D, temp_invoicesp_reverse_billing
+			WHERE temp_invoicesp_reverse_billing.transactionno = D.TransNo
+			AND temp_invoicesp_reverse_billing.CURRENCY_TYPE ='BILLING';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		OPEN UF3_cursor;
+		LOOP
+			FETCH UF3_cursor INTO UF3_rowid, UF3_oval1;
+			EXIT WHEN UF3_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE billingschedule
+			SET
+			billed = UF3_oval1,
+			invoiceno = null
+			WHERE ROWID = UF3_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF3_cursor;
+/* PTR # 11421 3/29/99 */
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+	END;
+
+	/* Here we must determine if this invoice is a match reveral. If so, we will not decrement the PAC_MNT_PROJECTS
+	   amountbilled */
+
+	/* OBSOLETE 2/26/200 BEGIN
+	  StoO_rowcnt := 0;
+	  StoO_selcnt := 0;
+	  StoO_error  := 0;
+	  SELECT   COUNT(*)
+		INTO iMatchReverseCount
+		FROM ppa_TransBill
+		WHERE InvoiceNo = sp_reverse_billings.invoiceno AND
+			  TransType = 'MR';
+
+	  StoO_rowcnt := SQL%ROWCOUNT;
+	  EXCEPTION
+	  WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+		    StoO_selcnt := 2;
+	  WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+	  WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END; */
+
+--   Does not start with match, so use count Vantive 48781
+--	IF  UPPER(SUBSTR(sp_reverse_billings.invoiceno, 1, 5)) != 'MATCH' THEN
+	IF NVL( iMatchReverseCount, 0 ) = 0 Then
+	BEGIN
+		BEGIN
+		  StoO_error   := 0;
+		  StoO_rowcnt  := 0;
+
+		  /* If Has Billing SubProjects then insert one row so that master project has AmountBilled decremented */
+		  IF v_HasBillingSubProjects = 1 Then
+		    BEGIN
+		      INSERT INTO temp_amountbilledsp_reverse_bi
+		      (COMPANY_CODE, PROJECT_CODE, AMOUNTBILLED, CURRENCY_TYPE)
+		        SELECT  v_CompanyCode, v_BillingProjectCode, SUM(totalamount), CURRENCY_TYPE
+			      FROM temp_invoicesp_reverse_billing
+			      WHERE SUBSTR(transtype, 1, 1) = 'B'
+			      GROUP BY CURRENCY_TYPE;
+
+		      StoO_rowcnt := SQL%ROWCOUNT;
+		      EXCEPTION
+			    WHEN NO_DATA_FOUND THEN
+				  NULL;
+			    WHEN OTHERS THEN
+				  StoO_error := SQLCODE;
+				  StoO_errmsg := SQLERRM;
+		    END;
+		  ELSE
+		    BEGIN
+		      INSERT INTO temp_amountbilledsp_reverse_bi
+		      (COMPANY_CODE, PROJECT_CODE, AMOUNTBILLED, CURRENCY_TYPE)
+		        SELECT  COMPANY_CODE, NVL( BILLING_PROJECT_CODE, PROJECT_CODE ), SUM(totalamount), CURRENCY_TYPE
+			      FROM temp_invoicesp_reverse_billing
+			      WHERE SUBSTR(transtype, 1, 1) = 'B'
+			      GROUP BY COMPANY_CODE, NVL( BILLING_PROJECT_CODE, PROJECT_CODE ), CURRENCY_TYPE;
+
+		      StoO_rowcnt := SQL%ROWCOUNT;
+		      EXCEPTION
+			    WHEN NO_DATA_FOUND THEN
+				  NULL;
+			    WHEN OTHERS THEN
+				  StoO_error := SQLCODE;
+				  StoO_errmsg := SQLERRM;
+		    END;
+		  END IF;
+		END;
+
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+
+		OPEN UF4_cursor;
+		LOOP
+			FETCH UF4_cursor INTO UF4_rowid, UF4_oval1;
+			EXIT WHEN UF4_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+      UPDATE pac_mnt_projects
+			SET
+			amountbilled = UF4_oval1
+			WHERE ROWID = UF4_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF4_cursor;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+	SELECT s_307_1_ppa_postingbatch.nextval, SYSDATE, sp_reverse_billings.RESOURCE_CODE, 'B', 'Credit Memo To ppa_Billings'
+		FROM DUAL;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+	    ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	select s_307_1_ppa_postingbatch.currval into sp_reverse_billings.iBatchNo from dual;
+	-- Insert a new record(bill) into the ppa_billings and corresponding 5 values in the values table.
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_Billings (TRANSNO, SourceModule, ApplyTo, TransType, COMPANY_CODE, PROJECT_CODE,
+		   					  Charge_Code, RESOURCE_CODE, BillingDate, Input_Type,
+							  InvoiceNo, Status, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE,
+							  LastUpdateDate, GLPosted, Quantity, BatchNo, ApplyToTransType,
+							  ExternalTransNo, WorkInt, WorkBuf,external_id)
+	SELECT  S_13_1_PPA_BILLINGS.nextval, SourceModule, ApplyTo, TransType, COMPANY_CODE, PROJECT_CODE,
+			Charge_Code,  RESOURCE_CODE, BillingDate, Input_Type,
+            InvoiceNo, 0, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE,
+			LastUpdateDate, 'N', Quantity, sp_reverse_billings.iBatchNo, ApplyToTransType,
+		    ExternalTransNo, TransNo, WorkBuf,external_id
+		 FROM ppa_TransBill
+		WHERE InvoiceNo = sp_reverse_billings.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO ppa_Billing_values (id, transno, exchange_id, Amount, AmountRemaining, currency_type,
+		   currency_code, exchange_rate, billrate )
+	SELECT  ppa_billing_values_s1.nextval, B.transno, exchange_id, TBV.Amount, TBV.Amount, TBV.currency_type,
+			TBV.currency_code, TBV.exchange_rate, TBV.billrate
+		 FROM ppa_TransBill_values TBV,
+		 	  ppa_Billings B,
+			  ppa_TransBill TB
+		WHERE B.InvoiceNo = sp_reverse_billings.invoiceno AND
+		      TB.TransNo = B.WorkInt AND
+			  TBV.TransNo = TB.TransNo;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+/* Populate ppa_InvoiceDetails based on those line items being Credit Memoed  */
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA(InvoiceNo, EntryType, LevelCode, Percentage,
+		   									   TaxableAmt, Amount, TaxCode, CURRENCY_TYPE,
+											   CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+      SELECT sp_reverse_billings.invoiceno, D.ENTRY_TYPE, D.TAX_METHOD_CODE, D.PERCENTAGE,
+	  		 SUM( D.AMOUNT ), ROUND(( SUM( D.AMOUNT ) * ( D.PERCENTAGE / 100 ) ), 2), D.TAX_CODE, D.CURRENCY_TYPE,
+			 D.CURRENCY_CODE, D.EXCHANGE_ID, D.EXCHANGE_RATE
+	    FROM PAC_BIL_INVOICE_TRN_DETAILS D,
+			 ppa_TransBill TB
+		WHERE TB.InvoiceNo = sp_reverse_billings.invoiceno AND
+			  D.TransNo = TB.ApplyTo
+		GROUP BY D.ENTRY_TYPE,
+			     D.TAX_METHOD_CODE,
+				 D.PERCENTAGE,
+				 D.TAX_CODE,
+				 D.CURRENCY_TYPE,
+				 D.CURRENCY_CODE,
+				 D.EXCHANGE_ID,
+				 D.EXCHANGE_RATE ;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO ppa_invoiceDetails (InvoiceNo, EntryType, LevelCode, Percentage, TaxCode, geocode_ship_to, geocode_ship_from, geocode_order_accepted)
+	SELECT DISTINCT  InvoiceNo, EntryType, LevelCode, Percentage, TaxCode, geocode_ship_to, geocode_ship_from, geocode_order_accepted
+		 FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+		 WHERE CURRENCY_TYPE = 'BILLING';
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	/* Multicurrency Change
+	* insert into ppa_invoicedetails_values
+	*/
+	DELETE FROM TEMP_PPA_INVOICEDETAILS_VALUES;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	INSERT INTO TEMP_PPA_INVOICEDETAILS_VALUES ( InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType)
+    SELECT  InvoiceNo, TaxableAmt, SUM( Amount ), currency_type, currency_code,
+		   exchange_id, exchange_rate, EntryType
+	   FROM TEMP_PPA_INVOICEDETAILSSP_FINA
+   	   GROUP BY InvoiceNo, TaxableAmt, currency_type, currency_code, exchange_id, exchange_rate, EntryType;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+    INSERT INTO PPA_INVOICEDETAILS_VALUES (Id, InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType)
+		   SELECT  ppa_invoicedetails_values_S1.nextval, InvoiceNo, TaxableAmt, Amount, currency_type, currency_code,
+				   exchange_id, exchange_rate, EntryType
+		   FROM TEMP_PPA_INVOICEDETAILS_VALUES;
+
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT TRAN1;
+		RETURN ;
+	END;
+	END IF;
+
+	sp_reverse_billings.arposted :=  0;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM billingschedule
+		WHERE invoiceno = sp_reverse_billings.applytoinvoice
+		 and atf = 1 ) ;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+/*  LB  11/01/96   PTR #5536  */
+		sp_reverse_billings.arposted :=  1;
+	END IF;
+	END;
+
+	/* LINEITEM CREDIT MEMO CHG */
+	SELECT SUM( AMOUNTBILLED )
+		   INTO nCreditAmount
+		   FROM temp_amountbilledsp_reverse_bi
+		   WHERE CURRENCY_TYPE = 'BILLING';
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO invoiceheader (invoiceno, invtype, cmsgroupno, invoicedate, COMPANY_CODE, RESOURCE_CODE, printed, arposted, status, invoiceno_applyto,
+		   					   CONSOLIDATED, HAS_BILLING_SUBPROJECTS, BILLING_PROJECT_CODE )
+	SELECT  sp_reverse_billings.invoiceno, 'C', sp_reverse_billings.invoiceno,
+		   sp_reverse_billings.invoicedate, COMPANY_CODE, RESOURCE_CODE,
+		   0, sp_reverse_billings.arposted, '9', sp_reverse_billings.applytoinvoice,
+		   CONSOLIDATED, HAS_BILLING_SUBPROJECTS, BILLING_PROJECT_CODE
+		 FROM invoiceheader
+		WHERE invoiceno = sp_reverse_billings.applytoinvoice;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	OPEN Invoiceheader_Values_CSR;
+	LOOP
+		FETCH Invoiceheader_Values_CSR INTO 	IV_CSR_ExchangeID,
+			  						   			IV_CSR_AmountReversed,
+												IV_CSR_CurrencyType,
+												IV_CSR_CurrencyCode,
+												IV_CSR_ExchangeRate,
+												IV_CSR_TaxAmount,
+												IV_CSR_AdminCharge ;
+
+		EXIT WHEN Invoiceheader_Values_CSR%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* Update Amount_Remaining of apply to invoice */
+		UPDATE invoiceheader_values
+        SET AMOUNT_REMAINING = AMOUNT_REMAINING - IV_CSR_AmountReversed
+		WHERE invoiceno = sp_reverse_billings.applytoinvoice AND
+			  Currency_Type = IV_CSR_CurrencyType ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		IF  StoO_error != 0 THEN
+	  	  BEGIN
+		    ROLLBACK TO SAVEPOINT tran1;
+		    RETURN ;
+	      END;
+	    END IF;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* Populate invoiceheader_values for new credit memo */
+	   	INSERT INTO invoiceheader_values(id, 		invoiceno, 		exchange_id,   invoiceamount,
+			   						     taxamount, currency_type,  currency_code, exchange_rate, admincharge, amount_remaining)
+			VALUES ( invoiceheader_values_s1.nextval, sp_reverse_billings.invoiceno, IV_CSR_ExchangeID, IV_CSR_AmountReversed,
+				     IV_CSR_TaxAmount, IV_CSR_CurrencyType, IV_CSR_CurrencyCode, IV_CSR_ExchangeRate, IV_CSR_AdminCharge, IV_CSR_AmountReversed ) ;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		IF  StoO_error != 0 THEN
+	  	  BEGIN
+		    ROLLBACK TO SAVEPOINT tran1;
+		    RETURN ;
+	      END;
+	    END IF;
+	END LOOP;
+
+	CLOSE Invoiceheader_Values_CSR;
+	IF  StoO_error != 0 THEN
+	  BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	  END;
+	END IF;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	UPDATE ppa_WIP
+	SET InvoiceNo = NULL,
+	LASTUPDTDBY_RESOURCE_CODE = sp_reverse_billings.RESOURCE_CODE,
+	LastUpdateDate = SYSDATE
+	WHERE InvoiceNo = sp_reverse_billings.applytoinvoice
+	 AND Chargeable = 0
+	 AND Status != 2;
+	StoO_rowcnt := SQL%ROWCOUNT;
+
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+/* 4/7/00  Should not reset Status to 0 for already reversed non-chargeable transactions */
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	  StoO_error   := 0;
+	  StoO_rowcnt  := 0;
+
+	/*  Line Item CreditMemo Status 2 indicates full reversal. Only subtract what's been credited from amount_remaining */
+
+	  UPDATE invoiceheader
+	  SET status = '2'
+	  WHERE invoiceno = sp_reverse_billings.applytoinvoice;
+
+	  EXCEPTION
+	    WHEN NO_DATA_FOUND THEN
+		  NULL;
+	    WHEN OTHERS THEN
+	      StoO_error := SQLCODE;
+		  StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	/* Get the amount_remaining from the values table and check if it is more than 0.
+	   If it is, then set the line item creditmemo status to 4 which indicates partial reversal*/
+
+	remainingAmount := 0;
+	SELECT amount_remaining INTO remainingAmount
+	FROM invoiceheader_values
+	WHERE invoiceno = sp_reverse_billings.applytoinvoice
+	AND currency_type = 'BILLING';
+
+	IF ( remainingAmount &gt; 0 ) THEN
+		UPDATE invoiceheader
+		SET status = '4'
+		WHERE invoiceno = sp_reverse_billings.applytoinvoice ;
+	END IF;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM TEMP_PPA_INVOICEDETAILSSP_FINA;
+	DELETE  ppa_TransBill_Values TBV
+		WHERE TBV.TransNo IN (SELECT TransNo FROM ppa_TransBill WHERE InvoiceNo = sp_reverse_billings.invoiceno);
+	DELETE  ppa_TransBill
+		WHERE InvoiceNo = sp_reverse_billings.invoiceno;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM temp_invoicesp_reverse_billing
+		WHERE glposted = 'D' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		OPEN UF5_cursor;
+		LOOP
+			FETCH UF5_cursor INTO UF5_rowid, UF5_oval1, UF5_oval2, UF5_oval3;
+			EXIT WHEN UF5_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE ppa_Billings
+			SET
+			GLPosted = UF5_oval1,
+			LASTUPDTDBY_RESOURCE_CODE = UF5_oval2,
+			LastUpdateDate = UF5_oval3
+			WHERE ROWID = UF5_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF5_cursor;
+	END IF;
+	END;
+	IF  StoO_error != 0 THEN
+	BEGIN
+		ROLLBACK TO SAVEPOINT tran1;
+		RETURN ;
+	END;
+	END IF;
+	COMMIT WORK;
+END sp_reverse_billings;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

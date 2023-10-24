@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_GROUP_HIERS_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SEC_GROUP_HIERS_DEL_SP" (
+      OLD_GROUP_ID          NUMBER,
+      OLD_PARENT_GROUP_ID   NUMBER
+   )
+   AS
+
+    BEGIN
+      IF OLD_GROUP_ID = OLD_PARENT_GROUP_ID
+      THEN
+         DELETE
+           FROM CMN_SEC_GROUP_FLAT_HIERS
+          WHERE GROUP_ID = OLD_GROUP_ID
+            OR  PARENT_GROUP_ID = OLD_PARENT_GROUP_ID;
+      ELSE
+         DELETE FROM CMN_SEC_GROUP_FLAT_HIERS
+         WHERE id IN (SELECT FH.id
+                          FROM CMN_SEC_GROUP_FLAT_HIERS FH,
+                               CMN_SEC_GROUP_FLAT_HIERS FH2,
+                               CMN_SEC_GROUP_FLAT_HIERS FH3
+                         WHERE FH2.GROUP_ID = OLD_PARENT_GROUP_ID
+                           AND FH3.PARENT_GROUP_ID = OLD_GROUP_ID
+                           AND FH2.PARENT_GROUP_ID = FH.PARENT_GROUP_ID
+                           AND FH3.GROUP_ID = FH.GROUP_ID)
+        and id not in (SELECT FH3.id
+                          FROM CMN_SEC_GROUP_FLAT_HIERS FH,
+                               CMN_SEC_GROUP_FLAT_HIERS FH2,
+                               CMN_SEC_GROUP_FLAT_HIERS FH3
+                         WHERE fh.group_id = OLD_GROUP_ID
+                           and fh2.group_id != old_group_id
+                           and fh2.parent_group_id = fh.parent_group_id
+                           and fh2.parent_group_id = OLD_PARENT_GROUP_ID
+                           and fh3.group_id = fh2.group_id
+                           and fh3.parent_group_id = OLD_GROUP_ID);                   
+                             
+      END IF;
+   END CMN_SEC_GROUP_HIERS_DEL_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

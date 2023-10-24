@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>NBI_PM_PTF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."NBI_PM_PTF_SP" (
+   P_PROJECT_ID        NUMBER,
+   P_WEEK_KEY          VARCHAR2,
+   P_MONTH_KEY         VARCHAR2,
+   P_PRIOR_WEEK_KEY    VARCHAR2,
+   P_PRIOR_MONTH_KEY   VARCHAR2
+)
+AS
+   V_PROJECT_ID                  NUMBER;
+   V_IS_ACTIVE                   NUMBER;
+   V_IS_APPROVED                 NUMBER;
+   V_GOAL_SCORE                  NUMBER;
+   V_PRIORITY                    NUMBER;
+   V_START_DATE                  DATE;
+   V_BASE_START_DATE             DATE;
+   V_FINISH_DATE                 DATE;
+   V_BASE_FINISH_DATE            DATE;
+   V_START_VARIANCE              NUMBER;
+   V_FINISH_VARIANCE             NUMBER;
+   V_BUDGET_HOURS                NUMBER;
+   V_ACTUAL_HOURS                NUMBER;
+   V_BASELINE_HOURS              NUMBER;
+   V_ETC_HOURS                   NUMBER;
+   V_ALLOCATED_HOURS             NUMBER;
+   V_COST_BASE_LABOR             NUMBER;
+   V_COST_BASE_EQUIP             NUMBER;
+   V_COST_BASE_EXPENSE           NUMBER;
+   V_COST_BASE_MATL              NUMBER;
+   V_COST_BASE_TOTAL             NUMBER;
+   V_COST_ACT_LABOR              NUMBER;
+   V_COST_ACT_EQUIP              NUMBER;
+   V_COST_ACT_EXPENSE            NUMBER;
+   V_COST_ACT_MATL               NUMBER;
+   V_COST_ACT_TOTAL              NUMBER;
+   V_COST_ETC_LABOR              NUMBER;
+   V_COST_ETC_EQUIP              NUMBER;
+   V_COST_ETC_EXPENSE            NUMBER;
+   V_COST_ETC_MATL               NUMBER;
+   V_COST_ETC_TOTAL              NUMBER;
+   V_CURRENCY_CODE               VARCHAR2(30);
+   V_PCT_PLAN_EXPANDED           NUMBER;
+   V_PCT_COMPLETE                NUMBER;
+   V_EARNED_VALUE                NUMBER;
+   V_PLANNED_VALUE               NUMBER;
+   V_SCHEDULE_VARIANCE           NUMBER;
+   V_COST_VARIANCE               NUMBER;
+   V_CPI_NUMBER                  NUMBER;
+   V_SPI_NUMBER                  NUMBER;
+   V_OPEN_TASKS                  NUMBER;
+   V_CLOSED_TASKS                NUMBER;
+   V_OPEN_ISSUES                 NUMBER;
+   V_CLOSED_ISSUES               NUMBER;
+   V_OPEN_RISKS                  NUMBER;
+   V_CLOSED_RISKS                NUMBER;
+   V_IS_OPP_ENABLED              NUMBER;
+   V_IS_FM_ENABLED               NUMBER;
+   V_IS_MGMT_ENABLED             NUMBER;
+   V_NUMBER_OF_RESOURCES         NUMBER;
+   V_COUNT                       NUMBER;
+   V_LAST_PERIOD_OPEN_TASKS      NUMBER;
+   V_LAST_PERIOD_CLOSED_TASKS    NUMBER;
+   V_LAST_PERIOD_OPEN_ISSUES     NUMBER;
+   V_LAST_PERIOD_CLOSED_ISSUES   NUMBER;
+   V_LAST_PERIOD_OPEN_RISKS      NUMBER;
+   V_LAST_PERIOD_CLOSED_RISKS    NUMBER;
+   V_LAST_PERIOD_ACTUAL_HOURS    NUMBER;
+   V_LAST_PERIOD_BASELINE_HOURS  NUMBER;
+   V_LAST_PERIOD_ETC_HOURS       NUMBER;
+   V_CALENDAR_TIME_KEY           VARCHAR2(100);
+   V_PRIOR_CALENDAR_TIME_KEY     VARCHAR2(100);
+   I                             INTEGER;
+   V_STMT                        VARCHAR2(200);
+BEGIN
+   FOR I IN 0 .. 1
+   LOOP
+      IF I = 0
+      THEN
+         V_CALENDAR_TIME_KEY := P_WEEK_KEY;
+         V_PRIOR_CALENDAR_TIME_KEY := P_PRIOR_WEEK_KEY;
+      ELSE
+         V_CALENDAR_TIME_KEY := P_MONTH_KEY;
+         V_PRIOR_CALENDAR_TIME_KEY := P_PRIOR_MONTH_KEY;
+      END IF;
+
+      V_STMT := 'Selecting from NBI_PROJECT_CURRENT_FACTS';
+      SELECT PROJECT_ID,
+             IS_ACTIVE,
+             IS_APPROVED,
+             GOAL_SCORE,
+             PRIORITY,
+             START_DATE,
+             BASE_START_DATE,
+             FINISH_DATE,
+             BASE_FINISH_DATE,
+             START_VARIANCE,
+             FINISH_VARIANCE,
+             BUDGET_HOURS,
+             ACTUAL_HOURS,
+             BASELINE_HOURS,
+             ETC_HOURS,
+             ALLOCATED_HOURS,
+             COST_BASE_LABOR,
+             COST_BASE_EQUIP,
+             COST_BASE_EXPENSE,
+             COST_BASE_MATL,
+             COST_BASE_TOTAL,
+             COST_ACT_LABOR,
+             COST_ACT_EQUIP,
+             COST_ACT_EXPENSE,
+             COST_ACT_MATL,
+             COST_ACT_TOTAL,
+             COST_ETC_LABOR,
+             COST_ETC_EQUIP,
+             COST_ETC_EXPENSE,
+             COST_ETC_MATL,
+             COST_ETC_TOTAL,
+             CURRENCY_CODE,
+             PCT_PLAN_EXPANDED,
+             PCT_COMPLETE,
+             EARNED_VALUE,
+             PLANNED_VALUE,
+             SCHEDULE_VARIANCE,
+             COST_VARIANCE,
+             CPI_NUMBER,
+             SPI_NUMBER,
+             OPEN_TASKS,
+             CLOSED_TASKS,
+             OPEN_ISSUES,
+             CLOSED_ISSUES,
+             OPEN_RISKS,
+             CLOSED_RISKS,
+             IS_OPP_ENABLED,
+             IS_FM_ENABLED,
+             IS_MGMT_ENABLED
+        INTO V_PROJECT_ID,
+             V_IS_ACTIVE,
+             V_IS_APPROVED,
+             V_GOAL_SCORE,
+             V_PRIORITY,
+             V_START_DATE,
+             V_BASE_START_DATE,
+             V_FINISH_DATE,
+             V_BASE_FINISH_DATE,
+             V_START_VARIANCE,
+             V_FINISH_VARIANCE,
+             V_BUDGET_HOURS,
+             V_ACTUAL_HOURS,
+             V_BASELINE_HOURS,
+             V_ETC_HOURS,
+             V_ALLOCATED_HOURS,
+             V_COST_BASE_LABOR,
+             V_COST_BASE_EQUIP,
+             V_COST_BASE_EXPENSE,
+             V_COST_BASE_MATL,
+             V_COST_BASE_TOTAL,
+             V_COST_ACT_LABOR,
+             V_COST_ACT_EQUIP,
+             V_COST_ACT_EXPENSE,
+             V_COST_ACT_MATL,
+             V_COST_ACT_TOTAL,
+             V_COST_ETC_LABOR,
+             V_COST_ETC_EQUIP,
+             V_COST_ETC_EXPENSE,
+             V_COST_ETC_MATL,
+             V_COST_ETC_TOTAL,
+             V_CURRENCY_CODE,
+             V_PCT_PLAN_EXPANDED,
+             V_PCT_COMPLETE,
+             V_EARNED_VALUE,
+             V_PLANNED_VALUE,
+             V_SCHEDULE_VARIANCE,
+             V_COST_VARIANCE,
+             V_CPI_NUMBER,
+             V_SPI_NUMBER,
+             V_OPEN_TASKS,
+             V_CLOSED_TASKS,
+             V_OPEN_ISSUES,
+             V_CLOSED_ISSUES,
+             V_OPEN_RISKS,
+             V_CLOSED_RISKS,
+             V_IS_OPP_ENABLED,
+             V_IS_FM_ENABLED,
+             V_IS_MGMT_ENABLED
+        FROM NBI_PROJECT_CURRENT_FACTS
+       WHERE PROJECT_ID = P_PROJECT_ID;
+      V_STMT := 'Getting facts from prior period';
+      SELECT NVL (MAX (OPEN_TASKS), 0),
+             NVL (MAX (CLOSED_TASKS), 0),
+             NVL (MAX (OPEN_ISSUES), 0),
+             NVL (MAX (CLOSED_ISSUES), 0),
+             NVL (MAX (OPEN_RISKS), 0),
+             NVL (MAX (CLOSED_RISKS), 0),
+             NVL (MAX (ACTUAL_HOURS), 0),
+             NVL (MAX (BASELINE_HOURS), 0),
+             NVL (MAX (ETC_HOURS), 0)
+        INTO V_LAST_PERIOD_OPEN_TASKS,
+             V_LAST_PERIOD_CLOSED_TASKS,
+             V_LAST_PERIOD_OPEN_ISSUES,
+             V_LAST_PERIOD_CLOSED_ISSUES,
+             V_LAST_PERIOD_OPEN_RISKS,
+             V_LAST_PERIOD_CLOSED_RISKS,
+             V_LAST_PERIOD_ACTUAL_HOURS,
+             V_LAST_PERIOD_BASELINE_HOURS,
+             V_LAST_PERIOD_ETC_HOURS
+        FROM NBI_PM_PT_FACTS
+       WHERE PROJECT_ID = P_PROJECT_ID
+         AND CALENDAR_TIME_KEY = V_PRIOR_CALENDAR_TIME_KEY;
+      V_STMT := 'Check if record already exists in NBI_PM_PT_FACTS';
+      SELECT COUNT (*)
+        INTO V_COUNT
+        FROM NBI_PM_PT_FACTS
+       WHERE PROJECT_ID = P_PROJECT_ID
+         AND CALENDAR_TIME_KEY = V_CALENDAR_TIME_KEY;
+
+      IF V_COUNT &lt;&gt; 0
+      THEN
+         BEGIN
+            V_STMT := 'Updating NBI_PM_PT_FACTS';
+            UPDATE NBI_PM_PT_FACTS
+               SET PROJECT_ID = V_PROJECT_ID,
+                   CALENDAR_TIME_KEY = V_CALENDAR_TIME_KEY,
+                   IS_ACTIVE = V_IS_ACTIVE,
+                   IS_APPROVED = V_IS_APPROVED,
+                   GOAL_SCORE = V_GOAL_SCORE,
+                   PRIORITY = V_PRIORITY,
+                   START_DATE = V_START_DATE,
+                   BASE_START_DATE = V_BASE_START_DATE,
+                   FINISH_DATE = V_FINISH_DATE,
+                   BASE_FINISH_DATE = V_BASE_FINISH_DATE,
+                   START_VARIANCE = V_START_VARIANCE,
+                   FINISH_VARIANCE = V_FINISH_VARIANCE,
+                   BUDGET_HOURS = V_BUDGET_HOURS,
+                   ACTUAL_HOURS = V_ACTUAL_HOURS,
+                   BASELINE_HOURS = V_BASELINE_HOURS,
+                   ETC_HOURS = V_ETC_HOURS,
+                   ALLOCATED_HOURS = V_ALLOCATED_HOURS,
+                   COST_BASE_LABOR = V_COST_BASE_LABOR,
+                   COST_BASE_EQUIP = V_COST_BASE_EQUIP,
+                   COST_BASE_EXPENSE = V_COST_BASE_EXPENSE,
+                   COST_BASE_MATL = V_COST_BASE_MATL,
+                   COST_BASE_TOTAL = V_COST_BASE_TOTAL,
+                   COST_ACT_LABOR = V_COST_ACT_LABOR,
+                   COST_ACT_EQUIP = V_COST_ACT_EQUIP,
+                   COST_ACT_EXPENSE = V_COST_ACT_EXPENSE,
+                   COST_ACT_MATL = V_COST_ACT_MATL,
+                   COST_ACT_TOTAL = V_COST_ACT_TOTAL,
+                   COST_ETC_LABOR = V_COST_ETC_LABOR,
+                   COST_ETC_EQUIP = V_COST_ETC_EQUIP,
+                   COST_ETC_EXPENSE = V_COST_ETC_EXPENSE,
+                   COST_ETC_MATL = V_COST_ETC_MATL,
+                   COST_ETC_TOTAL = V_COST_ETC_TOTAL,
+                   CURRENCY_CODE = V_CURRENCY_CODE,
+                   PCT_PLAN_EXPANDED = V_PCT_PLAN_EXPANDED,
+                   PCT_COMPLETE = V_PCT_COMPLETE,
+                   EARNED_VALUE = V_EARNED_VALUE,
+                   PLANNED_VALUE = V_PLANNED_VALUE,
+                   SCHEDULE_VARIANCE = V_SCHEDULE_VARIANCE,
+                   COST_VARIANCE = V_COST_VARIANCE,
+                   CPI_NUMBER = V_CPI_NUMBER,
+                   SPI_NUMBER = V_SPI_NUMBER,
+                   OPEN_TASKS = V_OPEN_TASKS,
+                   CLOSED_TASKS = V_CLOSED_TASKS,
+                   OPEN_ISSUES = V_OPEN_ISSUES,
+                   CLOSED_ISSUES = V_CLOSED_ISSUES,
+                   OPEN_RISKS = V_OPEN_RISKS,
+                   CLOSED_RISKS = V_CLOSED_RISKS,
+                   ACTUAL_HOURS_THIS_PERIOD =
+                      V_ACTUAL_HOURS - V_LAST_PERIOD_ACTUAL_HOURS,
+                   BASELINE_HOURS_THIS_PERIOD =
+                      V_BASELINE_HOURS - V_LAST_PERIOD_BASELINE_HOURS,
+                   ETC_HOURS_THIS_PERIOD =
+                      V_ETC_HOURS - V_LAST_PERIOD_ETC_HOURS,
+                   TASKS_OPENED_THIS_PERIOD =
+                      V_OPEN_TASKS - V_LAST_PERIOD_OPEN_TASKS,
+                   TASKS_CLOSED_THIS_PERIOD =
+                      V_CLOSED_TASKS - V_LAST_PERIOD_CLOSED_TASKS,
+                   ISSUES_OPENED_THIS_PERIOD =
+                      V_OPEN_ISSUES - V_LAST_PERIOD_OPEN_ISSUES,
+                   ISSUES_CLOSED_THIS_PERIOD =
+                      V_CLOSED_ISSUES - V_LAST_PERIOD_CLOSED_ISSUES,
+                   RISKS_OPENED_THIS_PERIOD =
+                      V_OPEN_RISKS - V_LAST_PERIOD_OPEN_RISKS,
+                   RISKS_CLOSED_THIS_PERIOD =
+                      V_CLOSED_RISKS - V_LAST_PERIOD_CLOSED_RISKS,
+                   IS_OPP_ENABLED = V_IS_OPP_ENABLED,
+                   IS_FM_ENABLED = V_IS_FM_ENABLED,
+                   IS_MGMT_ENABLED = V_IS_MGMT_ENABLED
+             WHERE PROJECT_ID = P_PROJECT_ID
+               AND CALENDAR_TIME_KEY = V_CALENDAR_TIME_KEY;
+         END;
+      ELSE
+         BEGIN
+            V_STMT := 'Inserting into NBI_PM_PT_FACTS';
+            INSERT INTO NBI_PM_PT_FACTS (
+                           PROJECT_ID,
+                           CALENDAR_TIME_KEY,
+                           IS_ACTIVE,
+                           IS_APPROVED,
+                           GOAL_SCORE,
+                           PRIORITY,
+                           START_DATE,
+                           BASE_START_DATE,
+                           FINISH_DATE,
+                           BASE_FINISH_DATE,
+                           START_VARIANCE,
+                           FINISH_VARIANCE,
+                           BUDGET_HOURS,
+                           ACTUAL_HOURS,
+                           BASELINE_HOURS,
+                           ETC_HOURS,
+                           ALLOCATED_HOURS,
+                           COST_BASE_LABOR,
+                           COST_BASE_EQUIP,
+                           COST_BASE_EXPENSE,
+                           COST_BASE_MATL,
+                           COST_BASE_TOTAL,
+                           COST_ACT_LABOR,
+                           COST_ACT_EQUIP,
+                           COST_ACT_EXPENSE,
+                           COST_ACT_MATL,
+                           COST_ACT_TOTAL,
+                           COST_ETC_LABOR,
+                           COST_ETC_EQUIP,
+                           COST_ETC_EXPENSE,
+                           COST_ETC_MATL,
+                           COST_ETC_TOTAL,
+                           CURRENCY_CODE,
+                           PCT_PLAN_EXPANDED,
+                           PCT_COMPLETE,
+                           EARNED_VALUE,
+                           PLANNED_VALUE,
+                           SCHEDULE_VARIANCE,
+                           COST_VARIANCE,
+                           CPI_NUMBER,
+                           SPI_NUMBER,
+                           OPEN_TASKS,
+                           CLOSED_TASKS,
+                           OPEN_ISSUES,
+                           CLOSED_ISSUES,
+                           OPEN_RISKS,
+                           CLOSED_RISKS,
+                           ACTUAL_HOURS_THIS_PERIOD,
+                           BASELINE_HOURS_THIS_PERIOD,
+                           ETC_HOURS_THIS_PERIOD,
+                           TASKS_OPENED_THIS_PERIOD,
+                           TASKS_CLOSED_THIS_PERIOD,
+                           ISSUES_OPENED_THIS_PERIOD,
+                           ISSUES_CLOSED_THIS_PERIOD,
+                           RISKS_OPENED_THIS_PERIOD,
+                           RISKS_CLOSED_THIS_PERIOD,
+                           IS_OPP_ENABLED,
+                           IS_FM_ENABLED,
+                           IS_MGMT_ENABLED,
+                           NUMBER_OF_RESOURCES
+                        )
+                 VALUES (
+                    P_PROJECT_ID,
+                    V_CALENDAR_TIME_KEY,
+                    V_IS_ACTIVE,
+                    V_IS_APPROVED,
+                    V_GOAL_SCORE,
+                    V_PRIORITY,
+                    V_START_DATE,
+                    V_BASE_START_DATE,
+                    V_FINISH_DATE,
+                    V_BASE_FINISH_DATE,
+                    V_START_VARIANCE,
+                    V_FINISH_VARIANCE,
+                    V_BUDGET_HOURS,
+                    V_ACTUAL_HOURS,
+                    V_BASELINE_HOURS,
+                    V_ETC_HOURS,
+                    V_ALLOCATED_HOURS,
+                    V_COST_BASE_LABOR,
+                    V_COST_BASE_EQUIP,
+                    V_COST_BASE_EXPENSE,
+                    V_COST_BASE_MATL,
+                    V_COST_BASE_TOTAL,
+                    V_COST_ACT_LABOR,
+                    V_COST_ACT_EQUIP,
+                    V_COST_ACT_EXPENSE,
+                    V_COST_ACT_MATL,
+                    V_COST_ACT_TOTAL,
+                    V_COST_ETC_LABOR,
+                    V_COST_ETC_EQUIP,
+                    V_COST_ETC_EXPENSE,
+                    V_COST_ETC_MATL,
+                    V_COST_ETC_TOTAL,
+                    V_CURRENCY_CODE,
+                    V_PCT_PLAN_EXPANDED,
+                    V_PCT_COMPLETE,
+                    V_EARNED_VALUE,
+                    V_PLANNED_VALUE,
+                    V_SCHEDULE_VARIANCE,
+                    V_COST_VARIANCE,
+                    V_CPI_NUMBER,
+                    V_SPI_NUMBER,
+                    V_OPEN_TASKS,
+                    V_CLOSED_TASKS,
+                    V_OPEN_ISSUES,
+                    V_CLOSED_ISSUES,
+                    V_OPEN_RISKS,
+                    V_CLOSED_RISKS,
+                    V_ACTUAL_HOURS - V_LAST_PERIOD_ACTUAL_HOURS,
+                    V_BASELINE_HOURS - V_LAST_PERIOD_BASELINE_HOURS,
+                    V_ETC_HOURS - V_LAST_PERIOD_ETC_HOURS,
+                    V_OPEN_TASKS - V_LAST_PERIOD_OPEN_TASKS,
+                    V_CLOSED_TASKS - V_LAST_PERIOD_CLOSED_TASKS,
+                    V_OPEN_ISSUES - V_LAST_PERIOD_OPEN_ISSUES,
+                    V_CLOSED_ISSUES - V_LAST_PERIOD_CLOSED_ISSUES,
+                    V_OPEN_RISKS - V_LAST_PERIOD_OPEN_RISKS,
+                    V_CLOSED_RISKS - V_LAST_PERIOD_CLOSED_RISKS,
+                    V_IS_OPP_ENABLED,
+                    V_IS_FM_ENABLED,
+                    V_IS_MGMT_ENABLED,
+                    NVL (V_NUMBER_OF_RESOURCES, 0)
+                 );
+         END;
+      END IF;
+   END LOOP;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RAISE_APPLICATION_ERROR (
+         -20000,
+         'Error in NBI_PM_PTF_SP - ' || V_STMT || ': ' || SQLERRM
+      );
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

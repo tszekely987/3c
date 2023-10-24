@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_SCH_JOB_DEF_INSERT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_SCH_JOB_DEF_INSERT_SP" (
+   P_JOB_NAME            IN       VARCHAR2,
+   P_JOB_CODE            IN       VARCHAR2,
+   P_JOB_DESCRIPTION     IN       VARCHAR2,
+   P_JOB_TYPE            IN       VARCHAR2,
+   P_EXECUTABLE          IN       VARCHAR2,
+   P_OUTPUT_PATH         IN       VARCHAR2,
+   P_IS_OUTPUT_ENABLED   IN       INTEGER DEFAULT 1,
+   P_IS_LOG_ENABLED      IN       INTEGER DEFAULT 1,
+   P_IS_SYSTEM           IN       INTEGER DEFAULT 1,
+   P_IS_ADMIN_VISIBLE    IN       INTEGER DEFAULT 1,
+   P_IS_ADMIN_JOB        IN       INTEGER DEFAULT 0,
+   P_IS_ACTIVE           IN       INTEGER DEFAULT 1,
+   P_CREATED_BY          IN       NUMBER DEFAULT 1,
+   P_LANGUAGE_CODE       IN       VARCHAR2 DEFAULT 'en',
+   P_SOURCE              IN       VARCHAR2 DEFAULT 'niku.com',
+   P_RUN_CONCURRENT      IN       INTEGER DEFAULT 0,
+   P_IS_SYSTEM_VISIBLE   IN       INTEGER DEFAULT 1,
+   P_JOB_EXTENDED_TYPE_CODE  IN   VARCHAR2 DEFAULT NULL,
+   P_IS_CANCELLABLE      IN       INTEGER DEFAULT 0,
+   P_ID                  OUT      NUMERIC
+)
+IS
+   V_STMT                        VARCHAR2(200);
+   V_CNT                         INTEGER := 0;
+   V_ID                          INTEGER := 0;
+   V_JOB_TYPE                    NUMERIC;
+   V_JOB_EXTENDED_TYPE_CODE      VARCHAR2(30);
+BEGIN
+
+  V_STMT := 'Selecting count of jobs';
+
+  SELECT  COUNT (*)
+  INTO    V_CNT
+  FROM    CMN_SCH_JOB_DEFINITIONS
+  WHERE   CMN_SCH_JOB_DEFINITIONS.JOB_CODE = P_JOB_CODE;
+
+  IF (V_CNT &gt; 0)
+  THEN
+    RAISE_APPLICATION_ERROR (-20001, 'Job with this code already exists');
+  END IF;
+
+  V_STMT := 'Getting sequence number';
+  SELECT  CMN_SCH_JOB_DEFINITIONS_S1.NEXTVAL
+  INTO    P_ID
+  FROM    DUAL;
+
+  V_STMT := 'Selecting id for the job type lookup';
+  BEGIN
+    SELECT  ID
+    INTO    V_JOB_TYPE
+    FROM    CMN_LOOKUPS
+    WHERE   LOOKUP_TYPE = 'SCH_JOB_TYPE'
+    AND     LOOKUP_CODE = P_JOB_TYPE;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR (-20002, 'Job type does not exist');
+  END;
+
+  V_STMT := 'Validating job extended type';
+  IF P_JOB_EXTENDED_TYPE_CODE IS NOT NULL THEN
+    BEGIN
+      SELECT  LOOKUP_CODE
+      INTO V_JOB_EXTENDED_TYPE_CODE
+      FROM    CMN_LOOKUPS
+      WHERE   LOOKUP_TYPE = 'SCH_JOB_EXTENDED_TYPE'
+      AND     LOOKUP_CODE = P_JOB_EXTENDED_TYPE_CODE
+      AND     PARENT_LOOKUP_CODE=P_JOB_TYPE;
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR (-20003, 'Job Extended type does not exist');
+    END;
+  END IF;
+
+  V_STMT := 'Inserting into CMN_SCH_JOB_DEFINITIONS table';
+  INSERT INTO CMN_SCH_JOB_DEFINITIONS (
+                  ID,
+                  JOB_CODE,
+                  JOB_TYPE,
+                  EXECUTABLE,
+                  IS_SYSTEM,
+                  IS_ADMIN_VISIBLE,
+				  IS_ADMIN_JOB,
+                  IS_ACTIVE,
+                  IS_LOG_ENABLED,
+                  OUTPUT_PATH,
+                  IS_OUTPUT_ENABLED,
+                  SOURCE,
+                  IS_SYSTEM_VISIBLE,
+                  JOB_EXTENDED_TYPE_CODE,
+                  IS_CANCELLABLE,
+                  CREATED_DATE,
+                  CREATED_BY,
+                  LAST_UPDATED_DATE,
+                  LAST_UPDATED_BY
+               )
+        VALUES (
+           P_ID,
+           P_JOB_CODE,
+           V_JOB_TYPE,
+           P_EXECUTABLE,
+           P_IS_SYSTEM,
+           P_IS_ADMIN_VISIBLE,
+		   P_IS_ADMIN_JOB,
+           P_IS_ACTIVE,
+           P_IS_LOG_ENABLED,
+           P_OUTPUT_PATH,
+           P_IS_OUTPUT_ENABLED,
+           P_SOURCE,
+           P_IS_SYSTEM_VISIBLE,
+           V_JOB_EXTENDED_TYPE_CODE,
+           P_IS_CANCELLABLE,
+           SYSDATE,
+           P_CREATED_BY,
+           SYSDATE,
+           P_CREATED_BY
+        );
+
+   V_STMT := 'Calling CMN_CAPTIONS_NLS_INS_SP';
+   CMN_CAPTIONS_NLS_INS_SP (
+      P_TABLE_NAME =&gt; 'CMN_SCH_JOB_DEFINITIONS',
+      P_PK_ID =&gt; P_ID,
+      P_NAME =&gt; P_JOB_NAME,
+      P_DESCRIPTION =&gt; P_JOB_DESCRIPTION,
+      P_CREATED_BY =&gt; P_CREATED_BY
+   );
+
+   IF ( P_JOB_TYPE != 'REPORT' AND  P_RUN_CONCURRENT = 0) THEN
+
+     SELECT CMN_SCH_JOB_NONCONCUR_S1.NEXTVAL
+       INTO V_ID
+       FROM DUAL;
+
+     INSERT INTO CMN_SCH_JOB_NONCONCUR (
+                    ID, JOB_DEFINITION_ID, NON_CONCUR_JOB_DEF_ID,
+                    CREATED_DATE,
+                    CREATED_BY,
+                    LAST_UPDATED_DATE,
+                    LAST_UPDATED_BY
+                 )
+          VALUES (
+             V_ID, P_ID, P_ID,
+             SYSDATE,
+             P_CREATED_BY,
+             SYSDATE,
+             P_CREATED_BY
+          );
+    END IF;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

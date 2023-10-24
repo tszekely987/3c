@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_COMPUTEMARKUP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_COMPUTEMARKUP" (
+  bUseCostPlus      NUMBER ,
+  cCostPlusCode     VARCHAR2 ,
+  cCharge_Code         VARCHAR2 ,
+  cInput_Type         VARCHAR2 ,
+  cTransType        VARCHAR2 ,
+  nCost             NUMBER ,
+  nQuantity         NUMBER ,
+  nStdCost          NUMBER ,
+  nRate             IN OUT NUMBER,
+  nAmount           IN OUT NUMBER,
+  nFactorAmt        IN OUT NUMBER,
+  nBurdenAmt        IN OUT NUMBER,
+  nOverheadAmt      IN OUT NUMBER,
+  --cCostRuleCode     IN OUT VARCHAR2,
+  cRateCurrencyCode IN OUT VARCHAR2,
+  cCostCurrencyCode IN VARCHAR2,
+  dTransDate        IN DATE,
+  cProjectCode      IN VARCHAR2,
+  cSystemCurrency  IN VARCHAR2 DEFAULT NULL
+)
+AS
+  StoO_selcnt       INTEGER;
+  StoO_error        INTEGER;
+  StoO_rowcnt       INTEGER;
+  StoO_crowcnt      INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg       GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  nTotalAmount      NUMBER(32,6);
+  nRatePrecision    INTEGER;
+  v_cRateCurrencyCode VARCHAR2(30);
+  v_cCostCurrencyCode VARCHAR2(30);
+  v_cSystemCurrency  VARCHAR2(30) := cSystemCurrency;
+
+/* NOTE: As per PTR 9055 and discussions with LC, use cost plus
+				 if rule found: else use Multiplier */
+BEGIN
+  cRateCurrencyCode := TRIM(cRateCurrencyCode);
+  v_cRateCurrencyCode := cRateCurrencyCode;
+  IF TRIM(v_cRateCurrencyCode) IS NULL THEN
+    IF v_cSystemCurrency  IS NULL THEN
+      SELECT V.VALUE
+        INTO v_cSystemCurrency
+        FROM CMN_OPTIONS O, CMN_OPTION_VALUES V
+      WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY' AND O.ID = V.OPTION_ID;      
+    END IF;
+    v_cRateCurrencyCode := v_cSystemCurrency;
+  END IF;
+
+  v_cCostCurrencyCode := TRIM(cCostCurrencyCode);
+  IF TRIM(v_cCostCurrencyCode) IS NULL THEN
+    IF v_cSystemCurrency  IS NULL THEN
+      SELECT V.VALUE
+        INTO v_cSystemCurrency
+        FROM CMN_OPTIONS O, CMN_OPTION_VALUES V
+      WHERE O.OPTION_CODE = 'CMN_SYSTEM_CURRENCY' AND O.ID = V.OPTION_ID;
+    END IF;
+    v_cCostCurrencyCode := v_cSystemCurrency; 
+  END IF;
+  
+  -- rate currency precision
+  BEGIN
+    SELECT CURRENCY_PRECISION
+      INTO nRatePrecision
+      FROM CMN_CURRENCIES
+      WHERE CURRENCY_CODE = v_cRateCurrencyCode;
+      EXCEPTION
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+        nRatePrecision := 2;
+  END;  -- rate currency precision
+
+  /* if costplus rule is used then call ate_computeratefactor
+  */
+	IF NVL(Ppa_Computemarkup.bUseCostPlus, 0) != 0 AND
+	   NVL(RTRIM(Ppa_Computemarkup.cCostPlusCode), ' ') IS NOT NULL THEN
+	BEGIN
+    BEGIN
+      Ate_Computeratefactors(Ppa_Computemarkup.cCostPlusCode,
+        Ppa_Computemarkup.nQuantity,
+        Ppa_Computemarkup.nRate,
+        Ppa_Computemarkup.nCost,
+        Ppa_Computemarkup.nStdCost,
+        Ppa_Computemarkup.nFactorAmt,
+        Ppa_Computemarkup.nBurdenAmt,
+        Ppa_Computemarkup.nOverheadAmt,
+        Ppa_Computemarkup.cRateCurrencyCode,
+        Ppa_Computemarkup.v_cCostCurrencyCode);
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+    END;
+
+
+    -- since the rate currency may have changed, recalculate the currency precision
+    BEGIN
+      SELECT CURRENCY_PRECISION
+        INTO nRatePrecision
+        FROM CMN_CURRENCIES
+        WHERE CURRENCY_CODE = v_cRateCurrencyCode;
+        EXCEPTION
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          nRatePrecision := 2;
+    END;  -- rate currency precision
+
+    Ppa_Computemarkup.nAmount := ROUND(Ppa_Computemarkup.nQuantity * Ppa_Computemarkup.nRate, nRatePrecision);
+
+	END;
+	END IF;
+
+  Ppa_Computemarkup.nAmount := ROUND(NVL(Ppa_Computemarkup.nAmount, 0), nRatePrecision);
+  Ppa_Computemarkup.nFactorAmt := ROUND(NVL(Ppa_Computemarkup.nFactorAmt,0), nRatePrecision);
+  Ppa_Computemarkup.nBurdenAmt := ROUND(NVL(Ppa_Computemarkup.nBurdenAmt,0), nRatePrecision);
+  Ppa_Computemarkup.nOverheadAmt := ROUND(NVL(Ppa_Computemarkup.nOverheadAmt,0), nRatePrecision);
+
+  Ppa_Computemarkup.nTotalAmount := ROUND(Ppa_Computemarkup.nAmount +
+                                      Ppa_Computemarkup.nFactorAmt +
+                                      Ppa_Computemarkup.nBurdenAmt +
+                                      Ppa_Computemarkup.nOverheadAmt, nRatePrecision);
+    
+
+END Ppa_Computemarkup;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

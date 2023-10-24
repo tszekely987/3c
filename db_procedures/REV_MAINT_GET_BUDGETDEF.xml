@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_MAINT_GET_BUDGETDEF</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_MAINT_GET_BUDGETDEF" (
+  in_clntcode   IN VARCHAR2  DEFAULT NULL,
+  in_projid   IN VARCHAR2  DEFAULT NULL,
+  RC1   IN OUT REV_MAINT_GET_BUDGETDEFPkg.RCT1)
+AS
+  COMPANY_CODE  GLOBALPKG.STRING;
+  PROJECT_CODE  GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  budgetcostsourcelabor   NUMBER;
+  budgetratesourcelabor   NUMBER;
+  budgetratelocationlabor   NUMBER(3,0);
+  budgetrateoverridelabor   NUMBER(1,0);
+  budgetcostsourcematerials   NUMBER;
+  budgetratesourcematerials   NUMBER;
+  budgetratelocationmaterials   NUMBER(3,0);
+  budgetrateoverridematerials   NUMBER(1,0);
+  budgetcostsourceequipment   NUMBER;
+  budgetratesourceequipment   NUMBER;
+  budgetratelocationequipment   NUMBER(3,0);
+  budgetrateoverrideequipment   NUMBER(1,0);
+  budgetcostsourcelabor_des   GLOBALPKG.STRING;
+  budgetratesourcelabor_des   GLOBALPKG.STRING;
+  budgetcostsourcematerials_des   GLOBALPKG.STRING;
+  budgetratesourcematerials_des   GLOBALPKG.STRING;
+  budgetcostsourceequipment_des   GLOBALPKG.STRING;
+  budgetratesourceequipment_des   GLOBALPKG.STRING;
+  budgetlevellabor  NUMBER(3,0);
+  budgetlevelmaterial   NUMBER(3,0);
+  budgetlevelequipment  NUMBER(3,0);
+  budget_details_exist  NUMBER(1,0);
+  budget  NUMBER(1,0);
+  id                     pac_mnt_projects.id%TYPE;
+BEGIN
+/*
+   Called From	 	 :
+   Procedure               :-
+   Trigger                    :-
+   PMD TransactionId  :-
+   WMD ActionId         :-
+   Modified By             :  sundar
+   Modified Date          :  07/25/2001
+*/
+
+	rev_maint_get_budgetdef.COMPANY_CODE := rev_maint_get_budgetdef.in_clntcode;
+	rev_maint_get_budgetdef.PROJECT_CODE := rev_maint_get_budgetdef.in_projid;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT
+			budget,
+			budgetlevellabor,
+			budgetlevelmaterial,
+			budgetlevelequipment,
+		  	budgetcostsourcelabor,
+			budgetratesourcelabor,
+			budgetratelocationlabor,
+			budgetrateoverridelabor,
+			budgetcostsourcematerials,
+			budgetratesourcematerials,
+			budgetratelocationmaterials,
+			budgetrateoverridematerials,
+			budgetcostsourceequipment,
+			budgetratesourceequipment,
+			budgetratelocationequipment,
+			budgetrateoverrideequipment,
+            id
+		INTO
+			rev_maint_get_budgetdef.budget,
+			rev_maint_get_budgetdef.budgetlevellabor,
+			rev_maint_get_budgetdef.budgetlevelmaterial,
+			rev_maint_get_budgetdef.budgetlevelequipment,
+			rev_maint_get_budgetdef.budgetcostsourcelabor,
+			rev_maint_get_budgetdef.budgetratesourcelabor,
+			rev_maint_get_budgetdef.budgetratelocationlabor,
+			rev_maint_get_budgetdef.budgetrateoverridelabor,
+			rev_maint_get_budgetdef.budgetcostsourcematerials,
+			rev_maint_get_budgetdef.budgetratesourcematerials,
+			rev_maint_get_budgetdef.budgetratelocationmaterials,
+			rev_maint_get_budgetdef.budgetrateoverridematerials,
+			rev_maint_get_budgetdef.budgetcostsourceequipment,
+			rev_maint_get_budgetdef.budgetratesourceequipment,
+			rev_maint_get_budgetdef.budgetratelocationequipment,
+			rev_maint_get_budgetdef.budgetrateoverrideequipment,
+			rev_maint_get_budgetdef.id
+                FROM pac_mnt_projects
+		WHERE COMPANY_CODE = rev_maint_get_budgetdef.COMPANY_CODE
+		 AND PROJECT_CODE = rev_maint_get_budgetdef.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetcostsourcelabor_des
+        FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetcostsourcelabor;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetratesourcelabor_des
+	FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetratesourcelabor;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetcostsourcematerials_des
+	FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetcostsourcematerials;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetratesourcematerials_des
+	FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetratesourcematerials;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetcostsourceequipment_des
+	FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetcostsourceequipment;
+	SELECT  MAX(Description)
+	INTO 	rev_maint_get_budgetdef.budgetratesourceequipment_des
+	FROM 	ppa_Matrix
+	WHERE 	MatrixKey = rev_maint_get_budgetdef.budgetratesourceequipment;
+	BEGIN
+		rev_maint_get_budgetdef.budget_details_exist := 0;
+/*
+    SELECT 1 INTO rev_maint_get_budgetdef.budget_details_exist
+		FROM DUAL
+		WHERE  EXISTS (SELECT  1
+				FROM budgetcontrol
+			 	WHERE COMPANY_CODE = rev_maint_get_budgetdef.COMPANY_CODE
+				AND PROJECT_CODE = rev_maint_get_budgetdef.PROJECT_CODE );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				rev_maint_get_budgetdef.budget_details_exist := 0;
+			WHEN OTHERS THEN
+				RAISE_APPLICATION_ERROR(-20831, 'Unable to determine if budget details exist');
+				RETURN;
+*/
+  END;
+	OPEN RC1 FOR
+	SELECT
+		rev_maint_get_budgetdef.COMPANY_CODE "COMPANY_CODE",
+		rev_maint_get_budgetdef.PROJECT_CODE "PROJECT_CODE",
+		rev_maint_get_budgetdef.budgetlevellabor "budgetlevellabor",
+		rev_maint_get_budgetdef.budgetratesourcelabor "budgetratesourcelabor",
+		rev_maint_get_budgetdef.budgetratesourcelabor_des "budgetratesourcelabor_des",
+		rev_maint_get_budgetdef.budgetcostsourcelabor "budgetcostsourcelabor",
+		rev_maint_get_budgetdef.budgetcostsourcelabor_des "budgetcostsourcelabor_des",
+		rev_maint_get_budgetdef.budgetratelocationlabor "budgetratelocationlabor",
+		rev_maint_get_budgetdef.budgetrateoverridelabor "budgetrateoverridelabor",
+		rev_maint_get_budgetdef.budgetlevelmaterial "budgetlevelmaterial",
+		rev_maint_get_budgetdef.budgetratesourcematerials "budgetratesourcematerials",
+		rev_maint_get_budgetdef.budgetratesourcematerials_des "budgetratesourcematerials_des",
+		rev_maint_get_budgetdef.budgetcostsourcematerials "budgetcostsourcematerials",
+		rev_maint_get_budgetdef.budgetcostsourcematerials_des "budgetcostsourcematerials_des",
+		rev_maint_get_budgetdef.budgetratelocationmaterials "budgetratelocationmaterials",
+		rev_maint_get_budgetdef.budgetrateoverridematerials "budgetrateoverridematerials",
+		rev_maint_get_budgetdef.budgetlevelequipment "budgetlevelequipment",
+		rev_maint_get_budgetdef.budgetratesourceequipment "budgetratesourceequipment",
+		rev_maint_get_budgetdef.budgetratesourceequipment_des "budgetratesourceequipment_des",
+		rev_maint_get_budgetdef.budgetcostsourceequipment "budgetcostsourceequipment",
+		rev_maint_get_budgetdef.budgetcostsourceequipment_des "budgetcostsourceequipment_des",
+		rev_maint_get_budgetdef.budgetratelocationequipment "budgetratelocationequipment",
+		rev_maint_get_budgetdef.budgetrateoverrideequipment "budgetrateoverrideequipment",
+		rev_maint_get_budgetdef.budget_details_exist "BudgetDetailsExist",
+		rev_maint_get_budgetdef.budget "BudgetedProject",
+		rev_maint_get_budgetdef.id "id"
+	FROM DUAL;
+END rev_maint_get_budgetdef;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

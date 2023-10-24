@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_PREVIEW_DB_ACCTS_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_CHG_PREVIEW_DB_ACCTS_FCT" 
+
+(
+  P_DATES_ID        NUMBER
+)
+  RETURN VARCHAR2
+IS
+  V_ACCOUNT_CODES   VARCHAR2(1000) := ' ';
+  V_ACCOUNT_CODE    VARCHAR2(1000) := ' ';
+  V_NEXT            VARCHAR2(3) := ' ';
+  V_TO_DATE         DATE;
+
+  CURSOR C_ACCT_CODES (C_DATES_ID NUMBER)
+      IS SELECT DISTINCT D.ID
+          FROM PAC_CHG_ALLOCS_DETAILS D
+          WHERE D.ALLOCATION_DATES_ID = C_DATES_ID
+          ORDER BY D.ID;
+
+BEGIN
+  V_TO_DATE := TO_DATE('12/31/2999', 'MM/DD/YYYY');
+
+  FOR C_ACCT_CODES_REC IN C_ACCT_CODES(P_DATES_ID)
+    LOOP
+      IF LENGTH(V_ACCOUNT_CODES) &lt; 255 THEN
+        SELECT ACCOUNT_CODE || ' (' || TO_CHAR(ALLOCATION_PERCENT) || '%)'
+          INTO V_ACCOUNT_CODE
+          FROM PAC_CHG_ALLOCS_DETAILS D,
+                         PAC_CHG_GL_ACCOUNTS A
+         WHERE D.ID = C_ACCT_CODES_REC.ID
+           AND D.ACCOUNT_CODE_ID = A.ID;
+
+        V_ACCOUNT_CODES := V_ACCOUNT_CODES || V_NEXT || V_ACCOUNT_CODE;
+      END IF;
+
+      IF V_NEXT = ' ' THEN
+        V_NEXT := ', ';
+      END IF;
+    END LOOP;
+
+  IF LENGTH(V_ACCOUNT_CODES) &gt; 255 THEN
+    V_ACCOUNT_CODES := SUBSTR(V_ACCOUNT_CODES, 1, 250) || '...';
+  END IF;
+
+  RETURN LTRIM(V_ACCOUNT_CODES);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

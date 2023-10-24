@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_SEC_GET_PERMSTR_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_SEC_GET_PERMSTR_FCT" (
+   P_USER_ID              IN   NUMBER,
+   P_OBJECT_ID            IN   NUMBER,
+   P_OBJECT_INSTANCE_ID   IN   NUMBER
+   )
+   RETURN VARCHAR2
+IS
+   V_PERMISSION      VARCHAR2(110);
+   V_ADD_SEPERATOR   NUMBER;
+   CURSOR C_PERMISSIONS
+   IS
+      SELECT DISTINCT PERMISSION_CODE
+        FROM CMN_SEC_ASSGND_OBJ_PERM_V0
+       WHERE USER_ID = P_USER_ID
+         AND OBJECT_ID = P_OBJECT_ID
+         AND OBJECT_INSTANCE_ID = P_OBJECT_INSTANCE_ID;
+BEGIN
+   /* USER/GROUP PERMISSION FUNCTION TO CONCATENATE INDIVIDUAL PERMISISON
+      ELEMENT INTO ONE PERMISSION STRING (E.G. "READ,WRITE,DELETE") */
+   V_ADD_SEPERATOR := 0;
+   FOR C_PERMISSION_REC IN C_PERMISSIONS
+   LOOP
+      IF V_ADD_SEPERATOR &gt; 0
+      THEN
+         V_PERMISSION := V_PERMISSION || ',' || C_PERMISSION_REC.PERMISSION_CODE;
+      ELSE
+         V_PERMISSION := C_PERMISSION_REC.PERMISSION_CODE;
+         V_ADD_SEPERATOR := 1;
+      END IF;
+   END LOOP;
+   RETURN V_PERMISSION;
+EXCEPTION
+   WHEN OTHERS
+   THEN
+      RETURN NULL;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.teamCapacityLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Team Capacity (Instance = Project)" languageCode="en" name="Team Capacity"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT  @SELECT:DIM:USER_DEF:IMPLIED:resource:TO_DATE(v.month_key,'YYYY-MM'):month_key@,
+        @SELECT:DIM_PROP:USER_DEF:IMPLIED:resource:v.period_end_date:month_label@,
+        @SELECT:METRIC:USER_DEF:IMPLIED:ROUND(SUM(CASE WHEN v.request_name = 'MONTHLYRESOURCEALLOCCURVE' THEN v.hrs ELSE 0 END),0):remaining_alloc_hrs:AGG@,
+        @SELECT:METRIC:USER_DEF:IMPLIED:ROUND(SUM(CASE WHEN v.request_name = 'MONTHLYRESOURCEESTCURVE' OR v.request_name = 'MONTHLYRESOURCEACTCURVE' THEN v.hrs ELSE 0 END),0):usage_hrs:AGG@
+FROM  
+  (SELECT tm.prprojectid inv_id,
+          cal.month_key month_key,
+          ld.period_end_date,
+          sr.request_name request_name,
+          ROUND(SUM(@NVL@(s.slice,0)),0) hrs 
+   FROM   prteam tm
+   INNER  JOIN  prj_blb_slices s ON  tm.prID = s.prj_object_id
+   INNER  JOIN  srm_resources r ON  tm.prresourceid = r.id
+                                AND r.resource_type = 0 
+                                AND r.is_active = 1
+   INNER  JOIN  prj_blb_slicerequests sr ON  s.slice_request_id = sr.id 
+                                         AND sr.request_name IN ('MONTHLYRESOURCEALLOCCURVE')     
+   INNER  JOIN  nbi_dim_calendar_time cal ON  s.slice_date = cal.day
+                                          AND cal.hierarchy_level = 'DAY'
+   INNER  JOIN  nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                         AND ld.hierarchy_level = 'MONTH'										  
+   LEFT   OUTER JOIN (SELECT prassignment.prresourceid res_id,
+                             MAX(prassignment.practthru) act_thru 
+                      FROM   prassignment
+                      INNER  JOIN prtask ON prassignment.prtaskid = prtask.prid 
+                      WHERE  prtask.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@ 
+                      GROUP  BY  prassignment.prresourceid) assignment ON r.id = assignment.res_id
+   WHERE  tm.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+   AND    (s.slice_date >= @NVL@(assignment.act_thru,s.slice_date))
+   AND    @DBUSER@.CMN_FIRST_OF_MONTH_FCT( s.slice_date ) >= @DBUSER@.CMN_FIRST_OF_MONTH_FCT( @SYSDATE@ )
+   GROUP  BY tm.prprojectid, cal.month_key, ld.period_end_date, sr.request_name
+   UNION ALL
+   SELECT t.prprojectid inv_id,
+          cal.month_key month_key,
+          ld.period_end_date,
+          'MONTHLYRESOURCEESTCURVE' request_name,
+          ROUND(SUM(@NVL@(s.slice,0)),0) hrs
+   FROM   prassignment a
+   INNER  JOIN prj_blb_slices s ON  a.prID = s.prj_object_id
+   INNER  JOIN prtask t ON  a.prtaskid = t.prid
+   INNER  JOIN srm_resources r ON  a.prresourceid = r.id AND r.resource_type = 0 AND r.is_active = 1
+   INNER  JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id 
+                                        AND sr.request_name IN ('MONTHLYRESOURCEESTCURVE')
+   INNER  JOIN nbi_dim_calendar_time cal ON  s.slice_date = cal.day 
+                                         AND cal.hierarchy_level = 'DAY'
+   INNER  JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                        AND ld.hierarchy_level = 'MONTH'										 
+   WHERE  t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+   AND    @DBUSER@.CMN_FIRST_OF_MONTH_FCT( s.slice_date ) >= @DBUSER@.CMN_FIRST_OF_MONTH_FCT( @SYSDATE@ )
+   GROUP  BY t.prprojectid, cal.month_key, ld.period_end_date, sr.request_name
+   UNION ALL 
+   SELECT t.prprojectid inv_id, 
+          cal.month_key month_key,
+          ld.period_end_date,
+          'MONTHLYRESOURCEACTCURVE' request_name,
+          ROUND(SUM(@NVL@(s.slice,0)),0) hrs
+   FROM   prassignment a
+   INNER  JOIN prj_blb_slices s ON  a.prID = s.prj_object_id
+   INNER  JOIN prtask t ON  a.prtaskid = t.prid
+   INNER  JOIN srm_resources r ON  a.prresourceid = r.id 
+                               AND r.resource_type = 0 AND  r.is_active = 1
+   INNER  JOIN prj_blb_slicerequests sr ON  s.slice_request_id = sr.id 
+                                        AND sr.request_name IN ('MONTHLYRESOURCEACTCURVE')
+   INNER  JOIN nbi_dim_calendar_time cal  ON  s.slice_date = cal.day 
+                                          AND cal.hierarchy_level = 'DAY'
+   INNER  JOIN nbi_dim_calendar_time ld ON  ld.month_key = cal.month_key 
+                                        AND ld.hierarchy_level = 'MONTH'										  
+   WHERE  t.prprojectid = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+   AND    @DBUSER@.CMN_FIRST_OF_MONTH_FCT( s.slice_date ) >= @DBUSER@.CMN_FIRST_OF_MONTH_FCT( @SYSDATE@ )
+   GROUP  BY t.prprojectid, cal.month_key, ld.period_end_date, sr.request_name
+  ) v
+WHERE  @WHERE:SECURITY:PROJECT:v.inv_id@
+AND    @FILTER@
+GROUP  BY v.month_key, v.period_end_date
+HAVING @HAVING_FILTER@]]></nsql>
+            <attribute id="month_key" required="false">
+              
+              
+              
+              
+              <nls description="Month Key" languageCode="en" name="Month Key"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="month_label" required="false">
+              
+              
+              
+              
+              <nls description="Month" languageCode="en" name="Month"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="remaining_alloc_hrs" required="false">
+              
+              
+              
+              
+              <nls description="Remaining Allocation Hrs" languageCode="en" name="Remaining Allocation Hrs"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="usage_hrs" required="false">
+              
+              
+              
+              
+              <nls description="Usage Hours" languageCode="en" name="Usage Hours"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

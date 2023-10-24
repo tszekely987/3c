@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_CREDITMEMO</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_CREDITMEMO" 
+(
+  in_invoiceno      VARCHAR2 ,
+  in_newinvoiceno     VARCHAR2 ,
+  in_userinitials     VARCHAR2
+)
+AS
+  StoO_selcnt     INTEGER;
+  StoO_error      INTEGER;
+  StoO_rowcnt     INTEGER;
+  StoO_crowcnt    INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg     GLOBALPKG.STRING;
+  StoO_sqlstatus    INTEGER;
+  iBatchNo      NUMBER;
+  UF1_rowid       ROWID;
+  UF1_oval1   ppa_WIP.Status%TYPE;
+  UF1_oval2   ppa_WIP.LASTUPDTDBY_RESOURCE_CODE%TYPE;
+  UF1_oval3   ppa_WIP.LastUpdateDate%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT ppa_WIP.ROWID, 8, in_userinitials, SYSDATE FROM temp_invoiceapplysp_creditmemo, ppa_WIP
+    WHERE ppa_WIP.TransNo = temp_invoiceapplysp_creditmemo.applytonumber
+    AND temp_invoiceapplysp_creditmemo.transtype != 'A'
+    AND ppa_WIP.TransType = temp_invoiceapplysp_creditmemo.applytotranstype
+    FOR UPDATE OF ppa_WIP.Status, ppa_WIP.LASTUPDTDBY_RESOURCE_CODE, ppa_WIP.LastUpdateDate;
+  /* LB 5/20/98 PTR # 9575 Added cmsglsegment3 for MARKUP component billing */
+BEGIN
+ 	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM invoiceheader
+		WHERE invoiceno = in_invoiceno
+		 and status = '1' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+		raise_application_error(-20377, 'A credit memo has already been issued for this invoice by another user.');
+		RETURN ;
+	END;
+	END IF;
+	BEGIN
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM ppa_Billings
+		WHERE InvoiceNo = in_invoiceno
+		 and TransType  IN ('BP', 'BR') );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	IF StoO_selcnt != 0 THEN
+	BEGIN
+
+		SAVEPOINT tran0;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE invoiceheader
+		SET status = '1'
+		WHERE invoiceno = in_invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+		    WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+			END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran0;
+			RETURN ;
+		END;
+		END IF;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+		SELECT  S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, in_userinitials, 'TB', 'Credit Memo To TransBill'
+			FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran0;
+			RETURN ;
+		END;
+		END IF;
+
+		SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_TransBill (
+		                TRANSNO,
+			   			SourceModule,
+						ApplyTo,
+						TransType,
+						COMPANY_CODE,
+						PROJECT_CODE,
+            Charge_Code,
+			  			RESOURCE_CODE,
+						BillingDate,
+            Input_type,
+						ENTRY_RESOURCE_CODE,
+						EntryDate,
+						LASTUPDTDBY_RESOURCE_CODE,
+			   			LastUpdateDate,
+						InvoiceNo,
+						Notes,
+						Quantity,
+						BatchNo,
+						ApplyToTransType,
+						WorkInt,
+						WorkBuf,external_id)
+				SELECT  S_395_1_PPA_TRANSBILL.nextval,
+				        10,
+						B.TransNo,
+						'BC',
+						B.COMPANY_CODE,
+						B.PROJECT_CODE,
+            B.Charge_Code,
+						B.RESOURCE_CODE,
+						B.BillingDate,
+            B.Input_Type,
+						in_userinitials,
+						SYSDATE,
+						in_userinitials,
+						SYSDATE,
+						in_newinvoiceno,
+			   			B.Notes,
+						B.Quantity,
+						sp_creditmemo.iBatchNo,
+						B.TransType,
+						B.WorkInt,
+						B.WorkBuf,external_id
+				FROM ppa_Billings B
+				WHERE B.InvoiceNo = in_invoiceno
+				and B.TransType  IN ('BR', 'BP')
+				and B.Status = 0;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran0;
+			RETURN ;
+--  LB  02/22/96  PTR #3791 Set Status = 8 for BP BR to prevent matchings from taking place
+		END;
+		END IF;
+		-- Insert into the transbill values table.Get the transno from the sequence S_395_1_PPA_TRANSBILL.
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_TransBill_values (
+			   			id,
+						transno,
+						exchange_id,
+						amount,
+						currency_type,
+						currency_code,
+						exchange_rate,
+						billrate
+						)
+				SELECT  ppa_transbill_values_s1.NEXTVAL,
+						TB.TRANSNO,
+						BV.exchange_id,
+						BV.amount,
+						BV.currency_type,
+						BV.currency_code,
+						BV.exchange_rate,
+						BV.BILLRATE
+				FROM ppa_billings B,ppa_Billing_values BV, PPA_TRANSBILL TB
+				WHERE B.InvoiceNo = in_invoiceno
+				and B.TransType  IN ('BR', 'BP')
+				and B.Status = 0
+				and B.TRANSNO = BV.TRANSNO
+				and TB.APPLYTO = B.TRANSNO;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran0;
+			RETURN ;
+		END;
+		END IF;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_Billings
+		SET Status = 8,
+		LASTUPDTDBY_RESOURCE_CODE = in_userinitials,
+		LastUpdateDate = SYSDATE
+		WHERE InvoiceNo = in_invoiceno
+		 and TransType  IN ('BR', 'BP');
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+/* Underbill */
+		IF  StoO_error = 0 THEN
+			COMMIT WORK;
+		ELSE
+			ROLLBACK TO SAVEPOINT tran0;
+		END IF;
+		RETURN ;
+	END;
+	ELSE
+
+	BEGIN
+		DELETE FROM temp_invoiceapplysp_creditmemo;
+		SAVEPOINT tran1;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE invoiceheader
+		SET status = '1'
+		WHERE invoiceno = in_invoiceno;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_PostingBatch (BATCHNO, PostDate, POST_RESOURCE_CODE, PostTarget, PostProcess)
+		SELECT  S_307_1_PPA_POSTINGBATCH.nextval, SYSDATE, in_userinitials, 'TB', 'Credit Memo To TransBill'
+			FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+		SELECT S_307_1_PPA_POSTINGBATCH.currval INTO iBatchNo FROM dual;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		-- fix for bug # 43596 ( removed the space after 'B ' in the WHERE clause)
+
+		/* 9/25/01 Support Line Item Credit Memos by loading ppa_TransBill from temp table */
+		INSERT INTO ppa_TransBill (
+            TRANSNO, SourceModule, ApplyTo, TransType, COMPANY_CODE, PROJECT_CODE, Charge_Code,
+          RESOURCE_CODE, BillingDate, Input_type, ENTRY_RESOURCE_CODE, EntryDate, LASTUPDTDBY_RESOURCE_CODE,
+					LastUpdateDate, InvoiceNo, Notes, Quantity, BatchNo, ApplyToTransType,
+					WorkInt, WorkBuf)
+       SELECT S_395_1_PPA_TRANSBILL.nextval, 10, APPLYTO, TRANSTYPE, COMPANY_CODE, PROJECT_CODE, CHARGE_CODE,
+         RESOURCE_CODE, BILLINGDATE, Input_type, ENTRY_RESOURCE_CODE, ENTRYDATE, LASTUPDTDBY_RESOURCE_CODE,
+   			   LASTUPDATEDATE, in_newinvoiceno, NOTES, QUANTITY, sp_creditmemo.iBatchNo,APPLYTOTRANSTYPE,
+			   WORKINT, WORKBUF
+			 FROM TEMP_BIL_CREDIT_MEMO_GENERATE T;
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+		-- Insert into the transbill values table.Get the transno from the sequence S_395_1_PPA_TRANSBILL.
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO ppa_TransBill_values (
+			   			id,
+						transno,
+						exchange_id,
+						amount,
+						currency_type,
+						currency_code,
+						exchange_rate,
+						billrate
+						)
+				SELECT  ppa_transbill_values_s1.NEXTVAL,
+						TB.TransNo,
+						BV.exchange_id,
+						BV.amount,
+						BV.currency_type,
+						BV.currency_code,
+						BV.exchange_rate,
+						BV.billrate
+				FROM TEMP_BIL_CREDIT_MEMO_GENERATE T,
+					 ppa_Billing_values BV,
+					 ppa_TransBill TB
+				WHERE T.ApplyTo = BV.TransNo AND
+				      TB.ApplyTo = T.ApplyTo ;
+
+		/* Line Item Credit Memo Change TEMP_BIL_CREDIT_MEMO_GENERATE.ApplyTo is actually the
+		   TransNo for the original B, 'AU', 'AD' or 'AY' */
+
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK TO SAVEPOINT tran1;
+			RETURN ;
+		END;
+		END IF;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		/* 9/28/01 Support Line Item Credit Memos by loading from temp table */
+		INSERT INTO temp_invoiceapplysp_creditmemo (applytonumber, transtype, applytotranstype)
+		SELECT  b.ApplyTo, b.TransType, b.ApplyToTransType
+			 FROM TEMP_BIL_CREDIT_MEMO_GENERATE t,
+			 	  ppa_Billings b
+			 WHERE b.TransNo = t.ApplyTo ;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		DELETE FROM TEMP_BIL_CREDIT_MEMO_GENERATE;
+
+		OPEN UF1_cursor;
+		LOOP
+			FETCH UF1_cursor INTO UF1_rowid, UF1_oval1, UF1_oval2, UF1_oval3;
+			EXIT WHEN UF1_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE ppa_WIP
+			SET
+			Status = UF1_oval1,
+			LASTUPDTDBY_RESOURCE_CODE = UF1_oval2,
+			LastUpdateDate = UF1_oval3
+			WHERE ROWID = UF1_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF1_cursor;
+/* UnderBill */
+/* 4/7/00 Exclude Adjustments */
+		IF  StoO_error != 0 THEN
+			ROLLBACK TO SAVEPOINT tran1;
+		ELSE
+			COMMIT WORK;
+		END IF;
+	END;
+	END IF;
+	END;
+END sp_creditmemo;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

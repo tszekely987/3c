@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_LUP_PROJECTID_BILL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_LUP_PROJECTID_BILL" 
+(
+  in_projectid     IN VARCHAR2 DEFAULT NULL,
+  in_projecttitle  IN VARCHAR2 DEFAULT NULL,
+  in_clientcode    IN VARCHAR2 DEFAULT NULL,
+  in_excludechgord IN NUMBER   DEFAULT NULL,
+  in_username      IN VARCHAR2,
+  RC1           IN OUT REV_LUP_PROJECTID_BILLPkg.RCT1)
+AS
+  PROJECT_CODE     GLOBALPKG.STRING;
+  PROJECT_NAME     GLOBALPKG.STRING;
+  COMPANY_CODE     GLOBALPKG.STRING;
+  excludechgord    NUMBER(1,0);
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      GLOBALPKG.STRING;
+  StoO_sqlstatus   INTEGER;
+  currdate         DATE;
+BEGIN
+	rev_lup_projectid_bill.PROJECT_CODE := rev_lup_projectid_bill.in_projectid;
+	rev_lup_projectid_bill.PROJECT_NAME := rev_lup_projectid_bill.in_projecttitle;
+	rev_lup_projectid_bill.COMPANY_CODE := rev_lup_projectid_bill.in_clientcode;
+	rev_lup_projectid_bill.excludechgord := rev_lup_projectid_bill.in_excludechgord;
+	rev_lup_projectid_bill.currdate :=  SYSDATE;
+	rev_lup_projectid_bill.PROJECT_CODE :=  RTRIM(rev_lup_projectid_bill.PROJECT_CODE);
+	rev_lup_projectid_bill.COMPANY_CODE :=  RTRIM(rev_lup_projectid_bill.COMPANY_CODE);
+	rev_lup_projectid_bill.PROJECT_NAME :=  RTRIM(rev_lup_projectid_bill.PROJECT_NAME);
+  IF rev_lup_projectid_bill.PROJECT_CODE IN ('', 'NULL') THEN
+    rev_lup_projectid_bill.PROJECT_CODE := NULL;
+	END IF;
+
+  IF rev_lup_projectid_bill.PROJECT_CODE IS NULL THEN
+    rev_lup_projectid_bill.PROJECT_CODE := '%';
+	ELSE
+    rev_lup_projectid_bill.PROJECT_CODE :=  rev_lup_projectid_bill.PROJECT_CODE || '%';
+	END IF;
+
+  IF rev_lup_projectid_bill.PROJECT_NAME IN ('', 'NULL') THEN
+    rev_lup_projectid_bill.PROJECT_NAME := NULL;
+	END IF;
+
+  IF rev_lup_projectid_bill.PROJECT_NAME IS NULL THEN
+    rev_lup_projectid_bill.PROJECT_NAME := '%';
+	ELSE
+    rev_lup_projectid_bill.PROJECT_NAME := rev_lup_projectid_bill.PROJECT_NAME || '%';
+	END IF;
+  IF rev_lup_projectid_bill.COMPANY_CODE = ' ALL' THEN
+    rev_lup_projectid_bill.COMPANY_CODE := NULL;
+	END IF;
+  IF rev_lup_projectid_bill.COMPANY_CODE IN ('', 'NULL') THEN
+    rev_lup_projectid_bill.COMPANY_CODE := NULL;
+	END IF;
+  IF rev_lup_projectid_bill.excludechgord is NULL THEN
+    rev_lup_projectid_bill.excludechgord := 0;
+	END IF;
+  IF rev_lup_projectid_bill.excludechgord = 1 THEN
+	BEGIN
+    IF rev_lup_projectid_bill.PROJECT_CODE IS NULL THEN
+      IF rev_lup_projectid_bill.PROJECT_NAME IS NULL THEN
+				OPEN RC1 FOR
+        SELECT MASTER_PROJECT_CODE,
+               INV.NAME FROM PAC_MNT_PROJECTS P, INV_INVESTMENTS INV
+            WHERE INV.ID = P.ID
+            --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+         ORDER BY 1;
+			ELSE
+				OPEN RC1 FOR
+        SELECT MASTER_PROJECT_CODE,
+               INV.NAME FROM PAC_MNT_PROJECTS P, INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+         --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+           AND NLS_UPPER(INV.NAME) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_NAME) ESCAPE '\'
+        ORDER BY 2;
+			END IF;
+		ELSE
+      IF rev_lup_projectid_bill.PROJECT_NAME IS NULL THEN
+				OPEN RC1 FOR
+        SELECT MASTER_PROJECT_CODE,
+                INV.NAME FROM PAC_MNT_PROJECTS P, INV_INVESTMENTS INV
+        WHERE INV.ID = P.ID
+        --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND NLS_UPPER(MASTER_PROJECT_CODE) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_CODE) ESCAPE '\'
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+         ORDER BY 1;
+			ELSE
+				OPEN RC1 FOR
+        SELECT MASTER_PROJECT_CODE,
+               INV.NAME FROM PAC_MNT_PROJECTS P, INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+         --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+           AND NLS_UPPER(MASTER_PROJECT_CODE) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_CODE) ESCAPE '\'
+           AND NLS_UPPER(INV.NAME) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_NAME) ESCAPE '\'
+         ORDER BY 1;
+			END IF;
+		END IF;
+	END;
+	ELSE
+	BEGIN
+    IF rev_lup_projectid_bill.PROJECT_CODE IS NULL THEN
+      IF rev_lup_projectid_bill.PROJECT_NAME IS NULL THEN
+				OPEN RC1 FOR
+        SELECT PROJECT_CODE,
+               INV.NAME
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+           --AND p.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+      ORDER BY 1;
+			ELSE
+				OPEN RC1 FOR
+        SELECT PROJECT_CODE,
+               INV.NAME
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+           --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+           AND NLS_UPPER(INV.NAME) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_NAME) ESCAPE '\'
+         ORDER BY 2;
+			END IF;
+		ELSE
+      IF rev_lup_projectid_bill.PROJECT_NAME IS NULL THEN
+				OPEN RC1 FOR
+        SELECT PROJECT_CODE,
+               INV.NAME
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+           --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND NLS_UPPER(PROJECT_CODE) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_CODE) ESCAPE '\'
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+         ORDER BY 1;
+			ELSE
+				OPEN RC1 FOR
+        SELECT PROJECT_CODE,
+               INV.NAME
+          FROM PAC_MNT_PROJECTS P,
+               INV_INVESTMENTS INV
+         WHERE INV.ID = P.ID
+           --AND P.COMPANY_CODE = NVL(rev_lup_projectid_bill.COMPANY_CODE, P.COMPANY_CODE)
+           AND NLS_UPPER(PROJECT_CODE) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_CODE) ESCAPE '\'
+           AND NLS_UPPER(INV.NAME) LIKE NLS_UPPER(rev_lup_projectid_bill.PROJECT_NAME) ESCAPE '\'
+           AND PAC_FOS_IS_VALID_LOCATION_FCT(in_username, P.LOCATIONID) = 1
+         ORDER BY 1;
+			END IF;
+		END IF;
+  END;
+	END IF;
+END rev_lup_projectid_bill;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DPT_UPD_MATRIX_NEW_DEPARTMENT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DPT_UPD_MATRIX_NEW_DEPARTMENT" 
+           (olddepartmentcode  VARCHAR2,
+            newdepartmentcode  VARCHAR2)
+      /*
+                Given an old department code and a new department code, find all matrices that have department as a column and then update all old 
+                department codes with the new department codes
+            */
+      AS
+      BEGIN
+        DECLARE
+          matrixid   NUMBER;
+           columnnum  NUMBER;
+           updatesql  VARCHAR2(2000);
+           CURSOR v_dept_matrices IS 
+             SELECT matrixkey,
+                    columnno
+             FROM   ppa_matrixcoldef
+             WHERE  fieldname = 'departcode';
+        BEGIN
+          OPEN v_dept_matrices;
+
+          LOOP
+            FETCH v_dept_matrices INTO matrixid,columnnum;
+
+            EXIT WHEN v_dept_matrices%NOTFOUND;
+
+            BEGIN
+              updatesql := 'update ppa_matrixvalues set value'
+                           ||columnnum 
+                           ||' = '''
+                           ||newdepartmentcode
+                           ||''' where matrixkey = '
+                           ||matrixid
+                           ||' and value'
+                           ||columnnum
+                           ||' = '''
+                           ||olddepartmentcode
+                           ||'''';
+
+              EXECUTE IMMEDIATE updatesql;
+            EXCEPTION
+              WHEN OTHERS THEN
+          raise_application_error(-20000,SQLERRM);
+            END;
+          END LOOP;
+
+          CLOSE v_dept_matrices;
+        EXCEPTION
+          WHEN OTHERS THEN
+            IF v_dept_matrices%ISOPEN THEN
+              CLOSE v_dept_matrices;
+            END IF;
+
+            raise_application_error(-20000,SQLERRM);
+        END;
+      END dpt_upd_matrix_new_department;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

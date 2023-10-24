@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>COP_PROCESS_LOOP_COUNT_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."COP_PROCESS_LOOP_COUNT_FCT" (
+  pProcess_Id IN NUMBER,
+  p_DefStepId IN NUMBER,
+  p_RunStepId IN NUMBER
+)
+ RETURN varchar2 IS
+
+   /* The main cursor loops through the RUN steps for a process...*/
+   CURSOR c_steps
+   IS
+      -- Loop Thru Steps --
+      SELECT ROWNUM, RunSteps.id
+       FROM bpm_Run_Steps RunSteps
+
+      WHERE RunSteps.Step_Id = p_DefStepId
+        AND RunSteps.Process_Instance_Id = pProcess_Id
+      ORDER BY RunSteps.Start_date;
+    
+
+      v_id NUMBER;
+      v_id_row NUMBER;
+      v_return varchar2(20);
+      v_counter NUMBER;
+
+BEGIN   
+    
+       OPEN c_steps;
+
+       FETCH c_steps INTO v_id_row, v_id;
+
+       -- Loop through each step... 
+       WHILE (c_steps%FOUND)
+     LOOP       
+            if v_counter IS NULL THEN
+              v_counter := 1;
+            end if;
+            
+            if v_id = p_RunStepId THEN
+              v_return := to_char(v_id_row);
+            end if;
+
+
+            
+        -- Process next segment
+            v_counter := v_counter + 1;
+            
+        FETCH c_steps INTO v_id_row, v_id;
+     END LOOP;
+       CLOSE c_steps;
+
+
+   RETURN v_return;
+        
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

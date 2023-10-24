@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_INV_SUMM_HISTORY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_INV_SUMM_HISTORY_SP" (
+BILLING_SESSION_KEY	NUMBER ,
+LANGUAGE                VARCHAR2,
+RC1 	IN OUT PAC_BIL_INV_SUMM_HISTORY_PKG.RCT1,
+RC2 	IN OUT PAC_BIL_INV_SUMM_HISTORY_PKG.RCT2,
+RC3 	IN OUT PAC_BIL_INV_SUMM_HISTORY_PKG.RCT3)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+
+v_ERROR_CODE   INTEGER;
+v_STMT		   GLOBALPKG.STRING;
+v_cTaxAdminMessage   GLOBALPKG.STRING;
+
+BEGIN
+
+  DELETE FROM TEMP_BIL_INVOICE_HIST_SUMM ;
+
+  v_STMT := 'Error selecting from CMN_LOOKUPS_V' ;
+
+  SELECT NAME 
+    INTO v_cTaxAdminMessage
+    FROM CMN_LOOKUPS_V
+    WHERE LOOKUP_TYPE = 'PAC_RPT_TRANSLATIONS'
+      AND LOOKUP_CODE = 'TaxAdminKey'
+      AND LANGUAGE_CODE = LANGUAGE ;
+
+  v_STMT := 'Error inserting into TEMP_BIL_INVOICE_HIST_SUMM' ;
+
+  /* First populate results table with invoice amounts for each projet */
+  INSERT INTO TEMP_BIL_INVOICE_HIST_SUMM
+    ( INVOICENO,
+	  INVOICENO_WORK,
+  	  INVOICEDATE,
+  	  PROJECT_CODE,
+  	  INVOICE_AMOUNT,
+  	  NOTES,
+  	  RECORD_TYPE )
+    SELECT B.INVOICENO,
+		   B.INVOICENO,
+		   I.INVOICEDATE,
+		   B.PROJECT_CODE,
+		   SUM( BV.AMOUNT ) * ( 1 - (2 * INSTR('C', I.INVTYPE))),
+		   I.NOTES,
+		   1 -- Detail Record Type
+	  FROM PPA_BILLINGS B,
+	  	   PPA_BILLING_VALUES BV,
+	  	   INVOICEHEADER I,
+  	  	   INVOICEHEADER_VALUES IV,
+		   OLB_BILLINGCHECKOUT O
+      WHERE O.ACTIONID = PAC_BIL_INV_SUMM_HISTORY_SP.BILLING_SESSION_KEY AND
+	  		O.PROJECT_CODE = B.PROJECT_CODE AND
+			B.INVOICENO = I.INVOICENO AND
+			B.TransType  IN ('B', 'BR', 'BP', 'BC') AND
+			B.TRANSNO = BV.TRANSNO AND
+			BV.CURRENCY_TYPE = 'BILLING' AND
+			I.INVOICENO = IV.INVOICENO AND
+			IV.CURRENCY_TYPE = 'BILLING'
+	  GROUP BY B.INVOICENO,
+		   I.INVOICEDATE,
+		   B.PROJECT_CODE,
+		   I.INVTYPE,
+		   I.NOTES ;
+
+  INSERT INTO TEMP_BIL_INVOICE_HIST_SUMM
+    ( INVOICENO,
+      INVOICENO_WORK,
+      PROJECT_CODE,
+      INVOICE_AMOUNT,
+      RECORD_TYPE )
+    SELECT ' ',
+           T.INVOICENO,
+	       v_cTaxAdminMessage,
+           ( NVL(IV.ADMINCHARGE, 0) + NVL(IV.TAXAMOUNT,0)) * ( 1 - (2 * INSTR('C', I.INVTYPE))),
+           2 -- TAX/ADMIN Record Type
+      FROM TEMP_BIL_INVOICE_HIST_SUMM T,
+	   INVOICEHEADER I,
+  	   INVOICEHEADER_VALUES IV
+      WHERE T.INVOICENO = IV.INVOICENO AND
+	    I.INVOICENO = IV.INVOICENO AND
+	    IV.CURRENCY_TYPE = 'BILLING' AND
+      ( NVL(IV.ADMINCHARGE, 0) + NVL(IV.TAXAMOUNT,0) ) &gt; 0
+      GROUP BY T.INVOICENO,
+               IV.ADMINCHARGE,
+               IV.TAXAMOUNT,
+               I.INVTYPE ;
+
+  /* Next populate results table with invoice totals for each invoice */
+  INSERT INTO TEMP_BIL_INVOICE_HIST_SUMM
+    ( INVOICENO,
+	  INVOICENO_WORK,
+  	  INVOICE_AMOUNT,
+  	  RECORD_TYPE )
+    SELECT INVOICENO_WORK,
+	     INVOICENO_WORK,
+	     SUM( INVOICE_AMOUNT ),
+	     5 -- Total Record Type
+	  FROM TEMP_BIL_INVOICE_HIST_SUMM
+	  GROUP BY INVOICENO_WORK ;
+
+  /* Now populate results table with grand total for all invoices */
+  INSERT INTO TEMP_BIL_INVOICE_HIST_SUMM
+    ( INVOICENO,
+	  INVOICENO_WORK,
+  	  INVOICE_AMOUNT,
+  	  RECORD_TYPE )
+    SELECT 'ZZZZZZZZZZ',
+		   'ZZZZZZZZZZ',
+		   SUM( INVOICE_AMOUNT ),
+		   3 -- Total Record Type
+	  FROM TEMP_BIL_INVOICE_HIST_SUMM
+	  WHERE RECORD_TYPE = 5 ;
+
+  /* Need to figure out the first project per invoice for display purposes */
+  INSERT INTO TEMP_BIL_INVOICE_HIST_SUMM
+    ( INVOICENO,
+	  INVOICENO_WORK,
+  	  PROJECT_CODE,
+  	  RECORD_TYPE )
+    SELECT INVOICENO,
+		   INVOICENO,
+		   MIN( PROJECT_CODE ),
+		   4 -- Min(Project_Code ) per invoice
+	  FROM TEMP_BIL_INVOICE_HIST_SUMM
+	  WHERE RECORD_TYPE = 1
+	  GROUP BY INVOICENO ;
+
+  v_STMT := 'Error updating TEMP_BIL_INVOICE_HIST_SUMM' ;
+
+  UPDATE TEMP_BIL_INVOICE_HIST_SUMM
+    SET INVOICENO = ' ',
+		INVOICEDATE = NULL
+	WHERE RECORD_TYPE = 1 AND
+		  INVOICENO || PROJECT_CODE NOT IN (SELECT INVOICENO || PROJECT_CODE
+		  			   					   	  FROM TEMP_BIL_INVOICE_HIST_SUMM
+											  WHERE RECORD_TYPE = 4 ) ;
+
+	OPEN RC1 FOR
+	SELECT INVOICENO,
+		   INVOICEDATE,
+		   PROJECT_CODE,
+		   INVOICE_AMOUNT,
+		   NOTES,
+		   RECORD_TYPE
+	    FROM TEMP_BIL_INVOICE_HIST_SUMM
+	WHERE RECORD_TYPE IN ( 1, 2, 5 )
+	ORDER BY INVOICENO_WORK,
+		  	 RECORD_TYPE,
+			 PROJECT_CODE ;
+
+	OPEN RC2 FOR
+	SELECT INVOICE_AMOUNT
+	  FROM TEMP_BIL_INVOICE_HIST_SUMM
+	  WHERE RECORD_TYPE = 3 ;
+
+	OPEN RC3 FOR
+	SELECT DISTINCT BILLING_CURRENCY_CODE
+		   FROM PAC_MNT_PROJECTS P,
+		   		TEMP_BIL_INVOICE_HIST_SUMM T
+		   WHERE P.PROJECT_CODE = T.PROJECT_CODE;
+
+  DELETE FROM TEMP_BIL_INVOICE_HIST_SUMM ;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+	  If v_ERROR_CODE IS NULL Then
+	    v_ERROR_CODE := SQLCODE ;
+--	    v_ERROR_CODE := -20114 ;
+		v_STMT := SQLERRM;
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  Else
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  End If;
+
+
+END PAC_BIL_INV_SUMM_HISTORY_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_CALCULATE_TAXES_ON_ADMIN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_CALCULATE_TAXES_ON_ADMIN" (
+  cInvoiceNo VARCHAR2,
+  RET    OUT NUMBER )
+
+AS
+
+  StoO_selcnt INTEGER;
+  v_iErrorCode     INT;
+  v_cErrorMessage  GLOBALPKG.STRING;
+  v_CurrentRow     ROWID;
+  v_cProjectCode   GLOBALPKG.STRING;
+  v_LaborExchRateType   GLOBALPKG.STRING;
+  v_ProjectId           NUMBER;
+  v_CurrentDate         DATE;
+  v_BillingCurrencyCode GLOBALPKG.STRING;
+  v_ERROR_CODE          INTEGER;
+  v_STMT		        GLOBALPKG.STRING;
+  v_ExchangeRateType    GLOBALPKG.STRING;
+  v_CurrencyType        VARCHAR2(30);
+  v_FromCurrency        VARCHAR2(30);
+  v_ToCurrency          VARCHAR2(30);
+  v_ExchangeRateId      NUMBER;
+  v_ExchangeRate        NUMBER(32,6);
+  v_ConvertedAmount     NUMBER(32,6);
+  exrAmount             CMN_EXCHANGERATE_PKG.exchangeRateTAB;  
+
+BEGIN
+
+  RET := 0;
+  v_CurrentDate := SYSDATE;  
+  
+  v_STMT := 'Error deleting from TEMP table in ORACLE' ;
+  
+  DELETE from temp_applytotaxcodessp_calcula ;
+  DELETE from temp_Prelimppa_ComputeAdminAnd;
+  DELETE from temp_Finalppa_ComputeAdminAndT;  
+  
+  v_STMT := 'Error selecting from table in ORACLE' ;
+  
+  SELECT MIN(PROJECT_CODE) 
+    INTO v_cProjectCode  
+    FROM   PPA_TRANSBILL
+    WHERE  INVOICENO = cInvoiceNo ;
+
+  SELECT LABOR_EXCHANGE_RATE_TYPE,
+         ID,
+		 BILLING_CURRENCY_CODE
+    INTO v_LaborExchRateType,
+         v_ProjectId,
+         v_BillingCurrencyCode  
+    FROM PAC_MNT_PROJECTS
+    WHERE PROJECT_CODE = v_cProjectCode ;
+
+  v_STMT := 'Error inserting into table in ORACLE' ;	
+	
+  INSERT INTO TEMP_APPLYTOTAXCODESSP_CALCULA 
+    (TAXCODE, AMOUNT)
+    SELECT  TAXCODE.APPLY_TO_TAXCODE, SUM(F.AMOUNT)
+	  FROM TAXCODE, 
+	       TEMP_PPA_INVOICEDETAILSSP_FINA F
+	  WHERE F.TAXCODE = TAXCODE.CODE
+	    AND F.INVOICENO = SP_CALCULATE_TAXES_ON_ADMIN.CINVOICENO
+	    AND F.ENTRYTYPE = 'A'
+	    AND TAXCODE.APPLY_TO_TAXCODE IS NOT NULL
+		AND F.CURRENCY_TYPE = 'BILLING' 
+	  GROUP BY TAXCODE.APPLY_TO_TAXCODE;	
+
+
+  INSERT INTO TEMP_PRELIMPPA_COMPUTEADMINAND
+    (ENTRYTYPE, LEVELCODE, PERCENTAGE, AMOUNT, TAXCODE)
+    SELECT  'T', M.CODE, M.AMOUNT, A.AMOUNT, A.TAXCODE
+      FROM TAXCODE_METHOD T, 
+           TAX_METHOD M, 
+           TEMP_APPLYTOTAXCODESSP_CALCULA A, 
+           TAXCODE C
+      WHERE T.TAXCODE = A.TAXCODE
+        AND M.CODE = T.TAX_METHOD_CODE
+        AND M.ACTIVE = 1
+        AND M.TAXTYPE = 'TAX'
+        AND C.CODE = A.TAXCODE
+        AND C.ACTIVE = 1 ;
+
+  INSERT INTO TEMP_FINALPPA_COMPUTEADMINANDT (ENTRYTYPE, LEVELCODE, PERCENTAGE, AMOUNT, TAXCODE)
+    SELECT  ENTRYTYPE, LEVELCODE, PERCENTAGE, SUM(AMOUNT), TAXCODE
+      FROM TEMP_PRELIMPPA_COMPUTEADMINAND
+      GROUP BY ENTRYTYPE, LEVELCODE, PERCENTAGE, TAXCODE ;
+
+  BEGIN --TAX_VALUES_CURR LOOP
+    DECLARE CURSOR TAX_VALUES_CURR IS
+      SELECT EntryType, LevelCode, Percentage, Amount, TaxCode
+        FROM TEMP_FINALPPA_COMPUTEADMINANDT ;  
+  
+    BEGIN
+	FOR TAX_VALUES_REC IN TAX_VALUES_CURR
+	  LOOP
+		/* Default Labor Exchange Rate Type for Taxes */
+        v_ExchangeRateType := v_LaborExchRateType;
+
+    	--- get the amount in differnt currency ---:
+		exrAmount :=CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(v_ProjectId,
+		  			  												v_CurrentDate,
+																	v_BillingCurrencyCode,
+																	TAX_VALUES_REC.Amount,
+																	v_ExchangeRateType) ;
+
+	    --- insert or update TEMP_PPA_INVOICEDETAILSSP_FINA for each currency ---
+		BEGIN
+          FOR i in 1  .. exrAmount.count
+		    LOOP
+			  v_CurrencyType := exrAmount(i).currencyType;
+		      v_FromCurrency := exrAmount(i).fromCurrencyCode;
+			  v_ToCurrency := exrAmount(i).toCurrencyCode;
+		      v_ConvertedAmount := NVL(exrAmount(i).convertedAmount,0);
+		      v_ExchangeRateId := exrAmount(i).exchangeRateId;
+		      v_ExchangeRate := NVL(exrAmount(i).exchangeRate,0);
+			  StoO_selcnt := 0;
+			  
+              SELECT 1 INTO StoO_selcnt 
+                FROM DUAL
+                WHERE EXISTS( SELECT 1
+                           FROM TEMP_PPA_INVOICEDETAILSSP_FINA T
+                           WHERE T.INVOICENO = CINVOICENO  AND
+                                 T.ENTRYTYPE = TAX_VALUES_REC.ENTRYTYPE AND
+                                 T.LEVELCODE = TAX_VALUES_REC.LEVELCODE AND
+                                 T.TAXCODE   = TAX_VALUES_REC.TAXCODE AND
+								 T.CURRENCY_TYPE = v_CurrencyType  ) ;
+								 
+              IF StoO_selcnt &gt; 0 Then								  
+                BEGIN
+				  v_STMT := 'Error updating into table in ORACLE' ;
+				  
+                  UPDATE TEMP_PPA_INVOICEDETAILSSP_FINA
+                    SET TEMP_PPA_INVOICEDETAILSSP_FINA.TaxableAmt = TEMP_PPA_INVOICEDETAILSSP_FINA.TaxableAmt + v_ConvertedAmount,
+                        TEMP_PPA_INVOICEDETAILSSP_FINA.Amount = TEMP_PPA_INVOICEDETAILSSP_FINA.Amount + Round( ( v_ConvertedAmount * ( TAX_VALUES_REC.Percentage / 100 ) ), CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( v_ToCurrency ) )
+                    WHERE TEMP_PPA_INVOICEDETAILSSP_FINA.InvoiceNo = cInvoiceNo  AND
+                          TEMP_PPA_INVOICEDETAILSSP_FINA.EntryType = TAX_VALUES_REC.ENTRYTYPE AND
+                          TEMP_PPA_INVOICEDETAILSSP_FINA.LevelCode = TAX_VALUES_REC.LEVELCODE AND
+                          TEMP_PPA_INVOICEDETAILSSP_FINA.TaxCode   = TAX_VALUES_REC.TAXCODE AND
+                          TEMP_PPA_INVOICEDETAILSSP_FINA.CURRENCY_TYPE = v_CurrencyType ;
+                END;
+              ELSE
+                BEGIN
+				  v_STMT := 'Error inserting into table in ORACLE' ;
+				  
+                  INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA
+                    ( INVOICENO, ENTRYTYPE, LEVELCODE, PERCENTAGE,
+                      TAXABLEAMT, AMOUNT, 
+                      TAXCODE, CURRENCY_TYPE, CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+                    SELECT cInvoiceNo, TAX_VALUES_REC.ENTRYTYPE, TAX_VALUES_REC.LEVELCODE, TAX_VALUES_REC.Percentage,
+                           v_ConvertedAmount, ROUND(( v_ConvertedAmount * ( TAX_VALUES_REC.Percentage / 100 ) ), CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( v_ToCurrency )),
+                           TAX_VALUES_REC.TAXCODE, v_CurrencyType, v_ToCurrency, v_ExchangeRateId, v_ExchangeRate
+                      FROM DUAL ;
+
+                END;
+              END IF;
+            END LOOP;
+		  END;	 
+      END LOOP;
+	  END;   
+  END; --TAX_VALUES_CURR LOOP  					  	  
+
+  RET := 0 ;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+	  RET := -1;
+	  If v_ERROR_CODE IS NULL Then
+	    v_ERROR_CODE := SQLCODE ;
+		v_STMT := SQLERRM;
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  Else
+        RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	  End If;
+
+END SP_CALCULATE_TAXES_ON_ADMIN;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

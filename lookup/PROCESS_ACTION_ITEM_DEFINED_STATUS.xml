@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="PROCESS_ACTION_ITEM_DEFINED_STATUS" displayAttributeName="name" hiddenAttributeName="lookup_code" objectCode="" sortAttributeName="sort_order" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="Process Action Item Status" languageCode="en" name="Process Action Item Status"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="all"><![CDATA[select
+ @SELECT:aiStatus.CODE:CODE@,
+@SELECT:aiStatus.name:name@,
+@SELECT:aiStatus.lookup_code:lookup_code@,
+@SELECT:aiStatus.lookup_type:lookup_type@,
+@SELECT:aiStatus.sort_order:sort_order@
+ from (select id code, name, lookup_code, lookup_type, 0 sort_order from cmn_lookups_v where is_active = 1 and language_code = @WHERE:PARAM:LANGUAGE@ and lookup_type = 'CAL_ACTIONITEM_STATUS'  and lookup_code='CAL_OPEN'
+ union
+ select clv.id code, clv.name, clv.lookup_code lookup_code, clv.lookup_type lookup_type, clv.sort_order from cmn_lookups_v clv
+    INNER JOIN 	(select a.status_type_code stype, a.status_code code from BPM_RUN_STEP_ACTION_RESULTS ar, BPM_DEF_STEP_AI_ACTIONS a, 	CAL_ACTION_ITEMS cai where ar.id = cai.process_handler_id and ( @WHERE:PARAM:USER_DEF:INTEGER:CAL_ACTION_ITEM_ID@ IS NULL or @WHERE:PARAM:USER_DEF:INTEGER:CAL_ACTION_ITEM_ID@ = cai.id) and ar.step_action_id = a.step_action_id) selected_status
+        ON (clv.lookup_type = selected_status.stype AND  clv.lookup_code = selected_status.code) where clv.is_active = 1 and clv.language_code = @WHERE:PARAM:LANGUAGE@
+        union
+  select clv.id code, clv.name, clv.lookup_code, clv.lookup_type, clv.sort_order from cal_action_items cai
+ join odf_multi_valued_lookups mvl on cai.ai_def_id = mvl.pk_id and mvl.object = 'actionitemdef' and mvl.attribute = 'status_list'
+ join cmn_lookups_v clv on clv.lookup_code = mvl.value and clv.lookup_type = 'PROCESS_DEFAULT_AI_STATUS'
+ where clv.is_active = 1 and cai.ai_def_type = 'actionitemdef' and clv.language_code = @WHERE:PARAM:LANGUAGE@ and @WHERE:PARAM:USER_DEF:INTEGER:CAL_ACTION_ITEM_ID@ = cai.id
+        ) aiStatus]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="lookup_code"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="lookup_code"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Process Action Item Status" languageCode="en" name="Select Process Action Item Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Select Process Action Item Status" languageCode="en" name="Select Process Action Item Status"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="code" defaultValue="" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="lookup_code" defaultValue="" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="lookup_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <filter code="lookup_type" defaultValue="" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="lookup_type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="code" order="1" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="lookup_code" order="3" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="lookup_code"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="lookup_type" order="4" widgetType="text">
+                
+                
+                
+                
+                <nls description="No description" languageCode="en" name="lookup_type"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

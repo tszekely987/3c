@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <lookups update="true">
+          <dynamicLookup autoSuggestEnabled="true" autoSuggestMaxSuggestions="10" code="TASK_ASSIGNED_RESOURCES" displayAttributeName="name" hiddenAttributeName="prid" objectCode="" sortAttributeName="name" sortDirection="asc" source="niku.com" status="active" update="true">
+            
+            
+            
+            
+            <nls description="List resources assigned to a task" languageCode="en" name="Assigned Resources for a Task"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql databaseId="Niku" dbVendor="mssql"><![CDATA[
+                  
+                  SELECT @SELECT:'T'+cast(team.prid as varchar):prid@, @SELECT:ISNULL(team.requirement_name, res.full_name):name@,
+                         @SELECT:team.last_updated_date:last_updated_date@
+ FROM PRTEAM team, SRM_RESOURCES res, PRASSIGNMENT assign
+WHERE 1=1
+  AND @FILTER@         
+	AND res.id = team.prresourceid
+  AND team.prid = assign.team_id
+  AND assign.prtaskid = @WHERE:PARAM:USER_DEF:integer:taskid@ @BROWSE-ONLY: AND @WHERE:SECURITY:RESOURCE:res.ID@:BROWSE-ONLY@
+                ]]></nsql>
+            <nsql databaseId="Niku" dbVendor="oracle"><![CDATA[SELECT @SELECT:'T'||team.prid:prid@, @SELECT:NVL(team.requirement_name, res.full_name):name@,
+        @SELECT:team.last_updated_date:last_updated_date@
+ FROM PRTEAM team, SRM_RESOURCES res, PRASSIGNMENT assign
+WHERE 1=1
+  AND @FILTER@         
+	AND res.id = team.prresourceid
+  AND team.prid = assign.team_id
+  AND assign.prtaskid = @WHERE:PARAM:USER_DEF:integer:taskid@ @BROWSE-ONLY: AND @WHERE:SECURITY:RESOURCE:res.ID@:BROWSE-ONLY@]]></nsql>
+            <nsql databaseId="Niku" dbVendor="postgres"><![CDATA[SELECT @SELECT:'T'||team.prid:prid@, @SELECT:COALESCE(team.requirement_name, res.full_name):name@,
+        @SELECT:team.last_updated_date:last_updated_date@
+ FROM PRTEAM team, SRM_RESOURCES res, PRASSIGNMENT assign
+WHERE 1=1
+  AND @FILTER@
+	AND res.id = team.prresourceid
+  AND team.prid = assign.team_id
+  AND assign.prtaskid = cast(@WHERE:PARAM:USER_DEF:integer:taskid@ as int) @BROWSE-ONLY: AND @WHERE:SECURITY:RESOURCE:res.ID@:BROWSE-ONLY@]]></nsql>
+            <displayedSuggestionAttributes>
+              <displayedSuggestionAttribute value="param_taskid"/>
+              <displayedSuggestionAttribute value="name"/>
+            </displayedSuggestionAttributes>
+            <searchedSuggestionAttributes>
+              <searchedSuggestionAttribute value="param_taskid"/>
+              <searchedSuggestionAttribute value="name"/>
+            </searchedSuggestionAttributes>
+            <browsePage>
+              <singleSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Task Assigned Resource" languageCode="en" name="Task Assigned Resource"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </singleSelectPageTitles>
+              <multiSelectPageTitles>
+                
+                
+                
+                
+                <nls description="Task Assigned Resources" languageCode="en" name="Task Assigned Resources"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </multiSelectPageTitles>
+              <filter code="name" defaultValue="" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </filter>
+              <listColumn code="prid" order="4" widgetType="hidden">
+                
+                
+                
+                
+                <nls description="prid" languageCode="en" name="prid"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+              <listColumn code="name" order="2" widgetType="text">
+                
+                
+                
+                
+                <nls description="Name" languageCode="en" name="Name"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+              </listColumn>
+            </browsePage>
+          </dynamicLookup>
+        </lookups>
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="1" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

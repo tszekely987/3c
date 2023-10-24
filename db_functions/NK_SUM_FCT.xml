@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_SUM_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_SUM_FCT" (P_CURVE IN NK_CURVE, P_START IN TIMESTAMP DEFAULT NULL, P_FINISH IN TIMESTAMP DEFAULT NULL)
+RETURN NUMBER
+AS
+  V_START SIMPLE_INTEGER := 2; V_FINISH SIMPLE_INTEGER := 65534;
+BEGIN
+
+  IF( P_START IS NOT NULL ) THEN
+    V_START := CRV_DATE_TO_JULIAN_FCT(TRUNC(P_START,'DDD'));
+  END IF;
+
+  IF( P_FINISH IS NOT NULL ) THEN
+    IF(EXTRACT(HOUR FROM P_FINISH) &gt; 0) THEN
+      V_FINISH := CRV_DATE_TO_JULIAN_FCT(TRUNC(P_FINISH, 'DDD') + 1);
+    ELSE
+      V_FINISH := CRV_DATE_TO_JULIAN_FCT(TRUNC(P_FINISH, 'DDD'));
+    END IF;
+  END IF;
+
+  RETURN NK_SUM_JULIAN_FCT(P_CURVE, V_START, V_FINISH);
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GETSCHAPPRVDAMT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GETSCHAPPRVDAMT_SP" (
+COMPANY_CODE 	VARCHAR2 ,
+PROJECT_CODE 	VARCHAR2 ,
+approvedamount 	IN OUT NUMBER,
+RC1 	IN OUT PAC_BIL_GETSCHAPPRVDAMT_SPPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+approvedamount_local 	NUMBER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   NVL(amountbilled, 0)
+    INTO PAC_BIL_GETSCHAPPRVDAMT_SP.approvedamount FROM PAC_MNT_PROJECTS
+		WHERE COMPANY_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.COMPANY_CODE
+		 and PROJECT_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	BEGIN
+	    /*** MultiCurrency Change - Get the amount from Values table***/
+		SELECT   PAC_BIL_GETSCHAPPRVDAMT_SP.approvedamount + NVL(SUM(TV.Amount),0)
+		into PAC_BIL_GETSCHAPPRVDAMT_SP.approvedamount
+		FROM ppa_TransBill T,ppa_TransBill_values TV
+			WHERE COMPANY_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.COMPANY_CODE
+			 and PROJECT_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.PROJECT_CODE
+			 and TransType = 'B'
+			 and SUBSTR(InvoiceNo, 1, 5) != 'MATCH'
+			 and T.TRANSNO = TV.TRANSNO
+			 and TV.CURRENCY_TYPE ='BILLING';
+	EXCEPTION
+		 WHEN NO_DATA_FOUND THEN
+			 	  NULL;
+		 WHEN TOO_MANY_ROWS THEN
+		 	  	  NULL;
+		 WHEN OTHERS THEN
+				 NULL;
+	end;
+	OPEN RC1 FOR
+	/*** MultiCurrency Change - Get the amount from Values table***/
+	SELECT   PAC_BIL_GETSCHAPPRVDAMT_SP.approvedamount + NVL(SUM(TV.Amount),0)
+	FROM ppa_TransBill T,ppa_TransBill_values TV
+		WHERE COMPANY_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.COMPANY_CODE
+		 and PROJECT_CODE = PAC_BIL_GETSCHAPPRVDAMT_SP.PROJECT_CODE
+		 and TransType = 'B'
+		 and SUBSTR(InvoiceNo, 1, 5) != 'MATCH'
+		 and T.TRANSNO = TV.TRANSNO
+		 and TV.CURRENCY_TYPE ='BILLING';
+END PAC_BIL_GETSCHAPPRVDAMT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

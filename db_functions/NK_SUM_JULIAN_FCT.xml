@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>NK_SUM_JULIAN_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."NK_SUM_JULIAN_FCT" (P_CURVE IN NK_CURVE, P_START IN INTEGER DEFAULT 2, P_FINISH IN INTEGER DEFAULT 65534)
+  RETURN NUMBER
+  AS
+  V_SUM NUMBER := 0.0;
+  V_SEGS_START PLS_INTEGER; V_SEGS_FINISH PLS_INTEGER;
+  V_START PLS_INTEGER; V_FINISH PLS_INTEGER; V_DATE PLS_INTEGER;
+  V_START2 PLS_INTEGER; V_FINISH2 PLS_INTEGER;
+  V_DAY_OF_WEEK PLS_INTEGER;
+  V_WEEK_TOTAL PLS_INTEGER; V_WEEKS PLS_INTEGER; V_WORK_TIME INTEGER;
+  V_IDX PLS_INTEGER;
+  V_START_TOD PLS_INTEGER; V_FINISH_TOD PLS_INTEGER;
+  V_SEG_LOW PLS_INTEGER; V_SEG_HIGH PLS_INTEGER;
+  V_EXCP_LOW PLS_INTEGER; V_EXCP_HIGH PLS_INTEGER; V_EXCP_PTR PLS_INTEGER;
+  V_SEARCH_LIMIT PLS_INTEGER;
+  V_LAST_EXCP_PTR PLS_INTEGER;
+  BEGIN
+
+    V_SEGS_START := P_START;
+    V_SEGS_FINISH := P_FINISH;
+
+    /*
+      Iterate through the curve including a sum from each segment that is in the date range
+    */
+    IF( P_CURVE IS NOT NULL AND P_CURVE.SEGMENTS IS NOT NULL AND P_CURVE.SEGMENTS.COUNT &gt; 0) THEN
+
+      /*
+        If the parameter dates are outside of the curve start/finish dates then just return
+        the curve sum
+      */
+      V_SEG_LOW := 1;
+      V_SEG_HIGH := P_CURVE.SEGMENTS.COUNT;
+
+      /*
+        If dates are outside the curve range then return 0
+       */
+      IF(V_SEGS_FINISH &lt; P_CURVE.SEGMENTS(V_SEG_LOW).SEGMENT_START OR V_SEGS_START &gt; P_CURVE.SEGMENTS(V_SEG_HIGH).SEGMENT_FINISH) THEN
+        RETURN 0;
+      END IF;
+
+      IF(V_SEGS_START &lt;= P_CURVE.SEGMENTS(V_SEG_LOW).SEGMENT_START AND (V_SEGS_FINISH &gt; P_CURVE.SEGMENTS(V_SEG_HIGH).SEGMENT_FINISH OR (V_SEGS_FINISH = P_CURVE.SEGMENTS(V_SEG_HIGH).SEGMENT_FINISH AND P_CURVE.SEGMENTS(V_SEG_HIGH).FINISH_TOD = 0))) THEN
+        RETURN P_CURVE.CURVE_SUM;
+      END IF;
+
+      V_SUM := 0.0;
+      /*
+        Iterate through the segments looking for ones that overlap the requested dates and compute the worktime
+       */
+      FOR s_idx IN V_SEG_LOW .. V_SEG_HIGH LOOP
+        IF( P_CURVE.SEGMENTS(s_idx).SEGMENT_START &lt; V_SEGS_FINISH AND P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH &gt;= V_SEGS_START ) THEN
+
+          /*
+            If the parameter dates fully encompass the segment dates then just return the segment sum
+          */
+          IF(V_SEGS_START &lt;= P_CURVE.SEGMENTS(s_idx).SEGMENT_START AND (V_SEGS_FINISH &gt; P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH OR (V_SEGS_FINISH = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND P_CURVE.SEGMENTS(s_idx).FINISH_TOD = 0))) THEN
+            V_SUM := V_SUM + P_CURVE.SEGMENTS(s_idx).SEGMENT_SUM;
+            CONTINUE;
+          END IF;
+
+          V_START := GREATEST( V_SEGS_START, P_CURVE.SEGMENTS(s_idx).SEGMENT_START);
+          V_FINISH := LEAST( V_SEGS_FINISH, P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH);
+          IF( P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS IS NOT NULL ) THEN
+            /*
+              Compute the weekly work time from the calendar
+            */
+            V_WEEK_TOTAL := 0; V_WORK_TIME := 0;
+            V_WEEK_TOTAL := V_WEEK_TOTAL
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(1)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(2)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(3)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(4)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(5)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(6)
+                            + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(7);
+
+            V_DAY_OF_WEEK := MOD((V_START+6),7)+1;
+            V_IDX := V_START;
+            /*
+              Iterate through the periods daily to add to worktime
+             */
+            WHILE(V_IDX &lt; V_FINISH) LOOP
+              /*
+                If a full week is found then shortcut the process by multipling the
+                weekly total by the number of full weeks found
+               */
+              IF(V_DAY_OF_WEEK = 1 AND (V_FINISH - V_IDX) &gt; 7) THEN
+                V_WEEKS := trunc((V_FINISH - V_IDX) / 7);
+                V_WORK_TIME := V_WORK_TIME + (V_WEEKS * V_WEEK_TOTAL);
+                -- reposition to the new day and move on
+                V_IDX := V_IDX + (V_WEEKS * 7);
+                V_DAY_OF_WEEK := MOD((V_IDX+6),7)+1;
+                CONTINUE;
+              END IF;
+
+              V_WORK_TIME := V_WORK_TIME + P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+              IF(V_DAY_OF_WEEK = 7) THEN
+                V_DAY_OF_WEEK := 1;
+              ELSE
+                V_DAY_OF_WEEK := V_DAY_OF_WEEK + 1;
+              END IF;
+
+              V_IDX := V_IDX + 1;
+            END LOOP;
+
+
+            /*
+              Need to check for a 1 day segment with either start tod or finish tod
+            */
+            IF(P_CURVE.SEGMENTS(s_idx).SEGMENT_START = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND (P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 OR P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0)) THEN
+              V_DAY_OF_WEEK := MOD((V_START+6),7)+1;
+              -- define the tod boundary
+              V_START_TOD := GREATEST(0,P_CURVE.SEGMENTS(s_idx).START_TOD);
+              V_FINISH_TOD := LEAST(86400,P_CURVE.SEGMENTS(s_idx).FINISH_TOD);
+              FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).DAY_OF_WEEK = V_DAY_OF_WEEK AND (P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD &gt; V_START_TOD AND P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD &lt;= V_FINISH_TOD)) THEN
+                  V_WORK_TIME := V_WORK_TIME + (LEAST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD, V_FINISH_TOD) - GREATEST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD,P_CURVE.SEGMENTS(s_idx).START_TOD));
+                END IF;
+              END LOOP;
+            ELSE
+
+              /*
+                check for first day stuff here
+              */
+              IF(P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 AND V_START = P_CURVE.SEGMENTS(s_idx).SEGMENT_START AND P_CURVE.SEGMENTS(s_idx).SHIFTS IS NOT NULL) THEN
+                V_DAY_OF_WEEK := MOD((V_START+6),7)+1;
+                V_WORK_TIME := V_WORK_TIME - P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+                -- get the sume from the shifts for the day
+                FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                  IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).DAY_OF_WEEK = V_DAY_OF_WEEK AND P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD &gt; P_CURVE.SEGMENTS(s_idx).START_TOD) THEN
+                    V_WORK_TIME := V_WORK_TIME + (P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD - GREATEST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD,P_CURVE.SEGMENTS(s_idx).START_TOD));
+                  END IF;
+                END LOOP;
+              END IF;
+
+              /*
+                check for last day stuff here
+              */
+              IF(P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0 AND V_FINISH = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND V_SEGS_FINISH &gt; P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND P_CURVE.SEGMENTS(s_idx).SHIFTS IS NOT NULL) THEN
+                V_DAY_OF_WEEK := MOD((V_FINISH+6),7)+1;
+                -- get the sume from the shifts for the day
+                FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                  IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).DAY_OF_WEEK = V_DAY_OF_WEEK AND P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD &lt; P_CURVE.SEGMENTS(s_idx).FINISH_TOD) THEN
+                    V_WORK_TIME := V_WORK_TIME + (LEAST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD,P_CURVE.SEGMENTS(s_idx).FINISH_TOD) - P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD);
+                  END IF;
+                END LOOP;
+              END IF;
+            END IF;
+
+            /*
+               Now iterate through the exceptions and backout the total
+               from the work week and add the exception
+            */
+            IF( P_CURVE.SEGMENTS(s_idx).EXCEPTIONS IS NOT NULL AND P_CURVE.SEGMENTS(s_idx).EXCEPTIONS.COUNT &gt; 0 ) THEN
+              V_EXCP_LOW := 1;
+              V_EXCP_HIGH := P_CURVE.SEGMENTS(s_idx).EXCEPTIONS.COUNT;
+
+              /*
+                Only need to process exceptions if the requested date range is between the first start and the last finish then process exceptions
+              */
+              IF(V_FINISH &gt;= P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(V_EXCP_LOW).START_DATE AND V_START &lt;= P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(V_EXCP_HIGH).FINISH_DATE) THEN
+                /*
+                  Implemented a binary search here for the mitre case where there are hundreds of exceptions for the segment. Look for any exception
+                  that contains the requested start date
+                 */
+                IF(V_EXCP_HIGH &gt; 5) THEN
+                  -- This loop in place to avoid unintended infinite loop.  20 is the max number of binary searches for 1M items so should be plenty
+                  FOR bi IN 1 .. 20 loop
+                    V_LAST_EXCP_PTR := V_EXCP_PTR;
+                    V_EXCP_PTR := V_EXCP_LOW + ((V_EXCP_HIGH - V_EXCP_LOW)/2);
+
+                    -- could be that there is no exception that starts on that date -- weekends
+                    IF( V_LAST_EXCP_PTR = V_EXCP_PTR OR V_EXCP_LOW = V_EXCP_HIGH) THEN
+                      EXIT;
+                    END IF;
+
+                    -- found it
+                    IF(V_START &gt;= P_CURVE.SEGMENTS(S_IDX).EXCEPTIONS(V_EXCP_PTR).START_DATE AND V_START &lt;= P_CURVE.SEGMENTS(S_IDX).EXCEPTIONS(V_EXCP_PTR).FINISH_DATE) THEN
+                      V_EXCP_LOW := V_EXCP_PTR;
+                      EXIT;
+                    END IF;
+
+                    -- move back
+                    IF(V_START &lt; P_CURVE.SEGMENTS(S_IDX).EXCEPTIONS(V_EXCP_PTR).START_DATE) THEN
+                      V_EXCP_HIGH := V_EXCP_PTR;
+                      CONTINUE;
+                    END IF;
+
+                    -- move forward
+                    IF(V_START &gt; P_CURVE.SEGMENTS(S_IDX).EXCEPTIONS(V_EXCP_PTR).FINISH_DATE) THEN
+                      V_EXCP_LOW := V_EXCP_PTR;
+                      CONTINUE;
+                    END IF;
+                  END LOOP;  -- safety loop
+                END IF; -- IF &gt; ? THEN do BINARY search
+
+                -- now that the low has been established, reset the high to the count
+                v_excp_high := p_curve.segments(s_idx).exceptions.count;
+
+                /*
+                  Iterate through the exceptions
+                 */
+                FOR e_idx IN V_EXCP_LOW .. V_EXCP_HIGH LOOP
+                  IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).FINISH_DATE &lt; V_START) THEN
+                    CONTINUE;
+                  END IF;
+
+                  IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).START_DATE &gt; V_FINISH) THEN
+                    EXIT;
+                  END IF;
+
+                  -- the exception fits the date range so process it
+                  IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).START_DATE &lt;= V_FINISH AND P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).FINISH_DATE &gt; V_START) THEN
+                    --dbms_output.put_line('EXCP:' || P_CURVE.SEGMENTS(S_IDX).EXCEPTIONS(E_IDX).START_DATE);
+                    V_START2 := GREATEST( P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).START_DATE, V_START);
+                    V_FINISH2 := P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).FINISH_DATE - 1; -- natively stored as the next day, like a midnight date
+
+                    V_DAY_OF_WEEK := MOD((V_START2+6),7)+1;
+                    /*
+                      each date in the exception should be considered including v_finish2
+                     */
+                    FOR V_DATE IN V_START2 .. (V_FINISH2) LOOP
+                      -- if date &gt; seg finish quit
+                      IF(V_DATE &gt; P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH) THEN
+                        EXIT;
+                      END IF;
+
+                      -- if date = segment finish and doesn't have a tod quit
+                      IF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND P_CURVE.SEGMENTS(s_idx).FINISH_TOD = 0) THEN
+                        EXIT;
+                      END IF;
+
+                      -- if date &gt;= the query finish then exit
+                      IF(V_DATE &gt;= V_SEGS_FINISH) THEN
+                        EXIT;
+                      END IF;
+
+                      -- backout the worktime from the calendar
+                      IF(P_CURVE.SEGMENTS(s_idx).SHIFTS IS NOT NULL) THEN
+
+                        -- 1 day segment equals start and finish and either start_tod &gt; 0 or finish_tod &gt; 0
+                        IF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_START and V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH and (P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 or P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0)) then
+                          -- define the tod boundary
+                          V_START_TOD := GREATEST(0,P_CURVE.SEGMENTS(s_idx).START_TOD);
+                          V_FINISH_TOD := LEAST(86400,P_CURVE.SEGMENTS(s_idx).FINISH_TOD);
+                          FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                            IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).DAY_OF_WEEK = V_DAY_OF_WEEK AND (P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD &gt; V_START_TOD AND P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD &lt;= V_FINISH_TOD)) THEN
+                              V_WORK_TIME := V_WORK_TIME - (LEAST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).FINISH_TOD, V_FINISH_TOD) - GREATEST(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).START_TOD,P_CURVE.SEGMENTS(s_idx).START_TOD));
+                            END IF;
+                          END LOOP;
+
+                        -- segment start date with a start tod
+                        ELSIF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_START and P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0) then
+                          -- get the sum from the shifts for the day
+                          FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                            IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).day_of_week = v_day_of_week and P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).finish_tod &gt; P_CURVE.SEGMENTS(s_idx).start_tod ) THEN
+                              V_WORK_TIME := V_WORK_TIME - (P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).finish_tod - greatest(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).start_tod,P_CURVE.SEGMENTS(s_idx).start_tod));
+                            END IF;
+                          END LOOP;
+
+                        -- segment finish date with a finish tod
+                        ELSIF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH and P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0) then
+                          FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).SHIFTS.COUNT LOOP
+                            IF(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).day_of_week = v_day_of_week and P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).start_tod &lt; P_CURVE.SEGMENTS(s_idx).finish_tod ) THEN
+                              V_WORK_TIME := V_WORK_TIME - (least(P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).finish_tod,P_CURVE.SEGMENTS(s_idx).finish_tod) - P_CURVE.SEGMENTS(s_idx).SHIFTS(ELEM).start_tod);
+                            END IF;
+                          END LOOP;
+
+                        ELSE
+                          -- backout the original work time
+                          V_WORK_TIME := V_WORK_TIME - P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+                        END IF;
+                      ELSE
+                        -- segment shifts are null so backout the original work time
+                        V_WORK_TIME := V_WORK_TIME - P_CURVE.SEGMENTS(s_idx).WORK_WEEK_TOTALS(V_DAY_OF_WEEK);
+                      END IF;
+
+                      -- add the exception based time
+                      IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS IS NOT NULL) THEN
+                        -- 1 day segment
+                        IF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_START and V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH and (P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 or P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0) and P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).shifts is NOT NULL) THEN
+
+                          -- loop through the shifts on the exception
+                          V_START_TOD := GREATEST(0,P_CURVE.SEGMENTS(s_idx).START_TOD);
+                          V_FINISH_TOD := LEAST(86400,P_CURVE.SEGMENTS(s_idx).FINISH_TOD);
+                          FOR ELEM in 1 .. P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS.COUNT LOOP
+                            IF((P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).FINISH_TOD &gt; V_START_TOD AND P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).START_TOD &lt;= V_FINISH_TOD)) THEN
+                              V_WORK_TIME := V_WORK_TIME + (LEAST(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).FINISH_TOD, V_FINISH_TOD) - GREATEST(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).START_TOD,P_CURVE.SEGMENTS(s_idx).START_TOD));
+                            END IF;
+                          END LOOP;
+
+                        -- segment start date with a start tod
+                        ELSIF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_START and P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 and P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS IS NOT NULL) THEN
+                          -- loop through the shifts on the exception
+                          FOR ELEM IN 1 .. P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS.COUNT LOOP
+                            IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).finish_tod &gt; P_CURVE.SEGMENTS(s_idx).start_tod ) then
+                              V_WORK_TIME := V_WORK_TIME + (P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).finish_tod - greatest(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).start_tod,P_CURVE.SEGMENTS(s_idx).start_tod));
+                            END IF;
+                          END LOOP;
+
+                        -- segment finish date with a finish tod
+                        ELSIF(V_DATE = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH and P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0 and P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).shifts is not null) THEN
+                          -- loop through the shifts on the exception
+                          FOR ELEM in 1..P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS.COUNT loop
+                            IF(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).start_tod &lt; P_CURVE.SEGMENTS(s_idx).finish_tod ) THEN
+                              V_WORK_TIME := V_WORK_TIME + (least(P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).finish_tod,P_CURVE.SEGMENTS(s_idx).finish_tod) - P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).SHIFTS(ELEM).start_tod);
+                            END IF;
+                          END LOOP;
+
+                        ELSE
+                          -- get the total shifts from the exception
+                          V_WORK_TIME := V_WORK_TIME + P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).TOTAL;
+                        END IF; -- e.shifts NOT NULL
+                      ELSE
+                        -- get the total shifts from the exception because the shifts were null
+                        V_WORK_TIME := V_WORK_TIME + P_CURVE.SEGMENTS(s_idx).EXCEPTIONS(e_idx).TOTAL;
+                      END IF;  -- e.shifts not null
+
+                      -- advance day of week
+                      IF(V_DAY_OF_WEEK = 7) THEN
+                        V_DAY_OF_WEEK := 1;
+                      ELSE
+                        V_DAY_OF_WEEK := V_DAY_OF_WEEK + 1;
+                      END IF;
+                    END LOOP; -- dates in the exception
+                  END IF; -- EXCEPTION IS IN DATE range
+                END LOOP; -- exceptions loop
+              END IF; -- exceptions NOT NULL
+            END IF; -- vstart BETWEEN FIRST START AND LAST finish
+            V_SUM := V_SUM + (V_WORK_TIME * P_CURVE.SEGMENTS(s_idx).RATE);
+          ELSE
+            -- no calendar so straight computation
+            /*
+             If a 1 day segment with tod
+            */
+            IF(P_CURVE.SEGMENTS(s_idx).SEGMENT_START = P_CURVE.SEGMENTS(s_idx).SEGMENT_FINISH AND (P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 OR P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0)) THEN
+              IF(P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 AND P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0) THEN
+                V_SUM := V_SUM + ((P_CURVE.SEGMENTS(s_idx).FINISH_TOD - P_CURVE.SEGMENTS(s_idx).START_TOD) * P_CURVE.SEGMENTS(s_idx).RATE);
+              ELSIF(P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0) THEN
+                V_SUM := V_SUM + (P_CURVE.SEGMENTS(s_idx).FINISH_TOD * P_CURVE.SEGMENTS(s_idx).RATE);
+              ELSE
+                V_SUM := V_SUM + ((86400 - P_CURVE.SEGMENTS(s_idx).START_TOD) * P_CURVE.SEGMENTS(s_idx).RATE);
+              END IF;
+              CONTINUE;
+            END IF;
+
+            -- multiday sgment
+            V_SUM := V_SUM + ((V_FINISH - V_START) * 86400 * P_CURVE.SEGMENTS(s_idx).RATE);
+
+            /*
+              check for the start_tod &gt; 0
+            */
+            IF(P_CURVE.SEGMENTS(s_idx).START_TOD &gt; 0 and v_start = P_CURVE.SEGMENTS(s_idx).segment_start) THEN
+              -- subtract the start day
+              V_SUM := V_SUM - (86400 * P_CURVE.SEGMENTS(s_idx).RATE);
+              -- add the portion
+              V_SUM := V_SUM + ((86400 - P_CURVE.SEGMENTS(s_idx).START_TOD) * P_CURVE.SEGMENTS(s_idx).RATE);
+            END IF;
+
+            /*
+              check for the finish_tod &gt; 0
+            */
+            IF(P_CURVE.SEGMENTS(s_idx).FINISH_TOD &gt; 0 and v_finish = P_CURVE.SEGMENTS(s_idx).segment_finish and v_segs_finish &gt; P_CURVE.SEGMENTS(s_idx).segment_finish) THEN
+              V_SUM := V_SUM + (P_CURVE.SEGMENTS(s_idx).FINISH_TOD * P_CURVE.SEGMENTS(s_idx).RATE);
+            END IF;
+
+          END IF;
+        /*
+          Stop the process if the segment is beyond the requested finish date
+        */
+        ELSIF (P_CURVE.SEGMENTS(s_idx).SEGMENT_START &gt; V_SEGS_FINISH) THEN
+          EXIT;
+        END IF;
+      END LOOP;
+    END IF;
+
+    RETURN V_SUM;
+
+    -- safety check ... if anything goes wrong just return zero
+    EXCEPTION
+    WHEN OTHERS THEN
+      RETURN 0;
+  END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

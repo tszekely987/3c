@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_DROPDOWN</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_DROPDOWN" 
+(
+  column_   VARCHAR2 ,
+  parm  VARCHAR2  DEFAULT NULL,
+  RC1   IN OUT SP_DROPDOWNPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+  IF  sp_dropdown.column_ = 'input_type' THEN
+		OPEN RC1 FOR
+    SELECT prexternalid, prname, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM prtypecode
+    WHERE prisopen &lt;&gt; 0;
+	ELSE
+			IF  sp_dropdown.column_ = 'costrulecode' THEN
+				OPEN RC1 FOR
+        SELECT NULL, NULL, 'None',  NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM DUAL;
+--        WHERE transtype = sp_dropdown.parm;
+			ELSE
+				IF  sp_dropdown.column_ = 'uomcode' THEN
+					OPEN RC1 FOR
+          SELECT NULL,  description, NULL, uomcode, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM unitmeasure;
+				ELSE
+/*
+					IF  sp_dropdown.column_ = 'costclass' THEN
+						OPEN RC1 FOR
+            SELECT NULL,  description, NULL, NULL, costclass, NULL, NULL, NULL, NULL, NULL, NULL FROM costclass
+						WHERE active = 1;
+					ELSE
+*/
+						IF  sp_dropdown.column_ = 'transclass' THEN
+							OPEN RC1 FOR
+              SELECT NULL,  description, NULL, NULL, NULL, transclass, NULL, NULL, NULL, NULL, NULL FROM transclass
+							WHERE transtype  IN ('L', 'M', 'Q', 'X');
+						ELSE
+							IF  sp_dropdown.column_ = 'udf1' THEN
+								StoO_rowcnt := 0;
+								StoO_selcnt := 0;
+								StoO_error  := 0;
+								OPEN RC1 FOR
+                SELECT  NULL,  'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+								FROM DUAL
+--                UNION
+--                SELECT NULL, NULL, NULL,  shortdesc, NULL, NULL, NULL, access_code, NULL, NULL, NULL, NULL FROM cost_udf1
+                ;
+							ELSE
+								IF  sp_dropdown.column_ = 'udf2' THEN
+									StoO_rowcnt := 0;
+									StoO_selcnt := 0;
+									StoO_error  := 0;
+									OPEN RC1 FOR
+                  SELECT  NULL,  'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+									FROM DUAL
+--                    UNION
+--                  SELECT NULL, NULL, NULL,  shortdesc, NULL, NULL, NULL, access_code, NULL, NULL, NULL, NULL FROM cost_udf2
+                  ;
+								ELSE
+									IF  sp_dropdown.column_ = 'locations' THEN
+										OPEN RC1 FOR
+                    SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, locationid,  locationdescription, NULL, NULL FROM locations;
+									ELSE
+										IF  sp_dropdown.column_ = 'projclass' THEN
+											OPEN RC1 FOR
+                      SELECT NULL,  description, NULL, NULL, NULL, NULL, NULL, NULL, NULL, projclass, NULL FROM projclass;
+										ELSE
+											IF  sp_dropdown.column_ = 'departcode' THEN
+												OPEN RC1 FOR
+                        SELECT NULL,  departments.description, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, departments.departcode FROM departments, locationdept
+												WHERE locationdept.locationid = sp_dropdown.parm
+												 AND locationdept.departcode = departments.departcode;
+											ELSE
+												IF  sp_dropdown.column_ = 'projectudf1' THEN
+													OPEN RC1 FOR
+                          SELECT NULL, 'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM DUAL;
+--                          SELECT NULL,  description, NULL, NULL, NULL, NULL, NULL, access_code, NULL, NULL, NULL, NULL FROM project_udf1;
+                        ELSE
+													IF  sp_dropdown.column_ = 'projectudf2' THEN
+														OPEN RC1 FOR
+                            SELECT NULL,  'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM DUAL;
+--                            SELECT NULL,  description, NULL, NULL, NULL, NULL, NULL, access_code, NULL, NULL, NULL, NULL FROM project_udf2;
+                          END IF;
+												END IF;
+											END IF;
+  --                  END IF;
+									END IF;
+								END IF;
+							END IF;
+						END IF;
+					END IF;
+				END IF;
+    --  END IF;
+		END IF;
+	END IF;
+END sp_dropdown;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

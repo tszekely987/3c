@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_SAVE_CONTRACT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_SAVE_CONTRACT_SP" (
+COMPANY_CODE 	VARCHAR2 ,
+PROJECT_CODE 	VARCHAR2 ,
+MASTER_PROJECT_CODE 	VARCHAR2 ,
+changeorder 	VARCHAR2 ,
+contractnbr 	VARCHAR2 ,
+contractdate 	DATE ,
+contractamount 	NUMBER ,
+billamount 	NUMBER ,
+billfreq 	NUMBER ,
+billnbr 	NUMBER ,
+billdate 	DATE ,
+taxcode 	VARCHAR2 ,
+admincode 	VARCHAR2 ,
+newrecord 	NUMBER,
+enforcecontractamount NUMBER,
+contractnotes VARCHAR2)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+projcode_int	pac_mnt_projects.MASTER_PROJECT_CODE%TYPE;
+v_enforcecontractamount NUMBER;
+v_AMOUNTBILLED NUMBER;
+
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+   	v_enforcecontractamount := NVL( enforcecontractamount, 0 ) ;
+
+	IF contractamount &lt; 0 THEN
+		raise_application_error(-20765, 'The contract amount cannot be a negative amount.');
+		RETURN;
+	ELSIF billamount &lt;= 0 THEN
+		raise_application_error(-20766, 'The bill amount cannot be 0 or negative amount.');
+		RETURN;
+	ELSIF billnbr &lt;= 0 THEN
+		raise_application_error(-20767, 'The number of bills cannot be 0 or negative value.');
+		RETURN;
+	END IF;
+
+	IF v_enforcecontractamount = 1 And NVL( contractamount, 0 ) = 0 Then
+		raise_application_error(-20983, 'Contract Amount is required for a Standard project type if Enforce Contract Amount is selected.');
+		RETURN;
+	End If;
+
+	IF (billamount IS NOT NULL OR billamount != '') AND
+		(billnbr IS NULL OR billnbr = '' OR billfreq IS NULL OR billfreq = '' OR billdate IS NULL OR billdate = '') THEN
+		raise_application_error(-20905, 'The bill amount, number of bills, bill frequency and date are required, if any one of them is entered.');
+		RETURN;
+	ELSIF (billnbr IS NOT NULL OR billnbr != '') AND
+		(billamount IS NULL OR billamount = '' OR billfreq IS NULL OR billfreq = '' OR billdate IS NULL OR billdate = '') THEN
+		raise_application_error(-20905, 'The bill amount, number of bills, bill frequency and date are required, if any one of them is entered.');
+		RETURN;
+	ELSIF (billfreq IS NOT NULL OR billfreq != '') AND
+		(billnbr IS NULL OR billnbr = '' OR billamount IS NULL OR billamount = '' OR billdate IS NULL OR billdate = '') THEN
+		raise_application_error(-20905, 'The bill amount, number of bills, bill frequency and date are required, if any one of them is entered.');
+		RETURN;
+	ELSIF (billdate IS NOT NULL OR billdate != '') AND
+		(billnbr IS NULL OR billnbr = '' OR billfreq IS NULL OR billfreq = '' OR billamount IS NULL OR billamount = '') THEN
+		raise_application_error(-20905, 'The bill amount, number of bills, bill frequency and date are required, if any one of them is entered.');
+		RETURN;
+	END IF;
+
+	IF (billamount * billnbr) &gt; contractamount THEN
+		raise_application_error(-20768, 'The bill amount times the number of bills cannot exceed the contract amount.');
+		RETURN;
+	END IF;
+	IF PAC_MNT_SAVE_CONTRACT_SP.taxcode IS NOT NULL THEN
+		StoO_selcnt := 0;
+		BEGIN
+		SELECT 1
+		INTO 	StoO_selcnt
+		FROM 	DUAL
+		WHERE 	EXISTS(	SELECT 	1
+				FROM 	taxcode
+				WHERE 	code = PAC_MNT_SAVE_CONTRACT_SP.taxcode
+				AND 	taxtype = 'TAX');
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				raise_application_error(-20769, 'The tax code is invalid.');
+				RETURN;
+			WHEN OTHERS THEN
+				raise_application_error(-20769, 'The tax code is invalid.');
+				RETURN;
+		END;
+		IF StoO_selcnt = 0 THEN
+			raise_application_error(-20769, 'The tax code is invalid.');
+			RETURN;
+		END IF;
+	END IF;
+	IF PAC_MNT_SAVE_CONTRACT_SP.admincode IS NOT NULL THEN
+		StoO_selcnt := 0;
+		BEGIN
+		SELECT 1
+		INTO 	StoO_selcnt
+		FROM 	DUAL
+		WHERE 	EXISTS(	SELECT 	1
+				FROM 	taxcode
+				WHERE 	code = PAC_MNT_SAVE_CONTRACT_SP.admincode
+				AND 	taxtype = 'ADM');
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				raise_application_error(-20770, 'The administration code is invalid.');
+				RETURN;
+			WHEN OTHERS THEN
+				raise_application_error(-20770, 'The administration code is invalid.');
+				RETURN;
+		END;
+		IF StoO_selcnt = 0 THEN
+			raise_application_error(-20770, 'The administration code is invalid.');
+			RETURN;
+		END IF;
+	END IF;
+	SELECT 	MAX(MASTER_PROJECT_CODE)
+	INTO 	projcode_int
+	FROM 	pac_mnt_projects
+	WHERE 	COMPANY_CODE = PAC_MNT_SAVE_CONTRACT_SP.COMPANY_CODE
+	AND	PROJECT_CODE = PAC_MNT_SAVE_CONTRACT_SP.PROJECT_CODE;
+
+	BEGIN
+	  SELECT 	AMOUNTBILLED
+	    INTO 	v_AMOUNTBILLED
+	    FROM 	pac_mnt_projects
+	    WHERE 	COMPANY_CODE = PAC_MNT_SAVE_CONTRACT_SP.COMPANY_CODE
+	     AND	PROJECT_CODE = PAC_MNT_SAVE_CONTRACT_SP.PROJECT_CODE;
+
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL ;
+	END;
+
+	IF NVL( v_AMOUNTBILLED, 0 ) &gt; PAC_MNT_SAVE_CONTRACT_SP.contractamount Then
+		raise_application_error(-20984, 'Billings to date are greater than the Contract Amount.');
+		RETURN;
+	End If;
+
+	IF  PAC_MNT_SAVE_CONTRACT_SP.newrecord = 1 THEN
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		INSERT INTO projcntrts
+			(COMPANY_CODE,
+			PROJECT_CODE,
+			MASTER_PROJECT_CODE,
+			changeorder,
+			contractnbr,
+			contractdate,
+			contractamount,
+			billamount,
+			billfreq,
+			billnbr,
+			billdate,
+			taxcode,
+			admincode,
+			enforce_contract_amount,
+			notes)
+		VALUES (PAC_MNT_SAVE_CONTRACT_SP.COMPANY_CODE,
+			PAC_MNT_SAVE_CONTRACT_SP.PROJECT_CODE,
+			PAC_MNT_SAVE_CONTRACT_SP.projcode_int,
+			PAC_MNT_SAVE_CONTRACT_SP.changeorder,
+			PAC_MNT_SAVE_CONTRACT_SP.contractnbr,
+			PAC_MNT_SAVE_CONTRACT_SP.contractdate,
+			PAC_MNT_SAVE_CONTRACT_SP.contractamount,
+			PAC_MNT_SAVE_CONTRACT_SP.billamount,
+			PAC_MNT_SAVE_CONTRACT_SP.billfreq,
+			PAC_MNT_SAVE_CONTRACT_SP.billnbr,
+			PAC_MNT_SAVE_CONTRACT_SP.billdate,
+			PAC_MNT_SAVE_CONTRACT_SP.taxcode,
+			PAC_MNT_SAVE_CONTRACT_SP.admincode,
+			PAC_MNT_SAVE_CONTRACT_SP.v_enforcecontractamount,
+			PAC_MNT_SAVE_CONTRACT_SP.contractnotes);
+		StoO_rowcnt := SQL%ROWCOUNT;
+		END;
+	END;
+	ELSE
+	BEGIN
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE projcntrts
+		SET contractnbr = PAC_MNT_SAVE_CONTRACT_SP.contractnbr,
+		contractdate = PAC_MNT_SAVE_CONTRACT_SP.contractdate,
+		contractamount = PAC_MNT_SAVE_CONTRACT_SP.contractamount,
+		billamount = PAC_MNT_SAVE_CONTRACT_SP.billamount,
+		billfreq = PAC_MNT_SAVE_CONTRACT_SP.billfreq,
+		billnbr = PAC_MNT_SAVE_CONTRACT_SP.billnbr,
+		billdate = PAC_MNT_SAVE_CONTRACT_SP.billdate,
+		taxcode = PAC_MNT_SAVE_CONTRACT_SP.taxcode,
+		admincode = PAC_MNT_SAVE_CONTRACT_SP.admincode,
+		enforce_contract_amount = PAC_MNT_SAVE_CONTRACT_SP.v_enforcecontractamount,
+		notes = PAC_MNT_SAVE_CONTRACT_SP.contractnotes
+		WHERE COMPANY_CODE = PAC_MNT_SAVE_CONTRACT_SP.COMPANY_CODE
+		 AND PROJECT_CODE = PAC_MNT_SAVE_CONTRACT_SP.PROJECT_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		END;
+	END;
+	END IF;
+END PAC_MNT_SAVE_CONTRACT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

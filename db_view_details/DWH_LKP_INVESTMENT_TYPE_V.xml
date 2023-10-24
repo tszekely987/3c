@@ -1,0 +1,39 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_LKP_INVESTMENT_TYPE_V">
+    <indexes/>
+    <text_length>1581</text_length>
+    <text>SELECT a.investment_type_key AS investment_type_key,
+       a.investment_type AS investment_type,
+       a.last_updated_date AS last_updated_date,
+       CASE WHEN a.sort_order = 1 THEN a.sort_order ELSE ROW_NUMBER() OVER(PARTITION BY lang.id ORDER BY a.sort_order, a.investment_type) END AS sort_order,
+       1 AS is_active,
+       LANG.LANGUAGE_CODE AS LANGUAGE_CODE,
+       LANG.ID AS LANGUAGE_ID
+FROM   (SELECT lkp.lookup_code AS investment_type_key, 
+               nls.name AS investment_type,
+               lkp.last_updated_date AS last_updated_date,
+               nls.language_code AS language_code,
+               1 AS sort_order
+        FROM   cmn_lookups lkp
+               INNER JOIN cmn_captions_nls nls ON nls.pk_id = lkp.id
+        WHERE  lkp.lookup_type = 'PMA_INVESTMENT_TYPE'
+        AND    lkp.lookup_code = 'all'
+        UNION  ALL
+        SELECT o.code AS investment_type_key,
+               c.name AS investment_type,
+               c.last_updated_date AS last_updated_date,
+               c.language_code AS language_code,
+               2 AS sort_order
+        FROM   odf_objects o 
+               INNER JOIN cmn_captions_nls c ON c.pk_id = o.ID
+               INNER JOIN odf_object_extensions oe ON oe.object_code = o.code
+        WHERE  o.is_customizable = 1
+        AND    o.is_dw_enabled = 1
+        AND    oe.extension_code = 'inv'
+        AND    c.table_name = 'ODF_OBJECTS') a
+        INNER JOIN cmn_languages lang ON lang.language_code = a.language_code
+WHERE   lang.language_code = lang.language_code
+AND     lang.is_dw_enabled = 1  
+AND     1=1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

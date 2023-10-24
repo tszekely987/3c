@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_MAINT_CLIENTS_GETAUTH</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_MAINT_CLIENTS_GETAUTH" (
+  COMPANY_CODE  VARCHAR2 ,
+  location  VARCHAR2 ,
+  department  VARCHAR2 ,
+  RC1   IN OUT REV_MAINT_CLIENTS_GETAUTHPkg.RCT1)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+BEGIN
+/*
+   Called From:
+   Procedure         :- none
+   Trigger           :- none
+   PMD TransactionId :-
+   WMD ActionId      :-
+   Modified By       :  sundar
+   Modified Date     :  07/25/2001
+*/
+	IF  ( rev_maint_clients_getAuth.location != 'All' and   rev_maint_clients_getAuth.department != 'All') THEN
+	BEGIN
+		OPEN RC1 FOR
+    SELECT E.RESOURCE_CODE, R.FULL_NAME "COMPANY_NAME"
+--        employees.RESOURCE_CODE,  RTRIM(employees.lastname) || '  ' || RTRIM(employees.firstname)
+     FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+    WHERE E.RESOURCE_CODE = R.UNIQUE_NAME
+     and locationid = rev_maint_clients_getAuth.location
+		 and departcode = rev_maint_clients_getAuth.department
+		 and
+		NOT EXISTS (
+		SELECT  clntrespons.COMPANY_CODE
+		 FROM clntrespons
+		WHERE clntrespons.COMPANY_CODE = rev_maint_clients_getAuth.COMPANY_CODE
+     and clntrespons.RESOURCE_CODE = E.RESOURCE_CODE );
+	END;
+	ELSE
+		IF  ( rev_maint_clients_getAuth.location = 'All' and   rev_maint_clients_getAuth.department != 'All') THEN
+		BEGIN
+			OPEN RC1 FOR
+    SELECT E.RESOURCE_CODE, R.FULL_NAME "COMPANY_NAME"
+--        employees.RESOURCE_CODE,  RTRIM(employees.lastname) || '  ' || RTRIM(employees.firstname)
+     FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+    WHERE E.RESOURCE_CODE = R.UNIQUE_NAME
+      AND departcode = rev_maint_clients_getAuth.department
+			 and
+			NOT EXISTS (
+			SELECT  clntrespons.COMPANY_CODE
+			 FROM clntrespons
+			WHERE clntrespons.COMPANY_CODE = rev_maint_clients_getAuth.COMPANY_CODE
+       and clntrespons.RESOURCE_CODE = E.RESOURCE_CODE );
+		END;
+		ELSE
+			IF  ( rev_maint_clients_getAuth.location != 'All' and   rev_maint_clients_getAuth.department = 'All') THEN
+			BEGIN
+				OPEN RC1 FOR
+          SELECT E.RESOURCE_CODE, R.FULL_NAME "COMPANY_NAME"
+      --        employees.RESOURCE_CODE,  RTRIM(employees.lastname) || '  ' || RTRIM(employees.firstname)
+          FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+          WHERE E.RESOURCE_CODE = R.UNIQUE_NAME
+         AND locationid = rev_maint_clients_getAuth.location
+				 and
+				NOT EXISTS (
+				SELECT  clntrespons.COMPANY_CODE
+				 FROM clntrespons
+				WHERE clntrespons.COMPANY_CODE = rev_maint_clients_getAuth.COMPANY_CODE
+         and clntrespons.RESOURCE_CODE = E.RESOURCE_CODE );
+			END;
+			END IF;
+			END IF;
+			END IF;
+		IF  ( rev_maint_clients_getAuth.location = 'All' and   rev_maint_clients_getAuth.department = 'All') THEN
+		BEGIN
+			OPEN RC1 FOR
+      SELECT E.RESOURCE_CODE, R.FULL_NAME "COMPANY_NAME"
+  --        employees.RESOURCE_CODE,  RTRIM(employees.lastname) || '  ' || RTRIM(employees.firstname)
+      FROM SRM_RESOURCES R, PAC_MNT_RESOURCES E
+      WHERE E.RESOURCE_CODE = R.UNIQUE_NAME
+      AND
+			NOT EXISTS (
+			SELECT  clntrespons.COMPANY_CODE
+			 FROM clntrespons
+			WHERE clntrespons.COMPANY_CODE = rev_maint_clients_getAuth.COMPANY_CODE
+       and clntrespons.RESOURCE_CODE = E.RESOURCE_CODE );
+		END;
+		END IF;
+END rev_maint_clients_getAuth;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

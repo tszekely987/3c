@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_PPA_UPDATE_CLNTSUPP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_PPA_UPDATE_CLNTSUPP" (
+status_type 	NUMBER ,
+COMPANY_NAME 	VARCHAR2  DEFAULT NULL,
+in_clntcode 	IN VARCHAR2  DEFAULT NULL,
+return_code 	IN OUT NUMBER,
+error_message 	IN OUT VARCHAR2,
+ret_code 	    OUT NUMBER)
+AS
+COMPANY_CODE 	GLOBALPKG.STRING;
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+transaction_started 	NUMBER(1,0);
+integration_id  NUMBER(5,0) := 0;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	sp_ppa_update_clntsupp.COMPANY_CODE := sp_ppa_update_clntsupp.in_clntcode;
+	sp_ppa_update_clntsupp.transaction_started :=  0;
+	sp_ppa_update_clntsupp.return_code :=  1;
+	sp_ppa_update_clntsupp.ret_code :=  0;
+	sp_ppa_update_clntsupp.error_message :=  '';
+	sp_ppa_update_clntsupp.COMPANY_CODE :=  UPPER(sp_ppa_update_clntsupp.COMPANY_CODE);
+
+/*
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   integration_id
+		INTO sp_ppa_update_clntsupp.integration_id FROM projectaccounting;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+*/
+	IF  sp_ppa_update_clntsupp.status_type IS NOT NULL THEN
+	BEGIN
+		IF  ( sp_ppa_update_clntsupp.integration_id  IN(4, 5) AND   sp_ppa_update_clntsupp.status_type  IN(2, 4)) OR   ( sp_ppa_update_clntsupp.integration_id != 8 AND   sp_ppa_update_clntsupp.status_type  IN(2, 3)) OR   ( sp_ppa_update_clntsupp.integration_id = 8 AND   sp_ppa_update_clntsupp.status_type = 2) THEN
+		BEGIN
+			BEGIN
+      sp_ppa_clntsupp_delete_check(sp_ppa_update_clntsupp.COMPANY_CODE,  sp_ppa_update_clntsupp.error_message);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  sp_ppa_update_clntsupp.error_message IS NOT NULL THEN
+			BEGIN
+				sp_ppa_update_clntsupp.return_code :=  -1;
+				sp_ppa_update_clntsupp.ret_code :=  -1;
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+		NULL;
+		sp_ppa_update_clntsupp.transaction_started :=  1;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE clntsupp
+		SET status_type = sp_ppa_update_clntsupp.status_type
+		WHERE COMPANY_CODE = sp_ppa_update_clntsupp.COMPANY_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			sp_ppa_update_clntsupp.ret_code :=  -1;
+			raise_application_error(-20409, 'Error updating clntsupp.status_type on PROJECT_CODE Accounting');
+			RETURN ;
+		END;
+		END IF;
+		IF  sp_ppa_update_clntsupp.status_type != 1 THEN
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE clntsupp
+			SET inactivedate = SYSDATE
+			WHERE COMPANY_CODE = sp_ppa_update_clntsupp.COMPANY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK WORK;
+				sp_ppa_update_clntsupp.ret_code :=  -1;
+				raise_application_error(-20410, 'Error updating clntsupp.inactivedate on PROJECT_CODE Accounting');
+				RETURN ;
+			END;
+			END IF;
+		END;
+		ELSE
+		BEGIN
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE clntsupp
+			SET inactivedate = NULL
+			WHERE COMPANY_CODE = sp_ppa_update_clntsupp.COMPANY_CODE;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			BEGIN
+				ROLLBACK WORK;
+				sp_ppa_update_clntsupp.ret_code :=  -1;
+				raise_application_error(-20410, 'Error updating clntsupp.inactivedate on PROJECT_CODE Accounting');
+				RETURN ;
+			END;
+			END IF;
+		END;
+		END IF;
+	END;
+	END IF;
+	IF  NVL(sp_ppa_update_clntsupp.COMPANY_NAME, '') IS NOT NULL THEN
+	BEGIN
+		IF  sp_ppa_update_clntsupp.transaction_started = 0 THEN
+			NULL;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE clntsupp
+		SET COMPANY_NAME = sp_ppa_update_clntsupp.COMPANY_NAME
+		WHERE COMPANY_CODE = sp_ppa_update_clntsupp.COMPANY_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			sp_ppa_update_clntsupp.ret_code :=  -1;
+			raise_application_error(-20411, 'Error updating clntsupp.COMPANY_NAME on PROJECT_CODE Accounting');
+			RETURN ;
+		END;
+		END IF;
+/*
+    BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE int_FieldMappings
+		SET IntDescription = sp_ppa_update_clntsupp.COMPANY_NAME
+		WHERE FieldType = 'C'
+		 AND PAValue = sp_ppa_update_clntsupp.COMPANY_CODE;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		BEGIN
+			ROLLBACK WORK;
+			sp_ppa_update_clntsupp.ret_code :=  -1;
+			raise_application_error(-20412, 'Error updating int_FieldMappings.IntDescription on PROJECT_CODE Accounting');
+			RETURN ;
+		END;
+		END IF;
+*/
+  END;
+	END IF;
+  COMMIT WORK;
+	RETURN ;
+/*
+Modified By : SN
+New OUT Parameter is included sp_ppa_update_clntsupp.ret_code for trigger tr_armmaster_update
+*/
+END sp_ppa_update_clntsupp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

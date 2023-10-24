@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PRJ_GET_OBS_PATH_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PRJ_GET_OBS_PATH_FCT" (
+  unit_id NUMBER,
+  obs_name VARCHAR2
+)
+   RETURN VARCHAR2
+IS
+  node VARCHAR2(10000);
+  path VARCHAR2(10000);
+  idx NUMBER;
+
+  CURSOR crumbs IS
+   SELECT U.NAME
+   FROM   PRJ_OBS_UNITS U
+          , PRJ_OBS_UNITS_FLAT F
+   WHERE   F.UNIT_ID = PRJ_GET_OBS_PATH_FCT.unit_id
+   AND     U.ID = F.BRANCH_UNIT_ID
+   ORDER BY U.DEPTH;
+BEGIN
+    idx := 0;
+		OPEN crumbs;
+		LOOP
+		 FETCH crumbs INTO node;
+		 EXIT WHEN crumbs%NOTFOUND;
+			 BEGIN
+			    IF idx = 0 THEN
+			      path := node;
+			    ELSE
+			      path := path || '/' || node;
+			    END IF;
+			    idx := idx + 1;
+			 END;
+		END LOOP;
+		CLOSE crumbs;
+	  RETURN obs_name || ':' || path;
+END;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

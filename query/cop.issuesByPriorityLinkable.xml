@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.issuesByPriorityLinkable" isUserPortletAvailable="0" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Issues By Priority (Instance = Project)" languageCode="en" name="Issues By Priority"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:issue:i.priority_code:priority_code@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:issue:priority.name:priority_name@,
+       @SELECT:DIM_PROP:USER_DEF:IMPLIED:issue:i.pk_id:proj_int_id@,
+       @SELECT:METRIC:USER_DEF:IMPLIED:count(i.odf_pk):total_count@
+FROM   ODF_ISSUE_V2 i
+LEFT   OUTER JOIN CMN_LOOKUPS_V priority
+             ON   priority.lookup_code = i.priority_code
+             AND  priority.lookup_type = 'RIM_PRIORITY' 
+             AND  priority.language_code =  @WHERE:PARAM:LANGUAGE@ 
+WHERE  i.status_code NOT IN ('CLOSED','RESOLVED')                      
+AND    i.pk_id = @WHERE:PARAM:XML:INTEGER:/data/id/@value@
+AND    @WHERE:SECURITY:PROJECT:i.pk_id@
+AND    @FILTER@
+GROUP  BY priority.name,
+       i.priority_code,
+       i.pk_id 
+HAVING  @HAVING_FILTER@]]></nsql>
+            <attribute id="priority_code" required="false">
+              
+              
+              
+              
+              <nls description="Priority Code" languageCode="en" name="Priority Code"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="priority_name" required="false">
+              
+              
+              
+              
+              <nls description="Priority" languageCode="en" name="Priority"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="proj_int_id" required="false">
+              
+              
+              
+              
+              <nls description="Project Internal ID" languageCode="en" name="Project Internal ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="total_count" required="false">
+              
+              
+              
+              
+              <nls description="Total Count" languageCode="en" name="Total Count"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="copPrjCurrentIssuesLink" code="issues.drill.down">
+                
+                
+                
+                
+                <nls description="Current Issues Drill Down  (Instance = Project)" languageCode="en" name="Current Issues Drill Down"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="proj_int_id" dataSource="data" paramCode="id"/>
+                <linkParam dataRef="priority_code" dataSource="data" paramCode="Priority"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

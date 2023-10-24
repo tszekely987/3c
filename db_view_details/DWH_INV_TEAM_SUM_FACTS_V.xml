@@ -1,0 +1,27 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_TEAM_SUM_FACTS_V">
+    <indexes/>
+    <text_length>1405</text_length>
+    <text>SELECT t.prID team_key,
+          t.prProjectID investment_key,
+          t.prResourceID resource_key,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(t.prAllocSum, 0) - NVL(t.hard_sum, 0) &lt; 10000000000000 
+		       THEN (NVL (t.prAllocSum, 0) - NVL (t.hard_sum, 0)) / 3600 ELSE 0 END soft_alloc_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(t.hard_sum, 0) &lt; 10000000000000 THEN NVL (t.hard_sum, 0) / 3600 ELSE 0 END hard_alloc_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(t.prAllocSum, 0) &lt; 10000000000000 THEN NVL (t.prAllocSum, 0) / 3600 ELSE 0 END alloc_hours,
+          CASE WHEN r.resource_type &lt;= 1 AND NVL(bd.usage_sum, 0) &lt; 10000000000000 THEN NVL (bd.usage_sum, 0) / 3600 ELSE 0 END base_hours,
+          NVL(t.alloccost_sum,0) - NVL(t.hardallccost_sum,0) soft_alloc_cost,
+          NVL(t.hardallccost_sum,0) hard_alloc_cost,
+          NVL(t.alloccost_sum,0) alloc_cost,
+          NVL (bd.cost_sum, 0) base_cost,
+          0 avg_alloc_pct,
+          t.last_updated_date clarity_updated_date
+     FROM prTeam t
+          INNER JOIN inv_investments i ON t.prProjectID = i.id
+          INNER JOIN srm_resources r ON t.prResourceID = r.id
+          LEFT OUTER JOIN prj_baseline_details bd ON t.prID = bd.object_id
+                                                 AND bd.object_type = 'TEAM'
+                                                 AND bd.is_current = 1
+    WHERE 1 = 1</text>
+  </QueryResult>
+</ClarityDBViewQuery>

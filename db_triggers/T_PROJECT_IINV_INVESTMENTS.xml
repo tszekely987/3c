@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>T_PROJECT_IINV_INVESTMENTS</code>
+          <table_name>INV_INVESTMENTS</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>INSERT OR UPDATE OR DELETE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>T_PROJECT_IINV_INVESTMENTS  AFTER INSERT OR UPDATE OR DELETE ON inv_investments REFERENCING NEW AS NEW OLD AS OLD FOR EACH ROW 
+  </description>
+          <trigger_body>DECLARE V_OBJECT_ID NUMBER; 
+ V_COUNT NUMBER; 
+          V_TRANSACTION_ID VARCHAR2(20); 
+         AUDIT_ID          NUMBER; 
+         ROW_COUNT NUMBER := 0; 
+ BEGIN 
+ SELECT DBMS_TRANSACTION.LOCAL_TRANSACTION_ID INTO V_TRANSACTION_ID FROM DUAL; 
+ IF( (:NEW.odf_object_code= 'project'  OR :OLD.odf_object_code= 'project' )) THEN
+ IF INSERTING THEN 
+ V_OBJECT_ID := :NEW.id;
+/* START BLOCK FOR CONTEXT INSERT SQL */
+ INSERT INTO ODF_AUD_OBJ_INST_CONTEXT
+ 	( ID, OBJECT_CODE, OBJECT_INSTANCE_ID, OBJECT_INSTANCE_CODE, OBJECT_INSTANCE_NAME, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY) 
+ 	SELECT  ODF_AUD_OBJ_INST_CONTEXT_S1.NEXTVAL,'project', :NEW.id, :NEW.code, :NEW.name,:NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY, :NEW.LAST_UPDATED_DATE, :NEW.LAST_UPDATED_BY 	 FROM DUAL;
+/* END BLOCK FOR CONTEXT INSERT SQL */
+
+ END IF; 
+
+ IF DELETING THEN 
+ V_OBJECT_ID := :OLD.id;
+/* START BLOCK FOR COLUMN: id*/
+ INSERT INTO CMN_AUDITS( ID, OBJECT_CODE, OBJECT_ID,  ATTRIBUTE_CODE,  TABLE_NAME,  COLUMN_NAME, VALUE_BEFORE , 
+ 	VALUE_AFTER, RAW_VALUE_BEFORE, RAW_VALUE_AFTER, OPERATION_CODE, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY, TRANSACTION_ID) 
+ 	SELECT CMN_AUDITS_S1.NEXTVAL, 'project', V_OBJECT_ID, 'odf_pk', 'inv_investments', 'id',:OLD.id, 
+ 	 NULL, :OLD.id, NULL, 'D', SYSDATE, :OLD.LAST_UPDATED_BY, SYSDATE, :OLD.LAST_UPDATED_BY, V_TRANSACTION_ID FROM DUAL; 
+/* END BLOCK FOR COLUMN: id*/
+
+ END IF; 
+ END IF;
+ END;</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

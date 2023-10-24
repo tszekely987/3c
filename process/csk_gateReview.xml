@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="false" code="csk_gateReview" createdBy="admin" endStep="Finish" source="csk.niku.com" startOption="ON_DEMAND" startStep="Start">
+            
+            
+            
+            
+            <nls description="Subprocess to manage the gate review workflow for Major Projects" languageCode="en" name="Project Gate Review Subprocess"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <Security>
+              
+              
+              
+              
+              
+              
+              
+            </Security>
+            <Objects>
+              <Object manualStart="true" name="thisProject" objectType="project" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_AND_ANSTRS_DESDNTS" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="csk_step_isPmoAssigned"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_isPmoAssigned" isMileStone="false" sequenceNo="3">
+                
+                
+                
+                
+                <nls description="Check is Project Management Office value is named on the project" languageCode="en" name="Check Project Management Office"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_SIMPLE_MERGE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( project.thisProject.obj_stakeholder2 ==  null )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_sendAssignPmoAI"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[( project.thisProject.obj_stakeholder2 !=  null )]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_reviewProject"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_sendAssignPmoAI" isMileStone="false" sequenceNo="4">
+                
+                
+                
+                
+                <nls description="Send action item to provide value for PMO Office" languageCode="en" name="Send Action item to provide value for PMO Office Action Item"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="The following project was recently submitted for approval: ${thisProject.name}. However, the project does not yet have a user assigned to the Project Management Office. Please ensure that a user is assigned then click Done on this action item for the approval process to resume.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Project ID: ${thisProject.unique_code}" aiObjectName="ActionItem-csk_act_assignPMO" aiPriority="CAL_MEDIUM" aiSubject="Project Management Office resource needed: ${thisProject.name}" aiUserStatusOnly="0" code="csk_act_assignPMO" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Assign PMO Office Action Item" languageCode="en" name="Assign PMO Office Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="Recentment s'ha enviat el següent projecte per al seu aprobación: ${thisProject.name}. Tanmateix, encara no se li ha assignat un usuari per a l'Oficina de Gestió de Projectes. Assigni'l un usuari i faci clic a Terminado per reprendre el procés d'aprobación.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;ID del proyecto: ${thisProject.unique_code}" languageCode="ca" name="Recurs de l'Oficina de Gestió de Projectes requerido: ${thisProject.name}"/>
+                    <message description="Následující projekt byl nedávno odeslán ke schválení: ${thisProject.name}. Projekt však zatím nemá přiřazeného uživatele k projektové kanceláři. Přiřaďte uživatele a poté kliknutím na tlačítko Hotovo u této akce nechte pokračovat proces schválení.&#13;&#10;&#13;&#10;Název projektu: ${thisProject.name}&#13;&#10;ID projektu: ${thisProject.unique_code}" languageCode="cs" name="Je potřeba zdroj projektové kanceláře: ${thisProject.name}."/>
+                    <message description="Følgende projekt blev for nylig indsendt til godkendelse: ${thisProject.name}. Projektet har imidlertid endnu ikke en bruger tilknyttet til projektstyringskontoret. Sørg for, at en bruger tilknyttes, og klik derefter på Udført på dette handlingselement, så processen med at godkende kan genoptages.&#13;&#10;&#13;&#10;Navn på projekt: ${thisProject.name}&#13;&#10;Id for projekt: ${thisProject.unique_code}" languageCode="da" name="Ressource fra projektstyringskontor krævet: ${thisProject.name}"/>
+                    <message description="Das folgende Projekt wurde kürzlich zur Genehmigung vorgelegt: ${thisProject.name}. Allerdings wurde für die Idee noch kein Benutzer zum Projektmanagementbüro zugewiesen. Stellen Sie sicher, dass ein Benutzer zugewiesen wird, und klicken Sie dann in dieser Aktion auf 'Fertig', damit der Genehmigungsprozess wieder aufgenommen wird.&#13;&#10;&#13;&#10;Projektname: ${thisProject.name}&#13;&#10;Project ID: ${thisProject.unique_code}" languageCode="de" name="Projektmanagementbüro-Ressource erforderlich: ${thisProject.name}"/>
+                    <message description="The following project was recently submitted for approval: ${thisProject.name}. However, the project does not yet have a user assigned to the Project Management Office. Please ensure that a user is assigned then click Done on this action item for the approval process to resume.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Project ID: ${thisProject.unique_code}" languageCode="en" name="Project Management Office resource needed: ${thisProject.name}"/>
+                    <message description="Recientemente se ha enviado el siguiente proyecto para su aprobación: ${thisProject.name}. Sin embargo, todavía no se le ha asignado un usuario para la Oficina de Gestión de Proyectos. Asígnele un usuario y haga clic en Terminado para reanudar el proceso de aprobación.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;ID del proyecto: ${thisProject.unique_code}" languageCode="es" name="Recurso de la Oficina de Gestión de Proyectos requerido: ${thisProject.name}"/>
+                    <message description="Seuraava projekti on hiljattain lähetetty hyväksyttäväksi: ${thisProject.name}. Projektin projektitoimistoon ei kuitenkaan ole vielä kiinnitetty käyttäjää. Varmista, että käyttäjä on kiinnitetty, ja jatka sitten hyväksyntäprosessia valitsemalla tässä toimenpiteessä Valmis.&#13;&#10;&#13;&#10;Projektin nimi: ${thisProject.name}&#13;&#10;Projektin tunnus: ${thisProject.unique_code}" languageCode="fi" name="Projektitoimiston resurssi tarvitaan: ${thisProject.name}"/>
+                    <message description="Le projet suivant a été récemment soumis pour approbation : ${thisProject.name}. Cependant, aucun utilisateur n'a été affecté au bureau de gestion de projets. Affectez un utilisateur, puis cliquez sur Terminé(e) pour cette action afin de reprendre le processus d'approbation.&#13;&#13;Nom du projet : ${thisProject.name}&#13;&#10;ID du projet : ${thisProject.unique_code}" languageCode="fr" name="Ressource requise pour le bureau de gestion de projets : ${thisProject.name}"/>
+                    <message description="A következő projektet nemrégiben benyújtották jóváhagyásra: ${thisProject.name}. Egyelőre nincs azonban felhasználó rendelve a projektnél a projektmenedzsment-irodához. Rendeljen hozzá egy felhasználót, majd kattintson ennél az elvégzendő feladatnál a Kész gombra, hogy folytatódhasson a jóváhagyási folyamat.&#13;&#10;&#13;&#10;Projektnév: ${thisProject.name}&#13;&#10;Projektazonosító: ${thisProject.unique_code}" languageCode="hu" name="Projektmenedzsment-iroda erőforrás szükséges: ${thisProject.name}"/>
+                    <message description="Il seguente progetto è stato inviato per l'approvazione: ${thisProject.name}. Tuttavia, il progetto non dispone di alcun utente assegnato al Project Management Office. Verificare che l'assegnazione dell'utente venga eseguita e fare clic su Completato per riprendere il processo di approvazione.&#13;&#10;&#13;&#10;Nome progetto: ${thisProject.name}&#13;&#10;ID progetto: ${thisProject.unique_code}" languageCode="it" name="Risorsa di Project Management Office richiesta: ${thisProject.name}"/>
+                    <message description="以下のプロジェクトは最近、承認要求されました: ${thisProject.name}。ただし、このプロジェクトにはまだプロジェクト マネジメント オフィスに割り当てられたユーザがありません。ユーザが割り当て済みであることを確認して、このアクション アイテムの [完了] をクリックし、承認プロセスを再開してください。&#13;&#10;&#13;&#10;プロジェクト名: ${thisProject.name}&#13;&#10;プロジェクト ID: ${thisProject.unique_code}" languageCode="ja" name="プロジェクト マネジメント オフィスのリソースが必要です: ${thisProject.name}"/>
+                    <message description="${thisProject.name} 프로젝트는 최근에 승인을 위해 제출되었습니다. 하지만 이 프로젝트의 프로젝트 관리 오피스에 배정된 사용자가 아직 없습니다. 승인 프로세스를 다시 시작하려면 이 작업 항목에 대해 사용자를 배정한 후 [완료]를 클릭하십시오.&#13;&#10;&#13;&#10;프로젝트 이름: ${thisProject.name}&#13;&#10;프로젝트 ID: ${thisProject.unique_code}" languageCode="ko" name="프로젝트 관리 오피스 리소스 필요: ${thisProject.name}"/>
+                    <message description="Het volgende project onlangs is ingediend voor goedkeuring: ${thisProject.name}. Er is echter nog geen gebruiker van het projectmanagementkantoor aan het project toegewezen. Zorg ervoor dat een gebruiker is toegewezen en klik voor dit actiepunt vervolgens op Gereed om het goedkeuringsproces te hervatten.&#13;&#10;&#13;&#10;Projectnaam: ${thisProject.name}&#13;&#10;Project-id: ${thisProject.unique_code}" languageCode="nl" name="Resource projectmanagementkantoor nodig: ${thisProject.name}"/>
+                    <message description="Følgende prosjekt ble nylig sendt til godkjenning.: ${thisProject.name}. Men prosjektet har ennå ikke en bruker tildelt til prosjektledelseskontoret. Sørg for å tildele en bruker og klikk på Ferdig på dette aksjonspunktet for å gjenoppta godkjenningsprosessen.&#13;&#10;&#13;&#10;Prosjektnavn: ${thisProject.name}&#13;&#10;Prosjekt-ID: ${thisProject.unique_code}" languageCode="no" name="Prosjektledelseskontorressurs kreves: ${thisProject.name}"/>
+                    <message description="Następujący projekt przesłano niedawno do zatwierdzenia: ${thisProject.name}. Projekt nie ma jednak jeszcze użytkownika przypisanego do biura zarządzania projektem. Przypisz użytkownika, a następnie kliknij opcję Gotowe dla tej czynności do wykonania, aby wznowić proces zatwierdzenia.&#13;&#10;&#13;&#10;Nazwa projektu: ${thisProject.name}&#13;&#10;Identyfikator projektu: ${thisProject.unique_code}" languageCode="pl" name="Potrzebny zasób biura zarządzania projektem: ${thisProject.name}"/>
+                    <message description="O projeto abaixo foi enviado para aprovação recentemente: ${thisProject.name}. No entanto, ele ainda não tem um usuário atribuído ao PMO. Atribua um e clique em Concluído neste item de ação para que o processo de aprovação seja retomado.&#13;&#10;&#13;&#10;Nome do projeto: ${thisProject.name}&#13;&#10;ID do projeto: ${thisProject.unique_code}" languageCode="pt" name="Requer recurso do PMO: ${thisProject.name}"/>
+                    <message description="Следующий проект недавно представлен для утверждения: ${thisProject.name}. Но для проекта не назначен пользователь для центра управления проектами. Выполните назначение пользователя и нажмите «готово» для возобновления процесса утверждения.&#13;&#10;&#13;&#10;Имя проекта: ${thisProject.name}&#13;&#10;Код проекта: ${thisProject.unique_code}" languageCode="ru" name="Требуется ресурс центра управления проектами: ${thisProject.name}"/>
+                    <message description="Följande projekt skickades nyligen för godkännande: ${thisProject.name}. Men projektet har inte fått någon användare tilldelad till Project Management Office ännu. Se till att en användare tilldelas och klicka sedan på Klar för åtgärdsalternativet för att återuppta godkännandeprocessen.&#13;&#10;&#13;&#10;Projektnamn: ${thisProject.name}&#13;&#10;Projekt-ID: ${thisProject.unique_code}" languageCode="sv" name="Project Management Office-resurs krävs: ${thisProject.name}"/>
+                    <message description="Aşağıdaki proje kısa bir süre önce onay için gönderildi: ${thisProject.name}. Ancak, henüz projede Proje Yönetim Ofisine atanmış bir kullanıcı yok. Lütfen bir kullanıcının atandığından emin olun ve ardından onaylama sürecinin devam etmesi için bu eylem öğesinde Tamamlandı'yı tıklatın.&#13;&#10;&#13;&#10;Proje Adı: ${thisProject.name}&#13;&#10;Proje Kimliği: ${thisProject.unique_code}" languageCode="tr" name="Proje Yönetim Ofisi kaynağı gerekli: ${thisProject.name}"/>
+                    <message description="最近提交了以下项目以供核准: ${thisProject.name}。但是，此项目尚未向项目管理办公室分配用户。请确保分配一个用户，然后对此操作项单击“完成”以便让该过程重新开始。&#13;&#10;&#13;&#10;项目名称: ${thisProject.name}&#13;&#10;项目 ID: ${thisProject.unique_code}" languageCode="zh" name="需要项目管理办公室资源: ${thisProject.name}"/>
+                    <message description="最近已提交以下專案供核准：${thisProject.name}。然而，專案尚未指派任何使用者到專案管理組織。請確定指派一名使用者後在這個動作項目上按一下 [完成]，以恢復核准流程。&#13;&#10;&#13;&#10;專案名稱：${thisProject.name}&#13;&#10;專案 ID：${thisProject.unique_code}" languageCode="zh_TW" name="必須有專案管理組織資源：${thisProject.name}"/>
+                    <Assignees>
+                      <Assignee id="Manager" objectName="thisProject" objectTypeCode="project" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="DONE" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk_step_sendAssignPmoAI.ActionItem-csk_act_assignPMO.allassignees-DONE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_isPmoAssigned"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_reviewProject" isMileStone="false" sequenceNo="5">
+                
+                
+                
+                
+                <nls description="Review Project" languageCode="en" name="Project Management Office Reviews Project"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="The following project has been submitted for your approval to proceed to the next stage.  After review please select Approved or Rejected for this action item to update the project status and to notify the project manager of your decision.  Thank you.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Stage:&#13;&#10;${thisProject.stage_code}&#13;&#10;Manager: ${thisProject.manager_id}&#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Category: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Finish: ${thisProject.schedule_finish}" aiObjectName="ActionItem-csk_act_reviewProject" aiPriority="CAL_MEDIUM" aiSubject="Please review this project for approval: ${thisProject.name}" aiUserStatusOnly="0" code="csk_act_reviewProject" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Review Project Action Item" languageCode="en" name="Review Project Action Item"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="S'ha enviat el següent projecte per a la seva aprovació de manera que pugui enviar-se a la següent fase. Una vegada revisat, seleccioni l'estat Aprovat o Rebutjat per actualitzar l'estat del projecte i notificar al gestor de projectes la seva decisió. Gracias.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;Etapa:&#13;&#10;${thisProject.stage_code}&#13;&#10;Gestor: ${thisProject.manager_id}&#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoría: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inicio: ${thisProject.schedule_start}&#13;&#10;Finalización: ${thisProject.schedule_finish}" languageCode="ca" name="Revisi aquest projecte per al seu aprobación: ${thisProject.name}."/>
+                    <message description="Následující projekt byl odeslán k vašemu schválení, aby mohl postoupit do další fáze. Po posouzení vyberte u této akce možnost Schváleno nebo Zamítnuto. Tím aktualizujete stav projektu a upozorníte manažera projektu na své rozhodnutí. Děkujeme.&#13;&#10;&#13;&#10;Název projektu: ${thisProject.name}&#13;&#10;Fáze:&#13;&#10;${thisProject.stage_code}&#13;&#10;Manažer: ${thisProject.manager_id}&#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategorie: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Zahájení: ${thisProject.schedule_start}&#13;&#10;Dokončení: ${thisProject.schedule_finish}" languageCode="cs" name="Posuďte tento projekt ke schválení: ${thisProject.name}."/>
+                    <message description="Følgende porojekt er blevet sendt til dig til godkendelse om at forsætte til næste fase. Efter gennemgang skal du vælge Godkendt eller Afvist for dette handlingselement for at opdatere projektstatus og underrette projektlederen om din beslutning. Tak. &#13;&#10;&#13;&#10;Navn på projekt: ${thisProject.name}&#13;&#10;Fase:&#13;&#10;${thisProject.stage_code}&#13;&#10;Leder: ${thisProject.manager_id}&#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slut: ${thisProject.schedule_finish}" languageCode="da" name="Gennemgå dette projekt for godkendelse: ${thisProject.name}"/>
+                    <message description="Das folgende Projekt bedarf Ihrer Genehmigung zur Weiterleitung ans nächste Stage. Wählen Sie nach der Überprüfung 'Genehmigt' oder 'Abgelehnt' für diese Aktion aus, um den Projektstatus zu aktualisieren und den Projektmanager über Ihre Entscheidung zu benachrichtigen. Vielen Dank. &#13;&#10;&#13;&#10;Projektname: ${thisProject.name}&#13;&#10;Stage:&#13;&#10;${thisProject.stage_code}&#13;&#10;Manager: ${thisProject.manager_id}&#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategorie: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Anfang: ${thisProject.schedule_start}&#13;&#10;Ende: ${thisProject.schedule_finish}" languageCode="de" name="Prüfen Sie dieses Projekt zur Genehmigung: ${thisProject.name}"/>
+                    <message description="The following project has been submitted for your approval to proceed to the next stage.  After review please select Approved or Rejected for this action item to update the project status and to notify the project manager of your decision.  Thank you.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Stage:&#13;&#10;${thisProject.stage_code}&#13;&#10;Manager: ${thisProject.manager_id}&#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Category: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Finish: ${thisProject.schedule_finish}" languageCode="en" name="Please review this project for approval: ${thisProject.name}"/>
+                    <message description="Se ha enviado el siguiente proyecto para su aprobación de manera que pueda enviarse a la siguiente fase. Una vez revisado, seleccione el estado Aprobado o Rechazado para actualizar el estado del proyecto y notificar al gestor de proyectos su decisión. Gracias.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;Etapa:&#13;&#10;${thisProject.stage_code}&#13;&#10;Gestor: ${thisProject.manager_id}&#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoría: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inicio: ${thisProject.schedule_start}&#13;&#10;Finalización: ${thisProject.schedule_finish}" languageCode="es" name="Revise este proyecto para su aprobación: ${thisProject.name}."/>
+                    <message description="Seuraava projekti on lähetetty sinulle hyväksyntään seuraavaan vaiheeseen siirtämistä varten. Kun arviointi on valmis, merkitse tämän toimenpiteen tilaksi Hyväksytty tai Hylätty, jolloin projektin tila päivittyy ja projektipäällikkö saa ilmoituksen tekemästäsi päätöksestä.&#13;&#10;&#13;&#10;Projektin nimi: ${thisProject.name}&#13;&#10;Vaihe:&#13;&#10;${thisProject.stage_code}&#13;&#10;Vastuuhenkilö: ${thisProject.manager_id} &#13;&#10;Tyyppi: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Alku: ${thisProject.schedule_start}&#13;&#10;Loppu: ${thisProject.schedule_finish}" languageCode="fi" name="Tarkista projekti hyväksyntää varten: ${thisProject.name}"/>
+                    <message description="Le projet suivant a été soumis pour approbation afin de passer à l'étape suivante. Après révision, sélectionnez Approuvé(e) ou Rejeté(e) pour cette action afin de mettre à jour le statut du projet et d'informer le chef de projets de votre décision. Merci.&#13;&#10;&#13;&#10;Nom du projet : ${thisProject.name}&#13;&#10;Etape :&#13;&#10;${thisProject.stage_code}&#13;&#10;Responsable : ${thisProject.manager_id}&#13;&#10;Type : &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Catégorie : &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Début : ${thisProject.schedule_start}&#13;&#10;Fin : ${thisProject.schedule_finish}" languageCode="fr" name="Révisez ce projet pour approbation : ${thisProject.name}"/>
+                    <message description="A következő projektet benyújtották Önnek a következő szintre való továbblépés jóváhagyására. Az ellenőrzés után válassza a Jóváhagyva vagy Elutasítva lehetőséget ennél az elvégzendő feladatnál. Ennek hatására frissül a projekt állapota, a projektvezető pedig értesítést kap a döntésről. Köszönjük.&#13;&#10;&#13;&#10;Projektnév: ${thisProject.name}&#13;&#10;Szint:&#13;&#10;${thisProject.stage_code}&#13;&#10;Vezető: ${thisProject.manager_id}&#13;&#10;Típus: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategória: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Kezdés: ${thisProject.schedule_start}&#13;&#10;Befejezés: ${thisProject.schedule_finish}" languageCode="hu" name="Ellenőrizze, hogy jóváhagyható-e ez a projekt: ${thisProject.name}"/>
+                    <message description="Il progetto seguente è stato inviato per l'approvazione dell'utente affinché possa passare alla fase successiva.  Una volta completata la revisione, selezionare Approvato o Rifiutato per aggiornare lo stato del progetto e notificare la propria decisione al manager di progetto.  Grazie.&#13;&#10;&#13;&#10;Nome progetto: ${thisProject.name}&#13;&#10;Fase:&#13;&#10;${thisProject.stage_code}&#13;&#10;Manager: ${thisProject.manager_id}&#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inizio: ${thisProject.schedule_start}&#13;&#10;Fine: ${thisProject.schedule_finish}" languageCode="it" name="Eseguire la revisione di questo progetto per l'approvazione: ${thisProject.name}"/>
+                    <message description="次のステージに進めるために以下のプロジェクトが承認要求されました。レビュー後にこのアクション アイテムに対して［承認済み］または［拒否済み］を選択してプロジェクト ステータスを更新し、プロジェクト マネージャに決定を通知してください。&#13;&#10;&#13;&#10;プロジェクト名: ${thisProject.name}&#13;&#10;ステージ:&#13;&#10;${thisProject.stage_code}&#13;&#10;マネージャ: ${thisProject.manager_id}&#13;&#10;タイプ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;カテゴリ: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;開始: ${thisProject.schedule_start}&#13;&#10;終了: ${thisProject.schedule_finish}" languageCode="ja" name="このプロジェクトを承認するためにレビューしてください: ${thisProject.name}"/>
+                    <message description="다음 프로젝트는 다음 단계로 진행하기 위해 승인 대상으로 제출되었습니다. 검토 후 이 작업 항목에 대해 [승인됨] 또는 [거부됨]을 선택하여 프로젝트 상태를 업데이트하고 프로젝트 관리자에게 결정 사항을 알리십시오. 감사합니다.&#13;&#10;&#13;&#10;프로젝트 이름: ${thisProject.name}&#13;&#10;단계:&#13;&#10;${thisProject.stage_code}&#13;&#10;관리자: ${thisProject.manager_id}&#13;&#10;유형: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;범주: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;시작: ${thisProject.schedule_start}&#13;&#10;종료: ${thisProject.schedule_finish}" languageCode="ko" name="${thisProject.name} 프로젝트를 검토하여 승인 여부를 결정하십시오."/>
+                    <message description="Het volgende project is ingediend voor uw goedkeuring om door te gaan naar de volgende fase. Selecteer na de beoordeling Goedgekeurd of Afgewezen voor dit actiepunt om de status van het project bij te werken en de projectmanager op de hoogte te brengen van uw beslissing. Dank u.&#13;&#10;&#13;&#10;Naam project: ${thisProject.name}&#13;&#10;Stage: &#13;&#10;, ${thisProject.stage_code} &#13;&#10;Manager: ${thisProject.manager_id} &#13;&#10;Type:&#13;&#10;, ${thisProject.obj_request_type}&#13;&#10;Categorie:&#13;&#10;${thisProject.obj_request_category}&#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Einde: ${thisProject.schedule_finish}" languageCode="nl" name="Controleer dit project voor goedkeuring: ${thisProject.name}"/>
+                    <message description="Følgende prosjekt er sendt til deg for godkjenning for å gå videre til neste fase. Velg Godkjent eller Forkastet for dette aksjonspunktet etter gjennomgangen for å oppdatere prosjektstatus og varsle prosjektleder om beslutningen. Mange takk.&#13;&#10;&#13;&#10;Prosjektnavn: ${thisProject.name}&#13;&#10;Fase:&#13;&#10;${thisProject.stage_code}&#13;&#10;Leder: ${thisProject.manager_id}&#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slutt: ${thisProject.schedule_finish}" languageCode="no" name="Gjennomgå dette prosjektet til godkjenning: ${thisProject.name}"/>
+                    <message description="Następujący projekt przesłano Ci do zatwierdzenia w celu przejścia do następnego etapu. Po zakończeniu przeglądu wybierz opcję Zatwierdzone lub Odrzucone dla tej czynności do wykonania, aby zaktualizować status projektu i powiadomić kierownika projektu o swojej decyzji. Dziękujemy.&#13;&#10;&#13;&#10;Nazwa projektu: ${thisProject.name}&#13;&#10;Etap:&#13;&#10;${thisProject.stage_code}&#13;&#10;Menedżer: ${thisProject.manager_id}&#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Rozpoczęcie: ${thisProject.schedule_start}&#13;&#10;Koniec: ${thisProject.schedule_finish}" languageCode="pl" name="Przejrzyj ten projekt do zatwierdzenia: ${thisProject.name}"/>
+                    <message description="O projeto abaixo foi enviado para sua aprovação para passar para a próxima etapa. Após análise, selecione Aprovado ou Rejeitado para este item de ação para atualizar o status do projeto e notificar o gerente do projeto sobre sua decisão.  Obrigado.&#13;&#10;&#13;&#10;Nome do projeto: ${thisProject.name}&#13;&#10;Etapa:&#13;&#10;${thisProject.stage_code}&#13;&#10;Gerente: ${thisProject.manager_id}&#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Início: ${thisProject.schedule_start}&#13;&#10;Término: ${thisProject.schedule_finish}" languageCode="pt" name="Analise este projeto para aprovação: ${thisProject.name}"/>
+                    <message description="Следующий проект представлен для утверждения и перехода к следующему этапу. После окончания проверки выберите статус «утверждено» или «отклонено» для изменения статуса проекта и уведомления менеджера проекта о принятом решении. Спасибо.&#13;&#10;&#13;&#10;Имя проекта: ${thisProject.name}&#13;&#10;Этап:&#13;&#10;${thisProject.stage_code}&#13;&#10;Менеджер: ${thisProject.manager_id}&#13;&#10;Тип: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Категория: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Начало: ${thisProject.schedule_start}&#13;&#10;Окончание: ${thisProject.schedule_finish}" languageCode="ru" name="Выполните проверку проекта для утверждения: ${thisProject.name}"/>
+                    <message description="Följande projekt har skickats för ditt godkännande till nästa nivå. Efter granskningen väljer du Godkänd eller Avvisad för detta åtgärdsalternativ för att uppdatera projektets status och meddela ditt beslut till projektledaren. Tack.&#13;&#10;&#13;&#10;Projektnamn: ${thisProject.name}&#13;&#10;Nivå:&#13;&#10;${thisProject.stage_code}&#13;&#10;Ansvarig: ${thisProject.manager_id}&#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slut: ${thisProject.schedule_finish}" languageCode="sv" name="Granska det här projektet för godkännande: ${thisProject.name}"/>
+                    <message description="Bir sonraki aşamaya geçmek için, aşağıdaki proje onaylamanız için gönderildi. Gözden geçirmeden sonra proje durumunu güncellemek ve proje yöneticisine kararınızı bildirmek amacıyla lütfen bu eylem öğesi için Onaylandı veya Reddedildi'yi seçin. Teşekkür ederiz.&#13;&#10;&#13;&#10;Proje Adı: ${thisProject.name}&#13;&#10;Aşama:&#13;&#10;${thisProject.stage_code}&#13;&#10;Yönetici: ${thisProject.manager_id}&#13;&#10;Tür: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Başlangıç: ${thisProject.schedule_start}&#13;&#10;Bitiş: ${thisProject.schedule_finish}" languageCode="tr" name="Lütfen onay için bu projeyi gözden geçirin: ${thisProject.name}"/>
+                    <message description="以下项目已提交供您审核以进入下一阶段。复查后，请对此操作项选择“已核准”或“已拒绝”以更新项目状态并将您的决策通知项目经理。谢谢。&#13;&#10;&#13;&#10;项目名称: ${thisProject.name}&#13;&#10;阶段:&#13;&#10;${thisProject.stage_code}&#13;&#10;经理: ${thisProject.manager_id}&#13;&#10;类型: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;类别: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;开始: ${thisProject.schedule_start}&#13;&#10;结束: ${thisProject.schedule_finish}" languageCode="zh" name="请复查此项目以便审核: ${thisProject.name}"/>
+                    <message description="以下專案已提交供您核准，準備前往下個階段。檢閱後請為這個動作項目選取「已核准」或「已否決」以更新專案狀態，並通知專案經理您的決定。謝謝。&#13;&#10;&#13;&#10;專案名稱：${thisProject.name}&#13;&#10;階段：&#13;&#10;${thisProject.stage_code}&#13;&#10;管理員：${thisProject.manager_id}&#13;&#10;類型：&#13;&#10;${thisProject.obj_request_type}&#13;&#10;類別：&#13;&#10;${thisProject.obj_request_category} &#13;&#10;開始：${thisProject.schedule_start}&#13;&#10;完成：${thisProject.schedule_finish}" languageCode="zh_TW" name="請檢閱這個專案以供核准：${thisProject.name}"/>
+                    <Assignees>
+                      <Assignee id="0" objectAttributeCode="obj_stakeholder2" objectName="thisProject" objectTypeCode="project" type="BPM_ASSIGNEE_CUSTOM_RES_LOV"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="APPROVED" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                      <AIAction statusCode="REJECTED" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                      <AIAction statusCode="CSK_RESUBMIT" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_EXCLUSIVE_CHOICE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk_step_reviewProject.ActionItem-csk_act_reviewProject.allassignees-REJECTED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_rejectProject"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk_step_reviewProject.ActionItem-csk_act_reviewProject.allassignees-APPROVED == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk_step_reviewProject.ActionItem-csk_act_reviewProject.allassignees-CSK_RESUBMIT == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_resubmitReview"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_resubmitReview" isMileStone="false" sequenceNo="6">
+                
+                
+                
+                
+                <nls description="Request Resubmission of Gate Review" languageCode="en" name="Request Resubmission of Gate Review"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action aiClose="true" aiDescription="Please revise the project ${thisProject.name}. Mark this action item Done after the revisions are complete to resubmit it for review.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Stage: ${thisProject.stage_code} &#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Category: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Finish: ${thisProject.schedule_finish}" aiObjectName="ActionItem-csk_act_resubmitForReview" aiPriority="CAL_MEDIUM" aiSubject="${thisProject.name} ${thisProject.stage_code} Gate did not pass" aiUserStatusOnly="0" code="csk_act_resubmitForReview" type="BPM_SAT_MANUAL">
+                    
+                    
+                    
+                    
+                    <nls description="Resubmit for Gate Review" languageCode="en" name="Resubmit for Gate Review"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <message description="Revisi el projecte ${thisProject.name}. Una vegada que hagi revisat el projecte, marqui l'acció amb l'estat Terminado per reenviar-lo per al seu revisión.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;Etapa: ${thisProject.stage_code} &#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoría: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inicio: ${thisProject.schedule_start}&#13;&#10;Finalización: ${thisProject.schedule_finish}" languageCode="ca" name="No s'ha superat el punt de decisió per a l'etapa ${thisProject.stage_code} del projecte ${thisProject.name}."/>
+                    <message description="Zrevidujte projekt ${thisProject.name}. Po dokončení revize označte tuto akci jako hotovou, čímž projekt znovu odešlete k posouzení.&#13;&#10;&#13;&#10;Název projektu: ${thisProject.name}&#13;&#10;Fáze: ${thisProject.stage_code} &#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategorie: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Zahájení: ${thisProject.schedule_start}&#13;&#10;Dokončení: ${thisProject.schedule_finish}" languageCode="cs" name="Brána ${thisProject.name} ${thisProject.stage_code} neprošla."/>
+                    <message description="Revidér projektet ${thisProject.name}. Markér dette handlingselement som udført, når revideringerne er fuldendt for at sende det til gennemgang igen.&#13;&#10;&#13;&#10;Navn på projekt: ${thisProject.name}&#13;&#10;Fase: ${thisProject.stage_code} &#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slut: ${thisProject.schedule_finish}" languageCode="da" name="${thisProject.name} ${thisProject.stage_code} Gate bestod ikke"/>
+                    <message description="Revidieren Sie das Projekt ${thisProject.name}. Wenn die Revidierung abgeschlossen ist, markieren Sie diese Aktion als erledigt, damit das Projekt zur Prüfung weitergeleitet werden kann.&#13;&#10;&#13;&#10;Projektname: ${thisProject.name}&#13;&#10;Stage: ${thisProject.stage_code} &#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategorie: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Anfang: ${thisProject.schedule_start}&#13;&#10;Ende: ${thisProject.schedule_finish}" languageCode="de" name="${thisProject.name} ${thisProject.stage_code} Gate hat nicht bestanden"/>
+                    <message description="Please revise the project ${thisProject.name}. Mark this action item Done after the revisions are complete to resubmit it for review.&#13;&#10;&#13;&#10;Project Name: ${thisProject.name}&#13;&#10;Stage: ${thisProject.stage_code} &#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Category: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Finish: ${thisProject.schedule_finish}" languageCode="en" name="${thisProject.name} ${thisProject.stage_code} Gate did not pass"/>
+                    <message description="Revise el proyecto ${thisProject.name}. Una vez que haya revisado el proyecto, marque la acción con el estado Terminado para reenviarlo para su revisión.&#13;&#10;&#13;&#10;Nombre del proyecto: ${thisProject.name}&#13;&#10;Etapa: ${thisProject.stage_code} &#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoría: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inicio: ${thisProject.schedule_start}&#13;&#10;Finalización: ${thisProject.schedule_finish}" languageCode="es" name="No se ha superado el punto de decisión para la etapa ${thisProject.stage_code} del proyecto ${thisProject.name}."/>
+                    <message description="Tee tarvittavat muutokset projektiin ${thisProject.name}. Kun olet tehnyt tarvittavat muutokset, merkitse tämä toimenpide valmiiksi ja lähetä projekti uudelleen tarkistettavaksi.&#13;&#10;&#13;&#10;Projektin nimi: ${thisProject.name}&#13;&#10;Vaihe: ${thisProject.stage_code} &#13;&#10;Tyyppi: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Alku: ${thisProject.schedule_start}&#13;&#10;Loppu: ${thisProject.schedule_finish}" languageCode="fi" name="${thisProject.name} ${thisProject.stage_code} Porttia ei hyväksytty"/>
+                    <message description="Révisez le projet ${thisProject.name}. A l'issue des révisions, marquez cette action comme étant terminée afin de le soumettre de nouveau pour révision.&#13;&#10;&#13;&#10;Nom du projet : ${thisProject.name}&#13;&#10;Etape : ${thisProject.stage_code} &#13;&#10;Type : &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Catégorie : &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Début : ${thisProject.schedule_start}&#13;&#10;Fin : ${thisProject.schedule_finish}" languageCode="fr" name="Echec de la création du point de passage pour ${thisProject.name} ${thisProject.stage_code}"/>
+                    <message description="Vizsgálja felül a következő projektet: ${thisProject.name}. Jelölje meg készként ezt az elvégzendő feladatot, amikor elkészült a módosításokkal, majd újra küldje el ellenőrzésre.&#13;&#10;&#13;&#10;A projekt neve: ${thisProject.name}&#13;&#10;Szint: ${thisProject.stage_code} &#13;&#10;Típus: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategória: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Kezdés: ${thisProject.schedule_start}&#13;&#10;Befejezés: ${thisProject.schedule_finish}" languageCode="hu" name="${thisProject.name} ${thisProject.stage_code} Kapu – nem jutott át"/>
+                    <message description="Eseguire la revisione del progetto: ${thisProject.name}. Impostare questa azione su Completato quando la revisione è completata e il progetto può essere inviato nuovamente per l'approvazione.&#13;&#10;&#13;&#10;Nome progetto: ${thisProject.name}&#13;&#10;Fase: ${thisProject.stage_code} &#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Inizio: ${thisProject.schedule_start}&#13;&#10;Fine: ${thisProject.schedule_finish}" languageCode="it" name="${thisProject.name} ${thisProject.stage_code}: gate non approvato"/>
+                    <message description="プロジェクト ${thisProject.name} を変更してください。変更が完了したら、このアクション アイテムを [完了] にマークして、レビュー用に再提出してください。&#13;&#10;&#13;&#10;プロジェクト名: ${thisProject.name}&#13;&#10;ステージ: ${thisProject.stage_code} &#13;&#10;タイプ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;カテゴリ: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;開始: ${thisProject.schedule_start}&#13;&#10;終了: ${thisProject.schedule_finish}" languageCode="ja" name="${thisProject.name} ${thisProject.stage_code} ゲートは合格しませんでした"/>
+                    <message description="${thisProject.name} 프로젝트를 수정하십시오. 수정이 완료되면 이 작업 항목을 완료된 것으로 표시하여 검토 대상으로 다시 제출하십시오.&#13;&#10;&#13;&#10;프로젝트 이름: ${thisProject.name}&#13;&#10;단계: ${thisProject.stage_code} &#13;&#10;유형: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;범주: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;시작: ${thisProject.schedule_start}&#13;&#10;종료: ${thisProject.schedule_finish}" languageCode="ko" name="${thisProject.name} ${thisProject.stage_code} 게이트가 통과되지 않았습니다."/>
+                    <message description="Herzie het project ${thisProject.name}. Markeer dit actiepunt als Gereed nadat de herzieningen zijn voltooid en verzend deze opnieuw voor beoordeling.&#13;&#10;&#13;&#10;Projectnaam: ${thisProject.name}&#13;&#10;Fase: ${thisProject.stage_code} &#13;&#10;Type: &#13;&#10;, ${thisProject.obj_request_type}&#13;&#10;Categorie:&#13;&#10;,${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Eind: ${thisProject.schedule_finish}" languageCode="nl" name="Gate van ${thisProject.name} ${thisProject.stage_code} niet goedgekeurd"/>
+                    <message description="Revider prosjektet ${thisProject.name}. Merk dette aksjonspunktet som ferdig når revisjonene er fullført for å sende det inn for ny gjennomgang.&#13;&#10;&#13;&#10;Prosjektnavn: ${thisProject.name}&#13;&#10;Fase: ${thisProject.stage_code} &#13;&#10;Type: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slutt: ${thisProject.schedule_finish}" languageCode="no" name="${thisProject.name} ${thisProject.stage_code}-port besto ikke"/>
+                    <message description="Skoryguj projekt ${thisProject.name}. Po skorygowaniu oznacz tę czynność do wykonania jako gotową, aby przesłać ponownie do przeglądu.&#13;&#10;&#13;&#10;Nazwa projektu: ${thisProject.name}&#13;&#10;Etap: ${thisProject.stage_code} &#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Rozpoczęcie: ${thisProject.schedule_start}&#13;&#10;Koniec: ${thisProject.schedule_finish}" languageCode="pl" name="Etap ${thisProject.stage_code} projektu ${thisProject.name} nie został zakończony pomyślnie"/>
+                    <message description="Analise o projeto ${thisProject.name}. Marque este item de ação como Concluído ao terminar a análise para reenviar para análise.&#13;&#10;&#13;&#10;Nome do projeto: ${thisProject.name}&#13;&#10;Etapa: ${thisProject.stage_code} &#13;&#10;Tipo: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Categoria: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Início: ${thisProject.schedule_start}&#13;&#10;Término: ${thisProject.schedule_finish}" languageCode="pt" name="Passagem do projeto ${thisProject.name} ${thisProject.stage_code} não autorizada"/>
+                    <message description="Внесите изменения в проект ${thisProject.name}. После внесения изменений отметьте этот элемент действия как выполненный и снова представьте проект для проверки.&#13;&#10;&#13;&#10;Имя проекта: ${thisProject.name}&#13;&#10;Этап: ${thisProject.stage_code} &#13;&#10;Тип: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Категория: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Начало: ${thisProject.schedule_start}&#13;&#10;Окончание: ${thisProject.schedule_finish}" languageCode="ru" name="${thisProject.name} ${thisProject.stage_code} Контроль не прошел"/>
+                    <message description="Du måste revidera projektet ${thisProject.name}. Markera detta åtgärdsalternativ som klart när slutfört för att skicka på nytt för granskning.&#13;&#10;&#13;&#10;Projektnamn: ${thisProject.name}&#13;&#10;Nivå: ${thisProject.stage_code} &#13;&#10;Typ: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Start: ${thisProject.schedule_start}&#13;&#10;Slut: ${thisProject.schedule_finish}" languageCode="sv" name="${thisProject.name} ${thisProject.stage_code} Gate gick inte igenom"/>
+                    <message description="Lütfen ${thisProject.name} projesini düzeltin. Düzeltmeler tamamlandıktan sonra gözden geçirme için yeniden gönderilmek üzere bu eylem öğesini Tamamlandı olarak işaretleyin.&#13;&#10;&#13;&#10;Proje Adı: ${thisProject.name}&#13;&#10;Aşama: ${thisProject.stage_code} &#13;&#10;Tür: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;Kategori: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;Başlangıç: ${thisProject.schedule_start}&#13;&#10;Bitiş: ${thisProject.schedule_finish}" languageCode="tr" name="${thisProject.name} ${thisProject.stage_code} Geçidi başarısız"/>
+                    <message description="请修改项目 ${thisProject.name}。在修改后将此操作项标为“完成”以便将其提交以供复查。&#13;&#10;&#13;&#10;项目名称: ${thisProject.name}&#13;&#10;阶段: ${thisProject.stage_code} &#13;&#10;类型: &#13;&#10;${thisProject.obj_request_type}&#13;&#10;类别: &#13;&#10;${thisProject.obj_request_category} &#13;&#10;开始: ${thisProject.schedule_start}&#13;&#10;结束: ${thisProject.schedule_finish}" languageCode="zh" name="${thisProject.name} ${thisProject.stage_code} 关口没有通过"/>
+                    <message description="請修訂專案 ${thisProject.name}。完成修訂後請將這個動作項目標示為 [完成] 以重新提交供檢閱。&#13;&#10;&#13;&#10;專案名稱：${thisProject.name}&#13;&#10;階段：${thisProject.stage_code} &#13;&#10;類型：&#13;&#10;${thisProject.obj_request_type}&#13;&#10;類別：&#13;&#10;${thisProject.obj_request_category} &#13;&#10;開始：${thisProject.schedule_start}&#13;&#10;完成：${thisProject.schedule_finish}" languageCode="zh_TW" name="${thisProject.name} ${thisProject.stage_code} 關卡未通過"/>
+                    <Assignees>
+                      <Assignee id="Manager" objectName="thisProject" objectTypeCode="project" type="BPM_ASSIGNEE_PROFILE"/>
+                    </Assignees>
+                    <AIActions>
+                      <AIAction statusCode="DONE" statusTypeCode="PROCESS_DEFAULT_AI_STATUS"/>
+                    </AIActions>
+                    <Objects/>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <ExpressionText><![CDATA[actionitem.csk_step_resubmitReview.ActionItem-csk_act_resubmitForReview.allassignees-DONE == 1]]></ExpressionText>
+                        <Transitions>
+                          <Transition to="csk_step_isPmoAssigned"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="csk_step_rejectProject" isMileStone="false" sequenceNo="7">
+                
+                
+                
+                
+                <nls description="Project Rejected" languageCode="en" name="Project Rejected"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="csk_act_rejectProject" objectMethod="status" objectName="thisProject" type="BPM_SAT_SYSTEM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Reject Project"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <ActionParams>
+                      <Param name="value" value="3"/>
+                    </ActionParams>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="3" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

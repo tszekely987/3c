@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_ADM_NAMEOPT_TEDEF_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_ADM_NAMEOPT_TEDEF_SP" (
+RC1 	IN OUT PAC_ADM_NAMEOPT_TEDEF_SPPkg.RCT1)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+transcostsourcelabor  NUMBER;
+transratesourcelabor  NUMBER;
+transratelocationlabor  NUMBER;
+transrateoverridelabor 	NUMBER(1,0);
+transcostsourcematerials  NUMBER;
+transratesourcematerials  NUMBER;
+transratelocationmaterials  NUMBER;
+transrateoverridematerials 	NUMBER(1,0);
+transcostsourceequipment  NUMBER;
+transratesourceequipment  NUMBER;
+transratelocationequipment  NUMBER;
+transrateoverrideequipment 	NUMBER(1,0);
+transcostsourceexpenses   NUMBER;
+transratesourceexpenses   NUMBER;
+transratelocationexpenses   NUMBER;
+transrateoverrideexpenses 	NUMBER(1,0);
+transcostsourcelabor_des 	GLOBALPKG.STRING;
+transratesourcelabor_des 	GLOBALPKG.STRING;
+transcostsourcematerials_des 	GLOBALPKG.STRING;
+transratesourcematerials_des 	GLOBALPKG.STRING;
+transcostsourceequipment_des 	GLOBALPKG.STRING;
+transratesourceequipment_des 	GLOBALPKG.STRING;
+transcostsourceexpenses_des 	GLOBALPKG.STRING;
+transratesourceexpenses_des 	GLOBALPKG.STRING;
+budgetlevellabor                NUMBER;
+budgetlevelmaterials            NUMBER;
+budgetlevelequipment            NUMBER;
+labor_exchange_rate_type         pac_mnt_projects.labor_exchange_rate_type%TYPE;
+MATERIALS_exchange_rate_type         pac_mnt_projects.MATERIALS_exchange_rate_type%TYPE;
+EQUIPMENT_exchange_rate_type         pac_mnt_projects.EQUIPMENT_exchange_rate_type%TYPE;
+EXPENSE_exchange_rate_type         pac_mnt_projects.EXPENSE_exchange_rate_type%TYPE;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   transcostsrclbr,  transratesrclbr,  transrateloclbr,  transrateallowovrdlbr,
+		  transcostsrcmtl,  transratesrcmtl,  transratelocmtl,  transrateallowovrdmtl,
+		  transcostsrcequip,  transratesrcequip,  transratelocequip,  transrateallowovrdequip,
+		  transcostsrcexpense,  transratesrcexpense,  transratelocexpense,  transrateallowovrdeexpense, dfltbudgetlevellbr, DFLTBUDGETLEVELMTL,DFLTBUDGETLEVELEQUIP,
+               labor_exchange_rate_type, MATERIALS_exchange_rate_type, EQUIPMENT_exchange_rate_type, EXPENSE_exchange_rate_type
+		INTO PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcelabor, PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcelabor, PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationlabor, PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverridelabor,
+		 PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcematerials, PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcematerials, PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationmaterials, PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverridematerials,
+		 PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceequipment, PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceequipment, PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationequipment, PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverrideequipment,
+		 PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceexpenses, PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceexpenses, PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationexpenses, PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverrideexpenses, PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevellabor,PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevelmaterials,
+		 PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevelequipment,
+               PAC_ADM_NAMEOPT_TEDEF_SP.labor_exchange_rate_type, PAC_ADM_NAMEOPT_TEDEF_SP.MATERIALS_exchange_rate_type,
+               PAC_ADM_NAMEOPT_TEDEF_SP.EQUIPMENT_exchange_rate_type, PAC_ADM_NAMEOPT_TEDEF_SP.EXPENSE_exchange_rate_type
+		FROM nameoptions;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_rowcnt = 0 THEN
+	BEGIN
+		raise_application_error(-20189, '00001');
+	END;
+	ELSE
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcelabor_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcelabor;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcelabor_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcelabor;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcematerials_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcematerials;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcematerials_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcematerials;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceequipment_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceequipment;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceequipment_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceequipment;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceexpenses_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceexpenses;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   Description
+			INTO PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceexpenses_des FROM ppa_Matrix
+			WHERE MatrixKey = PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceexpenses;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		OPEN RC1 FOR
+		SELECT  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcelabor "transratesrclbr",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcelabor_des "transratesrclbr_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcelabor "transcostsrclbr",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcelabor_des "transcostsrclbr_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationlabor "transrateloclbr",  PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverridelabor "transrateallowovrdlbr",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcematerials "transratesrcmtl",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourcematerials_des "transratesrcmtl_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcematerials "transcostsrcmaterials",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourcematerials_des "transcostsourcematerials_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationmaterials "transratelocationmaterials",  PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverridematerials "transrateoverridematerials",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceequipment "transratesourceequipment",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceequipment_des "transratesourceequipment_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceequipment "transcostsourceequipment",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceequipment_des "transcostsourceequipment_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationequipment "transratelocationequipment",  PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverrideequipment "transrateoverrideequipment",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceexpenses "transratesourceexpenses",  PAC_ADM_NAMEOPT_TEDEF_SP.transratesourceexpenses_des "transratesourceexpenses_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceexpenses "transcostsourceexpenses",  PAC_ADM_NAMEOPT_TEDEF_SP.transcostsourceexpenses_des "transcostsourceexpenses_des",  PAC_ADM_NAMEOPT_TEDEF_SP.transratelocationexpenses "transratelocationexpenses",  PAC_ADM_NAMEOPT_TEDEF_SP.transrateoverrideexpenses "transrateoverrideexpenses",
+		PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevellabor "budgetlevellabor",PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevelmaterials "budgetlevelmaterials", PAC_ADM_NAMEOPT_TEDEF_SP.budgetlevelequipment "budgetlevelequipment",
+               PAC_ADM_NAMEOPT_TEDEF_SP.labor_exchange_rate_type "labor_exchange_rate_type",
+               PAC_ADM_NAMEOPT_TEDEF_SP.MATERIALS_exchange_rate_type "MATERIALS_exchange_rate_type",
+               PAC_ADM_NAMEOPT_TEDEF_SP.EQUIPMENT_exchange_rate_type "EQUIPMENT_exchange_rate_type",
+PAC_ADM_NAMEOPT_TEDEF_SP.EXPENSE_exchange_rate_type "EXPENSE_exchange_rate_type"
+		FROM DUAL;
+	END;
+	END IF;
+END PAC_ADM_NAMEOPT_TEDEF_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

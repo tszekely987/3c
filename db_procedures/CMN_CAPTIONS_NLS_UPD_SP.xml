@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_CAPTIONS_NLS_UPD_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_CAPTIONS_NLS_UPD_SP" (
+   p_table_name    IN   VARCHAR2,
+   p_pk_id         IN   INTEGER,
+   p_name          IN   VARCHAR2,
+   p_description   IN   VARCHAR2,
+   p_updated_by    IN   INTEGER,
+   p_attribute1    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute2    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute3    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute4    IN   VARCHAR2 DEFAULT NULL,
+   p_attribute5    IN   VARCHAR2 DEFAULT NULL,
+   p_language      IN   VARCHAR2 DEFAULT NULL
+)
+IS
+   v_count   NUMBER;
+BEGIN
+   IF p_name IS NOT NULL
+   THEN
+   SELECT   COUNT (*)
+   INTO     v_count
+   FROM     cmn_captions_nls
+   WHERE    table_name = p_table_name
+   AND      pk_id = p_pk_id;
+
+   IF (v_count &gt; 0)
+   THEN
+      -- If the language is passed then update the labels 
+      -- just for that particular language. If not then
+      -- update the labels for all languages.
+      IF p_language IS NULL
+      THEN
+         UPDATE cmn_captions_nls
+            SET name = p_name,
+                description = p_description,
+                last_updated_date = SYSDATE,
+                last_updated_by = p_updated_by,
+                attribute1 = p_attribute1,
+                attribute2 = p_attribute2,
+                attribute3 = p_attribute3,
+                attribute4 = p_attribute4,
+                attribute5 = p_attribute5
+          WHERE table_name = p_table_name
+       AND      pk_id = p_pk_id;
+      ELSE
+         UPDATE cmn_captions_nls
+            SET name = p_name,
+                description = p_description,
+                last_updated_date = SYSDATE,
+                last_updated_by = p_updated_by,
+                attribute1 = p_attribute1,
+                attribute2 = p_attribute2,
+                attribute3 = p_attribute3,
+                attribute4 = p_attribute4,
+                attribute5 = p_attribute5
+          WHERE table_name = p_table_name
+       AND      pk_id = p_pk_id
+       AND      language_code = p_language;
+      END IF;
+   ELSE
+      cmn_captions_nls_ins_sp (
+         p_table_name,
+         p_pk_id,
+         p_name,
+         p_description,
+         p_updated_by,
+         p_attribute1,
+         p_attribute2,
+         p_attribute3,
+         p_attribute4,
+         p_attribute5
+      );
+   END IF;
+   END IF;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

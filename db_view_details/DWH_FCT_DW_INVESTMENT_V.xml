@@ -1,0 +1,64 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_FCT_DW_INVESTMENT_V">
+    <indexes/>
+    <text_length>3052</text_length>
+    <text>select investment_key, period_key, clr_cofund,created_date clarity_updated_date  from ( with  slice_range AS
+           (SELECT MIN(from_date) from_date,
+                   MAX(num_periods) row_count
+            FROM   prj_blb_slicerequests
+            WHERE  is_dwh_request = 1
+            AND    request_name IN ('','inv::clr_cofund::dwh_week','inv::clr_cofund::dwh_month', 'inv::clr_cofund::dwh_fiscal')), fiscal_periods AS
+           (SELECT d.period_key,
+                   d.period_start,
+                   d.row_key
+            FROM  (SELECT p.id period_key,
+                          p.start_date period_start,
+                          r.row_count,
+                          ROW_NUMBER() OVER (PARTITION BY p.entity_id ORDER BY p.start_date) AS row_key
+                   FROM   biz_com_periods p,
+                          dwh_settings s,
+                          slice_range r
+                   WHERE  p.entity_id = s.entity_key
+                   AND    p.period_type IN ('MONTHLY','13_PERIODS_PER_YEAR')
+                   AND    p.start_date >= r.from_date) d
+            WHERE  d.row_key &lt;= d.row_count), slice_keys AS
+           (SELECT id request_key,
+                   field field_type,
+                   CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+            FROM   prj_blb_slicerequests
+            WHERE  field IN ( -1,5012001)            AND    is_dwh_request = 1 ), fiscal_slice_keys AS
+           (SELECT id request_key,
+                   field field_type,
+                   period period_type
+            FROM prj_blb_slicerequests
+            WHERE  request_name IN ('', 'inv::clr_cofund::dwh_fiscal')), object_curves AS (
+ SELECT s.prj_object_id  investment_key,
+                   sk.field_type,
+                   CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) 
+                        ELSE CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+                   s.slice,
+                   s.created_date
+            FROM   prj_blb_slices s,
+                   slice_keys sk,
+                   rpt_calendar c
+            WHERE  s.slice_request_id = sk.request_key
+            AND    s.slice_date = c.start_date
+            AND    sk.period_type = c.period_type
+            AND    sk.field_type in ( -1,5012001 )            UNION ALL
+            SELECT s.prj_object_id investment_key,
+                   sk.field_type,
+                   fp.period_key,
+                   s.slice,
+                   s.created_date
+            FROM   prj_fiscal_blb_slices s,
+                   fiscal_slice_keys sk,
+                   fiscal_periods fp
+            WHERE  s.slice_request_id = sk.request_key
+            AND    s.period_id = fp.period_key) SELECT investment_key,
+              period_key,
+ sum( CASE WHEN field_type = 5012001 THEN slice ELSE 0 END )clr_cofund,
+              max(created_date) created_date 
+       FROM   object_curves  
+       group by investment_key, period_key)s</text>
+  </QueryResult>
+</ClarityDBViewQuery>

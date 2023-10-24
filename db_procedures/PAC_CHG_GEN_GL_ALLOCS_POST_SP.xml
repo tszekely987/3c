@@ -1,0 +1,700 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_CHG_GEN_GL_ALLOCS_POST_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_CHG_GEN_GL_ALLOCS_POST_SP" 
+(
+  P_JOB_RUN_ID	  	   NUMBER,
+  P_USER_ID            NUMBER,
+  P_SESSION_ID         NUMBER,
+  P_LOG_ERROR		   NUMBER,
+  P_BATCH_ID           NUMBER,
+  P_GL_PERIOD		   DATE,
+  P_IS_MULTI_CURRENCY  VARCHAR2,
+  P_SYSTEM_CURRENCY    VARCHAR2,  
+  P_TRANS_SOURCE       CHAR,
+  P_TRANSNO            NUMBER,
+  P_TRANSDATE          DATE,
+  P_ENTITY_ID          NUMBER,
+  P_ENTITY			   VARCHAR2,  
+  P_LOCATION_ID        NUMBER,
+  P_LOCATION		   VARCHAR2,  
+  P_DEPARTMENT_ID      NUMBER,
+  P_DEPARTMENT         VARCHAR2,  
+  P_INVESTMENT_ID      NUMBER,
+  P_PROJECT_ID         NUMBER,
+  P_WIPCLASS_ID        NUMBER,
+  P_WIPCLASS		   VARCHAR2,  
+  P_TRANSCLASS_ID      NUMBER,
+  P_TRANSCLASS		   VARCHAR2,  
+  P_CHARGECODE_ID      NUMBER,
+  P_RESOURCECLASS_ID   NUMBER,
+  P_RESOURCECLASS	   VARCHAR2,  
+  P_RESOURCE_ID        NUMBER,
+  P_QUANTITY           NUMBER,
+  P_TOTALAMOUNT        NUMBER,
+  P_CURRENCY_CODE      VARCHAR2,
+  P_EXCHANGE_RATE_TYPE VARCHAR2,
+  P_ALLOCATION_TYPE    VARCHAR2
+)
+AS
+  V_DATE               DATE;
+  V_END_DATE           DATE;
+  V_STMT               VARCHAR2(255);
+  V_TOTAL_AMOUNT       NUMBER(32, 6);
+  V_DEBIT_AMOUNT       NUMBER(32, 6);
+  V_CREDIT_AMOUNT      NUMBER(32, 6);
+  V_CREDIT_ERROR_CODE  NUMBER;
+  V_DEBIT_ERROR_CODE   NUMBER;
+  V_CREDIT_MESSAGE_CODE VARCHAR2(255);
+  V_DEBIT_MESSAGE_CODE VARCHAR2(255);  
+  V_BEST_DEBIT_ID      NUMBER;
+  V_BEST_CREDIT_ID     NUMBER;  
+  V_OBJECT_ID		   NUMBER;
+  V_CREDIT_STATUS      VARCHAR2(30);
+  V_DEBIT_STATUS       VARCHAR2(30); 
+  V_ENTITY_ID          NUMBER;
+  V_HOME_CURRENCY_CODE VARCHAR2(30);
+  V_TRANS_ID	       NUMBER;
+  V_ERROR_ID	       NUMBER;  
+  V_STATUS			   VARCHAR2(30);
+  V_JOB_CODE		   VARCHAR2(30);
+  V_EXCHANGE_RATES     CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  
+  TYPE errorArgumentsREC IS RECORD (ARG_INDEX NUMBER,
+  	   					 		    ARG_VALUE VARCHAR2(1000),
+									FORMAT_TYPE_CODE VARCHAR2(30)
+								   );
+
+  TYPE errorArgumentsTAB IS TABLE of errorArgumentsREC INDEX BY BINARY_INTEGER;
+
+  V_ERROR_ARGS		   errorArgumentsTAB;
+
+  StoO_selcnt          INTEGER;
+  StoO_error           INTEGER;
+  StoO_rowcnt          INTEGER;
+  StoO_crowcnt         INTEGER := 0;
+  StoO_fetchstatus     INTEGER := 0;
+  StoO_errmsg          GLOBALPKG.STRING;
+  StoO_sqlstatus       INTEGER;
+
+CURSOR C1_REC(C_END_DATE DATE) IS
+SELECT 
+       C.ID,
+       C.STATUS,
+       E.HOME_CURRENCY_CODE
+  FROM PAC_CHG_RESOURCE_CREDITS C,
+       PAC_CHG_RESCREDIT_DATES D,
+       ENTITY E
+ WHERE C.STATUS != 'INACTIVE'
+   AND C.ID = D.RESOURCE_CREDIT_ID
+   AND P_TRANSDATE BETWEEN D.FROM_DATE AND NVL(D.TO_DATE, C_END_DATE)
+   AND P_ENTITY_ID = NVL(C.ENTITY_ID, P_ENTITY_ID)
+   AND P_LOCATION_ID = NVL(C.LOCATION_ID, P_LOCATION_ID)
+   AND P_DEPARTMENT_ID = NVL(C.DEPARTMENT_ID, P_DEPARTMENT_ID)
+   AND P_TRANSCLASS_ID = NVL(C.TRANSACTION_CLASS_ID, P_TRANSCLASS_ID)
+   AND P_RESOURCECLASS_ID = NVL(C.RESOURCE_CLASS_ID, P_RESOURCECLASS_ID)
+   AND NVL(C.ENTITY_ID, P_ENTITY_ID) = E.ID
+ ORDER BY C.ENTITY_ID, C.LOCATION_ID, C.DEPARTMENT_ID, C.TRANSACTION_CLASS_ID, C.RESOURCE_CLASS_ID;
+
+CURSOR C2_REC (C_RES_CREDIT_ID NUMBER, C_TRANS_DATE DATE, C_END_DATE DATE) IS
+SELECT R.ID, D.ACCOUNT_CODE_ID, D.ALLOCATION_PERCENT,
+       NVL(A.ENTITY_ID, P_ENTITY_ID) "ENTITY_ID"
+  FROM PAC_CHG_RESCREDIT_DATES R,
+       PAC_CHG_RESCREDIT_DETAILS D,
+       PAC_CHG_GL_ACCOUNTS A
+ WHERE R.RESOURCE_CREDIT_ID = C_RES_CREDIT_ID
+   AND C_TRANS_DATE BETWEEN R.FROM_DATE AND NVL(R.TO_DATE, C_END_DATE)
+   AND R.ID = D.RES_CREDIT_DATES_ID
+   AND D.ACCOUNT_CODE_ID = A.ID;
+
+CURSOR C3_REC(C_END_DATE DATE) IS
+SELECT 
+       A.ID,
+       DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P.ALLOCATION_STATUS, CC.ALLOCATION_STATUS) "STATUS",
+       E.HOME_CURRENCY_CODE
+  FROM PAC_CHG_ALLOCATIONS A,
+       PAC_CHG_ALLOCS_DATES D,
+       ENTITY E,
+       PAC_MNT_PROJECTS P,
+       PRCHARGECODE CC
+ WHERE A.ALLOCATION_TYPE = P_ALLOCATION_TYPE
+   AND A.OBJECT_ID = DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P_PROJECT_ID, P_CHARGECODE_ID)
+   AND A.ID = D.ALLOCATION_ID
+   AND P_TRANSDATE BETWEEN D.FROM_DATE AND NVL(D.TO_DATE, C_END_DATE)
+   AND P.ID = P_PROJECT_ID
+   AND CC.PRID = P_CHARGECODE_ID
+   AND E.ID = P_ENTITY_ID;
+   --AND DECODE(P_ALLOCATION_TYPE, 'PROJECT_CHARGEBACKS', P.ALLOCATION_STATUS, CC.ALLOCATION_STATUS) != 'INACTIVE';
+
+CURSOR C4_REC (C_ALLOCATION_ID NUMBER, C_TRANS_DATE DATE, C_END_DATE DATE) IS
+SELECT R.ID, D.ACCOUNT_CODE_ID, D.ALLOCATION_PERCENT,
+       NVL(A.ENTITY_ID, P_ENTITY_ID) "ENTITY_ID"
+  FROM PAC_CHG_ALLOCS_DATES R,
+       PAC_CHG_ALLOCS_DETAILS D,
+       PAC_CHG_GL_ACCOUNTS A
+ WHERE R.ALLOCATION_ID = C_ALLOCATION_ID
+   AND C_TRANS_DATE BETWEEN R.FROM_DATE AND NVL(R.TO_DATE, C_END_DATE)
+   AND R.ID = D.ALLOCATION_DATES_ID
+   AND D.ACCOUNT_CODE_ID = A.ID;
+   
+CURSOR C5_REC(C_END_DATE DATE) IS
+SELECT 
+       A.ID,
+       P.ALLOCATION_STATUS_CODE "STATUS",
+       E.HOME_CURRENCY_CODE
+  FROM PAC_CHG_ALLOCATIONS A,
+       PAC_CHG_ALLOCS_DATES D,
+       ENTITY E,
+       FIN_OBJECT_PROPERTIES P
+ WHERE A.ALLOCATION_TYPE = P_ALLOCATION_TYPE
+   AND A.OBJECT_ID = P.OBJECT_ID
+   AND A.ID = D.ALLOCATION_ID
+   AND P_TRANSDATE BETWEEN D.FROM_DATE AND NVL(D.TO_DATE, C_END_DATE)
+   AND P.OBJECT_ID = P_INVESTMENT_ID
+   AND E.ID = P_ENTITY_ID;
+
+BEGIN
+  V_STMT := 'Initializing variables';
+  V_DATE := SYSDATE;
+  V_DEBIT_AMOUNT := 0;
+  V_CREDIT_AMOUNT := 0;
+  V_END_DATE := TO_DATE('12/31/2999', 'MM/DD/YYYY');
+  V_CREDIT_ERROR_CODE := 0;
+  V_DEBIT_ERROR_CODE := 0;
+  V_CREDIT_MESSAGE_CODE := NULL;
+  V_DEBIT_MESSAGE_CODE := NULL;  
+  V_BEST_CREDIT_ID := NULL;
+  V_BEST_DEBIT_ID := NULL;
+  V_JOB_CODE := 'FIN_ERRORTYPE_COSTING_EFFORT';
+  
+  -- Determine who does the work
+  V_STMT := 'Determine the resource credit rule';
+  FOR C1_DATA IN C1_REC(V_END_DATE)
+  LOOP
+    V_BEST_CREDIT_ID :=  C1_DATA.ID;
+	V_HOME_CURRENCY_CODE := C1_DATA.HOME_CURRENCY_CODE;
+	V_CREDIT_STATUS := C1_DATA.STATUS;
+	
+	IF C1_REC%ROWCOUNT = 1 THEN
+	  EXIT;
+	END IF;
+  END LOOP;
+  
+  IF V_BEST_CREDIT_ID IS NULL THEN
+  BEGIN
+    V_CREDIT_ERROR_CODE := 1000;
+	V_CREDIT_MESSAGE_CODE := 'itl.resourceCreditMatchNotFound';
+  END;
+  ELSIF V_CREDIT_STATUS = 'ONHOLD' THEN
+  BEGIN
+    V_CREDIT_ERROR_CODE := 1001;
+	V_CREDIT_MESSAGE_CODE := 'itl.resourceCreditOnHold';
+  END;
+  END IF;
+  
+  --Write the error to the errors table for the investment object transactions
+  IF P_LOG_ERROR = 1 THEN
+  BEGIN   
+    IF V_CREDIT_MESSAGE_CODE IS NOT NULL THEN
+	BEGIN
+	    --handle errors 
+		SELECT FIN_ERRORS_S1.NEXTVAL INTO V_ERROR_ID FROM DUAL;
+		
+		PAC_MNT_INS_ERROR_SP( V_ERROR_ID, 
+						   V_CREDIT_MESSAGE_CODE,
+		                   P_RESOURCE_ID, 
+						   P_INVESTMENT_ID,
+						   P_TRANSNO,
+						   'FIN_OBJECT_TXNS',
+						   P_JOB_RUN_ID,
+						   V_JOB_CODE,
+						   P_USER_ID
+						 );
+						 
+		--populate the PL/SQL table to insert the error arguments
+		V_ERROR_ARGS(1).ARG_INDEX := 0;
+		V_ERROR_ARGS(1).ARG_VALUE := P_ENTITY;
+		V_ERROR_ARGS(1).FORMAT_TYPE_CODE := 'string';
+		
+		V_ERROR_ARGS(2).ARG_INDEX := 1;
+		V_ERROR_ARGS(2).ARG_VALUE := P_LOCATION;
+		V_ERROR_ARGS(2).FORMAT_TYPE_CODE := 'string';
+		
+		V_ERROR_ARGS(3).ARG_INDEX := 2;
+		V_ERROR_ARGS(3).ARG_VALUE := P_DEPARTMENT;
+		V_ERROR_ARGS(3).FORMAT_TYPE_CODE := 'string';
+		
+		V_ERROR_ARGS(4).ARG_INDEX := 3;
+		V_ERROR_ARGS(4).ARG_VALUE := P_TRANSCLASS;
+		V_ERROR_ARGS(4).FORMAT_TYPE_CODE := 'string';
+		
+		V_ERROR_ARGS(5).ARG_INDEX := 4;
+		V_ERROR_ARGS(5).ARG_VALUE := P_RESOURCECLASS;
+		V_ERROR_ARGS(5).FORMAT_TYPE_CODE := 'string';
+		
+		--insert the error arguments				 
+	    FOR i IN 1  .. V_ERROR_ARGS.count
+	    LOOP
+		  PAC_MNT_INS_ERROR_ARGS_SP( V_ERROR_ID, 
+		                              V_ERROR_ARGS(i).ARG_INDEX,
+									  V_ERROR_ARGS(i).ARG_VALUE,
+									  V_ERROR_ARGS(i).FORMAT_TYPE_CODE,
+									  P_USER_ID
+								   );
+		END LOOP; 
+	  END;
+	  END IF;
+  END;
+  END IF; 
+  
+  -- Determine who pays for the work
+  V_BEST_DEBIT_ID := NULL;  
+
+  V_STMT := 'Determine charge to allocation rule';
+  IF P_PROJECT_ID !=0 THEN
+  BEGIN
+    FOR C3_DATA IN C3_REC(V_END_DATE)
+    LOOP
+      V_BEST_DEBIT_ID :=  C3_DATA.ID;
+      V_HOME_CURRENCY_CODE := C3_DATA.HOME_CURRENCY_CODE;
+      V_STATUS := C3_DATA.STATUS;
+
+      IF C3_REC%ROWCOUNT = 1 THEN
+        EXIT;
+      END IF;
+    END LOOP;
+  END;
+  ELSE
+  BEGIN
+  FOR C5_DATA IN C5_REC(V_END_DATE)
+    LOOP
+      V_BEST_DEBIT_ID :=  C5_DATA.ID;
+      V_HOME_CURRENCY_CODE := C5_DATA.HOME_CURRENCY_CODE;
+      V_STATUS := C5_DATA.STATUS;
+
+      IF C5_REC%ROWCOUNT = 1 THEN
+        EXIT;
+      END IF;
+    END LOOP;  
+  END;
+  END IF;
+    
+  IF V_BEST_DEBIT_ID IS NULL THEN
+  BEGIN
+    V_DEBIT_ERROR_CODE := 1003;
+	V_DEBIT_MESSAGE_CODE := 'itl.chargeToMatchNotFound';
+  END;
+  ELSIF V_DEBIT_STATUS = 'ONHOLD' THEN
+  BEGIN
+    V_DEBIT_ERROR_CODE := 1004;
+	V_DEBIT_MESSAGE_CODE := 'itl.chargeToRuleOnHold';	 
+  END;
+  ELSIF V_DEBIT_STATUS = 'INACTIVE' THEN
+  BEGIN
+    V_DEBIT_ERROR_CODE := 1005;
+	V_DEBIT_MESSAGE_CODE := 'itl.chargeToRuleInactive';	
+  END;
+  END IF;
+  
+  --Write the error to the errors table for the investment object transactions
+  IF P_LOG_ERROR = 1 THEN
+  BEGIN
+    IF V_DEBIT_MESSAGE_CODE IS NOT NULL THEN
+	BEGIN
+      --handle errors 
+	  SELECT FIN_ERRORS_S1.NEXTVAL INTO V_ERROR_ID FROM DUAL;
+		 
+	  PAC_MNT_INS_ERROR_SP( V_ERROR_ID, 
+						   V_DEBIT_MESSAGE_CODE, 
+		                   P_RESOURCE_ID, 
+						   P_INVESTMENT_ID,
+						   P_TRANSNO,
+						   'FIN_OBJECT_TXNS',
+						   P_JOB_RUN_ID,
+						   V_JOB_CODE,
+						   P_USER_ID
+						 );
+						 
+	  PAC_MNT_INS_ERROR_ARGS_SP( V_ERROR_ID, 
+		                           0,
+								   P_ENTITY,
+								   'string',
+								   P_USER_ID
+								 );
+	END;
+	END IF;
+  END;
+  END IF;
+  
+  IF ( V_CREDIT_ERROR_CODE = 0 AND V_DEBIT_ERROR_CODE = 0 ) THEN
+    BEGIN	  	   
+      V_STMT := 'Calculate the credit to resource allocations';
+      FOR C2_DATA IN C2_REC(V_BEST_CREDIT_ID, P_TRANSDATE, V_END_DATE)
+      LOOP
+        V_STMT := 'Get next transaction ID';
+        SELECT PAC_CHG_TRANSACTIONS_S1.NEXTVAL
+          INTO V_TRANS_ID
+          FROM DUAL;
+
+        V_STMT := 'Insert into posting table';
+        INSERT INTO PAC_CHG_TRANSACTIONS
+        (
+          ID,
+	      BATCH_ID,
+          CHARGEBACK_TYPE,
+          SOURCE_ID,
+          DATES_ID,
+          TRANS_SOURCE,
+          TRANSNO,
+          GL_PERIOD,
+          ENTITY_ID,
+          ACCOUNT_CODE_ID,
+          QUANTITY,
+          STATUS,
+          GL_BATCH_ID,
+          GL_POSTED_DATE,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        SELECT
+          V_TRANS_ID,
+	      P_BATCH_ID,
+          'C',
+          V_BEST_CREDIT_ID,
+          C2_DATA.ID,
+          P_TRANS_SOURCE,
+          P_TRANSNO,
+          P_GL_PERIOD,
+          C2_DATA.ENTITY_ID,
+          C2_DATA.ACCOUNT_CODE_ID,
+          P_QUANTITY,
+          0,
+          NULL,
+          NULL,
+          V_DATE,
+          P_USER_ID,
+          V_DATE,
+          P_USER_ID
+		  FROM DUAL;
+
+        -- do the percentage allocation calculation
+        V_TOTAL_AMOUNT := P_TOTALAMOUNT * (C2_DATA.ALLOCATION_PERCENT / 100.0);
+
+        -- keep a running total of the credits so we can compare to the debits at the end
+        V_DEBIT_AMOUNT := V_DEBIT_AMOUNT + V_TOTAL_AMOUNT;
+		
+		--if it is multi-currency system, then do the exchange rates conversion..
+        --otherwise just insert 5 rows for the different currency_types
+        IF P_IS_MULTI_CURRENCY = '1' THEN
+        BEGIN
+
+        -- set the object id to be the project id for projects and investment id for NPIOs
+        V_STMT := 'Set the Object Id to the project Id or the NPIO id';
+		IF P_PROJECT_ID != 0 THEN
+		  V_OBJECT_ID := P_PROJECT_ID;
+		ELSIF P_INVESTMENT_ID !=0 THEN
+		  V_OBJECT_ID := P_INVESTMENT_ID;
+		END IF;
+
+        -- do the exchange rate conversion
+        V_STMT := 'Get converted exchange rate';
+        V_EXCHANGE_RATES := CMN_EXCHANGERATE_PKG.CMN_GET_CONVERTED_VALUES_FCT
+                            ( V_OBJECT_ID,
+                              P_TRANSDATE,
+                              P_CURRENCY_CODE,
+                              V_TOTAL_AMOUNT,
+                              P_EXCHANGE_RATE_TYPE );
+
+        -- BUT convert the amount to the TARGET ENTITIES home currency (instead of the project entities' home currency)
+        IF P_CURRENCY_CODE != V_EXCHANGE_RATES(1).toCurrencyCode THEN
+          V_STMT := 'Get target entities converted exchange rate';
+          V_EXCHANGE_RATES(1).convertedAmount := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                    P_TRANSDATE, P_CURRENCY_CODE,
+                                                    V_HOME_CURRENCY_CODE, V_TOTAL_AMOUNT,
+                                                    P_EXCHANGE_RATE_TYPE);
+          V_EXCHANGE_RATES(1).toCurrencyCode := V_HOME_CURRENCY_CODE;
+        END IF;
+
+        -- insert the currency values
+        FOR i IN 1  .. V_EXCHANGE_RATES.count
+          LOOP
+            V_STMT := 'Insert into transaction values table';
+            INSERT INTO PAC_CHG_TRANS_VALUES
+            (
+              ID,
+              TRANSACTION_ID,
+              CURRENCY_TYPE,
+              CURRENCY_CODE,
+              AMOUNT,
+              CREATED_DATE,
+              CREATED_BY,
+              LAST_UPDATED_DATE,
+              LAST_UPDATED_BY
+            )
+            SELECT
+              PAC_CHG_TRANS_VALUES_S1.NEXTVAL,
+              V_TRANS_ID,
+              V_EXCHANGE_RATES(i).CURRENCYTYPE,
+              V_EXCHANGE_RATES(i).TOCURRENCYCODE,
+              V_EXCHANGE_RATES(i).CONVERTEDAMOUNT,
+              V_DATE,
+              P_USER_ID,
+              V_DATE,
+              P_USER_ID
+            FROM
+              DUAL;
+          END LOOP;
+		  END;
+		  ELSE
+		  BEGIN
+		    --home currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'HOME', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+			--reporting currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'REPORTING', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+		    --billing currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'BILLING', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+            --natural currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'NATURAL', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+		    --euro currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'EURO', 
+										 'EUR', 
+										 .100000, 
+										 P_USER_ID 
+									   );
+		  END;
+		  END IF; --end of inserting into trans_values for single currency mode
+      END LOOP;
+	  END;
+  END IF; 
+  
+  IF ( V_CREDIT_ERROR_CODE = 0 AND V_DEBIT_ERROR_CODE = 0 ) THEN
+  BEGIN
+    V_STMT := 'Calculate the charge to allocations';
+    FOR C4_DATA IN C4_REC(V_BEST_DEBIT_ID, P_TRANSDATE, V_END_DATE)
+      LOOP
+        V_STMT := 'Get next ID for posting table';
+        SELECT PAC_CHG_TRANSACTIONS_S1.NEXTVAL
+          INTO V_TRANS_ID
+          FROM DUAL;
+
+        V_STMT := 'Insert credit into posting table';
+        INSERT INTO PAC_CHG_TRANSACTIONS
+        (
+          ID,
+	      BATCH_ID,
+          CHARGEBACK_TYPE,
+          SOURCE_ID,
+          DATES_ID,
+          TRANS_SOURCE,
+          TRANSNO,
+          GL_PERIOD,
+          ENTITY_ID,
+          ACCOUNT_CODE_ID,
+          QUANTITY,
+          STATUS,
+          GL_BATCH_ID,
+          GL_POSTED_DATE,
+          CREATED_DATE,
+          CREATED_BY,
+          LAST_UPDATED_DATE,
+          LAST_UPDATED_BY
+        )
+        SELECT
+          V_TRANS_ID,
+	      P_BATCH_ID,
+          'D',
+          V_BEST_DEBIT_ID,
+          C4_DATA.ID,
+          P_TRANS_SOURCE,
+          P_TRANSNO,
+          P_GL_PERIOD,
+          C4_DATA.ENTITY_ID,
+          C4_DATA.ACCOUNT_CODE_ID,
+          P_QUANTITY,
+          0,
+          NULL,
+          NULL,
+          V_DATE,
+          P_USER_ID,
+          V_DATE,
+          P_USER_ID
+		  FROM DUAL;
+
+        -- do the percentage allocation calculation
+        V_TOTAL_AMOUNT := P_TOTALAMOUNT * (C4_DATA.ALLOCATION_PERCENT / 100.0);
+
+        -- keep a running total of the credits so we can compare to the debits at the end
+        V_CREDIT_AMOUNT := V_CREDIT_AMOUNT + V_TOTAL_AMOUNT;
+		
+        --if it is multi-currency system, then do the exchange rates conversion..
+        --otherwise just insert 5 rows for the different currency_types
+        IF P_IS_MULTI_CURRENCY = '1' THEN
+        BEGIN
+
+        -- set the object id to be the project id for projects and investment id for NPIOs
+        V_STMT := 'Set the Object Id to the project Id or the NPIO id';
+		IF P_PROJECT_ID != 0 THEN
+		  V_OBJECT_ID := P_PROJECT_ID;
+		ELSIF P_INVESTMENT_ID !=0 THEN
+		  V_OBJECT_ID := P_INVESTMENT_ID;
+		END IF;
+		
+        -- do the exchange rate conversion
+        V_STMT := 'Perform exchange rate conversion for charge amount';		
+        V_EXCHANGE_RATES := CMN_EXCHANGERATE_PKG.CMN_GET_CONVERTED_VALUES_FCT
+                            ( V_OBJECT_ID,
+                              P_TRANSDATE,
+                              P_CURRENCY_CODE,
+                              V_TOTAL_AMOUNT,
+                              P_EXCHANGE_RATE_TYPE );
+
+        -- BUT convert the amount to the TARGET ENTITIES home currency (instead of the project entities home currency)
+        IF P_CURRENCY_CODE != V_EXCHANGE_RATES(1).toCurrencyCode THEN
+          V_STMT := 'Perform exchange rate conversion for target entities charge amount';
+          V_EXCHANGE_RATES(1).convertedAmount := CMN_EXCHANGERATE_PKG.CMN_GET_ONLYCONVERTED_VAL_FCT(
+                                                    P_TRANSDATE, P_CURRENCY_CODE,
+                                                    V_HOME_CURRENCY_CODE, V_TOTAL_AMOUNT,
+                                                    P_EXCHANGE_RATE_TYPE);
+          V_EXCHANGE_RATES(1).toCurrencyCode := V_HOME_CURRENCY_CODE;
+        END IF;
+
+        -- insert the currency values
+        FOR i IN 1  .. V_EXCHANGE_RATES.count
+          LOOP
+            V_STMT := 'Insert charge into trial run values table';
+            INSERT INTO PAC_CHG_TRANS_VALUES
+            (
+              ID,
+              TRANSACTION_ID,
+              CURRENCY_TYPE,
+              CURRENCY_CODE,
+              AMOUNT,
+              CREATED_DATE,
+              CREATED_BY,
+              LAST_UPDATED_DATE,
+              LAST_UPDATED_BY
+            )
+            VALUES
+            (
+              PAC_CHG_TRANS_VALUES_S1.NEXTVAL,
+              V_TRANS_ID,
+              V_EXCHANGE_RATES(i).CURRENCYTYPE,
+              V_EXCHANGE_RATES(i).TOCURRENCYCODE,
+              V_EXCHANGE_RATES(i).CONVERTEDAMOUNT,
+              V_DATE,
+              P_USER_ID,
+              V_DATE,
+              P_USER_ID
+          );
+
+          END LOOP;
+		  END;
+		  ELSE
+		  BEGIN
+		    --home currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'HOME', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+			--reporting currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'REPORTING', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+		    --billing currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'BILLING', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+            --natural currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'NATURAL', 
+										 P_SYSTEM_CURRENCY, 
+										 V_TOTAL_AMOUNT, 
+										 P_USER_ID 
+									   );
+		    --euro currency
+			PAC_CHG_INS_TRANS_VALUES_SP( V_TRANS_ID, 
+										 'EURO', 
+										 'EUR', 
+										 .100000, 
+										 P_USER_ID 
+									   );
+		  END;
+		  END IF;
+      END LOOP;
+	  END;
+  END IF; 
+
+  --debits don't equal credits
+  IF ROUND(NVL(V_CREDIT_AMOUNT,0), 4) != ROUND(NVL(V_DEBIT_AMOUNT,0), 4) THEN
+  BEGIN
+     --Write the error to the errors table for the investment object transactions
+     IF P_LOG_ERROR = 1 THEN
+     BEGIN
+       --handle errors 
+	   SELECT FIN_ERRORS_S1.NEXTVAL INTO V_ERROR_ID FROM DUAL;
+	 
+	   PAC_MNT_INS_ERROR_SP( V_ERROR_ID, 
+				   			 'itl.debitNotEqualsCredit', 
+							 P_RESOURCE_ID, 
+					   		 P_INVESTMENT_ID,
+							 P_TRANSNO,
+							 'FIN_OBJECT_TXNS',
+							 P_JOB_RUN_ID,
+							 V_JOB_CODE,
+ 					   		 P_USER_ID
+					 	   );
+	 END;					 
+	 END IF;
+   
+   DELETE FROM PAC_CHG_TRANS_VALUES WHERE TRANSACTION_ID IN 
+       ( SELECT ID FROM PAC_CHG_TRANSACTIONS WHERE TRANSNO = P_TRANSNO 
+	   AND TRANS_SOURCE = P_TRANS_SOURCE );
+   DELETE FROM PAC_CHG_TRANSACTIONS WHERE TRANSNO = P_TRANSNO 
+	   AND TRANS_SOURCE = P_TRANS_SOURCE;
+  END;
+  END IF;
+
+END PAC_CHG_GEN_GL_ALLOCS_POST_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

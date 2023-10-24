@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_x_r_break_month" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="XOG Reqs breakdown by server month"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:RESOURCE:HOST_NAME:HOST@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:SUM(SOAP_VIEW_COUNT):SOAP_VIEW_COUNT@
+FROM     LOG_SUMMARY
+WHERE    LOG_DATE BETWEEN TRUNC(@WHERE:PARAM:USER_DEF:DATE:startdate@,'MON') AND ADD_MONTHS(TRUNC(@WHERE:PARAM:USER_DEF:DATE:startdate@,'MON'),1)-1
+AND @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT
+AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+AND      @FILTER@
+GROUP BY HOST_NAME
+HAVING   @HAVING_FILTER@]]></nsql>
+            <attribute id="host" required="false"/>
+            <attribute id="soap_view_count" required="false"/>
+            <attribute id="param_startdate" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

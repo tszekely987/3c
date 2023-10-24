@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>INT_ASSIGNINVOICENUMBER</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."INT_ASSIGNINVOICENUMBER" 
+(
+  cGroupNo  VARCHAR2 ,
+  cUserID   VARCHAR2 ,
+  RC1   IN OUT INT_ASSIGNINVOICENUMBERPkg.RCT1
+)
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  cClient   GLOBALPKG.STRING;
+  cProject  GLOBALPKG.STRING;
+  cInvoiceDate  GLOBALPKG.STRING;
+  cBillTo   GLOBALPKG.STRING;
+  cInvoiceNo  GLOBALPKG.STRING;
+  iPrinted  NUMBER(5,0);
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/25/2001
+*/
+	IF  ( UPPER(SUBSTR(int_AssignInvoiceNumber.cGroupNo, 1, 5)) = 'MATCH') THEN
+		int_AssignInvoiceNumber.cInvoiceNo :=  int_AssignInvoiceNumber.cGroupNo;
+		int_AssignInvoiceNumber.iPrinted :=  1;
+	END IF;
+	BEGIN
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	StoO_rowcnt := 0;
+	SELECT 1 INTO StoO_selcnt
+	FROM DUAL
+	WHERE  EXISTS (
+		SELECT  1
+		 FROM invoiceheader
+		WHERE printed = 1
+		 AND invoiceno = int_AssignInvoiceNumber.cGroupNo
+		 And status != '2' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+		WHEN OTHERS THEN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF StoO_selcnt != 0 THEN
+		int_AssignInvoiceNumber.cInvoiceNo :=  int_AssignInvoiceNumber.cGroupNo;
+		int_AssignInvoiceNumber.iPrinted :=  1;
+	ELSE
+	BEGIN
+		BEGIN
+		BEGIN
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		StoO_rowcnt := 0;
+		SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+			 FROM invoiceheader
+			WHERE printed = 1
+			 AND cmsgroupno = int_AssignInvoiceNumber.cGroupNo
+			 And status != '2' );
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF StoO_selcnt != 0 THEN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   invoiceno,  1
+				INTO int_AssignInvoiceNumber.cInvoiceNo, int_AssignInvoiceNumber.iPrinted FROM invoiceheader
+				WHERE printed = 1
+				 AND cmsgroupno = int_AssignInvoiceNumber.cGroupNo;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+		ELSE
+		BEGIN
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   COMPANY_CODE,  RPAD(TO_CHAR(invoicedate,'mm/dd/yyyy'), 10, ' '),  0
+				INTO int_AssignInvoiceNumber.cClient, int_AssignInvoiceNumber.cInvoiceDate, int_AssignInvoiceNumber.iPrinted FROM invoiceheader
+				WHERE invoiceno = int_AssignInvoiceNumber.cGroupNo;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   MIN(PROJECT_CODE)
+				INTO int_AssignInvoiceNumber.cProject FROM ppa_Billings
+				WHERE InvoiceNo = int_AssignInvoiceNumber.cGroupNo
+				 AND TransType  IN ('B', 'BR', 'BP', 'BC');
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+			bb_AssignInvoiceNumber(int_AssignInvoiceNumber.cClient,
+			 int_AssignInvoiceNumber.cProject,
+			 int_AssignInvoiceNumber.cGroupNo,
+			 int_AssignInvoiceNumber.cUserID,
+			 int_AssignInvoiceNumber.cInvoiceDate,
+			 int_AssignInvoiceNumber.cInvoiceNo,
+			 int_AssignInvoiceNumber.cBillTo);
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE ppa_WIP
+			SET InvoiceNo = int_AssignInvoiceNumber.cInvoiceNo
+			WHERE InvoiceNo = int_AssignInvoiceNumber.cGroupNo
+			 AND Status = 0
+			 AND Chargeable = 0;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END;
+		END IF;
+		END;
+	END;
+	END IF;
+	StoO_rowcnt := 0;
+	StoO_selcnt := 0;
+	StoO_error  := 0;
+	OPEN RC1 FOR
+	SELECT  int_AssignInvoiceNumber.cInvoiceNo "InvoiceNo",  int_AssignInvoiceNumber.iPrinted "Printed"
+	FROM DUAL;
+END int_AssignInvoiceNumber;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

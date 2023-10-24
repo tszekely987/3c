@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_SUMMARY_CONTRACT_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_SUMMARY_CONTRACT_SP" (
+  BILLING_SESSION_KEY NUMBER ,
+  cLanguageCode VARCHAR2 DEFAULT 'en',
+  RC1   IN OUT PAC_BIL_SUMMARY_CONTRACT_Pkg.RCT1,
+  RC2   IN OUT PAC_BIL_SUMMARY_CONTRACT_Pkg.RCT2
+  )
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg VARCHAR2(255);
+  StoO_sqlstatus  INTEGER;
+
+  BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  v_MASTER_PROJECT_CODE pac_mnt_projects.PROJECT_CODE%TYPE;
+
+  v_ERROR_CODE   INTEGER;
+  v_STMT       GLOBALPKG.STRING;
+
+BEGIN
+
+	v_STMT := 'Error selecting BILLING_CURRENCY_CODE';
+
+	SELECT DISTINCT BILLING_CURRENCY_CODE
+	  INTO BillingCurrencyCode
+	  FROM Pac_Mnt_Projects P,
+	  	   OLB_BILLINGCHECKOUT O
+	  WHERE O.ACTIONID = PAC_BIL_SUMMARY_CONTRACT_SP.BILLING_SESSION_KEY AND
+	  		O.PROJECT_CODE = P.PROJECT_CODE ;
+
+	v_STMT := 'Error selecting Master Project Code';
+
+	BEGIN
+	  SELECT O.PROJECT_CODE
+	    INTO v_MASTER_PROJECT_CODE
+	    FROM OLB_BILLINGCHECKOUT O,
+	  	     PAC_MNT_PROJECTS P
+	    WHERE O.ACTIONID = PAC_BIL_SUMMARY_CONTRACT_SP.BILLING_SESSION_KEY AND
+	  	   	  O.PROJECT_CODE = P.PROJECT_CODE AND
+	  		  NVL( P.BILLING_PROJECT_ID, P.ID ) = P.ID AND
+			  EXISTS ( SELECT 1
+				         FROM PAC_MNT_PROJECTS P2
+					     WHERE P2.BILLING_PROJECT_ID = P.ID AND
+					   		   P2.ID != P.ID ) ;
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+	      NULL;
+	END;
+
+
+	OPEN RC1 FOR
+	  SELECT PC.PROJECT_CODE,  NVL( INSTR( v_MASTER_PROJECT_CODE, PC.PROJECT_CODE ), 0),
+	  		 CONTRACTNBR, 	  PC.CONTRACTDATE,
+			 CONTRACTAMOUNT,  NVL( AMOUNTBILLED, 0),
+			 PC.NOTES
+	    FROM PROJCNTRTS PC,
+			 PAC_MNT_PROJECTS P,
+			 OLB_BILLINGCHECKOUT O
+	    WHERE O.ACTIONID = PAC_BIL_SUMMARY_CONTRACT_SP.BILLING_SESSION_KEY AND
+	  	   	  O.PROJECT_CODE = PC.PROJECT_CODE AND
+			  PC.PROJECT_CODE = P.PROJECT_CODE AND
+			  NVL( CONTRACTAMOUNT, 0) &gt; 0
+	    ORDER BY 2 DESC, 1 ;
+
+	OPEN RC2 FOR
+	SELECT BillingCurrencyCode
+	  FROM DUAL ;
+
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+	    NULL;
+      WHEN OTHERS THEN
+	    If v_ERROR_CODE IS NULL Then
+	      v_ERROR_CODE := -20993 ;
+		  v_STMT := SQLERRM;
+          RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	    Else
+          RAISE_APPLICATION_ERROR (v_ERROR_CODE, v_STMT);
+	    End If;
+
+END PAC_BIL_SUMMARY_CONTRACT_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

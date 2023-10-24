@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="userbyrights" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            <nls languageCode="en" name="User by Rights"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:USER_RIGHTS:s.ID:n_ID@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:s.GROUP_NAME:n_Name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:s.description:Description@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:v.name:v_Name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:v.lookup_code:lic_right_type@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:u.user_name:user_name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:u.first_name:first_name@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:USER_RIGHTS:u.last_name:last_name@
+         FROM     cmn_sec_groups_v s,cmn_lic_lookup_v v,cmn_sec_users u,cmn_lic_right_v r
+         WHERE    s.id in ( SELECT right_id
+                        FROM cmn_lic_users_v
+                        WHERE user_id=@where:param:xml:integer:/data/user_id/@value@)
+         AND      v.lookup_code=r.lic_right_type
+         AND      s.id = r.id
+         AND      v.language_code=@WHERE:PARAM:LANGUAGE@
+         AND      s.language_code=@WHERE:PARAM:LANGUAGE@
+         AND      s.is_active = 1
+         AND      u.id=@where:param:xml:integer:/data/user_id/@value@
+         AND      EXISTS (select  1
+         FROM    cmn_sec_chk_user_r_v0
+         WHERE  object_id = 1
+         AND  permission_code = 'AdminAccess'
+         AND  user_id = @WHERE:PARAM:USER_ID@)
+         AND      @FILTER@]]></nsql>
+            <attribute id="n_id" required="false"/>
+            <attribute id="n_name" required="false"/>
+            <attribute id="description" required="false"/>
+            <attribute id="v_name" lookup="CMN_DYN_LIC_LOOKUP" required="false"/>
+            <attribute id="lic_right_type" lookup="CMN_DYN_LIC_LOOKUP" required="false"/>
+            <attribute id="user_name" required="false"/>
+            <attribute id="first_name" required="false"/>
+            <attribute id="last_name" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

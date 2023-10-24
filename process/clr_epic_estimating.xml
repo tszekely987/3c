@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <Processes>
+          <Process allowOneRunningInstance="true" code="clr_epic_estimating" createdBy="admin" endStep="Finish" source="customer" startEvent="update" startOption="AUTO_START" startStep="Start">
+            
+            
+            
+            
+            <nls languageCode="en" name="Populate Story Points and Operating Cost"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <StartCondition><![CDATA[( clr_epic.clr_tshirt_size != clr_epic.clr_tshirt_size__oldValue )]]></StartCondition>
+            <Security/>
+            <Objects>
+              <Object manualStart="true" name="thisPortfolioEpics" objectType="clr_epic" partitionCode="NIKU.ROOT" partitionModeCode="PARTITION_ONLY" type="BPM_POT_PRIMARY"/>
+            </Objects>
+            <Steps>
+              <Step id="Start" isMileStone="false" sequenceNo="1">
+                
+                
+                
+                
+                <nls languageCode="en" name="Start"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations>
+                  <Action code="clr_update_point_size" synchronized="true" type="BPM_SAT_CUSTOM">
+                    
+                    
+                    
+                    
+                    <nls languageCode="en" name="Update Epic Points and Cost"/>
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <customScript languageCode="gel">
+                      <scriptText>
+                        <gel:script xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:core="jelly:core" xmlns:file="jelly:com.niku.union.gel.FileTagLibrary" xmlns:gel="jelly:com.niku.union.gel.GELTagLibrary" xmlns:soap="jelly:com.niku.union.gel.SOAPTagLibrary" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:sql="jelly:sql" xmlns:util="jelly:util" xmlns:xog="http://www.niku.com/xog" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                          <gel:setDataSource dbId="Niku" var="clarityDS"/>
+                          <!-- Update operating cost based on story point name -->
+                          <core:catch var="v2_exception">
+                            <sql:update dataSource="${clarityDS}">
+UPDATE FIN_FINANCIALS 
+SET PLANNED_CST_OPERATING_TOTAL = (SELECT ts.clr_tcost 
+FROM odf_ca_clr_tshirt ts 
+JOIN odf_ca_clr_epic e ON e.clr_tshirt_size = ts.code
+WHERE e.id = ${gel_objectInstanceId})
+WHERE id = (SELECT f.id
+FROM 
+INV_INVESTMENTS i
+JOIN odf_object_instance_mapping oim ON oim.primary_object_instance_id = i.id AND oim.primary_object_instance_code = 'clr_epic'
+JOIN FIN_FINANCIALS f ON f.id = oim.secondary_object_instance_id 
+WHERE 
+i.id = ${gel_objectInstanceId})
+		</sql:update>
+                          </core:catch>
+                          <core:choose>
+                            <core:when test="${v2_exception != null}">
+                              <gel:log level="ERROR">Could not set Operating Cost: ${v2_exception}</gel:log>
+                            </core:when>
+                            <core:otherwise>
+                              <gel:log>Operating Cost updated successfully</gel:log>
+                            </core:otherwise>
+                          </core:choose>
+                          <!-- Update total cost based on updated operating cost -->
+                          <core:catch var="v2_exception">
+                            <sql:update dataSource="${clarityDS}">
+UPDATE FIN_FINANCIALS
+SET PLANNED_CST_TOTAL = NVL(PLANNED_CST_CAPITAL_TOTAL,0) + NVL(PLANNED_CST_OPERATING_TOTAL,0)
+WHERE id = (SELECT f.id
+FROM 
+INV_INVESTMENTS i
+JOIN odf_object_instance_mapping oim ON oim.primary_object_instance_id = i.id AND oim.primary_object_instance_code = 'clr_epic'
+JOIN FIN_FINANCIALS f ON f.id = oim.secondary_object_instance_id 
+WHERE 
+i.id = ${gel_objectInstanceId})
+		</sql:update>
+                          </core:catch>
+                          <core:choose>
+                            <core:when test="${v2_exception != null}">
+                              <gel:log level="ERROR">Could not set Total  Cost: ${v2_exception}</gel:log>
+                            </core:when>
+                            <core:otherwise>
+                              <gel:log>Total Cost updated successfully</gel:log>
+                            </core:otherwise>
+                          </core:choose>
+                          <!-- Update Story Point based on story point name -->
+                          <core:catch var="v2_exception">
+                            <sql:update dataSource="${clarityDS}">
+			UPDATE odf_ca_clr_epic
+SET clr_t_points = (SELECT ts.clr_tstorypoints
+FROM odf_ca_clr_tshirt ts 
+JOIN odf_ca_clr_epic e ON e.clr_tshirt_size = ts.code
+WHERE e.id = ${gel_objectInstanceId})
+WHERE id = ${gel_objectInstanceId}
+		</sql:update>
+                          </core:catch>
+                          <core:choose>
+                            <core:when test="${v2_exception != null}">
+                              <gel:log level="ERROR">Could not set Story Points: ${v2_exception}</gel:log>
+                            </core:when>
+                            <core:otherwise>
+                              <gel:log>Story Points updated successfully</gel:log>
+                            </core:otherwise>
+                          </core:choose>
+                        </gel:script>
+                      </scriptText>
+                    </customScript>
+                    <Notifications notifyOwner="false">
+                      <NotifyWhen stepActionInError="false" stepActionPerformed="false" value="0"/>
+                      <Assignees/>
+                    </Notifications>
+                  </Action>
+                </Operations>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions>
+                          <Transition to="Finish"/>
+                        </Transitions>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+              <Step id="Finish" isMileStone="false" sequenceNo="2">
+                
+                
+                
+                
+                <nls languageCode="en" name="Finish"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <Notifications notifyOwner="false">
+                  <NotifyWhen stepCompleted="false" stepInError="false" stepStarted="false"/>
+                  <Assignees/>
+                </Notifications>
+                <Operations/>
+                <TransitionRestrictions>
+                  <TransitionRestriction>
+                    <Join type="BPM_JT_NONE">
+                      <Condition sequencNo="1" type="BPM_SCT_PRECONDITION"/>
+                    </Join>
+                  </TransitionRestriction>
+                  <TransitionRestriction>
+                    <Split type="BPM_ST_SEQUENCE">
+                      <Condition sequencNo="1" type="BPM_SCT_POSTCONDITION">
+                        <Transitions/>
+                      </Condition>
+                    </Split>
+                  </TransitionRestriction>
+                </TransitionRestrictions>
+              </Step>
+            </Steps>
+            <Groups/>
+            <OBSAssocs complete="false"/>
+          </Process>
+        </Processes>
+        
+      </contentPack>
+      <XOGOutput>
+        <Object type="contentPack"/>
+        <Status state="SUCCESS"/>
+        <Statistics failureRecords="0" insertedRecords="0" totalNumberOfRecords="2" updatedRecords="0"/>
+        <Records/>
+      </XOGOutput>
+    </NikuDataBus>

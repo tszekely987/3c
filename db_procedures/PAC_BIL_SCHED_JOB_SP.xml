@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_SCHED_JOB_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_SCHED_JOB_SP" 
+(
+  in_billRunKey         IN NUMBER DEFAULT 0,
+  in_printRunKey        IN NUMBER DEFAULT 0,
+  in_userID             IN VARCHAR2 DEFAULT ' ',
+  in_outputType         IN VARCHAR2 DEFAULT ' ',
+  in_outputName         IN VARCHAR2 DEFAULT ' ',
+  in_outputLinesPerPage IN NUMBER DEFAULT 0
+)
+AS
+  billRunKey  NUMBER;
+  printRunKey   NUMBER;
+  userID  GLOBALPKG.STRING;
+  outputType  GLOBALPKG.STRING;
+  outputName  GLOBALPKG.STRING;
+  outputLinesPerPage  INTEGER;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  quote   GLOBALPKG.STRING;
+  fieldnames  GLOBALPKG.STRING;
+  fieldvalues   GLOBALPKG.STRING;
+  delimiter   GLOBALPKG.STRING;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	Pac_Bil_Sched_Job_Sp.billRunKey := Pac_Bil_Sched_Job_Sp.in_billRunKey;
+	Pac_Bil_Sched_Job_Sp.printRunKey := Pac_Bil_Sched_Job_Sp.in_printRunKey;
+	Pac_Bil_Sched_Job_Sp.userID := Pac_Bil_Sched_Job_Sp.in_userID;
+	Pac_Bil_Sched_Job_Sp.outputType := Pac_Bil_Sched_Job_Sp.in_outputType;
+	Pac_Bil_Sched_Job_Sp.outputName := Pac_Bil_Sched_Job_Sp.in_outputName;
+	Pac_Bil_Sched_Job_Sp.outputLinesPerPage := Pac_Bil_Sched_Job_Sp.in_outputLinesPerPage;
+	Pac_Bil_Sched_Job_Sp.delimiter :=  CHR(59);
+	Pac_Bil_Sched_Job_Sp.quote :=  CHR(39);
+	IF  Pac_Bil_Sched_Job_Sp.userID IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.userID :=  ' ';
+	END IF;
+	IF  Pac_Bil_Sched_Job_Sp.outputType IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.outputType :=  ' ';
+	END IF;
+	IF  Pac_Bil_Sched_Job_Sp.outputName IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.outputName :=  ' ';
+	END IF;
+	IF  Pac_Bil_Sched_Job_Sp.billRunKey IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.billRunKey :=  0;
+	END IF;
+	IF  Pac_Bil_Sched_Job_Sp.printRunKey IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.printRunKey :=  0;
+	END IF;
+	IF  Pac_Bil_Sched_Job_Sp.outputLinesPerPage IS NULL THEN
+		Pac_Bil_Sched_Job_Sp.outputLinesPerPage :=  0;
+	END IF;
+	Pac_Bil_Sched_Job_Sp.userID :=  Pac_Bil_Sched_Job_Sp.userID;
+	Pac_Bil_Sched_Job_Sp.outputType :=  Pac_Bil_Sched_Job_Sp.quote
+	   || Pac_Bil_Sched_Job_Sp.outputType || Pac_Bil_Sched_Job_Sp.quote;
+	Pac_Bil_Sched_Job_Sp.outputName :=  Pac_Bil_Sched_Job_Sp.quote
+	   || Pac_Bil_Sched_Job_Sp.outputName || Pac_Bil_Sched_Job_Sp.quote;
+	Pac_Bil_Sched_Job_Sp.fieldnames :=  'billRunKey' || Pac_Bil_Sched_Job_Sp.delimiter
+	   || 'printRunKey' || Pac_Bil_Sched_Job_Sp.delimiter || 'userID'
+	   || Pac_Bil_Sched_Job_Sp.delimiter || 'outputType'
+	   || Pac_Bil_Sched_Job_Sp.delimiter || 'outputName' || Pac_Bil_Sched_Job_Sp.delimiter
+	   || 'outputLinesPerPage';
+	Pac_Bil_Sched_Job_Sp.fieldvalues := Pac_Bil_Sched_Job_Sp.billRunKey || Pac_Bil_Sched_Job_Sp.delimiter
+	   || Pac_Bil_Sched_Job_Sp.printRunKey || Pac_Bil_Sched_Job_Sp.delimiter || Pac_Bil_Sched_Job_Sp.userID
+	   || Pac_Bil_Sched_Job_Sp.delimiter || Pac_Bil_Sched_Job_Sp.outputType
+	   || Pac_Bil_Sched_Job_Sp.delimiter || Pac_Bil_Sched_Job_Sp.outputName
+	   || Pac_Bil_Sched_Job_Sp.delimiter || Pac_Bil_Sched_Job_Sp.outputLinesPerPage;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO PAC_MNT_BCKGRND_PROCESSES (METHOD_NAME, STORED_PROCEDURE_NAME, FIELD_NAMES, FIELD_VALUES, DELIMITER, CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY)
+		   VALUES ('processBatchPrintAndSummary', '', Pac_Bil_Sched_Job_Sp.fieldnames, Pac_Bil_Sched_Job_Sp.fieldvalues, Pac_Bil_Sched_Job_Sp.delimiter,
+		   SYSDATE, 1, SYSDATE, 1);
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END Pac_Bil_Sched_Job_Sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

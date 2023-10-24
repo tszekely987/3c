@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PFM_INV_PH_SUM_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PFM_INV_PH_SUM_FCT" (p_id NUMBER, p_plan NUMBER, p_attr_name VARCHAR, p_object NUMBER DEFAULT 0 )
+   RETURN NUMBER
+IS
+ v_return NUMBER;
+ v_test INTEGER;
+ v_start DATE;
+ v_finish DATE;
+ v_curve CLOB;
+BEGIN
+
+  IF( p_plan &gt; 0 ) THEN
+    SELECT START_DATE, FINISH_DATE INTO v_start,v_finish FROM PFM_PLANS WHERE ID = p_plan;
+    v_test := 1;
+  ELSE
+    SELECT START_DATE, FINISH_DATE INTO v_start, v_finish FROM PFM_PORTFOLIOS WHERE ID = (select portfolio_id from pfm_investments where id = p_id );
+    v_test := 0;
+  END IF;
+
+  select NVL( pln.clob_curve, port.clob_curve ) INTO v_curve
+    from pfm_investments inv
+    left outer join pfm_clob_curves port on inv.id = port.id and inv.portfolio_id = port.portfolio_id and port.plan_id = 0 and port.attribute = p_attr_name and port.object_id = p_object and port.table_name = 'PFM_INVESTMENTS'
+    left outer join pfm_clob_curves pln on inv.id = pln.id and inv.portfolio_id = pln.portfolio_id and pln.plan_id = p_plan and pln.attribute = p_attr_name and pln.object_id = p_object and pln.table_name = 'PFM_INVESTMENTS' and 1 = v_test
+   where inv.id = p_id;
+
+  IF( v_curve IS NOT NULL ) THEN
+    v_return := PFM_SUM_FCT( v_curve, v_start, v_finish );
+  ELSE
+    v_return := 0;
+  END IF;
+
+  RETURN v_return;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

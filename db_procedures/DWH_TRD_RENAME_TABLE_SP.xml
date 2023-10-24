@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>DWH_TRD_RENAME_TABLE_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."DWH_TRD_RENAME_TABLE_SP" 
+AS
+    v_sqlerrm VARCHAR2(4000);
+    v_sqlcode NUMBER;
+	v_object_name VARCHAR2(100);
+    v_sql_text CLOB;
+    v_count NUMBER;
+BEGIN
+    /* Run in PPM database, this renames the trending tables for Postgres */
+    SELECT COUNT(1) INTO v_count FROM user_constraints WHERE constraint_name = 'DWH_TRD_TREND_PK';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_PPM_TRENDS_PK';
+	    v_sql_text := 'ALTER TABLE DWH_TRD_TREND RENAME CONSTRAINT DWH_TRD_TREND_PK TO DWH_TRD_PPM_TRENDS_PK';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_tables WHERE table_name = 'DWH_TRD_TREND';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_PPM_TRENDS';
+	    v_sql_text := 'ALTER TABLE DWH_TRD_TREND RENAME TO DWH_TRD_PPM_TRENDS';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_indexes WHERE index_name = 'DWH_TRD_TREND_PK';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_PPM_TRENDS_PK';
+	    v_sql_text := 'ALTER INDEX DWH_TRD_TREND_PK RENAME TO DWH_TRD_PPM_TRENDS_PK';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_tables WHERE table_name = 'DWH_TRD_META_IDX_PK_FK';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_META_IDX_PK_FKS';
+	    v_sql_text := 'ALTER TABLE DWH_TRD_META_IDX_PK_FK RENAME TO DWH_TRD_META_IDX_PK_FKS';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_indexes WHERE index_name = 'DWH_TRD_META_IDX_PK_FK_U1';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_META_IDX_PK_FKS_U1';
+	    v_sql_text := 'ALTER INDEX DWH_TRD_META_IDX_PK_FK_U1 RENAME TO DWH_TRD_META_IDX_PK_FKS_U1';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_tables WHERE table_name = 'DWH_TRD_META_ODF_IDX_PK_FK';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_META_ODF_IDX_PK_FKS';
+	    v_sql_text := 'ALTER TABLE DWH_TRD_META_ODF_IDX_PK_FK RENAME TO DWH_TRD_META_ODF_IDX_PK_FKS';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+	SELECT COUNT(1) INTO v_count FROM user_indexes WHERE index_name = 'DWH_TRD_META_ODF_IDX_PK_FK_U1';
+	IF v_count = 1 THEN
+	    v_object_name := 'DWH_TRD_META_ODF_IDX_PK_FKS_U1';
+	    v_sql_text := 'ALTER INDEX DWH_TRD_META_ODF_IDX_PK_FK_U1 RENAME TO DWH_TRD_META_ODF_IDX_PK_FKS_U1';
+		EXECUTE IMMEDIATE v_sql_text;
+    END IF; 
+    EXCEPTION
+    WHEN OTHERS THEN
+    BEGIN
+        v_sqlcode := SQLCODE;
+        v_sqlerrm := SQLERRM;
+        RAISE_APPLICATION_ERROR(-20100,'ENCOUNTERED EXCEPTION WHILE RENAMING ' || v_object_name ||'. SQLERRM : ' || v_sqlerrm);
+    END;
+END DWH_TRD_RENAME_TABLE_SP;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_trigger</Code>
+      <Records>
+        <Record>
+          <code>TR_NAMEOPTIONS_UPDATE</code>
+          <table_name>NAMEOPTIONS</table_name>
+          <trigger_type>AFTER EACH ROW</trigger_type>
+          <triggering_event>UPDATE</triggering_event>
+          <column_name xsi:nil="true"/>
+          <referencing_names>REFERENCING NEW AS NEW OLD AS OLD</referencing_names>
+          <when_clause xsi:nil="true"/>
+          <status>ENABLED</status>
+          <description>"PPM"."TR_NAMEOPTIONS_UPDATE" 
+AFTER UPDATE
+ON NAMEOPTIONS
+REFERENCING OLD AS OLD NEW AS NEW
+FOR EACH ROW
+</description>
+          <trigger_body>DECLARE
+  StoO_selcnt         INTEGER;
+  StoO_error          INTEGER;
+  StoO_rowcnt         INTEGER := 1;
+  StoO_crowcnt        INTEGER := 0;
+  StoO_fetchstatus    INTEGER := 0;
+  StoO_errmsg         GLOBALPKG.STRING;
+  StoO_sqlstatus      INTEGER;
+  projchgordersep     GLOBALPKG.STRING;
+  projchgordersep2    GLOBALPKG.STRING;
+  p_locationid        GLOBALPKG.STRING;
+  p_departcode        GLOBALPKG.STRING;
+  p_entity            GLOBALPKG.STRING;
+  country             GLOBALPKG.STRING;
+  projchgordersepnew  GLOBALPKG.STRING;
+  ratematrix          NUMBER(1,0);
+  costplus            NUMBER(1,0);
+  ratematrixnew       NUMBER(1,0);
+  costplusnew         NUMBER(1,0);
+  defaultprojclass    GLOBALPKG.STRING;
+  dfltbillinglocation GLOBALPKG.STRING;
+  internalwip         NUMBER(1,0);
+  holdwip             NUMBER(1,0);
+  allocations         NUMBER(1,0);
+  fiscal_period_name  VARCHAR2(30);
+BEGIN
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT  :NEW.defaultlocation,  :NEW.defaultdepartment,
+		  :NEW.defaultentity,  :NEW.projchgordersep,  :NEW.allow_use_of_costplus,
+		  :NEW.allow_use_of_ratematrix,  :NEW.defaultprojclass,  :NEW.dfltbillinglocation,  :NEW.internalwip,
+      :NEW.holdwip, :NEW.allocations, :NEW.fiscal_period_name
+		INTO p_locationid, p_departcode,
+		 p_entity, projchgordersepnew, costplusnew,
+		 ratematrixnew, defaultprojclass, dfltbillinglocation, internalwip,
+     holdwip, allocations, fiscal_period_name
+   FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+		SELECT   :OLD.projchgordersep,  :OLD.allow_use_of_costplus,
+		  :OLD.allow_use_of_ratematrix
+		INTO projchgordersep, costplus,
+		 ratematrix FROM DUAL;
+		StoO_rowcnt := SQL%ROWCOUNT;
+
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+  IF ratematrixnew = 0 AND ratematrix = 1 THEN
+    BEGIN
+      BEGIN
+        BEGIN
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+        StoO_rowcnt := 0;
+
+        SELECT 1 INTO StoO_selcnt
+        FROM DUAL
+        WHERE  EXISTS (
+          SELECT  MASTER_PROJECT_CODE
+          FROM pac_mnt_projects
+          WHERE ratematrix = 1);
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+        END;
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20566, 'You cannot specify that this system will not use a rate matrix because a PROJECT_CODE is currently using a rate matrix.');
+            RETURN;
+          END;
+        END IF;
+      END;
+    END;
+	END IF;
+
+  IF costplusnew = 0 AND costplus = 1 THEN
+    BEGIN
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  MASTER_PROJECT_CODE
+            FROM pac_mnt_projects
+            WHERE costplus = 1);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20567, 'You cannot specify that this system will not use Cost Plus because a PROJECT_CODE is currently using cost plus.');
+            RETURN;
+          END;
+        END IF;
+      END;
+
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM costplus);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20568, 'You cannot specify that this system will not use Cost Plus because a costpluscode has been defined in the costplus table.');
+            RETURN;
+          END;
+        END IF;
+      END;
+    END;
+	END IF;
+
+  IF (:NEW.internalwip != :OLD.internalwip) AND internalwip = 0 THEN
+    BEGIN
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM pac_mnt_projects
+            WHERE type_ = 'I');
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20570, 'You cannot specify that this system will not use Internal Projects because an Internal PROJECT_CODE already exists.');
+            RETURN;
+          END;
+        END IF;
+      END;
+    END;
+	END IF;
+
+  IF (:NEW.holdwip != :OLD.holdwip) AND holdwip = 0 THEN
+    BEGIN
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM pac_mnt_projects
+            WHERE status = 'H');
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20571, 'You cannot specify that this system will not use PROJECT_CODE Hold because a PROJECT_CODE already exists that is on hold .');
+            RETURN;
+          END;
+        END IF;
+      END;
+    END;
+	END IF;
+
+  IF  (:NEW.projchgordersep != :OLD.projchgordersep) and   projchgordersepnew &lt;&gt; projchgordersep THEN
+    BEGIN
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  1
+            FROM pac_mnt_projects
+            WHERE CHANGEORDER IS NOT NULL );
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20572, 'PROJECT_CODE change order separator cannot be changed once change orders exist in the system.');
+            RETURN;
+          END;
+        END IF;
+      END;
+
+      BEGIN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error  := 0;
+
+        SELECT   projchgordersep
+        INTO projchgordersep FROM nameoptions;
+        StoO_rowcnt := SQL%ROWCOUNT;
+
+        EXCEPTION
+          WHEN TOO_MANY_ROWS THEN
+            StoO_rowcnt := 2;
+          WHEN NO_DATA_FOUND THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+          WHEN OTHERS THEN
+            StoO_rowcnt := 0;
+            StoO_selcnt := 0;
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF projchgordersep IS NOT NULL AND projchgordersep IS NOT NULL THEN
+        projchgordersep2 :=  '%' || projchgordersep || '%';
+      END IF;
+
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE  EXISTS (
+            SELECT  *
+            FROM pac_mnt_projects
+            WHERE MASTER_PROJECT_CODE  LIKE projchgordersep2);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            raise_application_error(-20573, 'A PROJECT_CODE change order separator has to be a unique character that is not already used in the PROJECT_CODE code of the PROJECT_CODE Profile.');
+            RETURN;
+          END;
+        END IF;
+      END;
+    END;
+  END IF;
+
+  IF (:NEW.defaultlocation != :OLD.defaultlocation) AND p_locationid IS NOT NULL AND p_locationid IS NOT NULL THEN
+    BEGIN
+        /*
+        OPEN UF1_cursor;
+        LOOP
+          FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+          EXIT WHEN UF1_cursor%NOTFOUND;
+          BEGIN
+          StoO_error   := 0;
+          StoO_rowcnt  := 0;
+          UPDATE employees
+          SET
+          employees.locationid = UF1_oval1
+          WHERE ROWID = UF1_rowid;
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              NULL;
+            WHEN OTHERS THEN
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+          END;
+        END LOOP;
+        CLOSE UF1_cursor;
+      */
+
+     StoO_error   := 0;
+     StoO_rowcnt  := 0;
+
+     BEGIN
+      /*
+        UPDATE employees
+        SET employees.locationid =  :NEW.defaultlocation
+        WHERE employees.RESOURCE_CODE IN ('PA1', 'PA2')
+        AND :NEW.defaultlocation IS NOT NULL
+        AND employees.locationid = 'INIT';
+      */
+        update PAC_MNT_RESOURCES
+        SET PAC_MNT_RESOURCES.locationid =  :NEW.defaultlocation
+        WHERE PAC_MNT_RESOURCES.RESOURCE_CODE IN ('PA1', 'PA2')
+        AND :NEW.defaultlocation IS NOT NULL
+        AND PAC_MNT_RESOURCES.locationid = 'INIT';
+
+        StoO_rowcnt := SQL%ROWCOUNT;
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            NULL;
+        WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+     END;
+
+
+     IF StoO_error != 0 THEN
+      BEGIN
+          RAISE_APPLICATION_ERROR(-20870,'Trigger forces a rollback ---&gt; '||StoO_error||'::::'||StoO_errMSG);
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF (:NEW.defaultdepartment != :OLD.defaultdepartment) AND p_departcode IS NOT NULL AND p_departcode IS NOT NULL THEN
+    BEGIN
+      /*
+      OPEN UF2_cursor;
+      LOOP
+        FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+        EXIT WHEN UF2_cursor%NOTFOUND;
+        BEGIN
+        StoO_error   := 0;
+        StoO_rowcnt  := 0;
+        UPDATE employees
+        SET
+        employees.departcode = UF2_oval1
+        WHERE ROWID = UF2_rowid;
+        StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+        END;
+      END LOOP;
+      CLOSE UF2_cursor;
+      */
+
+      StoO_error   := 0;
+      StoO_rowcnt  := 0;
+
+      BEGIN
+        /*
+          UPDATE employees
+          SET employees.departcode = :NEW.defaultdepartment
+          WHERE employees.RESOURCE_CODE IN ('PA1', 'PA2')
+          AND :NEW.defaultdepartment IS NOT NULL
+          AND employees.departcode = 'INIT';
+        */
+
+        update PAC_MNT_RESOURCES
+        SET PAC_MNT_RESOURCES.departcode = :NEW.defaultdepartment
+        WHERE PAC_MNT_RESOURCES.RESOURCE_CODE IN ('PA1', 'PA2')
+        AND :NEW.defaultdepartment IS NOT NULL
+        AND PAC_MNT_RESOURCES.departcode = 'INIT';
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          RAISE_APPLICATION_ERROR(-20425,'Trigger forces a rollback');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+  IF (:NEW.defaultprojclass != :OLD.defaultprojclass) AND (defaultprojclass IS NOT NULL AND defaultprojclass IS NOT NULL) THEN
+    BEGIN
+      BEGIN
+        BEGIN
+          StoO_selcnt := 0;
+          StoO_error  := 0;
+          StoO_rowcnt := 0;
+
+          SELECT 1 INTO StoO_selcnt
+          FROM DUAL
+          WHERE NOT EXISTS (
+            SELECT  *
+            FROM projclass
+            WHERE projclass = defaultprojclass);
+
+          StoO_rowcnt := SQL%ROWCOUNT;
+          EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+            WHEN OTHERS THEN
+              StoO_rowcnt := 0;
+              StoO_selcnt := 0;
+              StoO_error := SQLCODE;
+              StoO_errmsg := SQLERRM;
+        END;
+
+        IF StoO_selcnt != 0 THEN
+          BEGIN
+            StoO_error   := 0;
+            StoO_rowcnt  := 0;
+
+            INSERT INTO projclass (projclass, description, shortdesc, database2, burdencode, applyblabor, applybmaterials, applybequipment, applybexpenses, overheadcode, applyolabor, applyomaterials, applyoequipment, applyoexpenses)
+            SELECT  defaultprojclass, 'Default', 'Default', NULL, NULL, 0, 0, 0, 0, NULL, 0, 0, 0, 0 FROM DUAL;
+
+            StoO_rowcnt := SQL%ROWCOUNT;
+            EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+          END;
+        END IF;
+      END;
+
+      IF StoO_error != 0 THEN
+        BEGIN
+          raise_application_error(-20578, 'Unable to insert a record into the Projclass table.');
+          RETURN;
+        END;
+      END IF;
+    END;
+	END IF;
+
+
+  IF allocations = 1 AND fiscal_period_name IS NULL THEN
+    BEGIN
+      raise_application_error(-20579, 'You must select your Fiscal Period to enable allocations.');
+      RETURN;
+    END;
+	END IF;
+
+  /*
+	 Modified By : Sundar.
+	 Modification Date :06/12/2001.
+	 Changes: (1)The variable entity has been changed to p_entity and all its occurances are replaced.
+	 		  (2)The variable locationid has been changed to p_locationid and all its occurances are replaced.
+			  (3)The variable departcode has been changed to p_departcode and all its occurances are replaced.
+
+			  (4)To avoid ORA-01445 error the UF1_cursor and UF2_cursor and its usage are commented and
+			     it is modified with direct update statements.
+
+			  (5) To avoid "ORA-01779 - cannot modify a column which maps to a non key-preserved table" error
+			  	  the updation of RESOURCE_CODE view is modified with the updation of underlying base tables directly.
+	*/
+END tr_nameoptions_update;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</trigger_body>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

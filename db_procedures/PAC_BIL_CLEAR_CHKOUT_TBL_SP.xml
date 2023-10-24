@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_CLEAR_CHKOUT_TBL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_CLEAR_CHKOUT_TBL_SP" (
+cUserID 	VARCHAR2 ,
+iBillingSessionKey 	NUMBER,
+unLockNullSession   NUMBER := 1 )
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	VARCHAR2(255);
+StoO_sqlstatus	INTEGER;
+
+v_iBillingSessionKey NUMBER ;
+BEGIN
+
+	v_iBillingSessionKey := PAC_BIL_CLEAR_CHKOUT_TBL_SP.iBillingSessionKey ;
+
+    IF PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey IS NULL And unLockNullSession = 1 Then
+	   BEGIN
+	   StoO_error   := 0;
+	   StoO_rowcnt  := 0;
+	   SELECT TO_NUMBER(ActionID)
+	     INTO PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey
+	   	 FROM olb_BillingCheckout
+		 WHERE UserID = PAC_BIL_CLEAR_CHKOUT_TBL_SP.cUserID ;
+
+	   EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	   END;
+	End If;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM olb_BillingCheckout
+	WHERE ActionID = RPAD(PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey, 10, ' ');
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM pc_BillingDetailAllocations
+		WHERE BillingSessionKey = PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM pc_BillingSession
+		WHERE BillingSessionKey = PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM PAC_BIL_DETAIL_SUMMARY
+		WHERE BillingSessionKey = PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM TEMP_BILL_ITEM_DETAILS
+		WHERE BillSessionKey = PAC_BIL_CLEAR_CHKOUT_TBL_SP.v_iBillingSessionKey;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+END PAC_BIL_CLEAR_CHKOUT_TBL_SP;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

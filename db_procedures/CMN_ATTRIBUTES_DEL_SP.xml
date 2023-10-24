@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ATTRIBUTES_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ATTRIBUTES_DEL_SP" (
+   p_column_name   cmn_attributes.column_name%TYPE,
+   p_table_name    cmn_attributes.table_name%TYPE,
+   p_pk_id         cmn_attributes.pk_id%TYPE
+)
+IS
+   v_attribute_id   NUMBER;
+BEGIN
+   -- Delete the references to this attribute from all other satellite tables
+   -- cmn_browse_portlet_attributes, cmn_search_portlet_attributes,
+   -- cmn_form_portlet_attributes.
+   SELECT   id
+   INTO     v_attribute_id
+   FROM     cmn_attributes
+   WHERE    table_name = p_table_name
+   AND      pk_id = p_pk_id
+   AND      column_name = p_column_name;
+
+   DELETE
+     FROM cmn_browse_portlet_attributes
+    WHERE attribute_id = v_attribute_id;
+
+   DELETE
+     FROM cmn_search_portlet_attributes
+    WHERE attribute_id = v_attribute_id;
+
+   DELETE
+     FROM cmn_form_portlet_attributes
+    WHERE attribute_id = v_attribute_id;
+
+   DELETE
+     FROM cmn_attributes
+    WHERE table_name = p_table_name
+ AND      pk_id = p_pk_id
+ AND      column_name = p_column_name;
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

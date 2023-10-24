@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>REV_LUP_CLNTCODE_BILL</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."REV_LUP_CLNTCODE_BILL" 
+(
+  in_arg1   IN VARCHAR2  DEFAULT NULL,
+  in_clientname   IN VARCHAR2  DEFAULT NULL,
+  in_location   IN VARCHAR2  DEFAULT NULL,
+  in_togo   IN VARCHAR2  DEFAULT NULL,
+  user_   VARCHAR2  DEFAULT NULL,
+  RC1   IN OUT REV_LUP_CLNTCODE_BILLPkg.RCT1
+)
+AS
+  arg1  GLOBALPKG.STRING;
+  COMPANY_NAME  GLOBALPKG.STRING;
+  location  GLOBALPKG.STRING;
+  togo  GLOBALPKG.STRING;
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  currdate  DATE;
+BEGIN
+/*
+   Called From:
+   Procedure              :- none
+   Trigger                   :- none
+   PMD TransactionId :-
+   WMD ActionId        :-
+   Modified By            :  Sundar
+   Modified Date         :  07/25/2001
+*/
+
+	rev_lup_clntcode_bill.arg1 := rev_lup_clntcode_bill.in_arg1;
+	rev_lup_clntcode_bill.COMPANY_NAME := rev_lup_clntcode_bill.in_clientname;
+	rev_lup_clntcode_bill.location := rev_lup_clntcode_bill.in_location;
+	rev_lup_clntcode_bill.togo := rev_lup_clntcode_bill.in_togo;
+	rev_lup_clntcode_bill.currdate :=  SYSDATE;
+	rev_lup_clntcode_bill.arg1 :=  RTRIM(rev_lup_clntcode_bill.arg1);
+	rev_lup_clntcode_bill.COMPANY_NAME :=  RTRIM(rev_lup_clntcode_bill.COMPANY_NAME);
+	rev_lup_clntcode_bill.location :=  RTRIM(rev_lup_clntcode_bill.location);
+	rev_lup_clntcode_bill.togo :=  RTRIM(rev_lup_clntcode_bill.togo);
+	IF  rev_lup_clntcode_bill.arg1  IN('', 'NULL') THEN
+		rev_lup_clntcode_bill.arg1 :=  NULL;
+	ELSE
+		rev_lup_clntcode_bill.arg1 :=  rev_lup_clntcode_bill.arg1 || '%';
+	END IF;
+	IF  rev_lup_clntcode_bill.location  IN('', 'NULL') THEN
+		rev_lup_clntcode_bill.location :=  NULL;
+	END IF;
+	IF  rev_lup_clntcode_bill.location = ' ALL' THEN
+		rev_lup_clntcode_bill.location :=  NULL;
+	END IF;
+	IF  rev_lup_clntcode_bill.COMPANY_NAME  IN('', 'NULL') THEN
+		rev_lup_clntcode_bill.COMPANY_NAME :=  NULL;
+	ELSE
+		rev_lup_clntcode_bill.COMPANY_NAME :=  rev_lup_clntcode_bill.COMPANY_NAME
+		   || '%';
+	END IF;
+	IF  rev_lup_clntcode_bill.togo IS NULL THEN
+		rev_lup_clntcode_bill.togo :=  NULL;
+	END IF;
+	IF  rev_lup_clntcode_bill.togo = 'Y' THEN
+	BEGIN
+		OPEN RC1 FOR
+		SELECT C.COMPANY_CODE,  C.COMPANY_NAME FROM projstaff PS, clntsupp C
+		WHERE PS.RESOURCE_CODE = rev_lup_clntcode_bill.user_
+		 and PS.projecttogo = 1
+		 and C.COMPANY_CODE = PS.COMPANY_CODE
+		GROUP BY C.COMPANY_CODE, C.COMPANY_NAME
+		ORDER BY 1 ;
+	END;
+	ELSE
+		IF  rev_lup_clntcode_bill.arg1 IS NULL THEN
+		BEGIN
+			IF  rev_lup_clntcode_bill.COMPANY_NAME IS NULL THEN
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE clntsupp.status_type = 1
+				 AND clntsupp.locationid = NVL(rev_lup_clntcode_bill.location,
+				   clntsupp.locationid)
+				ORDER BY 1 ;
+			ELSE
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE clntsupp.status_type = 1
+				 AND clntsupp.locationid = NVL(rev_lup_clntcode_bill.location,
+				   clntsupp.locationid)
+				 AND clntsupp.COMPANY_NAME  LIKE rev_lup_clntcode_bill.COMPANY_NAME
+				ORDER BY 2 ;
+			END IF;
+		END;
+		ELSE
+		BEGIN
+			IF  rev_lup_clntcode_bill.COMPANY_NAME IS NULL THEN
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE clntsupp.status_type = 1
+				 AND clntsupp.locationid = NVL(rev_lup_clntcode_bill.location,
+				   clntsupp.locationid)
+				 AND clntsupp.COMPANY_CODE  LIKE rev_lup_clntcode_bill.arg1
+				ORDER BY 1 ;
+			ELSE
+				OPEN RC1 FOR
+				SELECT clntsupp.COMPANY_CODE,  clntsupp.COMPANY_NAME FROM clntsupp
+				WHERE clntsupp.status_type = 1
+				 AND clntsupp.locationid = NVL(rev_lup_clntcode_bill.location,
+				   clntsupp.locationid)
+				 AND clntsupp.COMPANY_CODE  LIKE rev_lup_clntcode_bill.arg1
+				 AND clntsupp.COMPANY_NAME  LIKE rev_lup_clntcode_bill.COMPANY_NAME
+				ORDER BY 1 ;
+			END IF;
+		END;
+		END IF;
+		END IF;
+END rev_lup_clntcode_bill;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

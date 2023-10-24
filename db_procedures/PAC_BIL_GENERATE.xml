@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_BIL_GENERATE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_BIL_GENERATE" (
+  cUserID          VARCHAR2,
+  iBillSessionKey  NUMBER,
+  bApprove         NUMBER  DEFAULT 0,
+  dBillDate        DATE,
+  iRetainPrecisionMode NUMBER DEFAULT 1) -- retain precision change
+AS
+  StoO_selcnt      INTEGER;
+  StoO_error       INTEGER;
+  StoO_rowcnt      INTEGER;
+  StoO_crowcnt     INTEGER := 0;
+  StoO_fetchstatus INTEGER := 0;
+  StoO_errmsg      VARCHAR2(255);
+  StoO_sqlstatus   INTEGER;
+  cInvoiceNo       VARCHAR2(16);
+  cCOMPANY_CODE    VARCHAR2(30);
+  v_dBillDate      DATE;
+
+  currencyPrecisionBilling CMN_CURRENCIES.CURRENCY_PRECISION%type;
+  BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  iAllowNegativeIvoices NUMBER;
+  iCurrentBatchNumber NUMBER;
+  nTotalBillAmount  NUMBER;
+  v_SubProjectAmount  NUMBER;
+  v_NextHigherProjectID NUMBER;
+  v_TopProjectID      NUMBER;
+  v_CurrProjectID     NUMBER;
+  v_CurrProjectCode   GLOBALPKG.STRING;
+  v_EnforceContractAmount NUMBER;
+  v_ProjectCodeForBillingProject GLOBALPKG.STRING;
+  v_ProjectTitle GLOBALPKG.STRING;
+
+  CURSOR LOAD_TOP_LEVEL_PROJECTS_CSR IS
+      SELECT P.ID,
+          SUM( A.BillAmount )
+      FROM pc_BillingDetailAllocations A,
+        PAC_MNT_PROJECTS P
+      WHERE A.BillingSessionKey = PAC_BIL_GENERATE.iBillSessionKey AND
+          A.COMPANY_CODE = P.COMPANY_CODE AND
+          A.PROJECT_CODE = P.PROJECT_CODE AND
+          P.ID != NVL( P.BILLING_PROJECT_ID, P.ID ) AND
+          P.Type_ IN ( 'P', 'S' )
+      GROUP BY P.ID ;
+
+BEGIN
+	PAC_BIL_GENERATE.v_dBillDate := PAC_BIL_GENERATE.dBillDate;
+
+	DELETE FROM temp_ContractCheckpc_BillingGe;
+
+	SELECT Billing_Currency_Code
+	  INTO BillingCurrencyCode
+	  FROM PC_BillingSession
+	  WHERE BillingSessionKey = iBillSessionKey;
+
+  currencyPrecisionBilling := 0;
+
+	currencyPrecisionBilling := CMN_EXCHANGERATE_PKG.CMN_GET_CURRENCY_PRECISION_FCT( BillingCurrencyCode );
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+
+    SELECT COMPANY_CODE
+      INTO PAC_BIL_GENERATE.cCOMPANY_CODE FROM pc_BillingSession
+     WHERE BillingSessionKey = PAC_BIL_GENERATE.iBillSessionKey
+       and UserID = PAC_BIL_GENERATE.cUserID;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN TOO_MANY_ROWS THEN
+        StoO_rowcnt := 2;
+      WHEN NO_DATA_FOUND THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+      WHEN OTHERS THEN
+        StoO_rowcnt := 0;
+        StoO_selcnt := 0;
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  IF StoO_rowcnt = 0 or PAC_BIL_GENERATE.cCOMPANY_CODE IS NULL THEN
+    RETURN;
+	END IF;
+
+	/*  First insert only Top Level Projects into temp table for contracts and standards with Enforce Contract Amount turned on */
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO temp_ContractCheckpc_BillingGe (COMPANY_CODE, PROJECT_CODE, BillAmount, Matchable, SeqNo, PROJECT_ID, BILLING_PROJECT_ID)
+    SELECT A.COMPANY_CODE, A.PROJECT_CODE, SUM(A.BillAmount), 0,  1, P.ID, P.BILLING_PROJECT_ID
+      FROM pc_BillingDetailAllocations A,
+           PROJCNTRTS PC,
+           PAC_MNT_PROJECTS P
+     WHERE A.BillingSessionKey = PAC_BIL_GENERATE.iBillSessionKey
+       AND A.COMPANY_CODE = PC.COMPANY_CODE
+       AND A.PROJECT_CODE = PC.PROJECT_CODE
+       AND A.COMPANY_CODE = P.COMPANY_CODE
+       AND A.PROJECT_CODE = P.PROJECT_CODE
+       AND NVL( P.BILLING_PROJECT_ID, P.ID ) = P.ID
+       AND A.BillAmount != 0
+       AND ( A.ProjectType = 'P' OR  ( A.ProjectType = 'S' AND PC.ENFORCE_CONTRACT_AMOUNT = 1))
+  GROUP BY A.COMPANY_CODE,
+           A.PROJECT_CODE,
+           P.ID,
+           P.BILLING_PROJECT_ID ;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+	/* We will loop through all the sub billing level projects and find the top level project. If one exists
+	   we shall add to the total. If it does not exist, we will insert a new record. This is only for Contracts
+	   and Standards with Enforce Contract Amount turned on */
+
+	OPEN LOAD_TOP_LEVEL_PROJECTS_CSR;
+	  LOOP
+		FETCH LOAD_TOP_LEVEL_PROJECTS_CSR INTO v_CurrProjectID,
+			  							  	   v_SubProjectAmount ;
+		EXIT WHEN LOAD_TOP_LEVEL_PROJECTS_CSR%NOTFOUND;
+
+    BEGIN
+		  /* Get Top Level Billing Project */
+		  PAC_BIL_GET_BILLING_PROJECT_SP( v_CurrProjectID, v_ProjectCodeForBillingProject, v_EnforceContractAmount, v_ProjectTitle ) ;
+
+		  /* Only process it if it's a Contract or Standard with Enforce Contract Amount on */
+		  BEGIN
+		    SELECT 1
+              INTO StoO_selcnt
+              FROM DUAL
+              WHERE EXISTS(SELECT 1
+                             FROM PAC_MNT_PROJECTS P,
+                                  PROJCNTRTS PC
+                            WHERE P.COMPANY_CODE = PAC_BIL_GENERATE.cCOMPANY_CODE
+                              AND P.PROJECT_CODE = PAC_BIL_GENERATE.v_ProjectCodeForBillingProject
+                              AND P.COMPANY_CODE = PC.COMPANY_CODE
+                              AND P.PROJECT_CODE = PC.PROJECT_CODE
+                              AND ( TYPE_ = 'P' OR(TYPE_ = 'S' AND PC.ENFORCE_CONTRACT_AMOUNT = 1 )));
+
+	        StoO_rowcnt := SQL%ROWCOUNT;
+	        EXCEPTION
+		    WHEN TOO_MANY_ROWS THEN
+		      NULL;
+		    WHEN NO_DATA_FOUND THEN
+		      StoO_rowcnt := 0;
+			  StoO_selcnt := 0;
+		    WHEN OTHERS THEN
+		      StoO_rowcnt := 0;
+		      StoO_selcnt := 0;
+		      StoO_error := SQLCODE;
+		      StoO_errmsg := SQLERRM;
+		  END;
+
+		  IF StoO_selcnt &gt; 0 Then
+		    BEGIN
+		      BEGIN
+		        SELECT 1
+                  INTO StoO_selcnt
+                  FROM DUAL
+                  WHERE EXISTS(SELECT 1
+                                 FROM temp_ContractCheckpc_BillingGe
+                                 WHERE COMPANY_CODE = PAC_BIL_GENERATE.cCOMPANY_CODE
+                                   AND PROJECT_CODE = PAC_BIL_GENERATE.v_ProjectCodeForBillingProject );
+
+	            StoO_rowcnt := SQL%ROWCOUNT;
+	            EXCEPTION
+		        WHEN TOO_MANY_ROWS THEN
+		          NULL;
+		        WHEN NO_DATA_FOUND THEN
+		          StoO_rowcnt := 0;
+			      StoO_selcnt := 0;
+		        WHEN OTHERS THEN
+		          StoO_rowcnt := 0;
+		          StoO_selcnt := 0;
+		          StoO_error := SQLCODE;
+		          StoO_errmsg := SQLERRM;
+		      END;
+
+		      IF StoO_selcnt = 0 Then
+		        BEGIN
+              StoO_error   := 0;
+              StoO_rowcnt  := 0;
+
+              INSERT INTO temp_ContractCheckpc_BillingGe (COMPANY_CODE, PROJECT_CODE, BillAmount,
+                                    Matchable, SeqNo, PROJECT_ID, BILLING_PROJECT_ID)
+                  SELECT  PAC_BIL_GENERATE.cCOMPANY_CODE, PAC_BIL_GENERATE.v_ProjectCodeForBillingProject, v_SubProjectAmount,
+                  0,  1, P.ID, P.BILLING_PROJECT_ID
+                FROM PAC_MNT_PROJECTS P
+                WHERE PAC_BIL_GENERATE.cCOMPANY_CODE = P.COMPANY_CODE
+                  and PAC_BIL_GENERATE.v_ProjectCodeForBillingProject = P.PROJECT_CODE ;
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+			    END;
+			  ELSE
+		        BEGIN
+              StoO_error   := 0;
+              StoO_rowcnt  := 0;
+              UPDATE temp_ContractCheckpc_BillingGe
+              SET BillAmount = BillAmount + NVL( v_SubProjectAmount, 0)
+              WHERE COMPANY_CODE = PAC_BIL_GENERATE.cCOMPANY_CODE AND
+                PROJECT_CODE = PAC_BIL_GENERATE.v_ProjectCodeForBillingProject ;
+
+              StoO_rowcnt := SQL%ROWCOUNT;
+              EXCEPTION
+              WHEN NO_DATA_FOUND THEN
+                NULL;
+              WHEN OTHERS THEN
+                StoO_error := SQLCODE;
+                StoO_errmsg := SQLERRM;
+            END;
+		      End IF;
+        END ;
+		  END IF;
+    END;
+
+	  END LOOP ;
+	CLOSE LOAD_TOP_LEVEL_PROJECTS_CSR ;
+
+	BEGIN
+ 	  StoO_selcnt := 0;
+	  StoO_error  := 0;
+	  StoO_rowcnt := 0;
+
+    SELECT 1 INTO StoO_selcnt
+		FROM DUAL
+		WHERE  EXISTS (
+			SELECT  1
+        FROM temp_ContractCheckpc_BillingGe B,
+             pac_mnt_projects P,
+             projcntrts C
+       WHERE B.SeqNo = 1
+         AND P.COMPANY_CODE = B.COMPANY_CODE
+         AND P.PROJECT_CODE = B.PROJECT_CODE
+         AND C.COMPANY_CODE = P.COMPANY_CODE
+         AND C.PROJECT_CODE = P.PROJECT_CODE
+         AND NVL(C.contractamount, 0) &gt; 0
+         AND B.BillAmount + NVL(P.amountbilled, 0) &gt; C.contractamount );
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+
+	IF StoO_selcnt != 0 THEN
+	  raise_application_error(-20830, 'You may not bill more than the contract amount.');
+	  RETURN ;
+	END IF;
+
+  PAC_BIL_GENERATE.cInvoiceNo := SUBSTR(RTRIM(PAC_BIL_GENERATE.cCOMPANY_CODE)
+	   || TO_CHAR(SYSDATE,'yyyymmdd') || PAC_BIL_GENERATE.iBillSessionKey,
+	   LENGTH(RTRIM(PAC_BIL_GENERATE.cCOMPANY_CODE) || TO_CHAR(SYSDATE,'yyyymmdd')
+	   || PAC_BIL_GENERATE.iBillSessionKey) -  16 + 1,  16);
+
+	BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    DELETE FROM olb_GenerateInfo
+     WHERE UserID = PAC_BIL_GENERATE.cUserID
+       AND GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    INSERT INTO olb_GenerateInfo
+          (UserID, GroupNo, WTransNo, BillAmt, AdjAmt, BillUnits, BillRate,
+            BillFlags, BillDate, AmtRemain, Quantity, TotalAmt, QtyRemain)
+    SELECT PAC_BIL_GENERATE.cUserID, PAC_BIL_GENERATE.cInvoiceNo,
+          TransNo, BillAmount, AdjustAmount, 0, Rate, BillFlags,
+          NVL(PAC_BIL_GENERATE.v_dBillDate, SYSDATE), AmountRemaining, Quantity, TotalAmount, Quantity
+      FROM pc_BillingDetailAllocations
+    WHERE BillingSessionKey = PAC_BIL_GENERATE.iBillSessionKey
+      AND (BillAmount != 0 or AdjustAmount != 0);
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE olb_GenerateInfo
+      SET QtyRemain = (SELECT olb_GenerateInfo.Quantity - NVL(SUM(B.QUANTITY), 0)
+                         FROM PPA_BILLINGS B
+                        WHERE olb_GenerateInfo.WTRANSNO  = B.APPLYTO
+                          AND B.TRANSTYPE = 'B'
+                          AND B.STATUS = 0)
+      WHERE UserID = PAC_BIL_GENERATE.cUserID AND
+            GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+    
+      /* first, take care of the scenario where bill != adjust and AdjAmt is zero see CLRT-25128 which also stops rounding of BillUnits */
+     UPDATE olb_GenerateInfo
+       SET BillUnits = ABS((BillAmt - AdjAmt)/AmtRemain) * QtyRemain,
+           BillRate =  DECODE(iRetainPrecisionMode, 1, -- retain precision change 
+		   			   	ROUND( BillRate, currencyPrecisionBilling),
+						BillRate
+					   )		 	 
+     WHERE BillAmt != AdjAmt
+       AND AdjAmt = 0
+       AND UserID = PAC_BIL_GENERATE.cUserID
+       AND GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+	
+	/* take care of the scenario where bill != adjust and AdjAmt is non-zero */
+    UPDATE olb_GenerateInfo
+       SET BillUnits = ABS((BillAmt - AdjAmt)/AmtRemain) * QtyRemain,
+           BillRate =  DECODE(iRetainPrecisionMode, 1, -- retain precision change 
+		   			   	ROUND( ABS(BillAmt/(BillAmt - AdjAmt + (1 - ABS(1 * SIGN(BillAmt - AdjAmt)))) *
+                             (AmtRemain/(QtyRemain + (1 - ABS(1 * SIGN(QtyRemain)))))), currencyPrecisionBilling),
+						ABS(BillAmt/(BillAmt - AdjAmt + (1 - ABS(1 * SIGN(BillAmt - AdjAmt)))) *
+                             (AmtRemain/(QtyRemain + (1 - ABS(1 * SIGN(QtyRemain))))))
+					   )		 	 
+     WHERE BillAmt != AdjAmt
+       AND AdjAmt != 0
+       AND UserID = PAC_BIL_GENERATE.cUserID
+       AND GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  /* second, take care of the scenario where the bill amount = the adjust amount */
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE olb_GenerateInfo
+       SET BillUnits = 0,
+           BillRate = BillAmt
+     WHERE BillAmt = AdjAmt
+       AND UserID = PAC_BIL_GENERATE.cUserID
+       AND GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  /* third, if we are writing off the amount remaining, create a B for the quantity remaining */
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    UPDATE olb_GenerateInfo
+       SET BillUnits = QtyRemain,
+           BillRate = 0
+     WHERE BillAmt = 0
+       AND AdjAmt * -1 = AmtRemain
+       AND UserID = PAC_BIL_GENERATE.cUserID
+       AND GroupNo = PAC_BIL_GENERATE.cInvoiceNo;
+
+    StoO_rowcnt := SQL%ROWCOUNT;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        NULL;
+      WHEN OTHERS THEN
+        StoO_error := SQLCODE;
+        StoO_errmsg := SQLERRM;
+	END;
+
+  /* save the billings */
+  BEGIN
+    StoO_error   := 0;
+    StoO_rowcnt  := 0;
+
+    olb_SaveTrans(PAC_BIL_GENERATE.cUserID, PAC_BIL_GENERATE.cInvoiceNo, iRetainPrecisionMode); -- retain precision change
+
+    EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+				raise_application_error(StoO_error, StoO_errmsg);
+				RETURN;
+  END;
+
+  /* clean up the check-out table we used so no one else could bill these same transactions */
+  IF StoO_error = 0 THEN
+	BEGIN
+		BEGIN
+      PAC_BIL_CLEAR_CHKOUT_TBL_SP(PAC_BIL_GENERATE.cUserID,  PAC_BIL_GENERATE.iBillSessionKey);
+
+      EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+          NULL;
+        WHEN OTHERS THEN
+          StoO_error := SQLCODE;
+          StoO_errmsg := SQLERRM;
+          raise_application_error(StoO_error, StoO_errmsg);
+          RETURN;
+		END;
+
+  /* if these billing decisions are pre-approved, then go ahead and approve them... */
+  IF PAC_BIL_GENERATE.bApprove != 0 THEN
+		BEGIN
+			BEGIN
+        REV_BILL_FINALAPP_POSTTOWIP(PAC_BIL_GENERATE.cInvoiceNo, PAC_BIL_GENERATE.cUserID);
+
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+            NULL;
+          WHEN OTHERS THEN
+            StoO_error := SQLCODE;
+            StoO_errmsg := SQLERRM;
+            raise_application_error(StoO_error, StoO_errmsg);
+            RETURN;
+			END;
+		END;
+		END IF;
+	END;
+	END IF;
+	NULL;
+END PAC_BIL_GENERATE;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

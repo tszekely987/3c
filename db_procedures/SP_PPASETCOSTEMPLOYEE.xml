@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_PPASETCOSTEMPLOYEE</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_PPASETCOSTEMPLOYEE" (
+costlevel 	NUMBER ,
+emplylevel 	NUMBER ,
+costkeylevel3 	IN OUT VARCHAR2,
+COSTKEYLVL4_RESOURCE_CODE 	IN OUT VARCHAR2,
+costkeylevel6 	IN OUT VARCHAR2,
+costkeylevel7 	IN OUT VARCHAR2,
+input_type   IN OUT VARCHAR2,
+RESOURCE_CODE 	IN OUT VARCHAR2,
+charge_code  IN OUT VARCHAR2)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+defaultcharge_code   GLOBALPKG.STRING;
+defaultresource   GLOBALPKG.STRING;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Tarun
+   Modified Date : 07/25/2001
+*/
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+    INTO sp_ppasetcostemployee.defaultcharge_code
+    FROM default_costkey_values
+		WHERE costkey_level = sp_ppasetcostemployee.costlevel;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	IF  TRIM(sp_ppasetcostemployee.costkeylevel3) IS NULL THEN
+		sp_ppasetcostemployee.costkeylevel3 :=  NULL;
+	END IF;
+	IF  TRIM(sp_ppasetcostemployee.COSTKEYLVL4_RESOURCE_CODE) IS NULL THEN
+		sp_ppasetcostemployee.COSTKEYLVL4_RESOURCE_CODE :=  NULL;
+	END IF;
+	IF  TRIM(sp_ppasetcostemployee.costkeylevel6) IS NULL THEN
+		sp_ppasetcostemployee.costkeylevel6 :=  NULL;
+	END IF;
+	IF  TRIM(sp_ppasetcostemployee.costkeylevel7) IS NULL THEN
+		sp_ppasetcostemployee.costkeylevel7 :=  NULL;
+	END IF;
+  IF  TRIM(sp_ppasetcostemployee.input_type) IS NULL THEN
+    sp_ppasetcostemployee.input_type :=  NULL;
+	END IF;
+	sp_ppasetcostemployee.costkeylevel3 :=  NVL(sp_ppasetcostemployee.costkeylevel3,
+                      sp_ppasetcostemployee.defaultcharge_code);
+  sp_ppasetcostemployee.charge_code :=  sp_ppasetcostemployee.costkeylevel3;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   default_value
+    INTO sp_ppasetcostemployee.defaultresource FROM default_costkey_values
+		WHERE costkey_level = sp_ppasetcostemployee.emplylevel;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	sp_ppasetcostemployee.COSTKEYLVL4_RESOURCE_CODE :=  NVL(sp_ppasetcostemployee.COSTKEYLVL4_RESOURCE_CODE,
+                      sp_ppasetcostemployee.defaultresource);
+	sp_ppasetcostemployee.RESOURCE_CODE :=  sp_ppasetcostemployee.COSTKEYLVL4_RESOURCE_CODE;
+END sp_ppasetcostemployee;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PFM_RESEQUENCE_RANK_EDITS_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PFM_RESEQUENCE_RANK_EDITS_SP" (
+   v_portfolio_id IN NUMBER,
+   v_plan_id IN NUMBER,
+   v_user_id IN NUMBER,
+   v_direction in varchar
+  )
+AUTHID CURRENT_USER IS
+   v_new_rank number := 0;
+   v_count number := 0;
+   seq_name varchar(100) := 'PFM' || to_char(v_portfolio_id) || to_char(v_plan_id) || to_char(v_user_id);
+   sql_stmt varchar(1000) := null;
+BEGIN
+   delete from temp_pfm_rank_edits where  portfolio_id=v_portfolio_id and plan_id=v_plan_id and user_id=v_user_id;
+   sql_stmt := 'drop sequence ' || seq_name;
+   select count(*) into v_count from all_objects where object_type='SEQUENCE' and object_name=seq_name;
+   if (v_count &gt; 0) then
+   select count(*) into v_count from all_objects where object_type='SEQUENCE' and object_name=seq_name;
+   if (v_count &gt; 0) then
+     execute immediate sql_stmt;
+   end if;
+   end if;
+
+   sql_stmt := 'create sequence ' || seq_name || ' minvalue 1 maxvalue 9999999999 start with 1 increment by 1';
+   execute immediate sql_stmt;
+   if (v_direction = 'asc') then
+       begin
+         insert into temp_pfm_rank_edits (portfolio_id, plan_id, user_id, instance_id, rank, is_new, temp_rank, created_date, created_by, last_updated_date, last_updated_by)
+           select ranks.portfolio_id, ranks.plan_id, ranks.user_id, ranks.instance_id, ranks.rank, ranks.is_new, 0, ranks.created_date, ranks.created_by, ranks.last_updated_date, ranks.last_updated_by
+             from
+              (select row_number() over( order by rank, last_updated_date asc, temp_rank asc) as new_rank
+                , r.*
+                from pfm_rank_edits r where r.portfolio_id=v_portfolio_id and r.plan_id=v_plan_id and r.user_id=v_user_id and rank &gt; 0) ranks
+                order by rank, last_updated_date asc, temp_rank asc;
+        end;
+    else
+        begin
+         insert into temp_pfm_rank_edits (portfolio_id, plan_id, user_id, instance_id, rank, is_new, temp_rank, created_date, created_by, last_updated_date, last_updated_by)
+           select ranks.portfolio_id, ranks.plan_id, ranks.user_id, ranks.instance_id, ranks.rank, ranks.is_new, 0, ranks.created_date, ranks.created_by, ranks.last_updated_date,ranks.last_updated_by
+             from
+              (select row_number() over( order by rank, last_updated_date desc, temp_rank desc) as new_rank
+                , r.*
+                from pfm_rank_edits r where r.portfolio_id=v_portfolio_id and r.plan_id=v_plan_id and r.user_id=v_user_id and rank &gt; 0) ranks
+                order by rank, last_updated_date desc, temp_rank desc;
+        end;
+    end if;
+   delete from pfm_rank_edits where portfolio_id=v_portfolio_id and plan_id=v_plan_id and user_id=v_user_id and rank &gt; 0;
+
+   insert into pfm_rank_edits (portfolio_id, plan_id, user_id, instance_id, rank, is_new, temp_rank, created_date, created_by, last_updated_date, last_updated_by)
+    select portfolio_id, plan_id, user_id, instance_id, rank, is_new, temp_rank, created_date, created_by, last_updated_date, last_updated_by from temp_pfm_rank_edits
+     where portfolio_id=v_portfolio_id and plan_id=v_plan_id and user_id=v_user_id;
+
+   delete from temp_pfm_rank_edits where  portfolio_id=v_portfolio_id and plan_id=v_plan_id and user_id=v_user_id;
+   sql_stmt := 'drop sequence ' || seq_name;
+   execute immediate sql_stmt;
+
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

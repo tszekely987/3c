@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_ACTION_DEL_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_ACTION_DEL_SP" (
+   P_ACTION_CODE  		IN   VARCHAR2
+)
+IS
+   V_ACTION_COUNT       NUMBER;
+   V_ACTION_ID          NUMBER;
+   V_PARAMETER_ID		NUMBER;
+   CURSOR C_ACTION_PARAMS (CP_ACTION_CODE VARCHAR2)
+   IS
+      SELECT   CMN_ACTION_PARAMS.ID,
+               CMN_ACTION_PARAMS.PARAMETER_CODE
+      FROM     CMN_ACTIONS, CMN_ACTION_PARAMS
+      WHERE    CMN_ACTIONS.ACTION_CODE = CP_ACTION_CODE
+	  AND	   CMN_ACTION_PARAMS.ACTION_ID = CMN_ACTIONS.ID;
+BEGIN
+
+	-- CHECK IF ACTION EXISTS FIRST
+
+	SELECT	 COUNT (*)
+	INTO     V_ACTION_COUNT
+	FROM     CMN_ACTIONS
+	WHERE    ACTION_CODE = P_ACTION_CODE;
+
+  	IF V_ACTION_COUNT = 0 THEN
+  	  NULL;
+  	ELSE
+  	
+    	-- GET ACTION ID
+    	BEGIN
+		 SELECT  ID
+		 INTO    V_ACTION_ID
+		 FROM    CMN_ACTIONS
+		 WHERE   ACTION_CODE = P_ACTION_CODE;
+		 EXCEPTION
+			WHEN OTHERS THEN
+				NULL;
+     	END;
+
+
+    	-- DELETE PARAMETERS AND CAPTIONS
+    	BEGIN
+	   	 FOR C_ACTION_PARAM_REC IN C_ACTION_PARAMS(P_ACTION_CODE) LOOP
+
+    		 	 -- DELETE PARAMETER CAPTIONS
+	    		 CMN_CAPTIONS_NLS_DEL_SP('CMN_ACTION_PARAMS', C_ACTION_PARAM_REC.ID);
+
+    			 -- DELETE PARAMETER
+    			 DELETE
+    			 FROM  	   CMN_ACTION_PARAMS
+    			 WHERE	   ID = C_ACTION_PARAM_REC.ID;
+
+    		 END LOOP;
+    	END;
+
+    	-- DELETE ACTION AND CAPTIONS
+    	CMN_CAPTIONS_NLS_DEL_SP( 'CMN_ACTIONS', V_ACTION_ID );
+
+    	DELETE
+    	FROM   CMN_ACTIONS
+    	WHERE  ID = V_ACTION_ID;
+
+  	END IF;
+
+
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

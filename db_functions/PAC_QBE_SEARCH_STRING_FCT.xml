@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>PAC_QBE_SEARCH_STRING_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."PAC_QBE_SEARCH_STRING_FCT" 
+ (P_SEARCH_STRING VARCHAR2)
+  RETURN VARCHAR2
+IS
+  V_RETURN_VALUE    VARCHAR2(255);
+  V_POSITION        NUMBER;
+BEGIN
+  SELECT NVL(TRIM(P_SEARCH_STRING), '%')
+    INTO V_RETURN_VALUE
+    FROM DUAL;
+
+  V_POSITION := INSTR(V_RETURN_VALUE, '*', 1);
+  WHILE V_POSITION &gt; 0
+    LOOP
+      V_RETURN_VALUE := CMN_REPLACE_FCT(V_RETURN_VALUE, V_POSITION, 1, '%');
+
+      V_POSITION := INSTR(V_RETURN_VALUE, '*', 1);
+    END LOOP;
+
+  IF SUBSTR(V_RETURN_VALUE, LENGTH(V_RETURN_VALUE), 1) != '%' THEN
+    V_RETURN_VALUE := V_RETURN_VALUE || '%';
+  END IF;
+
+  RETURN NLS_UPPER(V_RETURN_VALUE);
+END;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>RPT_PROGRAM_HIERARCHY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."RPT_PROGRAM_HIERARCHY_SP" 
+AS
+    v_program_id1 NUMERIC;
+    v_program_id2 NUMERIC;
+    v_program_id3 NUMERIC;
+    v_project_id NUMERIC;
+    v_is_program NUMERIC;
+    v_level NUMERIC;
+    v_found INTEGER;
+BEGIN
+    BEGIN
+    DELETE FROM rpt_program_hierarchy WHERE 1=1;
+    EXCEPTION
+    WHEN OTHERS THEN
+        BEGIN
+            ROLLBACK;
+            GOTO Output;
+        END;
+    END;
+    COMMIT;
+
+    BEGIN
+    INSERT INTO rpt_program_hierarchy
+    SELECT p.prID, p.prID, p.is_program, 1
+    FROM   inv_projects p
+    WHERE  1=1;
+    EXCEPTION
+    WHEN OTHERS THEN
+        BEGIN
+            ROLLBACK;
+            GOTO Output;
+        END;
+    END;
+    COMMIT;
+
+    DECLARE CURSOR cursor1 IS
+    SELECT z.program_id, s.prRefProjectID project_id, p.is_program, 2
+    FROM   rpt_program_hierarchy z, prTask t, prSubProject s, inv_projects p
+    WHERE  z.program_id = t.prProjectID
+    AND    t.prID = s.prTaskID
+    AND    s.prRefProjectID = p.prID;
+    BEGIN
+    OPEN cursor1;
+    LOOP
+        FETCH cursor1 INTO v_program_id1, v_project_id, v_is_program, v_level;
+        EXIT WHEN cursor1%NOTFOUND;
+        IF rpt_program_hierarchy_ins_fct (v_program_id1, v_project_id, v_is_program, v_level) = -1 THEN
+            GOTO Output;
+        END IF;
+    END LOOP;
+    COMMIT;
+    END;
+
+    DECLARE CURSOR cursor2 IS
+    SELECT z.program_id, s.prRefProjectID, p.is_program, 3
+    FROM   rpt_program_hierarchy z, prTask t, prSubProject s, inv_projects p
+    WHERE  z.project_id = t.prProjectID
+    AND    t.prID = s.prTaskID
+    AND    s.prRefProjectID = p.prID
+    AND    z.the_level = 2;
+    BEGIN
+    OPEN cursor2;
+    LOOP
+        FETCH cursor2 INTO v_program_id1, v_project_id, v_is_program, v_level;
+        EXIT WHEN cursor2%NOTFOUND;
+        IF rpt_program_hierarchy_ins_fct (v_program_id1, v_project_id, v_is_program, v_level) = -1 THEN
+            GOTO Output;
+        END IF;
+    END LOOP;
+    COMMIT;
+    END;
+
+    DECLARE CURSOR cursor3 IS
+    SELECT z.program_id, s.prRefProjectID, p.is_program, 4
+    FROM   rpt_program_hierarchy z, prTask t, prSubProject s, inv_projects p
+    WHERE  z.project_id = t.prProjectID
+    AND    t.prID = s.prTaskID
+    AND    s.prRefProjectID = p.prID
+    AND    z.the_level = 3;
+    BEGIN
+    OPEN cursor3;
+    LOOP
+        FETCH cursor3 INTO v_program_id1, v_project_id, v_is_program, v_level;
+        EXIT WHEN cursor3%NOTFOUND;
+        IF rpt_program_hierarchy_ins_fct (v_program_id1, v_project_id, v_is_program, v_level) = -1 THEN
+            GOTO Output;
+        END IF;
+    END LOOP;
+    COMMIT;
+    END;
+
+    DECLARE CURSOR cursor4 IS
+    SELECT z.program_id, s.prRefProjectID, p.is_program, 5
+    FROM   rpt_program_hierarchy z, prTask t, prSubProject s, inv_projects p
+    WHERE  z.project_id = t.prProjectID
+    AND    t.prID = s.prTaskID
+    AND    s.prRefProjectID = p.prID
+    AND    z.the_level = 4;
+    BEGIN
+    OPEN cursor4;
+    LOOP
+        FETCH cursor4 INTO v_program_id1, v_project_id, v_is_program, v_level;
+        EXIT WHEN cursor4%NOTFOUND;
+        IF rpt_program_hierarchy_ins_fct (v_program_id1, v_project_id, v_is_program, v_level) = -1 THEN
+            GOTO Output;
+        END IF;
+    END LOOP;
+    COMMIT;
+    END;
+    &lt;&lt;Output&gt;&gt;
+    RETURN;
+END rpt_program_hierarchy_sp;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

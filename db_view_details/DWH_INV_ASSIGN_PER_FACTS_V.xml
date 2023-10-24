@@ -1,0 +1,155 @@
+<ClarityDBViewQuery>
+  <QueryResult code="DWH_INV_ASSIGN_PER_FACTS_V">
+    <indexes/>
+    <text_length>8104</text_length>
+    <text>SELECT s.prj_object_id assignment_key,
+           CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) 
+                ELSE CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+           CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END actual_hours,
+           CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END etc_hours,
+           CASE WHEN sk.field_type = 1 THEN s.slice
+                WHEN sk.field_type = 2 THEN s.slice
+                ELSE 0 END eac_hours,
+           0 base_hours,
+           CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END actual_cost,
+           CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END etc_cost,
+           CASE WHEN sk.field_type = 3 THEN s.slice
+                WHEN sk.field_type = 4 THEN s.slice
+                ELSE 0 END eac_cost,
+           0 base_cost,
+           a.last_updated_date clarity_updated_date
+    FROM  (SELECT id request_key,
+                  CASE WHEN request_name = 'MONTHLYRESOURCEACTCURVE' THEN 1
+                       WHEN request_name = 'MONTHLYRESOURCEESTCURVE' THEN 2
+                       WHEN request_name LIKE 'assignment::actcost_curve%' THEN 3
+                       WHEN request_name LIKE 'assignment::etccost_curve%' THEN 4
+                  END field_type,
+                  CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+           FROM   prj_blb_slicerequests
+           WHERE (SELECT monthly_slices FROM dwh_settings) = 1
+           AND    request_name IN ('MONTHLYRESOURCEESTCURVE',
+                                   'assignment::etccost_curve::dwh_month',
+                                   'MONTHLYRESOURCEACTCURVE',
+                                   'assignment::actcost_curve::dwh_month')
+           UNION ALL
+           SELECT id request_key,
+                  CASE WHEN request_name = 'WEEKLYRESOURCEACTCURVE' THEN 1
+                       WHEN request_name = 'WEEKLYRESOURCEESTCURVE' THEN 2
+                       WHEN request_name LIKE 'assignment::actcost_curve%' THEN 3
+                       WHEN request_name LIKE 'assignment::etccost_curve%' THEN 4
+                  END field_type,
+                  CASE WHEN period = 1 THEN 'WEEKLY' ELSE 'MONTHLY' END period_type
+           FROM   prj_blb_slicerequests
+           WHERE (SELECT weekly_slices FROM dwh_settings) = 1
+           AND    request_name IN ('WEEKLYRESOURCEESTCURVE',  
+                                   'assignment::etccost_curve::dwh_week',
+                                   'WEEKLYRESOURCEACTCURVE',
+                                   'assignment::actcost_curve::dwh_week')) sk
+           INNER JOIN prj_blb_slices s ON sk.request_key = s.slice_request_id
+           INNER JOIN prAssignment a ON s.prj_object_id = a.prID
+    WHERE  s.slice &lt;&gt; 0
+    UNION ALL
+    SELECT s.prj_object_id assignment_key,
+           s.period_id period_key,
+           CASE WHEN sk.field_type = 1 THEN s.slice ELSE 0 END actual_hours,
+           CASE WHEN sk.field_type = 2 THEN s.slice ELSE 0 END etc_hours,
+           CASE WHEN sk.field_type = 1 THEN s.slice
+                WHEN sk.field_type = 2 THEN s.slice
+                ELSE 0 END eac_hours,
+           0 base_hours,
+           CASE WHEN sk.field_type = 3 THEN s.slice ELSE 0 END actual_cost,
+           CASE WHEN sk.field_type = 4 THEN s.slice ELSE 0 END etc_cost,
+           CASE WHEN sk.field_type = 3 THEN s.slice
+                WHEN sk.field_type = 4 THEN s.slice
+                ELSE 0 END eac_cost,
+           0 base_cost,
+           a.last_updated_date clarity_updated_date
+    FROM  (SELECT id request_key,
+                  CASE WHEN request_name LIKE 'assignment::practcurve%' THEN 1
+                       WHEN request_name LIKE 'assignment::prestcurve%' THEN 2
+                       WHEN request_name LIKE 'assignment::actcost_curve%' THEN 3
+                       WHEN request_name LIKE 'assignment::etccost_curve%' THEN 4
+                   END field_type,
+                   period period_type
+           FROM   prj_blb_slicerequests 
+           WHERE (SELECT fiscal_slices FROM dwh_settings) = 1
+           AND     request_name IN ('assignment::prestcurve::dwh_fiscal',  
+                                    'assignment::etccost_curve::dwh_fiscal',
+                                    'assignment::practcurve::dwh_fiscal',
+                                    'assignment::actcost_curve::dwh_fiscal')) sk
+           INNER JOIN prj_fiscal_blb_slices s ON sk.request_key = s.slice_request_id
+           INNER JOIN prAssignment a ON s.prj_object_id = a.prID
+    WHERE  s.slice &lt;&gt; 0
+    UNION ALL
+    SELECT bd.object_id assignment_key,
+           CASE WHEN sk.period_type = 'WEEKLY' THEN CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 2000000 AS INTEGER) 
+                ELSE CAST(s.slice_date - TO_DATE('01/01/2000','MM/DD/YYYY') + 3000000 AS INTEGER) END period_key,
+           0 actual_hours,
+           0 etc_hours,
+           0 eac_hours,
+           CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+           0 actual_cost,
+           0 etc_cost,
+           0 eac_cost,
+           CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+           a.last_updated_date clarity_updated_date
+    FROM  (SELECT id request_key,
+                  CASE WHEN request_name = 'MONTHLYRESOURCEBASECURVE' THEN 5
+                       WHEN request_name = 'MONTHLYBASEASSIGNCOSTS' THEN 6
+                  END field_type,
+                  'MONTHLY' period_type
+           FROM   prj_blb_slicerequests
+           WHERE  is_dwh_request = 1
+           AND    is_active = 1
+           AND   (SELECT monthly_slices FROM dwh_settings) = 1
+           AND    request_name IN ('MONTHLYRESOURCEBASECURVE',
+                                   'MONTHLYBASEASSIGNCOSTS')
+           UNION ALL
+           SELECT id request_key,
+                  CASE WHEN request_name = 'WEEKLYRESOURCEBASECURVE' THEN 5
+                       WHEN request_name = 'WEEKLYBASEASSIGNCOSTS' THEN 6
+                  END field_type,
+                  'WEEKLY' period_type
+           FROM   prj_blb_slicerequests
+           WHERE  is_dwh_request = 1
+           AND    is_active = 1
+           AND   (SELECT weekly_slices FROM dwh_settings) = 1
+           AND    request_name IN ('WEEKLYRESOURCEBASECURVE',  
+                                   'WEEKLYBASEASSIGNCOSTS')) sk
+           INNER JOIN prj_blb_slices s ON sk.request_key = s.slice_request_id
+           INNER JOIN prj_baseline_details bd ON s.prj_object_id = bd.id
+           INNER JOIN prAssignment a ON bd.object_id = a.prID
+    WHERE  bd.object_type = 'ASSIGNMENT'
+    AND    bd.is_current = 1
+    AND    s.slice &lt;&gt; 0 
+    UNION ALL
+    SELECT bd.object_id assignment_key,
+           s.period_id period_key,
+           0 actual_hours,
+           0 etc_hours,
+           0 eac_hours,
+           CASE WHEN sk.field_type = 5 THEN s.slice ELSE 0 END base_hours,
+           0 actual_cost,
+           0 etc_cost,
+           0 eac_cost,
+           CASE WHEN sk.field_type = 6 THEN s.slice ELSE 0 END base_cost,
+           a.last_updated_date clarity_updated_date
+    FROM  (SELECT id request_key,
+                  CASE WHEN request_name LIKE 'baseline::current_assignment_usage%' THEN 5
+                       WHEN request_name LIKE 'baseline::current_assignment_cost%' THEN 6
+                  END field_type,
+                  period period_type
+           FROM   prj_blb_slicerequests
+           WHERE  is_dwh_request = 1
+           AND    is_active = 1
+           AND   (SELECT fiscal_slices FROM dwh_settings) = 1
+           AND    request_name IN ('baseline::current_assignment_usage::dwh_fiscal',  
+                                   'baseline::current_assignment_cost::dwh_fiscal')) sk
+           INNER JOIN prj_fiscal_blb_slices s ON sk.request_key = s.slice_request_id
+           INNER JOIN prj_baseline_details bd ON s.prj_object_id = bd.id
+           INNER JOIN prAssignment a ON bd.object_id = a.prID
+    WHERE  bd.object_type = 'ASSIGNMENT'
+    AND    bd.is_current = 1 
+    AND    s.slice &lt;&gt; 0</text>
+  </QueryResult>
+</ClarityDBViewQuery>

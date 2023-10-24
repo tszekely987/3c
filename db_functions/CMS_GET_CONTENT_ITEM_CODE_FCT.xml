@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMS_GET_CONTENT_ITEM_CODE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMS_GET_CONTENT_ITEM_CODE_FCT" (
+  p_odf_pk     in   number,
+  p_type       in   varchar2,
+  p_table_name in   varchar2 default null,
+  p_uniquecode in   varchar2 default ''
+   )
+   RETURN varchar2
+IS
+  v_table_name varchar2(30);
+  v_code_column varchar2(30);
+  v_dynamic_sql varchar2(200);
+  v_code varchar2(100);
+BEGIN
+  BEGIN
+    SELECT table_name, code_column
+    INTO v_table_name, v_code_column
+    FROM cms_content_types
+    WHERE type = p_type;
+
+  EXCEPTION
+    WHEN OTHERS
+      THEN
+       v_code_column := '';
+       v_table_name := '';
+  END;
+
+  IF p_type = 'PROCESS' THEN
+    SELECT bdp.process_code into v_code
+      FROM bpm_def_processes bdp, bpm_def_process_versions bdpv
+      WHERE bdpv.id = p_odf_pk and bdp.id = bdpv.process_id;
+  ELSIF p_type = 'VIEW' THEN
+    IF p_table_name = 'ODF_CVIEW_RELEASES' OR p_table_name = 'CMN_GRIDS' THEN
+      SELECT v.view_code into v_code FROM ODF_OBJECT_CUSTOM_VIEWS_V v
+        WHERE v.view_code || '::' || v.object_code = p_uniquecode and v.table_name in ( 'ODF_CVIEW_RELEASES', 'CMN_GRIDS' ) and v.language_code = 'en' and rownum = 1;
+    ELSE
+      SELECT v.view_code into v_code FROM ODF_OBJECT_CUSTOM_VIEWS_V v
+        WHERE v.view_code || '::' || v.object_code = p_uniquecode and v.table_name = p_table_name and v.language_code = 'en';
+    END IF;
+  ELSE
+    v_dynamic_sql := 'SELECT ' || v_code_column || ' FROM ' || v_table_name || ' WHERE id = ' || p_odf_pk;
+    EXECUTE IMMEDIATE v_dynamic_sql INTO v_code;
+  END IF;
+
+  RETURN v_code;
+
+EXCEPTION
+  WHEN OTHERS
+    THEN
+      RETURN NULL;
+END;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

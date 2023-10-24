@@ -1,0 +1,1526 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PPA_COMPUTEADMINANDTAXES</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PPA_COMPUTEADMINANDTAXES" (
+  cInvoiceNo  VARCHAR2,
+  userid  VARCHAR2,
+  RET out number )
+AS
+  StoO_selcnt INTEGER;
+  StoO_error  INTEGER;
+  StoO_rowcnt INTEGER;
+  StoO_crowcnt  INTEGER := 0;
+  StoO_fetchstatus  INTEGER := 0;
+  StoO_errmsg GLOBALPKG.STRING;
+  StoO_sqlstatus  INTEGER;
+  return_   NUMBER;
+  applyadmin  NUMBER;
+  applytaxes  NUMBER;
+  iAdminMatrixKey   NUMBER;
+  iTaxMatrixKey   NUMBER;
+  cProjectCode  PAC_MNT_PROJECTS.PROJECT_CODE%TYPE;
+  dInvoiceDate  INVOICEHEADER.INVOICEDATE%TYPE;
+  cLocationID   GLOBALPKG.STRING;
+  cHCol1  GLOBALPKG.STRING;
+  cHCol2  GLOBALPKG.STRING;
+  cHCol3  GLOBALPKG.STRING;
+  cHCol4  GLOBALPKG.STRING;
+  cHCol5  GLOBALPKG.STRING;
+  cHCol6  GLOBALPKG.STRING;
+  cHCol7  GLOBALPKG.STRING;
+  cHCol8  GLOBALPKG.STRING;
+  cHCol9  GLOBALPKG.STRING;
+  cHCol10   GLOBALPKG.STRING;
+  ProjectId pac_mnt_projects.ID%TYPE;
+  LaborExchRateType pac_mnt_projects.labor_exchange_rate_type%TYPE;
+  MaterialsExchRateType pac_mnt_projects.materials_exchange_rate_type%TYPE;
+  ExpenseExchRateType pac_mnt_projects.expense_exchange_rate_type%TYPE;
+  EquipmentExchRateType pac_mnt_projects.equipment_exchange_rate_type%TYPE;
+  BillingCurrencyCode pac_mnt_projects.BILLING_CURRENCY_CODE%TYPE;
+  exrAmount CMN_EXCHANGERATE_PKG.exchangeRateTAB;
+  CurrencyType VARCHAR2(30);
+  FromCurrency VARCHAR2(30);
+  ToCurrency VARCHAR2(30);
+  ExchangeRateId NUMBER;
+  ExchangeRate NUMBER(32,6);
+  ExchangeRateType VARCHAR2(30);
+  ConvertedAmount NUMBER(32,6);
+  iLastUpdatedby  PAC_CMN_USERS_V.USER_ID%TYPE;
+  cUserID VARCHAR2(30);
+
+  UF1_rowid   ROWID;
+  UF1_oval1   ppa_TaxAdminLocWork.AdminMatrix%TYPE;
+  CURSOR UF1_cursor IS
+    SELECT ppa_TaxAdminLocWork.ROWID, LM.MatrixKey FROM ppa_LocMatrixAssignments LM, ppa_Matrix M, ppa_TaxAdminLocWork
+    WHERE LM.LocationID = ppa_TaxAdminLocWork.LocationID
+    and M.MatrixKey = LM.MatrixKey
+    and M.MatrixType = 'A'
+    and ppa_TaxAdminLocWork.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+    FOR UPDATE OF ppa_TaxAdminLocWork.AdminMatrix;
+  UF2_rowid   ROWID;
+  UF2_oval1   ppa_TaxAdminLocWork.TaxMatrix%TYPE;
+  CURSOR UF2_cursor IS
+    SELECT ppa_TaxAdminLocWork.ROWID, LM.MatrixKey FROM ppa_LocMatrixAssignments LM, ppa_Matrix M, ppa_TaxAdminLocWork
+    WHERE LM.LocationID = ppa_TaxAdminLocWork.LocationID
+    and M.MatrixKey = LM.MatrixKey
+    and M.MatrixType = 'T'
+    and ppa_TaxAdminLocWork.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+    FOR UPDATE OF ppa_TaxAdminLocWork.TaxMatrix;
+  --- when Adminmatrix is not specified for a location--
+  UF3_rowid   ROWID;
+  UF3_oval1   ppa_TaxAdminLocWork.AdminMatrix%TYPE;
+  CURSOR UF3_cursor IS
+    SELECT ppa_TaxAdminLocWork.ROWID, M.MatrixKey FROM ppa_Matrix M, ppa_TaxAdminLocWork
+    WHERE M.MatrixType = 'A'
+    and
+    NOT EXISTS (
+    SELECT  1
+    FROM ppa_LocMatrixAssignments LM
+    WHERE LM.MatrixKey = M.MatrixKey )
+    and ppa_TaxAdminLocWork.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+    and ppa_TaxAdminLocWork.AdminMatrix IS NULL
+    FOR UPDATE OF ppa_TaxAdminLocWork.AdminMatrix;
+  --- when Taxmatrix is not specified for a location--
+  UF4_rowid   ROWID;
+  UF4_oval1   ppa_TaxAdminLocWork.TaxMatrix%TYPE;
+  CURSOR UF4_cursor IS
+    SELECT ppa_TaxAdminLocWork.ROWID, M.MatrixKey FROM ppa_Matrix M, ppa_TaxAdminLocWork
+    WHERE M.MatrixType = 'T'
+    and
+    NOT EXISTS (
+    SELECT  1
+    FROM ppa_LocMatrixAssignments LM
+    WHERE LM.MatrixKey = M.MatrixKey )
+    and ppa_TaxAdminLocWork.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+    and ppa_TaxAdminLocWork.TaxMatrix IS NULL
+    FOR UPDATE OF ppa_TaxAdminLocWork.TaxMatrix;
+  UF5_rowid   ROWID;
+  UF5_oval1   ppa_TaxAdminTransWork.TaxAdminCode%TYPE;
+  CURSOR UF5_cursor IS
+    SELECT R.ROWID, A.TaxAdminCode FROM ppa_TaxAdminBestMatch B, ppa_TaxAdminTransWork R, ppa_TaxAdminAllMatches
+      A
+    WHERE B.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+    and R.InvoiceNo = B.InvoiceNo
+    and R.TransNo = B.TransNo
+    and R.EntryType = B.EntryType
+    and RTRIM(A.InvoiceNo) = B.InvoiceNo
+    and A.EntryType = B.EntryType
+    and A.SeqNo = B.BestMatchRowIndex
+    FOR UPDATE OF R.TaxAdminCode;
+  CURSOR Tax_Transaction_Details_cursor IS
+  SELECT  ppa_ComputeAdminAndTaxes.cInvoiceNo, W.TransNo, W.EntryType,
+          W.TaxAdminCode, M.code, M.amount, W.BillAmount
+      FROM ppa_TaxAdminTransWork W, taxcode_method T, tax_method M,
+        taxcode TC
+      WHERE W.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+      and W.TaxAdminCode IS NOT NULL
+      and T.taxcode = W.TaxAdminCode
+      and TC.code = T.taxcode
+      AND TC.active = 1
+      AND M.code = T.tax_method_code
+      AND M.active = 1
+      AND W.TransDate  BETWEEN M.from_date AND M.to_date
+      and M.taxtype  LIKE ( W.EntryType || '%' );
+  -- cursor to insert Admin matrix rows into ppa_TaxAdminAllMatches in an order such that the Best matching row is at the top ---
+  CURSOR Admin_Matrix_Values_Curr IS
+  SELECT ppa_ComputeAdminAndTaxes.cInvoiceNo, W.TransNo TransNo, V.StrVal1 StrVal1,'A'
+        FROM ppa_TaxAdminTransWork W, ppa_MatrixValues V
+          WHERE W.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+          and W.EntryType = 'A'
+          and V.MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+          and V.FromDate &lt;= W.TransDate
+          and V.ToDate &gt;= W.TransDate
+          and NVL(RTRIM(V.Value1), NVL( W.Col1, ' ')) = NVL( W.Col1, ' ')
+          and NVL(RTRIM(V.Value2), NVL( W.Col2, ' ')) = NVL( W.Col2, ' ')
+          and NVL(RTRIM(V.Value3), NVL( W.Col3, ' ')) = NVL( W.Col3, ' ')
+          and NVL(RTRIM(V.Value4), NVL( W.Col4, ' ')) = NVL( W.Col4, ' ')
+          and NVL(RTRIM(V.Value5), NVL( W.Col5, ' ')) = NVL( W.Col5, ' ')
+          and NVL(RTRIM(V.Value6), NVL( W.Col6, ' ')) = NVL( W.Col6, ' ')
+          and NVL(RTRIM(V.Value7), NVL( W.Col7, ' ')) = NVL( W.Col7, ' ')
+          and NVL(RTRIM(V.Value8), NVL( W.Col8, ' ')) = NVL( W.Col8, ' ')
+          and NVL(RTRIM(V.Value9), NVL( W.Col9, ' ')) = NVL( W.Col9, ' ')
+          and NVL(RTRIM(V.Value10), NVL( W.Col10, ' ')) = NVL( W.Col10, ' ')
+          ORDER BY V.Value1 , V.Value2 , V.Value3 , V.Value4 , V.Value5 , V.Value6 ,
+              V.Value7 , V.Value8 , V.Value9 , V.Value10 ;
+  -- cursor to insert Tax matrix rows into ppa_TaxAdminAllMatches in an order such that the Best matching row is at the top ---
+  CURSOR Tax_Matrix_Values_Curr IS
+  SELECT ppa_ComputeAdminAndTaxes.cInvoiceNo, W.TransNo, V.StrVal1,'T'
+        FROM ppa_TaxAdminTransWork W, ppa_MatrixValues V
+          WHERE W.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+          and W.EntryType = 'T'
+          and V.MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+          and V.FromDate &lt;= W.TransDate
+          and V.ToDate &gt;= W.TransDate
+          and NVL(RTRIM(V.Value1), NVL( W.Col1, ' ')) = NVL( W.Col1, ' ')
+          and NVL(RTRIM(V.Value2), NVL( W.Col2, ' ')) = NVL( W.Col2, ' ')
+          and NVL(RTRIM(V.Value3), NVL( W.Col3, ' ')) = NVL( W.Col3, ' ')
+          and NVL(RTRIM(V.Value4), NVL( W.Col4, ' ')) = NVL( W.Col4, ' ')
+          and NVL(RTRIM(V.Value5), NVL( W.Col5, ' ')) = NVL( W.Col5, ' ')
+          and NVL(RTRIM(V.Value6), NVL( W.Col6, ' ')) = NVL( W.Col6, ' ')
+          and NVL(RTRIM(V.Value7), NVL( W.Col7, ' ')) = NVL( W.Col7, ' ')
+          and NVL(RTRIM(V.Value8), NVL( W.Col8, ' ')) = NVL( W.Col8, ' ')
+          and NVL(RTRIM(V.Value9), NVL( W.Col9, ' ')) = NVL( W.Col9, ' ')
+          and NVL(RTRIM(V.Value10), NVL( W.Col10, ' ')) = NVL( W.Col10, ' ')
+          ORDER BY V.Value1 , V.Value2 , V.Value3 , V.Value4 , V.Value5 , V.Value6 ,
+              V.Value7 , V.Value8 , V.Value9 , V.Value10 ;
+
+BEGIN
+/***
+ * This procedure calculates the Tax amount and Admin charges  for the STANDARD type projects, only
+ * if the Use Admincharges= 1 &amp; Tax type = 1  are set.All the calculated inforamtions  are inserted into
+ * TEMP_PPA_INVOICEDETAILSSP_FINA so that the calling procedures (REV_BILL_FINALAPP_POSTTOWIP )
+ * will use this table to get the TAX/ADMIN amounts
+ ***/
+
+    RET := 0;
+
+	DELETE from temp_Prelimppa_ComputeAdminAnd;
+	DELETE from temp_Finalppa_ComputeAdminAndT;
+
+	cUserID := ppa_ComputeAdminAndTaxes.userid;
+
+	SELECT PAC_CMN_USERS_V.USER_ID
+      INTO ppa_ComputeAdminAndTaxes.iLastUpdatedby
+      FROM PAC_CMN_USERS_V
+      WHERE RESOURCE_CODE = cUserID;
+
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   useadmincharges,  tax_type
+		INTO ppa_ComputeAdminAndTaxes.applyadmin, ppa_ComputeAdminAndTaxes.applytaxes FROM nameoptions;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	-- check if Tax and Admin charges are to be applied --
+	IF  ppa_ComputeAdminAndTaxes.applytaxes != 1 AND   ppa_ComputeAdminAndTaxes.applyadmin = 0 THEN
+	    RET := 0;
+		RETURN ;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminBestMatch
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminAllMatches
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminLocWork
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminTransWork
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	--- get the Location of the Invoice ---
+	INSERT INTO ppa_TaxAdminLocWork (LocationID, InvoiceNo)SELECT  W.LocationID, ppa_ComputeAdminAndTaxes.cInvoiceNo
+		 FROM ppa_TransBill B, ppa_WIP W
+		WHERE B.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+		 and B.TransType = 'B'
+		 and W.TransNo = B.ApplyTo
+		GROUP BY W.LocationID;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+
+	--- update with the Admin matrixkey from ppa_LocMatrixAssignments defined for the Location ---
+	OPEN UF1_cursor;
+	LOOP
+		FETCH UF1_cursor INTO UF1_rowid, UF1_oval1;
+		EXIT WHEN UF1_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TaxAdminLocWork
+		SET
+		AdminMatrix = UF1_oval1
+		WHERE ROWID = UF1_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF1_cursor;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+	--- update with the Tax matrixkey from ppa_LocMatrixAssignments defined for the Location ---
+	OPEN UF2_cursor;
+	LOOP
+		FETCH UF2_cursor INTO UF2_rowid, UF2_oval1;
+		EXIT WHEN UF2_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TaxAdminLocWork
+		SET
+		TaxMatrix = UF2_oval1
+		WHERE ROWID = UF2_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF2_cursor;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+	--- update with the Admin matrixkey from ppa_matrix when not defined for the Location ---
+	OPEN UF3_cursor;
+	LOOP
+		FETCH UF3_cursor INTO UF3_rowid, UF3_oval1;
+		EXIT WHEN UF3_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TaxAdminLocWork
+		SET
+		AdminMatrix = UF3_oval1
+		WHERE ROWID = UF3_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF3_cursor;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+	--- update with the Tax matrixkey from ppa_matrix when not defined for the Location ---
+	OPEN UF4_cursor;
+	LOOP
+		FETCH UF4_cursor INTO UF4_rowid, UF4_oval1;
+		EXIT WHEN UF4_cursor%NOTFOUND;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE ppa_TaxAdminLocWork
+		SET
+		TaxMatrix = UF4_oval1
+		WHERE ROWID = UF4_rowid;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+	END LOOP;
+	CLOSE UF4_cursor;
+	IF  StoO_error != 0 THEN
+/* for each location... */
+   	    RET := -1;
+		RETURN ;
+	END IF;
+	BEGIN
+		StoO_rowcnt := 0;
+		StoO_selcnt := 0;
+		StoO_error  := 0;
+		SELECT   MIN(LocationID)
+		INTO ppa_ComputeAdminAndTaxes.cLocationID FROM ppa_TaxAdminLocWork
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN TOO_MANY_ROWS THEN
+				StoO_rowcnt := 2;
+			WHEN NO_DATA_FOUND THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+			WHEN OTHERS THEN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+	END;
+	&lt;&lt;i_loop1&gt;&gt;
+	WHILE  StoO_rowcnt &gt; 0 and   ppa_ComputeAdminAndTaxes.cLocationID IS NOT NULL LOOP
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   TaxMatrix,  AdminMatrix
+			INTO ppa_ComputeAdminAndTaxes.iTaxMatrixKey, ppa_ComputeAdminAndTaxes.iAdminMatrixKey FROM ppa_TaxAdminLocWork
+			WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+			 and LocationID = ppa_ComputeAdminAndTaxes.cLocationID;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		    RET := -1;
+			RETURN ;
+		END IF;
+		/* ADMIN Charge*/
+		IF  ppa_ComputeAdminAndTaxes.applyadmin = 1 and   ppa_ComputeAdminAndTaxes.iAdminMatrixKey IS NOT NULL THEN
+		BEGIN
+/* read column hierarchy */
+			BEGIN
+			  StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol1 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 1;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol2 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 2;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol3 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 3;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol4 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 4;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol5 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 5;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol6 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 6;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol7 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 7;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol8 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 8;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol9 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 9;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol10 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iAdminMatrixKey
+				 and ColumnNo = 10;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			-- get the Values for all the assigned Columns(project_code,resource_code etc.,) in the Admin Matrix from the WIP table  --
+			INSERT INTO ppa_TaxAdminTransWork (InvoiceNo,
+			                                   TransNo,
+											   EntryType,
+											   TaxAdminCode,
+											   TransDate,
+											   BillAmount,
+			                                   Col1, Col2, Col3, Col4, Col5, Col6, Col7, Col8, Col9, Col10)
+			     SELECT DISTINCT  ppa_ComputeAdminAndTaxes.cInvoiceNo, B.TransNo,
+           'A', NULL, W.TransDate, BV.Amount,
+				    DECODE(ppa_ComputeAdminAndTaxes.cHCol1,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'chargecode',
+           W.Charge_Code, 'inputtype', NVL(RTRIM(W.Input_type), ''), 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol2, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'chargecode', W.Charge_Code, 'inputtype', NVL(RTRIM(W.Input_type),
+           ''), 'resource_code', W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass',
+           W.ProjectClass, 'resource_class', W.Resource_Class,
+				   'wipclass', W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType
+				   , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol3, 'entity', W.Entity,
+				   'locationid', W.LocationID, 'departcode', W.DepartCode, 'company_code',
+           W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type),
+           ''), 'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol4,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol5, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol6,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol7, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol8,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol9, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol10,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , '')
+         FROM ppa_TransBill B, ppa_WIP W, ppa_TransBill_values BV
+				WHERE B.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+				 and B.TransType = 'B'
+				 and W.TransNo = B.ApplyTo
+				 and W.LocationID = ppa_ComputeAdminAndTaxes.cLocationID
+				 and BV.TRANSNO = B.TRANSNO
+				 and BV.CURRENCY_TYPE = 'BILLING';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+         	    RET := -1;
+				RETURN ;
+			END IF;
+/**********************************************************/
+/* PATTERN MATCHING  ( refer PA 3.1 Rates.doc )           */
+/* First pass  for ADMIN                                  */
+/* ********************************************************/
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			-- Get all the matching Admin Matrix rows  ('*' or exact value matching rows)--
+			FOR Admin_Matrix_Values_Rec IN Admin_Matrix_Values_Curr
+			LOOP
+			BEGIN
+        INSERT INTO ppa_TaxAdminAllMatches (InvoiceNo, TransNo, TaxAdminCode, EntryType, SeqNo)
+          VALUES( ppa_ComputeAdminAndTaxes.cInvoiceNo, Admin_Matrix_Values_Rec.TransNo, Admin_Matrix_Values_Rec.StrVal1,'A', S_290_5_PPA_TAXADMINALLMAT.nextval);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			END;
+			END LOOP;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			    RET := -1;
+				RETURN ;
+			END IF;
+		END;
+		END IF;
+/*********************************************************/
+
+/* TAX charge*/
+		IF  ppa_ComputeAdminAndTaxes.applytaxes = 1 AND   ppa_ComputeAdminAndTaxes.iTaxMatrixKey IS NOT NULL THEN
+		BEGIN
+/* read column hierarchy */
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol1 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 1;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol2 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 2;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol3 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 3;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol4 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 4;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol5 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 5;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol6 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 6;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol7 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 7;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol8 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 8;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol9 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 9;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+				StoO_rowcnt := 0;
+				StoO_selcnt := 0;
+				StoO_error  := 0;
+				SELECT   FieldName
+				INTO ppa_ComputeAdminAndTaxes.cHCol10 FROM ppa_MatrixColDef
+				WHERE MatrixKey = ppa_ComputeAdminAndTaxes.iTaxMatrixKey
+				 and ColumnNo = 10;
+				StoO_rowcnt := SQL%ROWCOUNT;
+				EXCEPTION
+					WHEN TOO_MANY_ROWS THEN
+						StoO_rowcnt := 2;
+					WHEN NO_DATA_FOUND THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+					WHEN OTHERS THEN
+						StoO_rowcnt := 0;
+						StoO_selcnt := 0;
+						StoO_error := SQLCODE;
+						StoO_errmsg := SQLERRM;
+			END;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			-- get the Values for all the assigned Columns(project_code,resource_code etc.,) in the Tax Matrix from the WIP table  --
+			INSERT INTO ppa_TaxAdminTransWork (InvoiceNo, TransNo, EntryType, TaxAdminCode, TransDate, BillAmount, Col1, Col2, Col3, Col4, Col5, Col6, Col7, Col8, Col9, Col10)
+			SELECT DISTINCT  ppa_ComputeAdminAndTaxes.cInvoiceNo, B.TransNo,
+				   'T', NULL, W.TransDate, BV.Amount, DECODE(ppa_ComputeAdminAndTaxes.cHCol1,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'chargecode',
+           W.Charge_Code, 'inputtype', NVL(RTRIM(W.Input_type), ''), 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol2, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'chargecode', W.Charge_Code, 'inputtype', NVL(RTRIM(W.Input_type),
+           ''), 'resource_code', W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass',
+           W.ProjectClass, 'resource_class', W.Resource_Class,
+				   'wipclass', W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType
+				   , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol3, 'entity', W.Entity,
+				   'locationid', W.LocationID, 'departcode', W.DepartCode, 'company_code',
+           W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type),
+           ''), 'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol4,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol5, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol6,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol7, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol8,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , ''),
+				   DECODE(ppa_ComputeAdminAndTaxes.cHCol9, 'entity', W.Entity, 'locationid',
+				   W.LocationID, 'departcode', W.DepartCode, 'company_code', W.COMPANY_CODE,
+           'project_code', W.PROJECT_CODE, 'inputtype', NVL(RTRIM(W.Input_type), ''),
+           'chargecode', W.Charge_Code, 'resource_code', W.RESOURCE_CODE, 'clntclass',
+           W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass', W.WIPClass, 'transclass',
+           W.TransClass, 'resource_role', W.ROLE_CODE,
+				   'transtype', W.TransType , ''), DECODE(ppa_ComputeAdminAndTaxes.cHCol10,
+				   'entity', W.Entity, 'locationid', W.LocationID, 'departcode',
+           W.DepartCode, 'company_code', W.COMPANY_CODE, 'project_code', W.PROJECT_CODE, 'inputtype',
+           NVL(RTRIM(W.Input_type), ''), 'chargecode', W.Charge_Code, 'resource_code',
+				   W.RESOURCE_CODE, 'clntclass', W.ClientClass, 'projclass', W.ProjectClass,
+           'resource_class', W.Resource_Class, 'wipclass',
+				   W.WIPClass, 'transclass', W.TransClass,
+           'resource_role', W.ROLE_CODE, 'transtype', W.TransType , '')
+         FROM ppa_TransBill B, ppa_WIP W, ppa_TransBill_values BV
+				WHERE B.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+				 and B.TransType = 'B'
+				 and W.TransNo = B.ApplyTo
+				 and W.LocationID = ppa_ComputeAdminAndTaxes.cLocationID
+				 and BV.TRANSNO = B.TRANSNO
+				 and BV.CURRENCY_TYPE = 'BILLING';
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+   		   	    RET := -1;
+				RETURN ;
+			END IF;
+/**********************************************************/
+/* PATTERN MATCHING  ( refer PA 3.1 Rates.doc )           */
+/* First pass  for TAX                                    */
+/* ********************************************************/
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			-- Get all the matching Tax Matrix rows ('*' or exact value matching rows) --
+			FOR Tax_Matrix_Values_Rec IN Tax_Matrix_Values_Curr
+			LOOP
+			BEGIN
+         INSERT INTO ppa_TaxAdminAllMatches (InvoiceNo, TransNo, TaxAdminCode, EntryType, SeqNo)
+           VALUES( ppa_ComputeAdminAndTaxes.cInvoiceNo, Tax_Matrix_Values_Rec.TransNo, Tax_Matrix_Values_Rec.StrVal1, 'T', S_290_5_PPA_TAXADMINALLMAT.nextval);
+			StoO_rowcnt := SQL%ROWCOUNT;
+			END;
+			END LOOP;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+			IF  StoO_error != 0 THEN
+			    RET := -1;
+				RETURN ;
+			END IF;
+		END;
+		END IF;
+/*************************************************/
+/* PATTERN MATCHING                              */
+/* Second Pass for TAX &amp; ADMIN                   */
+/*************************************************/
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+
+		-- get the BEST matching row --
+		-- use MIN(A.SEQNO) as the best matching row will be the first  in ppa_TaxAdminAllMatches table --
+		-- (see cursor Admin_Matrix_Values_Curr &amp; Tax_Matrix_Values_Curr)--
+		INSERT INTO ppa_TaxAdminBestMatch (TransNo, EntryType, BestMatchRowIndex, InvoiceNo)
+		    SELECT  A.TransNo, A.EntryType, MIN(A.SeqNo), ppa_ComputeAdminAndTaxes.cInvoiceNo
+			FROM ppa_TaxAdminAllMatches A
+			WHERE RTRIM(A.InvoiceNo) = ppa_ComputeAdminAndTaxes.cInvoiceNo
+			GROUP BY A.TransNo, A.EntryType;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  StoO_error != 0 THEN
+		    RET := -1;
+			RETURN ;
+		END IF;
+		--- Update the Tax &amp; Admin code column for the best matched rows --
+		OPEN UF5_cursor;
+		LOOP
+			FETCH UF5_cursor INTO UF5_rowid, UF5_oval1;
+			EXIT WHEN UF5_cursor%NOTFOUND;
+			BEGIN
+			StoO_error   := 0;
+			StoO_rowcnt  := 0;
+			UPDATE ppa_TaxAdminTransWork R
+			SET
+			TaxAdminCode = UF5_oval1
+			WHERE ROWID = UF5_rowid;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN NO_DATA_FOUND THEN
+					NULL;
+				WHEN OTHERS THEN
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+			END;
+		END LOOP;
+		CLOSE UF5_cursor;
+		IF  StoO_error != 0 THEN
+			    RET := -1;
+			RETURN ;
+		END IF;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE FROM ppa_TaxAdminBestMatch
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		DELETE FROM ppa_TaxAdminAllMatches
+		WHERE RTRIM(InvoiceNo) = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   MIN(LocationID)
+			INTO ppa_ComputeAdminAndTaxes.cLocationID FROM ppa_TaxAdminLocWork
+			WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+			 and LocationID &gt; ppa_ComputeAdminAndTaxes.cLocationID;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END LOOP;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminBestMatch
+	WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminAllMatches
+	WHERE RTRIM(InvoiceNo) = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	-- Get the TAX &amp; ADMIN percentage --
+	INSERT INTO temp_Prelimppa_ComputeAdminAnd (EntryType, LevelCode, Percentage, Amount, TaxCode)
+		 SELECT  W.EntryType, M.code, M.amount, W.BillAmount, W.TaxAdminCode
+		 FROM ppa_TaxAdminTransWork W, taxcode_method T, tax_method M,
+		   taxcode TC
+		WHERE W.InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo
+		 and W.TaxAdminCode IS NOT NULL
+		 and T.taxcode = W.TaxAdminCode
+		 and TC.code = T.taxcode
+		 AND TC.active = 1
+		 AND M.code = T.tax_method_code
+		 AND M.active = 1
+		 AND W.TransDate  BETWEEN M.from_date AND M.to_date
+		 and M.taxtype  LIKE ( W.EntryType || '%' );
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+
+	/* Insert into PAC_BIL_INVOICE_TRN_DETAILS to use later for line item credit memos tax/admin reversal
+				   We must keep tax information at a detail level in this case */
+
+	BEGIN --Tax_Transaction_Details_cursor LOOP
+
+		  /* Only need to get one project code here even though an invoice can have multiple projects since Demand Billing
+	     and Batch Billing ensure one Billing currency and unique entities per invoice */
+	  SELECT MIN( Project_Code )
+	    INTO cProjectCode
+	    FROM ppa_TransBill
+	    WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+
+	  ppa_ComputeAdminAndTaxes.dInvoiceDate := SysDate;
+	--- get the exchange rate types ---
+      SELECT id, billing_currency_code,labor_exchange_rate_type, materials_exchange_rate_type,
+	    equipment_exchange_rate_type, expense_exchange_rate_type
+	    INTO ProjectId, BillingCurrencyCode, LaborExchRateType, MaterialsExchRateType,
+		   EquipmentExchRateType, ExpenseExchRateType
+	    FROM pac_mnt_projects
+	    WHERE pac_mnt_projects.project_code = cProjectCode;
+
+	    FOR TAX_TRN_DETAILS_REC IN Tax_Transaction_Details_cursor
+	    LOOP
+
+	    /* Default Labor Exchange Rate Type for Taxes */
+          ExchangeRateType := LaborExchRateType;
+
+          --- get the amount in differnt currency ---:
+	      exrAmount   :=CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(ProjectId,
+	 		     	  													ppa_ComputeAdminAndTaxes.dInvoiceDate,
+					    												ppa_ComputeAdminAndTaxes.BillingCurrencyCode,
+						    											TAX_TRN_DETAILS_REC.BillAmount,
+							    										ExchangeRateType) ;
+
+	      --- insert into PAC_BIL_INVOICE_TRN_DETAILS for each currency ---
+		  BEGIN
+		    StoO_error   := 0;
+		    StoO_rowcnt  := 0;
+		    FOR i in 1  .. exrAmount.count
+		    LOOP
+			  CurrencyType := exrAmount(i).currencyType;
+		      FromCurrency := exrAmount(i).fromCurrencyCode;
+			  ToCurrency := exrAmount(i).toCurrencyCode;
+		      ConvertedAmount := NVL(exrAmount(i).convertedAmount,0);
+		      ExchangeRateId := exrAmount(i).exchangeRateId;
+		      ExchangeRate := NVL(exrAmount(i).exchangeRate,0);
+
+			  BEGIN
+			    StoO_error   := 0;
+			    StoO_rowcnt  := 0;
+                INSERT INTO PAC_BIL_INVOICE_TRN_DETAILS (ID, INVOICE_NO, TRANSNO, ENTRY_TYPE,
+		   							 			   TAX_CODE, TAX_METHOD_CODE, PERCENTAGE,
+												   AMOUNT, CURRENCY_CODE, CURRENCY_TYPE,
+												   EXCHANGE_ID, EXCHANGE_RATE,
+												   CREATED_DATE, CREATED_BY, LAST_UPDATED_DATE, LAST_UPDATED_BY )
+			    SELECT  PAC_BIL_INVOICE_TRN_DETAILS_S1.NEXTVAL, ppa_ComputeAdminAndTaxes.cInvoiceNo, TAX_TRN_DETAILS_REC.TransNo, TAX_TRN_DETAILS_REC.EntryType,
+			 		  TAX_TRN_DETAILS_REC.TaxAdminCode, TAX_TRN_DETAILS_REC.code, TAX_TRN_DETAILS_REC.amount,
+			          ConvertedAmount, ToCurrency, CurrencyType,
+					  ExchangeRateId, ExchangeRate,
+					  SYSDATE, iLastUpdatedby, SYSDATE, iLastUpdatedby
+			        FROM DUAL ;
+			      StoO_rowcnt := SQL%ROWCOUNT;
+			      EXCEPTION
+			      WHEN NO_DATA_FOUND THEN
+				    NULL;
+			      WHEN OTHERS THEN
+				    StoO_error := SQLCODE;
+				    StoO_errmsg := SQLERRM;
+				    RET := -1;
+				    RETURN ;
+			  END;
+		    END LOOP;
+		  END;
+	    END LOOP; -- Tax_Transaction_Details_cursor
+	END; --Tax_Transaction_Details_cursor LOOP
+
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	INSERT INTO temp_Finalppa_ComputeAdminAndT (EntryType, LevelCode, Percentage, Amount, TaxCode)
+		 SELECT  EntryType, LevelCode, Percentage, SUM(Amount), TaxCode
+		 FROM temp_Prelimppa_ComputeAdminAnd
+		GROUP BY EntryType, TaxCode, LevelCode, Percentage;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+
+	-- MULTICURRENCY CHANGES BEGIN
+
+	/* Loop through temp_Finalppa_ComputeAdminAndT and get MC values for each amount */
+
+	BEGIN
+	  DECLARE CURSOR TAX_VALUES_CURR IS
+	    select EntryType, LevelCode, Percentage, Amount, TaxCode
+	      FROM temp_Finalppa_ComputeAdminAndT ;
+
+	  BEGIN --TAX_VALUES_CURR LOOP
+	    FOR TAX_VALUES_REC IN TAX_VALUES_CURR
+		  LOOP
+		    /* Default Labor Exchange Rate Type for Taxes */
+            ExchangeRateType := LaborExchRateType;
+
+    	    --- get the amount in differnt currency ---:
+		    exrAmount   :=CMN_EXCHANGERATE_PKG.CMN_GET_EXCHANGE_RATES_FCT(ProjectId,
+		  			  													ppa_ComputeAdminAndTaxes.dInvoiceDate,
+																		ppa_ComputeAdminAndTaxes.BillingCurrencyCode,
+																		TAX_VALUES_REC.Amount,
+																		ExchangeRateType) ;
+
+	        --- insert into TEMP_PPA_INVOICEDETAILSSP_FINA for each currency ---
+		    BEGIN
+		      StoO_error   := 0;
+		      StoO_rowcnt  := 0;
+		      FOR i in 1  .. exrAmount.count
+		      LOOP
+			    CurrencyType := exrAmount(i).currencyType;
+		        FromCurrency := exrAmount(i).fromCurrencyCode;
+			    ToCurrency := exrAmount(i).toCurrencyCode;
+		        ConvertedAmount := NVL(exrAmount(i).convertedAmount,0);
+		        ExchangeRateId := exrAmount(i).exchangeRateId;
+		        ExchangeRate := NVL(exrAmount(i).exchangeRate,0);
+
+			    BEGIN
+			      StoO_error   := 0;
+			      StoO_rowcnt  := 0;
+			      INSERT INTO TEMP_PPA_INVOICEDETAILSSP_FINA(InvoiceNo, EntryType, LevelCode, Percentage,
+					   									   TaxableAmt, Amount, TaxCode, CURRENCY_TYPE,
+														   CURRENCY_CODE, EXCHANGE_ID, EXCHANGE_RATE)
+			      SELECT  ppa_ComputeAdminAndTaxes.cInvoiceNo, TAX_VALUES_REC.EntryType, TAX_VALUES_REC.LevelCode, TAX_VALUES_REC.Percentage,
+						ConvertedAmount, ROUND(( ConvertedAmount * ( TAX_VALUES_REC.Percentage / 100 ) ), 2),  TAX_VALUES_REC.TaxCode, CurrencyType,
+						ToCurrency, ExchangeRateId, ExchangeRate
+			        FROM DUAL ;
+			      StoO_rowcnt := SQL%ROWCOUNT;
+			      EXCEPTION
+			      WHEN NO_DATA_FOUND THEN
+				    NULL;
+			      WHEN OTHERS THEN
+				    StoO_error := SQLCODE;
+				    StoO_errmsg := SQLERRM;
+				    RET := -1;
+				    RETURN ;
+			    END;
+		      END LOOP;
+		    END;
+	      END LOOP; -- TAX_VALUES_CURR
+	   END; --TAX_VALUES_CURR LOOP
+	END;
+	-- MULTICURRENCY CHANGES END
+	END;
+	IF  StoO_error != 0 THEN
+	    RET := -1;
+		RETURN ;
+	END IF;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminLocWork
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	BEGIN
+	StoO_error   := 0;
+	StoO_rowcnt  := 0;
+	DELETE FROM ppa_TaxAdminTransWork
+		WHERE InvoiceNo = ppa_ComputeAdminAndTaxes.cInvoiceNo;
+	StoO_rowcnt := SQL%ROWCOUNT;
+	EXCEPTION
+		WHEN NO_DATA_FOUND THEN
+			NULL;
+		WHEN OTHERS THEN
+			StoO_error := SQLCODE;
+			StoO_errmsg := SQLERRM;
+	END;
+	IF  ppa_ComputeAdminAndTaxes.applytaxes = 1 AND   ppa_ComputeAdminAndTaxes.applyadmin != 0 THEN
+	BEGIN
+		BEGIN
+		sp_calculate_taxes_on_admin(ppa_ComputeAdminAndTaxes.cInvoiceNo,ppa_ComputeAdminAndTaxes.return_);
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+		IF  ppa_ComputeAdminAndTaxes.return_ != 0 THEN
+		    RET := -1;
+			RETURN ;
+		END IF;
+	END;
+	END IF;
+    RET := 0;
+	RETURN ;
+	--modified by : nitin
+	-- comment : changed the temp tables for insertion of data.
+	--           changed call to procedure sp_calculate_taxes_on_admin(out paramter added )
+    -- COMMENT BY nITIN : ADDED THE RETURN PARAMETER WHICH IS NEEDED BY SOME PROCEDURES.
+END ppa_ComputeAdminAndTaxes;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

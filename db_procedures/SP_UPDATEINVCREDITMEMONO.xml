@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>SP_UPDATEINVCREDITMEMONO</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."SP_UPDATEINVCREDITMEMONO" 
+(
+  transtype   VARCHAR2 ,
+  COMPANY_CODE  VARCHAR2  DEFAULT NULL,
+  invcdate  DATE  DEFAULT NULL,
+  arinvcnmbr  IN OUT VARCHAR2
+)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+mask 	GLOBALPKG.STRING;
+masklength  INTEGER;
+numlength   INTEGER;
+zeropos   INTEGER;
+stuffpos  INTEGER;
+numericinvcmnbr   NUMBER;
+poundpos  INTEGER;
+charinvcnmbr 	GLOBALPKG.STRING;
+/*  LB   08/08/95   If this stored proc changes, the stored proc of the same name
+                           on the Platinum database must also be modified   */
+/* added so all sp_updateinvcreditmemono procedures use same parameter list regardless of integration */
+/* added so all sp_updateinvcreditmemono procedures use same parameter list regardless of integration */
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   : Devdatta
+   Modified Date : 07/26/2001
+*/
+	IF  transtype = 'BC' THEN -- if credit memo
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   next_cm_doc
+			INTO numericinvcmnbr FROM arnumber;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE arnumber
+		SET next_cm_doc = next_cm_doc + 1;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   cm_doc_mask
+			INTO mask FROM arnumber;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END;
+
+ELSE --if invoice print
+	BEGIN
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   next_inv_doc
+			INTO numericinvcmnbr FROM arnumber;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+		StoO_error   := 0;
+		StoO_rowcnt  := 0;
+		UPDATE arnumber
+		SET next_inv_doc = next_inv_doc + 1;
+		StoO_rowcnt := SQL%ROWCOUNT;
+		EXCEPTION
+			WHEN NO_DATA_FOUND THEN
+				NULL;
+			WHEN OTHERS THEN
+				StoO_error := SQLCODE;
+				StoO_errmsg := SQLERRM;
+		END;
+
+		BEGIN
+			StoO_rowcnt := 0;
+			StoO_selcnt := 0;
+			StoO_error  := 0;
+			SELECT   inv_doc_mask
+			INTO mask FROM arnumber;
+			StoO_rowcnt := SQL%ROWCOUNT;
+			EXCEPTION
+				WHEN TOO_MANY_ROWS THEN
+					StoO_rowcnt := 2;
+				WHEN NO_DATA_FOUND THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+				WHEN OTHERS THEN
+					StoO_rowcnt := 0;
+					StoO_selcnt := 0;
+					StoO_error := SQLCODE;
+					StoO_errmsg := SQLERRM;
+		END;
+	END;
+	END IF;
+	charinvcnmbr :=  RPAD(numericinvcmnbr, 16, ' ');
+	masklength :=  LENGTHB(RTRIM(mask));
+	numlength :=  LENGTHB(RTRIM(charinvcnmbr));
+	zeropos :=  INSTR( mask, '0');
+	IF  zeropos &gt; 0 THEN
+	BEGIN
+		stuffpos :=  zeropos + ( masklength - ( zeropos - 1 ) - numlength );
+		IF  stuffpos &gt;= zeropos THEN
+      arinvcnmbr :=  RTRIM(CMN_REPLACE_FCT(mask,stuffpos, numlength, charinvcnmbr));
+    END IF;
+	END;
+	ELSE
+	BEGIN
+		poundpos :=  INSTR( mask, '#');
+		IF  poundpos &gt; 0 THEN
+		BEGIN
+			IF  ( masklength - poundpos + 1 ) &gt;= numlength THEN
+				arinvcnmbr :=  SUBSTR(mask, 1, poundpos - 1) || charinvcnmbr;
+			END IF;
+		END;
+		ELSE
+			arinvcnmbr :=  mask || charinvcnmbr;
+		END IF;
+	END;
+	END IF;
+END sp_updateinvcreditmemono;
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_summary_export" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Access Log Summary Export"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[select @SELECT:DIM:USER_DEF:IMPLIED:LOG:log_date:log_date@,
+@SELECT:METRIC:USER_DEF:IMPLIED:sum(view_count):VIEW_TOTAL@,
+@SELECT:METRIC:USER_DEF:IMPLIED:CASE sum(VIEW_COUNT) WHEN 0 THEN 0 ELSE round((avg(avg_resp)*sum(view_count)/sum(view_count)/1000),2) END:AVG_RESP@,
+@SELECT:METRIC:USER_DEF:IMPLIED:CASE sum(SOAP_VIEW_COUNT) WHEN 0 THEN 0 ELSE round((avg(avg_soap_resp)*sum(soap_view_count)/sum(soap_view_count)/1000),2) END:AVG_SOAP_RESP@,
+@SELECT:METRIC:USER_DEF:IMPLIED:SUM(SOAP_VIEW_COUNT):XOG_TOTAL@,
+@SELECT:METRIC:USER_DEF:IMPLIED:SUM(SESSION_COUNT):UNIQ_SESSION_COUNT@
+FROM LOG_SUMMARY
+WHERE ENVIRONMENT = @WHERE:PARAM:USER_DEF:STRING:env@
+AND LOG_DATE BETWEEN CAST(@WHERE:PARAM:USER_DEF:DATE:start_date@ AS DATE) AND
+CAST(@WHERE:PARAM:USER_DEF:DATE:end_date@ AS DATE)
+AND @FILTER@
+GROUP BY LOG_DATE]]></nsql>
+            <attribute id="log_date" required="false"/>
+            <attribute id="view_total" required="false"/>
+            <attribute id="avg_resp" required="false"/>
+            <attribute id="avg_soap_resp" required="false"/>
+            <attribute id="xog_total" required="false"/>
+            <attribute id="uniq_session_count" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_end_date" required="false"/>
+            <attribute id="param_start_date" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

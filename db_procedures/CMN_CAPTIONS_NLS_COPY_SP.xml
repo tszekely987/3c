@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>CMN_CAPTIONS_NLS_COPY_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."CMN_CAPTIONS_NLS_COPY_SP" (
+   p_copy_from_table          		in   varchar2,
+   p_copy_from_pk_id          		in   number,
+   p_copy_to_table          			in   varchar2,
+   p_copy_to_pk_id          			in   number
+)
+is
+	v_cnt                         integer := 0;
+	v_cnt_target                  integer := 0;
+
+	type t_name	is table of cmn_captions_nls.name%type;
+	type t_desc	is table of cmn_captions_nls.description%type;
+	type t_lang	is table of cmn_captions_nls.language_code%type;
+
+	v_name 											t_name;
+	v_desc 											t_desc;
+	v_lang 											t_lang;
+
+	cursor c_captions_to_add
+	is
+		select   name, description, language_code
+		from     cmn_captions_nls
+		where    table_name = p_copy_from_table 
+		and      pk_id 			= p_copy_from_pk_id;
+
+begin
+	--
+	--	Ensure we have valid params
+	--
+   select   count (*)
+   into     v_cnt
+   from     cmn_captions_nls
+   where    table_name 	= p_copy_from_table
+   and			pk_id 			= p_copy_from_pk_id;
+   select   count (*)
+   into     v_cnt_target
+   from     cmn_captions_nls
+   where    table_name 	= p_copy_to_table
+   and			pk_id 			= p_copy_to_pk_id;
+
+   if ( v_cnt &gt; 0 )
+   then
+			open c_captions_to_add;
+
+			loop
+				fetch c_captions_to_add bulk collect into v_name,
+																									v_desc,
+																									v_lang;
+				exit when c_captions_to_add%notfound;
+			end loop;
+
+			close c_captions_to_add;
+
+			if ( v_cnt_target = 0 ) then
+				forall j in v_name.first .. v_name.last
+					insert into cmn_captions_nls
+							(
+								 id, name, description, language_code,
+								 table_name, pk_id,
+								 created_date, created_by, last_updated_date, last_updated_by
+							)
+					select cmn_captions_nls_s1.nextval, v_name(j), v_desc(j), v_lang(j),
+								 p_copy_to_table, p_copy_to_pk_id,
+								 sysdate, 1, sysdate, 1
+					from 	 dual;
+			else
+				forall j in v_name.first .. v_name.last
+					update 	cmn_captions_nls
+					set    	name = v_name(j), description = v_desc(j),
+									last_updated_date = sysdate, last_updated_by = 1
+					where 	language_code = v_lang(j)
+					and			table_name 		= p_copy_to_table
+					and 		pk_id 				= p_copy_to_pk_id;
+			end if;
+
+			commit;
+
+   else
+      raise_application_error (-20000, 'RECORD DOES NOT EXIST');
+   end if;
+end;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

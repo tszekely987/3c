@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query code="log_clstr_avg_resp_host" isUserPortletAvailable="1" source="customer">
+            
+            
+            
+            
+            <nls languageCode="en" name="Cluster avg response by host"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT   @SELECT:DIM:USER_DEF:IMPLIED:LOGS:Z.HOST_NAME:HOST_NAME@,
+         @SELECT:DIM_PROP:USER_DEF:IMPLIED:LOGS:Z.REAL_HOST_NAME:REAL_HOST_NAME@,
+         @SELECT:DIM:USER_DEF:IMPLIED:TIME:Z.LOG_HOUR:HOUR@,
+         @SELECT:METRIC:USER_DEF:IMPLIED:AVG_RESP:AVG_RESPONSE@
+          FROM
+          ( SELECT HOST_NAME@+@' ('@+@TZ_OFFSET@+@')' HOST_NAME,
+                   HOST_NAME REAL_HOST_NAME,
+                   LOG_HOUR - @DBUSER@.LOG_TIMEZONE_DIFF_FCT(@WHERE:PARAM:USER_ID@)/24 LOG_HOUR,
+                   ROUND(AVG_RESP/1000,4) AVG_RESP
+            FROM
+            LOG_SUMMARY
+            WHERE LOG_DATE=@WHERE:PARAM:USER_DEF:DATE:log_date@
+            AND (@WHERE:PARAM:USER_DEF:STRING:hostname@ IS NULL OR @WHERE:PARAM:USER_DEF:STRING:hostname@=HOST_NAME)
+            AND @WHERE:PARAM:USER_DEF:STRING:env@=ENVIRONMENT
+          ) Z
+          WHERE @FILTER@]]></nsql>
+            <attribute id="host_name" required="false"/>
+            <attribute id="real_host_name" required="false"/>
+            <attribute id="hour" required="false"/>
+            <attribute id="avg_response" required="false"/>
+            <attribute id="param_env" lookup="LOG_ACCESS_LOG_ENVS" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_env"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_log_date" required="false"/>
+            <attribute id="param_hostname" lookup="LOG_ACCESS_LOGS_HOST" required="false">
+              
+              
+              
+              
+              <nls languageCode="en" name="param_hostname"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="log_clstr_view_hr_drill" code="log_hour">
+                
+                
+                
+                
+                <nls languageCode="en" name="log_hour"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="real_host_name" dataSource="data" paramCode="hostname"/>
+                <linkParam dataRef="hour" dataSource="data" paramCode="log_hour"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

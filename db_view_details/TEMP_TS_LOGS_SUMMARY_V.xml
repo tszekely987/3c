@@ -1,0 +1,14 @@
+<ClarityDBViewQuery>
+  <QueryResult code="TEMP_TS_LOGS_SUMMARY_V">
+    <indexes/>
+    <text_length>554</text_length>
+    <text>with report as (
+select job_run_id, phase, field_num, field_name, operation, min(start_date) start_date, max( batch_num ) batches, round( sum(seconds), 3) seconds, round( sum(seconds)/60.0,3 ) minutes, round( sum(seconds)/3600.0,3 ) hours
+  from temp_ts_logs_v
+ group by job_run_id, phase, field_num, field_name, operation
+ order by job_run_id, phase, field_num
+)
+select "JOB_RUN_ID","PHASE","FIELD_NUM","FIELD_NAME","OPERATION","START_DATE","BATCHES","SECONDS","MINUTES","HOURS" from report
+where job_run_id = (select max(job_run_id) from temp_ts_logs )</text>
+  </QueryResult>
+</ClarityDBViewQuery>

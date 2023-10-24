@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="RESOURCE" code="rqrmnt.requirementsByPriority" isUserPortletAvailable="1" source="niku.com">
+            
+            
+            
+            
+            <nls description="Requirements by Priority Graph Query" languageCode="en" name="Requirements by Priority"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @SELECT:DIM:USER_DEF:IMPLIED:THEME:Priority:PRIORITY_1@,
+          @SELECT:METRIC:USER_DEF:IMPLIED:Counts:COUNTS:COUNTS@
+FROM (SELECT count(bps.ID) COUNTS , cmn_lookups_v.Name PRIORITY
+FROM cmn_lookups, odf_mappings, cmn_lookups_v
+,(SELECT id, ((rqp_requirements.PRIORITY_1 + rqp_requirements.PRIORITY_2 + rqp_requirements.PRIORITY_3 + rqp_requirements.PRIORITY_4) / 4.000000) bpval FROM rqp_requirements
+    WHERE RQP_REQUIREMENTS.RELEASE_ID = @where:param:xml:integer:/data/id/@value@) bps
+WHERE cmn_lookups.LOOKUP_TYPE= 'ODF.OBJECT.REQUIREMENT.RQP_REQ_PRIORITY'
+     and cmn_lookups.LOOKUP_CODE= odf_mappings.MAPPING_CODE
+     and odf_mappings.TYPE_CODE= cmn_lookups_v.LOOKUP_CODE
+     and cmn_lookups_v.language_code = @WHERE:PARAM:LANGUAGE@
+     and cmn_lookups_v.lookup_type = 'ODF_IMAGES'
+     and bps.bpval between odf_mappings.LO and odf_mappings.HI
+group by cmn_lookups_v.Name
+) reqInfo
+WHERE @FILTER@]]></nsql>
+            <attribute id="priority_1" required="false"/>
+            <attribute id="counts" required="false"/>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

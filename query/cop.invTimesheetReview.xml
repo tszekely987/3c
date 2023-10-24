@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><NikuDataBus xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../xsd/nikuxog_contentPack.xsd">
+      <Header action="write" externalSource="NIKU" objectType="contentPack" version="16.1.1.1485"/>
+      <contentPack update="true">
+        <queries update="true">
+          <query category="PRODUCTIVITY" code="cop.invTimesheetReview" isUserPortletAvailable="1" source="csk.niku.com">
+            
+            
+            
+            
+            <nls description="Investment Timesheet Summary" languageCode="en" name="Investment Timesheet Summary"/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <nsql dbId="Niku" dbVendor="all"><![CDATA[SELECT @select:dim:user_def:implied:timesheet:inv.id:investment_int_id@,
+       @select:dim_prop:user_def:implied:timesheet:inv.code:investment_id@,
+       @select:dim_prop:user_def:implied:timesheet:inv.name:investment_name@,
+       @select:dim_prop:user_def:implied:timesheet:inv.odf_object_code:investment_type@,         
+       @select:dim_prop:user_def:implied:timesheet:@UPPER@(inv.odf_object_code):investment_type_upper@,
+       @select:dim_prop:user_def:implied:timesheet:inv.manager_id:investment_manager_int_id@,
+       @select:dim_prop:user_def:implied:timesheet:u.full_name:investment_manager@,
+       @select:metric:user_def:implied:SUM(CASE WHEN ts.prstatus > 3 THEN 0 ELSE @NVL@(te.practsum,0)/(CASE WHEN r.resource_type > 1 THEN 1 ELSE 3600 END) END):pending_actuals:AGG@,
+       @select:metric:user_def:implied:SUM(CASE WHEN ts.prstatus < 4 THEN 0 ELSE @NVL@(te.practsum,0)/(CASE WHEN r.resource_type > 1 THEN 1 ELSE 3600 END) END):posted_actuals:AGG@,
+       @select:metric:user_def:implied:SUM(@NVL@(te.practsum,0)/(CASE WHEN r.resource_type > 1 THEN 1 ELSE 3600 END)):total_actuals:AGG@
+
+FROM   INV_INVESTMENTS inv
+LEFT   OUTER JOIN SRM_RESOURCES u 
+             ON   inv.manager_id = u.user_id
+INNER  JOIN  PRTASK t 
+       ON    inv.id = t.prprojectid
+INNER  JOIN  PRASSIGNMENT a
+       ON    t.prid = a.prtaskid
+INNER  JOIN  SRM_RESOURCES r 
+       ON    a.prresourceid = r.id
+INNER  JOIN  PRTIMEENTRY te
+       ON    a.prid = te.prassignmentid
+INNER  JOIN  PRTIMESHEET ts
+       ON    te.prtimesheetid = ts.prid 
+       AND   ts.prstatus <> 5 -- Exclude adjusted timesheets
+INNER  JOIN  PRTIMEPERIOD tp
+       ON    ts.prtimeperiodid = tp.prid
+LEFT   OUTER JOIN (SELECT obs.record_id, obs.unit_id
+                   FROM   prj_obs_associations obs
+                          JOIN odf_objects odf ON odf.obs_code = obs.table_name
+                   WHERE  (odf.template_extension = 'inv_extension'
+                           OR odf.code IN ('application','asset','idea','other','product','project','service'))) assoc ON assoc.record_id = inv.id
+             AND  (( @WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NULL AND 1=2 ) OR ( @WHERE:PARAM:USER_DEF:INTEGER:OBS@ IS NOT NULL ))
+LEFT   OUTER JOIN prj_obs_units_flat flat
+             ON   flat.unit_id = assoc.unit_id		
+             AND  (( flat.branch_unit_id IS NULL ) OR (@WHERE:PARAM:USER_DEF:INTEGER:flat.branch_unit_id:OBS@ ))
+WHERE  inv.is_active <> 0
+AND    @WHERE:PARAM:USER_DEF:INTEGER:ts.prstatus:TIMESHEET_STATUS@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:tp.prid:TIME_PERIOD@
+AND    @WHERE:PARAM:USER_DEF:INTEGER:r.person_type:RESOURCE_TYPE@
+AND    @WHERE:SECURITY:INV:inv.id@
+AND    @FILTER@
+GROUP  BY inv.id, inv.code, inv.name, inv.odf_object_code, inv.manager_id, u.full_name
+HAVING  @HAVING_FILTER@]]></nsql>
+            <attribute id="investment_int_id" lookup="INV_BROWSE_INVESTMENT" required="false">
+              
+              
+              
+              
+              <nls description="Investment Filter" languageCode="en" name="Investment Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_id" required="false">
+              
+              
+              
+              
+              <nls description="Investment ID" languageCode="en" name="Investment ID"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_name" required="false">
+              
+              
+              
+              
+              <nls description="Investment" languageCode="en" name="Investment"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type" lookup="BROWSE_INV_EXTENDED_OBJECTS" required="false">
+              
+              
+              
+              
+              <nls description="Investment Type Filter" languageCode="en" name="Investment Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_type_upper" required="false">
+              
+              
+              
+              
+              <nls description="Investment Object Code Upper" languageCode="en" name="Investment Object Code Upper"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_manager_int_id" lookup="BROWSE_PROJMGR" required="false">
+              
+              
+              
+              
+              <nls description="Investment Manager Filter" languageCode="en" name="Investment Manager Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="investment_manager" required="false">
+              
+              
+              
+              
+              <nls description="Investment Manager" languageCode="en" name="Investment Manager"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="pending_actuals" required="false">
+              
+              
+              
+              
+              <nls description="Pending Actuals" languageCode="en" name="Pending Actuals"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="posted_actuals" required="false">
+              
+              
+              
+              
+              <nls description="Posted Actuals" languageCode="en" name="Posted Actuals"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="total_actuals" required="false">
+              
+              
+              
+              
+              <nls description="Total Actuals" languageCode="en" name="Total Actuals"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_obs" lookup="OBS_BROWSE_FLT_PRJ" required="false">
+              
+              
+              
+              
+              <nls description="Investment OBS Filter" languageCode="en" name="Investment OBS Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_timesheet_status" lookup="TIMESHEET_STATUS" required="false">
+              
+              
+              <nls description="Timesheet Status Filter" languageCode="en" name="Timesheet Status Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_time_period" lookup="COP_PORTLET_TIMESHEET_PERIOD" required="false">
+              
+              
+              
+              
+              <nls description="Time Period Filter" languageCode="en" name="Time Period Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <attribute id="param_resource_type" lookup="SRM_RESOURCE_TYPE" required="false">
+              
+              
+              
+              
+              
+              
+              
+              
+              <nls description="Employment Type Filter" languageCode="en" name="Employment Type Filter"/>
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+              
+            </attribute>
+            <links>
+              <link action="cop.page.tsDetailLinkable" code="Timesheet Review Drill Down">
+                
+                
+                
+                
+                <nls languageCode="en" name="Timesheet Review Drill Down"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="investment_int_id" dataSource="data" paramCode="id"/>
+              </link>
+              <link action="pma.investmentProperties" code="investmentProperties">
+                
+                
+                
+                
+                <nls description="Investment Properties" languageCode="en" name="Investment Properties"/>
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                <linkParam dataRef="/data/header/action/@id" dataSource="input" paramCode="return_to"/>
+                <linkParam dataRef="investment_type_upper" dataSource="data" paramCode="investment_code"/>
+                <linkParam dataRef="investment_int_id" dataSource="data" paramCode="id"/>
+              </link>
+            </links>
+          </query>
+        </queries>
+      </contentPack>
+    </NikuDataBus>

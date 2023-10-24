@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>PAC_MNT_VALIDATE_BUDGET_SP</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."PAC_MNT_VALIDATE_BUDGET_SP" (
+budgetratesourcelabor 	NUMBER ,
+budgetcostsourcelabor 	NUMBER ,
+budgetratelocationlabor 	NUMBER ,
+budgetrateoverridelabor 	NUMBER ,
+budgetcostsourcematerials 	NUMBER ,
+budgetratesourcematerials 	NUMBER ,
+budgetratelocationmaterials 	NUMBER ,
+budgetrateoverridematerials 	NUMBER ,
+budgetcostsourceequipment 	NUMBER ,
+budgetratesourceequipment 	NUMBER ,
+budgetratelocationequipment 	NUMBER ,
+budgetrateoverrideequipment 	NUMBER ,
+budgetlevellabor 	NUMBER ,
+budgetlevelmaterial 	NUMBER ,
+budgetlevelequipment 	NUMBER,
+retcode IN OUT NUMBER)
+AS
+StoO_selcnt	INTEGER;
+StoO_error 	INTEGER;
+StoO_rowcnt	INTEGER;
+StoO_crowcnt	INTEGER := 0;
+StoO_fetchstatus	INTEGER := 0;
+StoO_errmsg	GLOBALPKG.STRING;
+StoO_sqlstatus	INTEGER;
+BEGIN
+ /* Called From:
+     Procedure         :-
+     Trigger           :-
+     PMD TransactionId :-
+     WMD ActionId      :-
+   Modified By   :Nitin
+   Modified Date :07/25/01
+*/
+
+	PAC_MNT_VALIDATE_BUDGET_SP.retcode := 0;
+	IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetlevellabor IS NULL OR   PAC_MNT_VALIDATE_BUDGET_SP.budgetlevelmaterial IS NULL OR   PAC_MNT_VALIDATE_BUDGET_SP.budgetlevelequipment IS NULL THEN
+	BEGIN
+		PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+		raise_application_error(-20244, 'All the budget levels must be selected.');
+		RETURN ;
+	END;
+	END IF;
+	IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetlevellabor &gt; 2 THEN
+	BEGIN
+		IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratesourcelabor IS NULL THEN
+		BEGIN
+			PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+			raise_application_error(-20245, 'Rate source for labor cannot be empty if not budgeted to the PROJECT_CODE level .');
+			RETURN ;
+		END;
+		ELSE
+			IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetcostsourcelabor IS NULL THEN
+			BEGIN
+				PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+				raise_application_error(-20246, 'Cost source for labor cannot be empty if not budgeted to the PROJECT_CODE level.');
+				RETURN ;
+			END;
+			ELSE
+				IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratelocationlabor IS NULL THEN
+				BEGIN
+					PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+					raise_application_error(-20247, 'Cost and rate location for labor cannot be empty if not budgeted to the PROJECT_CODE level.');
+					RETURN ;
+				END;
+				END IF;
+				END IF;
+				END IF;
+		END;
+		END IF;
+		IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetlevelmaterial &gt; 2 THEN
+		BEGIN
+			IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratesourcematerials IS NULL THEN
+			BEGIN
+				PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+				raise_application_error(-20248, 'Rate source for material cannot be empty if not budgeted to the PROJECT_CODE level.');
+				RETURN ;
+			END;
+			ELSE
+				IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetcostsourcematerials IS NULL THEN
+				BEGIN
+					PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+					raise_application_error(-20249, 'Cost source for material cannot be empty if not budgeted to the PROJECT_CODE level.');
+					RETURN ;
+				END;
+				ELSE
+					IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratelocationmaterials IS NULL THEN
+					BEGIN
+						PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+						raise_application_error(-20250, 'Cost and rate location for material cannot be empty if not budgeted to the PROJECT_CODE level.');
+						RETURN ;
+					END;
+					END IF;
+					END IF;
+					END IF;
+			END;
+			END IF;
+			IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetlevelequipment &gt; 2 THEN
+			BEGIN
+				IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratesourceequipment IS NULL THEN
+				BEGIN
+					PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+					raise_application_error(-20251, 'Rate source for equipment cannot be empty if not budgeted to the PROJECT_CODE level.');
+					RETURN ;
+				END;
+				ELSE
+					IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetcostsourceequipment IS NULL THEN
+					BEGIN
+						PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+						raise_application_error(-20252, 'Cost source for equipment cannot be empty if not budgeted to the PROJECT_CODE level.');
+						RETURN ;
+					END;
+					ELSE
+						IF  PAC_MNT_VALIDATE_BUDGET_SP.budgetratelocationequipment IS NULL THEN
+						BEGIN
+							PAC_MNT_VALIDATE_BUDGET_SP.retcode := -1;
+							raise_application_error(-20253, 'Cost and rate location for equipment cannot be empty if not budgeted to the PROJECT_CODE level.');
+							RETURN ;
+						END;
+						END IF;
+						END IF;
+						END IF;
+				END;
+				END IF;
+				PAC_MNT_VALIDATE_BUDGET_SP.retcode := 0;
+				RETURN ;
+END PAC_MNT_VALIDATE_BUDGET_SP;
+/*
+  Modified By : Deva
+  Changes  	  :	Parameter retcode IN OUT NUMBER defined and initialized to 0
+  			   if procedure is success it will be 0
+			   in case of exception it will have value -1
+*/
+ 
+ 
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

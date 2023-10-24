@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_function</Code>
+      <Records>
+        <Record>
+          <code>CMN_LOOKUP_TYPE_CASE_FCT</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE FUNCTION "PPM"."CMN_LOOKUP_TYPE_CASE_FCT" 
+       (
+          pLookupTypeCode IN VARCHAR2
+       )
+      RETURN VARCHAR2 IS
+      vCorrectCaseLookupTypeCode VARCHAR2(100);
+      /******************************************************************************
+         NAME:       CMN_LOOKUP_TYPE_CASE_FCT
+         PURPOSE:    Return the lookup type in correct case. There are some seeded
+                     lookup types that must be allowed in mixed case since they are
+                     used in other places.
+                     This function MUST be kept in sync with
+                     com.niku.odf.lookup.LookupUtil#MIXED_CASE_LOOKUP_TYPES
+      ******************************************************************************/
+
+        BEGIN
+          CASE
+              WHEN UPPER(pLookupTypeCode)
+                                 IN ( 'PRASSIGNMENTPATTERN'
+                                    , 'PRCPMTYPE'
+                                    , 'PRCONSTRAINTTYPE'
+                                    , 'PRCUSTAGGTYPE'
+                                    , 'PRCUSTEXTTYPE'
+                                    , 'PRDEPENDENCYAMOUNTTYPE'
+                                    , 'PRDEPENDENCYTYPE'
+                                    , 'PREVTYPE'
+                                    , 'PRFORMAT'
+                                    , 'PRPLANTYPE'
+                                    , 'PRRESOURCEAVAILUNIT'
+                                    , 'PRRESOURCETYPE'
+                                    , 'PRRESOURCEUNIT'
+                                    , 'PRRESPONSE'
+                                    , 'PRSORT'
+                                    , 'PRTASKSTATUS'
+                                    , 'PRTEAMBOOKING'
+                                    , 'PRTEAMSTATUS'
+                                    , 'PRTIMESHEETSTATUS'
+                                    , 'PRTRACKMODE'
+                                    , 'PRTRACKSCALE'
+                                    , 'PRWBSLEVEL'
+                                    , 'PRWEEKSTART'
+                                     )
+                  then vCorrectCaseLookupTypeCode := pLookupTypeCode;
+              else
+                  vCorrectCaseLookupTypeCode := upper(pLookupTypeCode);
+          end case;
+
+          RETURN vCorrectCaseLookupTypeCode;
+
+          EXCEPTION
+               WHEN OTHERS THEN
+                 RAISE;
+
+        END CMN_LOOKUP_TYPE_CASE_FCT;
+ 
+ 
+ </definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>

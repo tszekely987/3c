@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><QueryResult xmlns="http://www.niku.com/xog/Query" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <Code>capture3c.get_db_procedure</Code>
+      <Records>
+        <Record>
+          <code>OBS_FROM_TYPE_AND_PATH</code>
+          <parallel>NO</parallel>
+          <definition>
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "PPM"."OBS_FROM_TYPE_AND_PATH" (
+  p_obs_type_name   varchar2 ,
+  p_obs_unit_path   varchar2 ,
+  p_obs_type_id     out number,
+  p_entity_id       out number,
+  p_obs_unit_id     out number
+)
+
+is
+  v_start_index     number;
+  v_end_index       number;   
+  v_obs_unit_path   varchar2(4000);
+  v_obs_unit_name   varchar2(4000);
+      
+begin
+
+  --
+  --  First do the easy part and get the type ID
+  --
+  select pot.id, e.id into p_obs_type_id, p_entity_id
+  from   prj_obs_types pot left outer join entity e on pot.id = e.org_chart_obs_type_id
+  where  pot.unique_name = p_obs_type_name;
+  
+  --
+  --  Strip the leading slash
+  --
+  v_obs_unit_path := p_obs_unit_path;
+  v_start_index := instr( v_obs_unit_path, '/' ); 
+  if( v_start_index = 1 ) then
+    v_obs_unit_path := substr( v_obs_unit_path, 2 );
+  end if;
+  
+  v_end_index := instr( v_obs_unit_path, '/' );
+  
+  --
+  --  No more slashes means we're done
+  --
+  if( v_end_index != 0 ) then
+    v_obs_unit_name := substr( v_obs_unit_path, 1, v_end_index - 1);
+  else
+    v_obs_unit_name := v_obs_unit_path;
+  end if;
+  
+  select id into p_obs_unit_id
+  from   prj_obs_units
+  where  name = v_obs_unit_name
+  and    type_id = p_obs_type_id
+  and    parent_id is null;
+
+  v_start_index := v_start_index + v_end_index;
+
+  --
+  --  Loop until we've parsed the whole string
+  --
+  while( v_end_index != 0 )
+  loop
+    v_end_index := instr( v_obs_unit_path, '/', v_start_index ); 
+    
+    if( v_end_index != 0 ) then
+      v_obs_unit_name := substr( v_obs_unit_path, v_start_index, v_end_index - v_start_index );
+    else
+      v_obs_unit_name := substr( v_obs_unit_path, v_start_index );
+    end if;
+
+    select id into p_obs_unit_id
+    from   prj_obs_units
+    where  name = v_obs_unit_name
+    and    type_id = p_obs_type_id
+    and    parent_id = p_obs_unit_id;
+
+    v_start_index := v_end_index + 1;
+
+  end loop;
+
+  exception
+    when no_data_found then
+    begin
+      p_obs_type_id := null;
+      p_obs_unit_id := null;
+    end;
+  
+end;</definition>
+        </Record>
+      </Records>
+      <Slice>
+        <Number>0</Number>
+        <Size>1</Size>
+        <Total>1</Total>
+      </Slice>
+    </QueryResult>
